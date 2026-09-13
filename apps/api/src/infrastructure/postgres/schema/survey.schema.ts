@@ -184,3 +184,8 @@ export const surveyAnswers = pgTable("survey_answers", {
   index("survey_answers_response_idx").on(table.responseId),
   index("survey_answers_question_idx").on(table.questionId),
 ]);
+
+export const surveyResponseSubscriptions = pgTable("survey_response_subscription", {
+  surveyId: uuid("survey_id").notNull().references(() => surveys.surveyId, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+}, table => [uniqueIndex("survey_response_subscription_unique").on(table.surveyId, table.userId)]);

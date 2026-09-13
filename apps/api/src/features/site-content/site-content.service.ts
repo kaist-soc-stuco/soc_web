@@ -17,6 +17,31 @@ interface AuditMetadata {
   ipAddress?: string | null;
 }
 
+const SINGLETON_CONTENT_BLOCK_TYPES = new Set<ContentBlockRecord["type"]>([
+  "HERO",
+  "LOGO",
+  "TOP_BANNER",
+  "QUICK_LINK",
+  "ORGANIZATION_CHART",
+]);
+
+const singletonConflictCode = (type: ContentBlockRecord["type"]): string => {
+  switch (type) {
+    case "HERO":
+      return "hero_already_exists";
+    case "LOGO":
+      return "logo_already_exists";
+    case "TOP_BANNER":
+      return "top_banner_already_exists";
+    case "QUICK_LINK":
+      return "quick_link_already_exists";
+    case "ORGANIZATION_CHART":
+      return "organization_chart_already_exists";
+    default:
+      return "content_block_already_exists";
+  }
+};
+
 const toPublicRecord = ({
   key,
   updatedAt,
@@ -102,17 +127,13 @@ export class SiteContentService {
     if (input.type === "LOGO" && !input.imageUrl) {
       throw new BadRequestException("logo_image_required");
     }
-    if (input.type === "LOGO") {
-      const existing = await this.siteContentRepository.listContentBlocks();
-      if (existing.some((block) => block.type === "LOGO")) {
-        throw new ConflictException("logo_already_exists");
-      }
+    if (input.type === "ORGANIZATION_CHART" && !input.imageUrl) {
+      throw new BadRequestException("organization_chart_image_required");
     }
-    if (input.type === "ORGANIZATION_CHART") {
-      if (!input.imageUrl) throw new BadRequestException("organization_chart_image_required");
+    if (SINGLETON_CONTENT_BLOCK_TYPES.has(input.type)) {
       const existing = await this.siteContentRepository.listContentBlocks();
-      if (existing.some((block) => block.type === "ORGANIZATION_CHART")) {
-        throw new ConflictException("organization_chart_already_exists");
+      if (existing.some((block) => block.type === input.type)) {
+        throw new ConflictException(singletonConflictCode(input.type));
       }
     }
     const after = await this.siteContentRepository.createContentBlock(input, audit.actorUserId);
@@ -135,22 +156,10 @@ export class SiteContentService {
     const before = await this.siteContentRepository.findContentBlockById(contentBlockId);
     if (!before) throw new NotFoundException("content_block_not_found");
     const nextType = input.type ?? before.type;
-    if (nextType === "LOGO") {
+    if (SINGLETON_CONTENT_BLOCK_TYPES.has(nextType)) {
       const existing = await this.siteContentRepository.listContentBlocks();
-      if (existing.some((block) =>
-        block.contentBlockId !== contentBlockId &&
-        block.type === "LOGO",
-      )) {
-        throw new ConflictException("logo_already_exists");
-      }
-    }
-    if (nextType === "ORGANIZATION_CHART") {
-      const existing = await this.siteContentRepository.listContentBlocks();
-      if (existing.some((block) =>
-        block.contentBlockId !== contentBlockId &&
-        block.type === "ORGANIZATION_CHART",
-      )) {
-        throw new ConflictException("organization_chart_already_exists");
+      if (existing.some((block) => block.contentBlockId !== contentBlockId && block.type === nextType)) {
+        throw new ConflictException(singletonConflictCode(nextType));
       }
     }
     const after = await this.siteContentRepository.updateContentBlock(contentBlockId, input, audit.actorUserId);

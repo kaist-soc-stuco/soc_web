@@ -443,7 +443,7 @@ type ReferenceAboutWorkContentSeed = {
     | "about.organization.description"
     | "about.partnership.description"
     | "about.partnership.cta";
-  legacyKo: string;
+  legacyKo: string | readonly string[];
   valueKo: string;
   valueEn: string;
 };
@@ -456,8 +456,11 @@ type ReferenceAboutWorkContentSeed = {
 const REFERENCE_ABOUT_WORK_CONTENT_SEEDS: readonly ReferenceAboutWorkContentSeed[] = [
   {
     key: "about.hero.description",
-    legacyKo: "KAIST 전산학부 학부생을 대표하는 학생자치기구 집행위원회입니다.",
-    valueKo: "전산학부 학우들을 위한 사업을 기획하고 진행하는 학생자치기구, 집행위원회입니다.",
+    legacyKo: [
+      "KAIST 전산학부 학부생을 대표하는 학생자치기구 집행위원회입니다.",
+      "전산학부 학우들을 위한 사업을 기획하고 진행하는 학생자치기구, 집행위원회입니다.",
+    ],
+    valueKo: "전산학부 학우들을 위한 사업을 기획하고 집행하는 학생자치기구, 전산학부 집행위원회입니다.",
     valueEn: "The SoC Student Council plans and runs programs for students in KAIST's School of Computing.",
   },
   {
@@ -896,7 +899,7 @@ type QuestionSeed = {
 };
 
 type SurveySeed = {
-  kind: "APPLICATION" | "SURVEY";
+  kind: "SURVEY";
   titleKo: string;
   titleEn: string;
   descriptionKo: string;
@@ -923,7 +926,7 @@ type OperationalSurveySeed = {
   sectionId: string;
   sectionTitleKo: string;
   sectionTitleEn: string;
-  kind: "APPLICATION";
+  kind: "SURVEY";
   titleKo: string;
   titleEn: string;
   descriptionKo: string;
@@ -941,7 +944,7 @@ const OPERATIONAL_SURVEY_SEEDS: OperationalSurveySeed[] = [
     sectionId: "7a120000-0000-4000-8000-000000000001",
     sectionTitleKo: "신청 정보",
     sectionTitleEn: "Application details",
-    kind: "APPLICATION",
+    kind: "SURVEY",
     titleKo: "전산학부 학번톡 초대 요청",
     titleEn: "SoC Cohort Chat Invitation Request",
     descriptionKo: "전산학부 주전공 학생의 학번별 카카오톡 대화방 초대를 요청합니다.",
@@ -982,7 +985,7 @@ const OPERATIONAL_SURVEY_SEEDS: OperationalSurveySeed[] = [
     sectionId: "7a120000-0000-4000-8000-000000000002",
     sectionTitleKo: "신청 정보",
     sectionTitleEn: "Application details",
-    kind: "APPLICATION",
+    kind: "SURVEY",
     titleKo: "학부 내 행사·동아리 홍보글 게시 요청",
     titleEn: "SoC Event or Club Promotion Post Request",
     descriptionKo: "전산학부 구성원을 대상으로 하는 행사·동아리 홍보글 게시를 요청합니다.",
@@ -1105,7 +1108,7 @@ function makeSimpleEventSurvey(input: {
   maxResponseCount?: number;
 }): SurveySeed {
   return {
-    kind: "APPLICATION",
+    kind: "SURVEY",
     titleKo: input.titleKo,
     titleEn: input.titleEn,
     descriptionKo: input.descriptionKo,
@@ -1934,7 +1937,8 @@ async function seedReferenceAboutWorkContent() {
 
   for (const seed of REFERENCE_ABOUT_WORK_CONTENT_SEEDS) {
     const current = existingByKey.get(seed.key);
-    if (current && current.valueKo !== seed.legacyKo) continue;
+    const legacyValues = Array.isArray(seed.legacyKo) ? seed.legacyKo : [seed.legacyKo];
+    if (current && !legacyValues.includes(current.valueKo)) continue;
 
     await db
       .insert(siteContents)
@@ -2192,6 +2196,8 @@ async function createSeedVote(
       endsAt: definition.endsAt,
       academicStatuses: [],
       feePayersOnly: false,
+      quorumPercent: 50,
+      quorumInclusive: true,
       encryptedBallotKey: wrappedVoteKey.ciphertext,
       keyIv: wrappedVoteKey.iv,
       keyTag: wrappedVoteKey.authTag,
@@ -2888,7 +2894,7 @@ async function seedMockData() {
         accentDark: "#005f3a",
       }),
       survey: {
-        kind: "APPLICATION",
+        kind: "SURVEY",
         titleKo: "전산인의 밤 참가 신청",
         titleEn: "SoC Night Registration",
         descriptionKo: "참석 인원과 식사 준비를 위해 사전 신청을 받습니다. 신청 후 일정이 바뀌면 마감 전까지 응답을 수정할 수 있습니다.",
@@ -2978,7 +2984,7 @@ async function seedMockData() {
         accentDark: "#115e59",
       }),
       survey: {
-        kind: "APPLICATION",
+        kind: "SURVEY",
         titleKo: "기말고사 간식 배부 신청",
         titleEn: "Final Exam Snack Pickup Registration",
         descriptionKo: "간식 수량과 수령 시간을 조정하기 위한 신청 설문입니다. 신청은 1인 1회만 가능하며, 마감 전까지 응답을 수정할 수 있습니다.",
@@ -3067,7 +3073,7 @@ async function seedMockData() {
         accentDark: "#0e7490",
       }),
       survey: {
-        kind: "APPLICATION",
+        kind: "SURVEY",
         titleKo: "여름 개발 워크숍 참가 신청",
         titleEn: "Summer Development Workshop Registration",
         descriptionKo: "워크숍 팀 구성과 멘토 배정을 위해 관심 트랙과 개발 경험을 확인합니다. 신청 후 마감 전까지 응답을 수정할 수 있습니다.",
@@ -3156,7 +3162,7 @@ async function seedMockData() {
         accentDark: "#5b21b6",
       }),
       survey: {
-        kind: "APPLICATION",
+        kind: "SURVEY",
         titleKo: "가을 MT 사전 수요조사",
         titleEn: "Fall MT Preliminary Demand Survey",
         descriptionKo: "참여 의향과 선호 일정을 확인하기 위한 사전 조사입니다. 실제 참가 신청은 추후 별도 공지됩니다.",
@@ -3378,7 +3384,25 @@ async function seedMockData() {
   console.log("Seeded one survey containing every question type");
 
   await seedVotes(seedAuthor.userId);
+  await seedOngoingVote();
 }
+
+async function seedOngoingVote() {
+  const title = "[데모] 학생회 사업 추진 찬반 투표";
+  if ((await db.select().from(votes).where(eq(votes.titleKo, title))).length) return;
+  const [admin] = await db.select().from(users).where(eq(users.kaistUid, "DEV0001"));
+  if (!admin) throw new Error("Development admin is required");
+  await createSeedVote(admin.userId, admin, {
+    titleKo: title, titleEn: "Student council initiative vote",
+    descriptionKo: "로컬 테스트용 투표입니다.", descriptionEn: "Local demonstration election.",
+    startsAt: new Date(Date.now() - 86400000), endsAt: new Date(Date.now() + 7 * 86400000),
+    items: [{titleKo: "학생회 사업 추진 승인", titleEn: "Approve the student council initiative", descriptionKo: null, descriptionEn: null,
+      type: "YES_NO_ABSTAIN", maxSelections: 1, options: [
+        {labelKo: "찬성", labelEn: "Yes"}, {labelKo: "반대", labelEn: "No"}, {labelKo: "기권", labelEn: "Abstain"}
+      ]}]
+  });
+}
+
 async function main() {
   const seedMode = process.env.SEED_MODE ??
     (process.env.NODE_ENV === "production" ? "reference" : "demo");
@@ -3392,6 +3416,11 @@ async function main() {
   console.log("Using database:", DATABASE_URL.replace(/:[^:@]+@/, ":****@"));
   console.log("Seed mode:", seedMode);
   try {
+    if (process.env.SEED_VOTES_ONLY === "true") {
+      if (process.env.NODE_ENV === "production") throw new Error("demo_seed_is_forbidden_in_production");
+      await seedOngoingVote();
+      return;
+    }
     await seedPermissions();
     await seedInitialAdminRole();
     await seedBoards();

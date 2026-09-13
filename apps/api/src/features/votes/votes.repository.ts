@@ -1,3 +1,4 @@
+import { meetsVoteQuorum } from "@soc/shared";
 import { BadRequestException, ConflictException, Inject, Injectable } from "@nestjs/common";
 import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { CreateVoteRequest, UpdateVoteRequest, VoteVoterRecord } from "@soc/contracts";
@@ -312,8 +313,7 @@ export class VotesRepository {
       const [existing] = await tx.select().from(voteTallies).where(eq(voteTallies.voteId, id));
       if (existing) return existing;
       const counts = await this.counts(id, tx);
-      if (vote.quorumPercent !== null && (counts.eligibleCount === 0 ||
-        (vote.quorumInclusive ? counts.votedCount * 100 < counts.eligibleCount * vote.quorumPercent : counts.votedCount * 100 <= counts.eligibleCount * vote.quorumPercent))) {
+      if (!meetsVoteQuorum(counts.eligibleCount, counts.votedCount, vote.quorumPercent, vote.quorumInclusive)) {
         throw new ConflictException("vote_quorum_not_met");
       }
       if (totalBallots !== counts.votedCount) throw new ConflictException("vote_ballot_count_mismatch");

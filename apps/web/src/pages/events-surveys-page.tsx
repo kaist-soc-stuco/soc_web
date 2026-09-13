@@ -166,11 +166,11 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
             </div>
           ) : error ? (
             <div
-              className="flex flex-col items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-5 text-sm font-medium text-red-700 sm:flex-row sm:items-center"
+              className="mx-auto my-12 flex min-h-[45vh] w-full max-w-lg flex-col items-center justify-center gap-5 rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600"
               role="alert"
             >
-              <AlertCircle className="h-5 w-5 shrink-0" />
-              <span className="min-w-0 flex-1">{error}</span>
+              <AlertCircle className="h-12 w-12 shrink-0 text-slate-400" />
+              <span className="min-w-0">{error}</span>
               <Button
                 className="min-h-11 shrink-0"
                 onClick={retry}

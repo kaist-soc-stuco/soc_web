@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from "@nestjs/common";
@@ -15,7 +16,8 @@ import { SurveyQuestionsRepository } from "./survey-questions.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
 
 
-import { OPERATIONAL_SURVEY_IDS } from "@soc/contracts";
+import { EmailDeliveryService } from "../email/email-delivery.service";
+import { Permissions, OPERATIONAL_SURVEY_IDS } from "@soc/contracts";
 import type { ResponseDetailResponse } from "@soc/contracts";
 import type { SurveyAnswerRecord } from "./entities/survey-answer.entity";
 import type { SurveyResponseRecord } from "./entities/survey-response.entity";
@@ -45,7 +47,42 @@ export class SurveyResponsesService {
     @Optional() private readonly assetRepository?: AssetRepository,
     @Optional() private readonly surveySheetsService?: GoogleSurveySheetsService,
     @Optional() private readonly auditLogService?: AuditLogService,
+    @Optional() private readonly emailDeliveryService?: EmailDeliveryService,
   ) {}
+
+  private readonly logger = new Logger(SurveyResponsesService.name);
+
+  async getEmailSubscription(surveyId: string, userId: string) {
+    if (!await this.surveysRepo.findById(surveyId)) throw new NotFoundException("survey_not_found");
+    return this.responsesRepo.getEmailSubscription(surveyId, userId);
+  }
+
+  async setEmailSubscription(surveyId: string, userId: string, enabled: boolean) {
+    if (!await this.surveysRepo.findById(surveyId)) throw new NotFoundException("survey_not_found");
+    return this.responsesRepo.setEmailSubscription(surveyId, userId, enabled);
+  }
+
+  async deleteAll(surveyId: string, actorUserId: string) {
+    if (!await this.surveysRepo.findById(surveyId)) throw new NotFoundException("survey_not_found");
+    const result = await this.responsesRepo.deleteAllResponses(surveyId);
+    await this.auditLogService?.record({ action: "survey_response.delete_all", actorUserId, targetId: surveyId, targetType: "survey", payload: result });
+    await this.surveySheetsService?.enqueueRefresh(surveyId);
+    return result;
+  }
+
+  private async notifyNewResponse(surveyId: string, title: string) {
+    if (!this.emailDeliveryService) return;
+    try {
+      const subscribers = await this.responsesRepo.getEmailSubscribers(surveyId);
+      for (const subscriber of subscribers) {
+        const permission = await this.usersService.resolvePermissionBitmaskByUserId(subscriber.userId);
+        if (!Permissions.has(permission, Permissions.MANAGE_SURVEY)) continue;
+        try {
+          await this.emailDeliveryService.send({ recipients: [subscriber.email], subject: "새로운 설문 응답이 등록되었습니다", content: `"${title.replace(/<[^>]*>/g, "")}" 설문에 새로운 응답이 등록되었습니다. 관리자 대시보드의 설문 응답 탭에서 확인해 주세요.` });
+        } catch { this.logger.warn("survey_response_email_delivery_failed"); }
+      }
+    } catch { this.logger.warn("survey_response_email_notification_failed"); }
+  }
 
   private async validateUploadedAssets(
     answers: SubmitResponseDto["answers"],
@@ -212,6 +249,7 @@ export class SurveyResponsesService {
       },
     });
     await this.surveySheetsService?.enqueueRefresh(surveyId);
+    void this.notifyNewResponse(surveyId, survey.titleKo);
     return { ...submission.response, answers: submission.answers };
   }
 

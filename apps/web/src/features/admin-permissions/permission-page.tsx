@@ -7,7 +7,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableEmpty, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
-import { AdminCard, AdminCardHeader, AdminFormField, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSearchField, AdminSectionTitle } from "@/components/ui/admin-page";
+import { AdminCard, AdminCardHeader, AdminFormField, AdminLoadingState, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSearchField, AdminSectionTitle } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { Button } from "@/components/ui/button";
@@ -333,7 +333,7 @@ export function PermissionPage() {
               </AdminCardHeader>
               <div className="border-b border-slate-100 p-3"><AdminSearchField aria-label="역할 검색" placeholder="역할 검색" value={roleQuery} onValueChange={setRoleQuery} /></div>
               <div className="scrollbar-hidden max-h-[560px] overflow-y-auto p-2">
-                {loading && roles.length === 0 ? null
+                {loading && roles.length === 0 ? <AdminLoadingState className="min-h-24 px-2 py-6" />
                   : filteredRoles.length === 0 ? <p className="px-3 py-10 text-center text-sm font-normal text-[#344054]">검색 결과가 없습니다.</p>
                   : <div className="grid gap-1" role="listbox" aria-label="역할 목록">{filteredRoles.map((role) => {
                       const selected = role.roleGroupId === selectedRoleId;
@@ -404,7 +404,7 @@ export function PermissionPage() {
                 <div className={cn("transition-opacity duration-150", membersLoading ? "opacity-60" : "opacity-100")} aria-busy={membersLoading}>
                 <AdminDataTable minWidth={820}><colgroup><col style={{ width: 220 }} /><col style={{ width: 140 }} /><col style={{ width: 240 }} /><col style={{ width: 140 }} /><col style={{ width: 72 }} /></colgroup><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>학번</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>부여일</AdminTableHead><AdminTableHead className="text-right">작업</AdminTableHead></tr></AdminTableHeader><AdminTableBody>
                   {members.length === 0 ? <AdminTableEmpty colSpan={5}>이 역할에 지정된 구성원이 없습니다.</AdminTableEmpty>
-                    : members.map((member) => <tr key={member.userId}><AdminTableCell truncate className="admin-table-text-emphasis">{member.nameKo}</AdminTableCell><AdminTableCell truncate>{member.stdNo ?? member.kaistUid}</AdminTableCell><AdminTableCell truncate>{member.email}</AdminTableCell><AdminTableCell truncate>{formatDate(member.grantedAt)}</AdminTableCell><AdminTableCell className="text-right"><Button type="button" variant="ghost" size="icon" aria-label={`${member.nameKo} 제외`} title="제외" className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => void removeMember(member.userId)} disabled={candidateSaving}><Trash2 aria-hidden="true" className="size-4" /></Button></AdminTableCell></tr>)}
+                    : members.map((member) => <tr key={member.userId}><AdminTableCell truncate className="admin-table-text-emphasis">{member.nameKo}</AdminTableCell><AdminTableCell truncate>{member.stdNo ?? member.kaistUid}</AdminTableCell><AdminTableCell truncate>{member.email}</AdminTableCell><AdminTableCell truncate>{formatDate(member.grantedAt)}</AdminTableCell><AdminTableCell className="text-right"><Button type="button" variant="ghost" size="icon" aria-label={`${member.nameKo} 제외`} data-tooltip="구성원 제외" className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => void removeMember(member.userId)} disabled={candidateSaving}><Trash2 aria-hidden="true" className="size-4" /></Button></AdminTableCell></tr>)}
                 </AdminTableBody></AdminDataTable>
                 </div>
               </div>}

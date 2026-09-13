@@ -1,5 +1,6 @@
 import { sanitizeForDisplay } from "./rich-text-content";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   Bold,
   Italic,
@@ -10,6 +11,7 @@ import {
   Underline,
 } from "lucide-react";
 
+import { EditorLinkDialog, EditorLinkPopover, type EditorLinkPreview } from "./editor-link";
 import { cn } from "@/lib/utils";
 
 type RichTextInputProps = {
@@ -20,6 +22,7 @@ type RichTextInputProps = {
   disabled?: boolean;
   singleLine?: boolean;
   className?: string;
+  inputClassName?: string;
 };
 
 const TOOLBAR_ITEMS = [
@@ -41,7 +44,9 @@ export function RichTextInput({
   disabled = false,
   singleLine = false,
   className,
+  inputClassName,
 }: RichTextInputProps) {
+  const [focused, setFocused] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -64,15 +69,45 @@ export function RichTextInput({
     emitChange();
   };
 
+  const [linkDialog, setLinkDialog] = useState<{text:string;url:string} | null>(null);
+  const [linkPreview, setLinkPreview] = useState<EditorLinkPreview | null>(null);
+  const selectedRange = useRef<Range | null>(null);
+  const selectedAnchor = useRef<HTMLAnchorElement | null>(null);
   const addLink = () => {
     if (disabled) return;
-    const url = window.prompt("링크 URL", "https://");
-    if (!url?.trim()) return;
-    runCommand("createLink", url.trim());
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    selectedRange.current = range && editorRef.current?.contains(range.commonAncestorContainer) ? range.cloneRange() : null;
+    const node = range?.startContainer;
+    const anchor = (node?.nodeType === Node.ELEMENT_NODE ? node as Element : node?.parentElement)?.closest("a") as HTMLAnchorElement | null;
+    selectedAnchor.current = anchor && editorRef.current?.contains(anchor) ? anchor : null;
+    setLinkDialog({text:selectedAnchor.current?.textContent ?? selection?.toString() ?? "",url:selectedAnchor.current?.getAttribute("href") ?? ""});
+    setLinkPreview(null);
+  };
+  const restoreSelection = () => {
+    editorRef.current?.focus();
+    const selection = window.getSelection();
+    if (selectedRange.current && selection) { selection.removeAllRanges(); selection.addRange(selectedRange.current); }
+  };
+  const applyLink = (text: string, url: string) => {
+    // Release the modal focus trap before restoring the contenteditable range.
+    flushSync(() => setLinkDialog(null));
+    restoreSelection();
+    const anchor = selectedAnchor.current;
+    if (anchor?.isConnected) {
+      const range = document.createRange(); range.selectNode(anchor);
+      const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
+    }
+    const element = document.createElement("a");
+    element.href = url; element.textContent = text; element.target = "_blank"; element.rel = "noopener noreferrer";
+    document.execCommand("insertHTML", false, element.outerHTML);
+    emitChange();
   };
 
   return (
     <div
+      onFocusCapture={() => setFocused(true)}
+      onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setFocused(false); }}
       className={cn(
         "group/rich relative min-w-0",
         disabled && "cursor-not-allowed opacity-60",
@@ -90,20 +125,31 @@ export function RichTextInput({
         className={cn(
           "rich-text-input min-h-10 w-full rounded-none border-0 border-b border-slate-300 bg-slate-100/70 px-3 py-2 text-sm font-normal leading-6 text-[#172033] outline-none transition-colors hover:border-slate-300 focus:border-brand-primary focus:ring-0 empty:before:pointer-events-none empty:before:text-slate-400 empty:before:content-[attr(data-placeholder)]",
           singleLine && "h-10 overflow-hidden whitespace-nowrap",
+          inputClassName,
         )}
+        onClick={event => {
+          const anchor = (event.target as HTMLElement).closest("a");
+          if (!anchor || disabled) return;
+          event.preventDefault();
+          selectedAnchor.current = anchor;
+          const range = document.createRange(); range.selectNodeContents(anchor); selectedRange.current = range;
+          const rect = anchor.getBoundingClientRect();
+          setLinkPreview({url:anchor.getAttribute("href") ?? "",text:anchor.textContent ?? "",left:rect.left,top:rect.bottom+6});
+        }}
         onInput={emitChange}
         onKeyDown={(event) => {
+          if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); addLink(); }
           if (singleLine && event.key === "Enter") event.preventDefault();
         }}
       />
 
-      <div className="pointer-events-none absolute left-0 top-full z-30 mt-1 flex translate-y-[-2px] items-center gap-0.5 rounded-lg border border-slate-200 bg-white p-1 opacity-0 shadow-[0_6px_18px_rgba(15,23,42,0.12)] transition duration-150 group-focus-within/rich:pointer-events-auto group-focus-within/rich:translate-y-0 group-focus-within/rich:opacity-100">
+      <div className="rich-input-toolbar-space" data-open={focused && !disabled}><div className="min-h-0 overflow-hidden"><div className="rich-input-toolbar flex flex-wrap items-center gap-0.5 py-1" aria-hidden={!focused} inert={!focused}>
         {TOOLBAR_ITEMS.map(({ command, label, icon: Icon }) => (
           <button
             key={command}
             type="button"
             aria-label={label}
-            title={label}
+            data-tooltip={label}
             disabled={disabled}
             onMouseDown={(event) => {
               event.preventDefault();
@@ -116,8 +162,8 @@ export function RichTextInput({
         ))}
         <button
           type="button"
-          aria-label="링크"
-          title="링크"
+          aria-label="링크 삽입"
+          data-tooltip="링크 삽입"
           disabled={disabled}
           onMouseDown={(event) => {
             event.preventDefault();
@@ -132,7 +178,7 @@ export function RichTextInput({
             <button
               type="button"
               aria-label="번호 매기기 목록"
-              title="번호 매기기 목록"
+              data-tooltip="번호 매기기 목록"
               disabled={disabled}
               onMouseDown={(event) => {
                 event.preventDefault();
@@ -145,7 +191,7 @@ export function RichTextInput({
             <button
               type="button"
               aria-label="글머리기호 목록"
-              title="글머리기호 목록"
+              data-tooltip="글머리기호 목록"
               disabled={disabled}
               onMouseDown={(event) => {
                 event.preventDefault();
@@ -160,7 +206,7 @@ export function RichTextInput({
         <button
           type="button"
           aria-label="서식 삭제"
-          title="서식 삭제"
+          data-tooltip="서식 삭제"
           disabled={disabled}
           onMouseDown={(event) => {
             event.preventDefault();
@@ -171,7 +217,9 @@ export function RichTextInput({
         >
           <RemoveFormatting aria-hidden="true" className="size-4" />
         </button>
-      </div>
+      </div></div></div>
+      {linkDialog && <EditorLinkDialog initialText={linkDialog.text} initialUrl={linkDialog.url} onApply={applyLink} onClose={() => { flushSync(() => setLinkDialog(null)); restoreSelection(); }} />}
+      {linkPreview && <EditorLinkPopover link={linkPreview} onClose={() => setLinkPreview(null)} onEdit={() => { setLinkDialog({text:linkPreview.text,url:linkPreview.url});setLinkPreview(null); }} onUnlink={() => { restoreSelection(); document.execCommand("unlink"); emitChange(); setLinkPreview(null); }} />}
     </div>
   );
 }

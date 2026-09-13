@@ -100,13 +100,6 @@ export function getCalendarEventStyles(
         bullet: "bg-brand-primary",
         label: lang === "ko" ? "행사" : "Event",
       };
-    case "APPLICATION":
-      return {
-        bg: "bg-sky-100 text-sky-700 hover:bg-sky-200",
-        hoverBg: "bg-sky-200",
-        bullet: "bg-sky-500",
-        label: lang === "ko" ? "신청" : "Application",
-      };
     case "SURVEY":
     default:
       return {
@@ -129,7 +122,6 @@ export function getCompactKindLabel(
   if (sourceType === "MANUAL") {
     return lang === "ko" ? "일정" : "Calendar";
   }
-  if (kind === "APPLICATION") return lang === "ko" ? "신청" : "Application";
   if (kind === "EVENT") return lang === "ko" ? "행사" : "Event";
   return lang === "ko" ? "설문" : "Survey";
 }

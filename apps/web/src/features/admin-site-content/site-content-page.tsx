@@ -11,7 +11,7 @@ import { GripVertical, ImageUp, LayoutTemplate, Link2, Plus, Trash2 } from "luci
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
-import { AdminCard, AdminCardHeader, AdminEditorGuidance, AdminFormField, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSectionTitle, AdminStickyActionBar, AdminToolbarGroup } from "@/components/ui/admin-page";
+import { AdminCard, AdminCardHeader, AdminEditorGuidance, AdminFormField, AdminLoadingState, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSectionTitle, AdminStickyActionBar, AdminToolbarGroup } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { Button } from "@/components/ui/button";
@@ -44,9 +44,9 @@ interface BlockDraft {
 const CONTENT_BLOCK_QUERY_KEY = ["admin", "content-blocks"] as const;
 
 const categoryMeta: Record<ContentCategory, { createLabel: string; createType: ContentBlockType; label: string; singleton: boolean; types: ContentBlockType[] }> = {
-  NOTICE: { createLabel: "등록", createType: "TOP_BANNER", label: "띠배너", singleton: false, types: ["TOP_BANNER"] },
+  NOTICE: { createLabel: "등록", createType: "TOP_BANNER", label: "띠배너", singleton: true, types: ["TOP_BANNER"] },
   HERO: { createLabel: "등록", createType: "HERO", label: "홈 히어로", singleton: true, types: ["HERO"] },
-  QUICK_LINK: { createLabel: "등록", createType: "QUICK_LINK", label: "퀵링크", singleton: false, types: ["QUICK_LINK"] },
+  QUICK_LINK: { createLabel: "등록", createType: "QUICK_LINK", label: "퀵링크", singleton: true, types: ["QUICK_LINK"] },
   LOGO: { createLabel: "등록", createType: "LOGO", label: "로고", singleton: true, types: ["LOGO"] },
   ORGANIZATION: { createLabel: "등록", createType: "ORGANIZATION_CHART", label: "조직도", singleton: true, types: ["ORGANIZATION_CHART"] },
   PLEDGE: { createLabel: "공약 추가", createType: "PLEDGE", label: "공약", singleton: false, types: ["PLEDGE"] },
@@ -368,7 +368,7 @@ function SiteContentPageContent() {
         {!categoryMeta[category].singleton ? <AdminCard className="admin-site-content__list self-start xl:sticky xl:top-6">
           <AdminCardHeader><div><AdminSectionTitle>{categoryMeta[category].label}</AdminSectionTitle><AdminMetaText>{filteredBlocks.length}개 표시</AdminMetaText></div></AdminCardHeader>
           <div className="scrollbar-hidden max-h-none overflow-y-visible p-2 sm:max-h-[680px] sm:overflow-y-auto">
-            {blocksQuery.isLoading && !blocksQuery.data ? null
+            {blocksQuery.isLoading && !blocksQuery.data ? <AdminLoadingState className="min-h-24 px-2 py-6" />
               : filteredBlocks.length === 0 ? <div className="px-4 py-16 text-center"><LayoutTemplate aria-hidden="true" className="mx-auto mb-3 size-8 text-slate-300" /><p className="text-sm font-medium text-slate-600">조건에 맞는 콘텐츠가 없습니다.</p></div>
               : <DndContext modifiers={[restrictListDrag]} autoScroll={false} sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleDragEnd(event)}><SortableContext items={filteredBlocks.map((block) => block.contentBlockId)} strategy={verticalListSortingStrategy}><div className="grid gap-1">{filteredBlocks.map((block) => <SortableContentBlockItem key={block.contentBlockId} block={block} selected={block.contentBlockId === selectedId} disabled={isDirty || saving || orderSaving} sortable={!categoryMeta[category].singleton} onSelect={() => void selectBlock(block)} />)}</div></SortableContext></DndContext>}
             {orderSaving ? <p className="px-3 pb-3 pt-2 text-xs font-normal text-[#344054]">노출 순서를 저장하는 중입니다.</p> : null}
@@ -433,25 +433,36 @@ function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onS
   uploading: boolean;
   value: string;
 }) {
-  const renderSlot = (label: string | null, slotValue: string, select: (file: File) => void, remove: (() => void) | undefined) => (
-    <div className="space-y-3">
-      {label ? <p className="text-sm font-medium text-slate-700">{label}</p> : null}
-      <div className="group/image relative overflow-hidden rounded-lg border border-dashed border-slate-200 bg-slate-50" style={{ aspectRatio: `${spec.width} / ${spec.height}` }}>
-        {slotValue ? <img src={resolveAssetUrl(slotValue)} alt="" className="absolute inset-0 size-full object-contain" /> : null}
-        <label className={cn("absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-2 bg-slate-900/40 text-white transition-opacity focus-within:opacity-100", slotValue ? "opacity-0 hover:opacity-100" : "bg-slate-100 text-slate-500 hover:bg-slate-200/70", uploading && "pointer-events-none")}>
-          <ImageUp className="size-6" />{uploading ? "업로드 중" : "이미지 업로드"}
-          <input aria-label={`${label ?? spec.label} 업로드`} type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) select(file); }} />
-        </label>
-        {slotValue && remove ? <Button type="button" variant="ghost" size="icon" aria-label={`${label ?? spec.label} 제거`} className="absolute right-2 top-2 bg-white/90 text-slate-500 hover:bg-white hover:text-rose-600" onClick={remove} disabled={uploading}><Trash2 className="size-4" /></Button> : null}
+  const [failedPreviews, setFailedPreviews] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setFailedPreviews({});
+  }, [secondaryValue, value]);
+
+  const renderSlot = (key: string, label: string | null, slotValue: string, select: (file: File) => void, remove: (() => void) | undefined) => {
+    const previewUrl = slotValue && !failedPreviews[key] ? resolveAssetUrl(slotValue) : null;
+
+    return (
+      <div className="space-y-3">
+        {label ? <p className="text-sm font-medium text-slate-700">{label}</p> : null}
+        <div className="group/image relative overflow-hidden rounded-lg border border-dashed border-slate-200 bg-slate-50" style={{ aspectRatio: `${spec.width} / ${spec.height}` }}>
+          {previewUrl ? <img src={previewUrl} alt="" className="absolute inset-0 size-full object-contain" onError={() => setFailedPreviews((current) => ({ ...current, [key]: true }))} /> : null}
+          <label className={cn("absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-2 bg-slate-900/40 text-white transition-opacity focus-within:opacity-100", previewUrl ? "opacity-0 hover:opacity-100" : "bg-slate-100 text-slate-500 hover:bg-slate-200/70", uploading && "pointer-events-none")}>
+            <ImageUp className="size-6" />{uploading ? "업로드 중" : previewUrl ? "이미지 변경" : "이미지 업로드"}
+            {!previewUrl && failedPreviews[key] ? <span className="text-xs text-rose-600">이미지를 불러오지 못했습니다.</span> : null}
+            <input aria-label={`${label ?? spec.label} 업로드`} type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) select(file); }} />
+          </label>
+          {slotValue && remove ? <Button type="button" variant="ghost" size="icon" aria-label={`${label ?? spec.label} 제거`} data-tooltip={`${label ?? spec.label} 삭제`} className="absolute right-2 top-2 bg-white/90 text-slate-500 hover:bg-white hover:text-rose-600" onClick={remove} disabled={uploading}><Trash2 className="size-4" /></Button> : null}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const hasSecondary = Boolean(secondaryLabel && onSecondarySelect);
   return <div className="space-y-2"><p className="text-sm font-medium text-slate-700">{spec.label} ({spec.width} × {spec.height})</p>
     <div className="grid gap-5">
-      {renderSlot(hasSecondary ? "한국어 조직도" : null, value, onSelect, onRemove)}
-      {hasSecondary ? renderSlot(secondaryLabel!, secondaryValue ?? "", onSecondarySelect!, onSecondaryRemove) : null}
+      {renderSlot("primary", hasSecondary ? "한국어 조직도" : null, value, onSelect, onRemove)}
+      {hasSecondary ? renderSlot("secondary", secondaryLabel!, secondaryValue ?? "", onSecondarySelect!, onSecondaryRemove) : null}
     </div>
   </div>;
 }
@@ -460,7 +471,7 @@ function SortableContentBlockItem({ block, disabled, onSelect, selected, sortabl
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: block.contentBlockId, disabled: disabled || !sortable });
   const style: CSSProperties = { transform: CSS.Translate.toString(transform), transition };
   return <div ref={setNodeRef} style={style} className={cn("group flex min-w-0 w-full select-none items-stretch overflow-hidden rounded-lg", selected ? "bg-emerald-50" : "hover:bg-slate-50", isDragging && "z-10 opacity-40")}>
-    {sortable ? <button type="button" {...attributes} {...listeners} disabled={disabled} className="admin-list-drag-handle self-center ml-1 mr-1 disabled:cursor-default disabled:opacity-30" aria-label={`${block.titleKo} 노출 순서 변경`} title={disabled ? "변경 사항을 적용한 뒤 순서를 바꿀 수 있습니다." : "드래그하여 노출 순서 변경"}><GripVertical aria-hidden="true" className="size-4" /></button> : null}
+    {sortable ? <button type="button" {...attributes} {...listeners} disabled={disabled} className="admin-list-drag-handle self-center ml-1 mr-1 disabled:cursor-default disabled:opacity-30" aria-label={`${block.titleKo} 노출 순서 변경`} data-tooltip="드래그하여 순서 변경"><GripVertical aria-hidden="true" className="size-4" /></button> : null}
     <button type="button" onClick={onSelect} className={cn("min-w-0 flex-1 overflow-hidden pl-0 pr-2 py-3 text-left", sortable ? "rounded-none" : "rounded-lg")}>
       <span className="flex min-w-0 items-center justify-between gap-3"><span className="min-w-0 flex-1 truncate text-sm font-normal text-[#172033]">{block.titleKo}</span></span>
     </button>

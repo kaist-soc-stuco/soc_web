@@ -8,6 +8,34 @@
       "when": 1787850182158,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789160000000,
+      "tag": "0001_unify_surveys",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789160001000,
+      "tag": "0002_vote_quorum_default",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789160002000,
+      "tag": "0003_survey_response_subscriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789160003000,
+      "tag": "0004_clear_section_placeholder_titles",
+      "breakpoints": true
     }
   ]
 }

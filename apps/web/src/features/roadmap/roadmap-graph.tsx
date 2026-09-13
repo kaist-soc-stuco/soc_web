@@ -3,6 +3,7 @@ import {
   type EdgeProps,
   Background,
   BackgroundVariant,
+  ControlButton,
   Controls,
   Handle,
   MarkerType,
@@ -13,7 +14,7 @@ import {
   type NodeProps,
   type ReactFlowInstance,
 } from "@xyflow/react";
-import { Clock3, MapPin, Maximize2, Minimize2, RotateCcw, Search, X } from "lucide-react";
+import { Clock3, MapPin, Maximize2, Minimize2, Minus, Plus, RotateCcw, Search, X } from "lucide-react";
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -59,8 +60,8 @@ const edgeTypes = { smoothstep: RoutedEdge };
 
 const COURSE_WIDTH = 184;
 const COURSE_HEIGHT = 108;
-const COURSE_GAP_X = 20;
-const COURSE_GAP_Y = 18;
+const COURSE_GAP_X = 32;
+const COURSE_GAP_Y = 28;
 const GROUP_PADDING = 20;
 const GROUP_HEADER = 52;
 const LANE_GAP = 28;
@@ -842,7 +843,7 @@ export function RoadmapGraph({
             <IconButton
               type="button"
               aria-label={lang === "ko" ? "로드맵 전체 보기" : "Fit roadmap to view"}
-              title={lang === "ko" ? "로드맵 전체 보기" : "Fit roadmap to view"}
+              data-tooltip={lang === "ko" ? "로드맵 전체 보기" : "Fit roadmap to view"}
               onClick={() => void flow?.fitView({ padding: 0.15, duration: 300 })}
               className="size-9 border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900"
             >
@@ -853,7 +854,7 @@ export function RoadmapGraph({
             type="button"
             onClick={() => void toggleFullscreen()}
             aria-label={isFullscreen ? (lang === "ko" ? "전체 화면 닫기" : "Exit full screen") : (lang === "ko" ? "전체 화면" : "Full screen")}
-            title={isFullscreen ? (lang === "ko" ? "전체 화면 닫기" : "Exit full screen") : (lang === "ko" ? "전체 화면" : "Full screen")}
+            data-tooltip={isFullscreen ? (lang === "ko" ? "전체 화면 닫기" : "Exit full screen") : (lang === "ko" ? "전체 화면" : "Full screen")}
             className="absolute right-3 top-3 z-10 inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/25"
           >
             {isFullscreen ? <Minimize2 aria-hidden="true" className="size-4" /> : <Maximize2 aria-hidden="true" className="size-4" />}
@@ -892,7 +893,24 @@ export function RoadmapGraph({
               }}
             >
               <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#cbd5e1" />
-              <Controls showFitView={false} showInteractive={false} position="bottom-left" />
+              <Controls showZoom={false} showFitView={false} showInteractive={false} position="bottom-left">
+                <ControlButton
+                  type="button"
+                  aria-label={lang === "ko" ? "확대" : "Zoom in"}
+                  data-tooltip={lang === "ko" ? "확대" : "Zoom in"}
+                  onClick={() => void flow?.zoomIn({ duration: 200 })}
+                >
+                  <Plus aria-hidden="true" />
+                </ControlButton>
+                <ControlButton
+                  type="button"
+                  aria-label={lang === "ko" ? "축소" : "Zoom out"}
+                  data-tooltip={lang === "ko" ? "축소" : "Zoom out"}
+                  onClick={() => void flow?.zoomOut({ duration: 200 })}
+                >
+                  <Minus aria-hidden="true" />
+                </ControlButton>
+              </Controls>
             </ReactFlow>
           </RoadmapInteractionContext.Provider>
         </div>

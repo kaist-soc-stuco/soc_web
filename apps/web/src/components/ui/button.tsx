@@ -30,16 +30,19 @@ const buttonVariants = cva(
   },
 );
 
+type ButtonProps = React.ComponentProps<'button'> & VariantProps<typeof buttonVariants> & { asChild?: boolean; "data-tooltip"?: string };
+
 function Button({
   className,
   variant,
   size,
   asChild = false,
   ...props
-}: React.ComponentProps<'button'> & VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
+}: ButtonProps) {
   const Comp = asChild ? Slot : 'button';
+  const tooltip = props["data-tooltip"];
 
-  return <Comp data-slot="button" data-variant={variant ?? "default"} key={variant ?? "default"} className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+  return <Comp data-slot="button" data-variant={variant ?? "default"} key={variant ?? "default"} className={cn(buttonVariants({ variant, size, className }))} data-tooltip={tooltip} {...props} />;
 }
 
 export { Button, buttonVariants };

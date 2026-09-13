@@ -897,6 +897,7 @@ function BulkEmailPageContent() {
                       variant="ghost"
                       size="icon"
                       aria-label={`${attachment.filename} 첨부 제거`}
+                      data-tooltip="파일 삭제"
                       onClick={() => setAttachments((previous) => previous.filter((item) => item.assetId !== attachment.assetId))}
                       className="min-h-11 min-w-11 rounded text-slate-400 hover:bg-slate-200 sm:size-5 sm:min-h-0 sm:min-w-0"
                     >
@@ -956,7 +957,7 @@ function BulkEmailPageContent() {
                       {template.description ? <p className="mt-0.5 truncate text-xs font-normal text-slate-500">{template.description}</p> : null}
                     </button>
                     {template.createdBy ? (
-                      <Button type="button" variant="ghost" size="icon" aria-label={`${template.name} 삭제`} title="템플릿 삭제" onClick={() => void handleDeleteTemplate(template.id)} disabled={templateSaving} className="min-h-11 min-w-11 text-slate-400 hover:bg-rose-50 hover:text-rose-600 sm:size-8 sm:min-h-0 sm:min-w-0">
+                      <Button type="button" variant="ghost" size="icon" aria-label={`${template.name} 삭제`} data-tooltip="템플릿 삭제" onClick={() => void handleDeleteTemplate(template.id)} disabled={templateSaving} className="min-h-11 min-w-11 text-slate-400 hover:bg-rose-50 hover:text-rose-600 sm:size-8 sm:min-h-0 sm:min-w-0">
                         <Trash2 aria-hidden="true" />
                       </Button>
                     ) : null}

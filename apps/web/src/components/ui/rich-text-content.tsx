@@ -54,7 +54,8 @@ export function sanitizeForDisplay(value: string) {
 
   // Legacy/plain descriptions should remain text, not become HTML.
   if (!/<[a-z][\s\S]*>/i.test(trimmed) || typeof DOMParser === "undefined") {
-    return escapeHtml(value).replace(/\r?\n/g, "<br />");
+    const decoded = typeof DOMParser === "undefined" ? value : new DOMParser().parseFromString(value.replace(/&amp;(?=(?:amp;)*?(?:nbsp|amp|lt|gt|quot|#0?39);)/g, "&").replaceAll("<", "&lt;").replaceAll(">", "&gt;"), "text/html").body.textContent ?? value;
+    return escapeHtml(decoded).replace(/\r?\n/g, "<br />");
   }
 
   const document = new DOMParser().parseFromString(
@@ -176,7 +177,7 @@ export function stripRichText(value: string | null | undefined) {
   if (typeof DOMParser === "undefined") {
     return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   }
-  const document = new DOMParser().parseFromString(value, "text/html");
+  const document = new DOMParser().parseFromString(sanitizeForDisplay(value), "text/html");
   return document.body.textContent?.replace(/\s+/g, " ").trim() ?? "";
 }
 

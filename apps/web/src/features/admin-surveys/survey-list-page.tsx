@@ -8,7 +8,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { isoToDate, nowMs } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { AuthGuard } from "@/components/guards/auth-guard";
-import { AdminEmptyState, AdminPageHeader, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
+import { AdminEmptyState, AdminErrorState, AdminLoadingState, AdminPageHeader, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -102,11 +102,6 @@ function formatRelativeTime(dateIso: string | null) {
   return `${year}.${month}.${day}`;
 }
 
-function renderTypeLabel(survey: SurveyRecord) {
-  const label = survey.kind === "APPLICATION" ? "행사 신청" : "일반 설문";
-
-  return <span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{label}</span>;
-}
 
 export function SurveyListPage() {
   const navigate = useNavigate();
@@ -120,7 +115,6 @@ export function SurveyListPage() {
   const [surveyGroup, setSurveyGroup] = useState<"general" | "operational">("general");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<SurveyStatusFilter>("all");
-  const [typeFilter, setTypeFilter] = useState("all");
   const [sortBy, setSortBy] = useState<SurveySortKey>("updatedAt");
   const [sortDirection, setSortDirection] =
     useState<SurveySortDirection>("desc");
@@ -276,14 +270,12 @@ export function SurveyListPage() {
       sortBy,
       sortDirection,
       statusFilter,
-      typeFilter,
     });
   }, [
     surveyGroup,
     surveys,
     searchQuery,
     statusFilter,
-    typeFilter,
     sortBy,
     sortDirection,
   ]);
@@ -343,20 +335,6 @@ export function SurveyListPage() {
                 }}
                 className="w-28 shrink-0"
               />
-              <AdminSelectDropdown
-                ariaLabel="설문 유형"
-                value={typeFilter}
-                options={[
-                  { value: "all", label: "전체 유형" },
-                  { value: "SURVEY", label: "일반 설문" },
-                  { value: "APPLICATION", label: "행사 신청" },
-                ]}
-                onChange={(value) => {
-                  setTypeFilter(value);
-                  setCurrentPage(1);
-                }}
-                className="w-28 shrink-0"
-              />
               <PageSearchField
                 ariaLabel="설문 검색"
                 className="ml-auto w-full sm:w-72"
@@ -375,11 +353,9 @@ export function SurveyListPage() {
           </div>
 
           <div className="flex min-w-0 flex-col overflow-visible">
-            {error ? (
-              <div className="m-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700">
-                {error}
-              </div>
-            ) : null}
+            {error ? <AdminErrorState message={error} /> : null}
+
+            {showInitialLoading ? <AdminLoadingState /> : null}
 
             {!showInitialLoading && !error && filteredSurveys.length === 0 ? (
               <AdminEmptyState message="검색 및 필터 조건에 맞는 설문조사가 없습니다." />
@@ -390,7 +366,6 @@ export function SurveyListPage() {
                 <colgroup>
                   <col style={{ width: 360 }} />
                   <col style={{ width: 110 }} />
-                  <col style={{ width: 110 }} />
                   <col style={{ width: 120 }} />
                   <col style={{ width: 230 }} />
                   <col style={{ width: 190 }} />
@@ -400,7 +375,6 @@ export function SurveyListPage() {
                   <tr>
                     <AdminTableHead className="pl-5 text-left">제목</AdminTableHead>
                     <AdminTableHead className="text-center">상태</AdminTableHead>
-                    <AdminTableHead className="text-center">유형</AdminTableHead>
                     <AdminSortableHead
                       className="text-center"
                       active={sortBy === "responseCount"}
@@ -431,7 +405,20 @@ export function SurveyListPage() {
                 <AdminTableBody>
                   {paginatedSurveys.map((survey) => {
                     return (
-                      <tr key={survey.id} onClick={() => navigate(`/admin/surveys/${survey.id}/edit`)} className="interaction-row cursor-pointer transition-colors hover:bg-slate-50/60">
+                      <tr
+                        key={survey.id}
+                        tabIndex={0}
+                        role="link"
+                        aria-label={`${stripRichText(survey.titleKo)} 설문 편집`}
+                        onClick={() => navigate(`/admin/surveys/${survey.id}/edit`)}
+                        onKeyDown={(event) => {
+                          if (event.target !== event.currentTarget) return;
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          navigate(`/admin/surveys/${survey.id}/edit`);
+                        }}
+                        className="interaction-row cursor-pointer transition-colors hover:bg-slate-50/60 focus-visible:bg-slate-50 focus-visible:outline-none"
+                      >
                         <AdminTableCell className="pl-5" truncate>
                           <button
                             type="button"
@@ -444,7 +431,6 @@ export function SurveyListPage() {
                         <AdminTableCell data-mobile-label="상태" className="text-center">
                           <SurveyStatusBadge survey={survey} />
                         </AdminTableCell>
-                        <AdminTableCell data-mobile-label="유형" className="text-center">{renderTypeLabel(survey)}</AdminTableCell>
                         <AdminTableCell data-mobile-label="응답자 수" className="text-center tabular-nums">
                           {survey.responseCount ?? 0}명
                         </AdminTableCell>
@@ -455,7 +441,7 @@ export function SurveyListPage() {
                           {formatRelativeTime(survey.updatedAt)}
                         </AdminTableCell>
                         <AdminTableCell data-mobile-label="작업" className="text-center">
-                          <div className="inline-flex items-center gap-0.5 rounded-lg bg-slate-50/80 p-0.5">
+                          <div className="inline-flex items-center gap-0.5">
                             <AdminRowActions
                               label={`${stripRichText(survey.titleKo)} 작업 메뉴`}
                               onClick={(event) => { event.stopPropagation(); openRowDropdown(survey.id, event.currentTarget); }}

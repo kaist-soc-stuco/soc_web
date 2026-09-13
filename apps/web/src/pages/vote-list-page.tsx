@@ -1,9 +1,12 @@
+import { useCurrentSession } from "@/hooks/use-current-session";
+import { Permissions } from "@/lib/permissions";
+import { VoteStatusBadge } from "@/components/ui/vote-status-badge";
 import { createApiClient } from "@soc/api-client";
 import type { VoteRecord } from "@soc/contracts";
 import { isoToMs, nowMs } from "@soc/shared";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 
 import { Header } from "@/components/organisms/header";
 import { Button } from "@/components/ui/button";
@@ -34,10 +37,10 @@ function ActiveVoteCard({ vote, lang, now }: { vote: VoteRecord; lang: string; n
 
   return (
     <Link
-      to={`/votes/${vote.id}`}
-      className="group block rounded-2xl border-2 border-brand-primary/30 bg-white p-5 shadow-[0_12px_32px_rgba(0,110,63,0.08)] transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-brand-primary/55 hover:shadow-[0_16px_36px_rgba(0,110,63,0.13)] sm:p-7"
+      to={`/votes/${vote.id}`} target="_blank" rel="noopener noreferrer"
+      className="group block rounded-xl border border-slate-200 bg-white p-5 transition-colors hover:border-emerald-500 sm:p-6"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3"><VoteStatusBadge status={vote.status} startsAt={vote.startsAt} endsAt={vote.endsAt} />
         <span className="text-xs font-medium tabular-nums text-app-text-muted">
           {upcoming
             ? lang === "ko"
@@ -103,7 +106,7 @@ function VoteHistoryTable({ votes, lang }: { votes: VoteRecord[]; lang: string }
               <tr key={vote.id} className="group transition-colors hover:bg-slate-50/75">
                 <td className="max-w-0 px-4 py-4 align-middle sm:px-5">
                   <Link
-                    to={`/votes/${vote.id}`}
+                    to={`/votes/${vote.id}`} target="_blank" rel="noopener noreferrer"
                     className="block truncate font-semibold text-app-text-strong underline-offset-4 group-hover:text-brand-primary group-hover:underline"
                   >
                     {title}
@@ -126,6 +129,7 @@ function VoteHistoryTable({ votes, lang }: { votes: VoteRecord[]; lang: string }
 
 export function VoteListPage() {
   const { lang } = useLanguage();
+  const { data: session } = useCurrentSession();
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const [votes, setVotes] = useState<VoteRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,9 +171,9 @@ export function VoteListPage() {
       <PageMain>
         <PageHeader
           title={lang === "ko" ? "투표" : "Voting"}
-          containerClassName="max-w-4xl"
+          actions={Permissions.has(session?.permission ?? 0, Permissions.MANAGE_VOTE) ? <Button asChild><Link to="/admin/votes/new"><Plus className="size-4" />{lang === "ko" ? "등록" : "Create"}</Link></Button> : undefined}
         />
-        <PageContainer className="max-w-4xl pb-16">
+        <PageContainer className="pb-16">
           {loading ? (
             <div className="py-20 text-center text-sm font-normal text-[#344054]">
               {lang === "ko" ? "불러오는 중..." : "Loading..."}
@@ -202,7 +206,7 @@ export function VoteListPage() {
                   </span>
                 </div>
                 {featuredVotes.length > 0 ? (
-                  <div className="grid gap-4">
+                  <div className="grid gap-4 lg:grid-cols-2">
                     {featuredVotes.map((vote) => (
                       <ActiveVoteCard key={vote.id} vote={vote} lang={lang} now={now} />
                     ))}

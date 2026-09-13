@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { CircleAlert, Search } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 
 import { EmptyState } from "@/components/ui/data-state";
@@ -192,17 +192,17 @@ export function AdminFormField({
   label,
   labelClassName,
   ...props
-}: ComponentProps<"label"> & {
+}: ComponentProps<"div"> & {
   hint?: ReactNode;
   label: ReactNode;
   labelClassName?: string;
 }) {
   return (
-    <label className={cn("grid min-w-0 gap-1.5", className)} {...props}>
+    <div role="group" aria-label={typeof label === "string" ? label : undefined} className={cn("grid min-w-0 gap-1.5", className)} {...props}>
       <span className={cn("text-xs font-normal leading-4 text-[#344054]", labelClassName)}>{label}</span>
       {children}
       {hint ? <span className="text-xs font-normal leading-4 text-[#344054]">{hint}</span> : null}
-    </label>
+    </div>
   );
 }
 
@@ -249,5 +249,35 @@ export function AdminEmptyState({ message, className, ...props }: ComponentProps
       className={cn("rounded-none border-0 bg-transparent py-16 text-slate-400", className)}
       {...props}
     />
+  );
+}
+
+export function AdminLoadingState({ message = "불러오는 중…", className, ...props }: ComponentProps<"div"> & { message?: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn("flex min-h-32 items-center justify-center gap-2 px-4 py-8 text-sm font-normal text-slate-400", className)}
+      {...props}
+    >
+      <span aria-hidden="true" className="size-4 animate-spin rounded-full border-2 border-slate-200 border-t-brand-primary" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+export function AdminErrorState({ message, className, ...props }: ComponentProps<"div"> & { message: string }) {
+  return (
+    <div
+      role="alert"
+      aria-live="assertive"
+      className={cn("flex min-h-32 items-center justify-center px-4 py-8 text-center text-sm font-normal text-rose-600", className)}
+      {...props}
+    >
+      <span className="inline-flex items-center gap-2">
+        <CircleAlert aria-hidden="true" className="size-4 shrink-0" />
+        <span>{message}</span>
+      </span>
+    </div>
   );
 }

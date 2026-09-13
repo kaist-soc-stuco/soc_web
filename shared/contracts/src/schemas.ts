@@ -406,7 +406,7 @@ export const CommentUpdateSchema = z.object({
 // ─── Survey ──────────────────────────────────────────────────────────────────
 
 const SurveyResultVisibilitySchema = z.enum(["PRIVATE", "PUBLIC"]);
-const SurveyKindSchema = z.enum(["SURVEY", "APPLICATION"]);
+const SurveyKindSchema = z.literal("SURVEY").default("SURVEY");
 const SurveyFeeRequirementPolicySchema = z.enum(["NONE", "PAID_ONLY"]);
 export const SurveySocAffiliationSchema = z.enum(["PRIMARY"]);
 export const SurveyAcademicEligibilitySchema = z.enum([
@@ -467,7 +467,7 @@ export const UpdateSurveySchema = SurveyFieldsSchema.partial().extend({
 }).superRefine(validateSurveySchedule);
 
 export const CreateSectionSchema = z.object({
-  titleKo: z.string().trim().min(1).max(255),
+  titleKo: z.string().trim().max(255),
   titleEn: z.string().trim().max(255).optional(),
   descriptionKo: SurveyRichTextSchema,
   descriptionEn: SurveyRichTextSchema,

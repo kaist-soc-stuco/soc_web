@@ -258,7 +258,6 @@ export function BoardArticleTable({
             {isNew ? (
               <span
                 className="h-[5px] w-[5px] shrink-0 rounded-full bg-rose-500"
-                title={lang === "ko" ? "새 글" : "New post"}
               >
                 <span className="sr-only">{lang === "ko" ? "새 글" : "New post"}</span>
               </span>

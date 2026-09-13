@@ -36,11 +36,11 @@ export function AdminLayout() {
       <aside className="flex w-full shrink-0 flex-col border-r border-slate-200 bg-white md:sticky md:top-0 md:h-svh md:w-64">
         <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-6 py-4"><Link to="/" aria-label="홈으로 이동" className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"><p className="mb-1 text-lg font-bold tracking-tight text-slate-900">KAIST SoC</p><p className="text-xs font-medium text-slate-500">관리자 대시보드</p></Link></div>
         <div className="min-h-0 max-h-56 flex-1 overflow-y-auto md:max-h-none"><AdminSidebar /></div>
-        <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-6 py-4"><div className="flex items-center gap-2 text-sm"><User className="size-4" /><span className="truncate">{session?.nameKo ?? "관리자"}</span></div><Button variant="ghost" size="icon" className="ml-auto shrink-0 text-slate-700" aria-label="로그아웃" title="로그아웃" onClick={() => void logout()}><LogOut className="size-4" /></Button></div>
+        <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-6 py-4"><div className="flex items-center gap-2 text-sm"><User className="size-4" /><span className="truncate">{session?.nameKo ?? "관리자"}</span></div><Button variant="ghost" size="icon" className="ml-auto shrink-0 text-slate-700" aria-label="로그아웃" onClick={() => void logout()}><LogOut className="size-4" /></Button></div>
       </aside>
       <div className="relative min-w-0 flex-1">
 
-        <Suspense fallback={<p role="status" className="p-6">화면을 불러오는 중입니다.</p>}><Outlet context={{ session }} /></Suspense>
+        <Suspense fallback={null}><Outlet context={{ session }} /></Suspense>
       </div>
     </div>
   </AuthGuard>;

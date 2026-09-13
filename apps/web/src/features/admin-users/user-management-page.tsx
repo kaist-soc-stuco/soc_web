@@ -7,8 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminDataTable, AdminSortableHead, AdminTableBody, AdminTableCell, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
 import { AdminDrawer } from "@/components/ui/admin-drawer";
-import { AdminSelectDropdown } from "@/components/ui/admin-select";
-import { AdminCardHeader, AdminEmptyState, AdminPageHeader, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
+import { AdminCardHeader, AdminEmptyState, AdminLoadingState, AdminPageHeader, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -25,8 +24,6 @@ import { Permissions } from "@/lib/permissions";
 type UserSortBy = "name" | "lastLoginAt";
 type SortDirection = "asc" | "desc";
 type UserStatusFilter = "all" | "active" | "inactive";
-type FeeStatusFilter = "all" | "PAID" | "PARTIAL" | "UNPAID";
-
 const formatShortDateTime = (value?: string | null) => {
   if (!value) return "-";
   const date = isoToDate(value);
@@ -75,7 +72,6 @@ export function UserManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
-  const [feeStatusFilter, setFeeStatusFilter] = useState<FeeStatusFilter>("all");
   const [sortBy, setSortBy] = useState<UserSortBy>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -136,7 +132,6 @@ export function UserManagementPage() {
         sortBy,
         sortDirection,
         status: statusFilter === "all" ? undefined : statusFilter,
-        feeStatus: feeStatusFilter === "all" ? undefined : feeStatusFilter,
       })
       .then((response) => {
         if (!cancelled) setData(response);
@@ -159,8 +154,6 @@ export function UserManagementPage() {
     currentPage,
     pageSize,
     query,
-    feeStatusFilter,
-
     refreshVersion,
     sessionLoading,
     sortBy,
@@ -315,18 +308,6 @@ export function UserManagementPage() {
                     setCurrentPage(1);
                   }}
                 />
-                <AdminSelectDropdown
-                  ariaLabel="과비 납부 상태"
-                  className="w-36"
-                  value={feeStatusFilter}
-                  onChange={(value) => { setFeeStatusFilter(value as FeeStatusFilter); setCurrentPage(1); }}
-                  options={[
-                    { value: "all", label: "전체 과비" },
-                    { value: "PAID", label: "완납" },
-                    { value: "PARTIAL", label: "부분 납부" },
-                    { value: "UNPAID", label: "미납" },
-                  ]}
-                />
               </div>
               <PageSearchField
                 ariaLabel="사용자 검색"
@@ -350,7 +331,7 @@ export function UserManagementPage() {
               </div>
             ) : null}
 
-            {showInitialLoading ? null : error && !data ? (
+            {showInitialLoading ? <AdminLoadingState /> : error && !data ? (
               <div className="m-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
                 {error}
               </div>
@@ -435,7 +416,7 @@ export function UserManagementPage() {
                             variant="ghost"
                             size="icon"
                             aria-label={user.isActive ? "계정 비활성화" : "계정 복구"}
-                            title={user.isActive ? "계정 비활성화" : "계정 복구"}
+                            data-tooltip={user.isActive ? "계정 비활성화" : "계정 복구"}
                             disabled={updatingUserId === user.userId}
                             onClick={(event) => {
                               event.stopPropagation();

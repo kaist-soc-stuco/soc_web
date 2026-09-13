@@ -221,6 +221,7 @@ export function ExecutiveMemberModal({
               <button
                 type="button"
                 aria-label="연결된 포털 회원 해제"
+                data-tooltip="연결 해제"
                 onClick={clearPortalMember}
                 className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-emerald-700 transition-colors hover:bg-emerald-100 hover:text-emerald-900"
               >
@@ -307,7 +308,7 @@ export function ExecutiveMemberModal({
                   <UiInput aria-label={`활동 연도 ${index + 1}`} type="number" min={1900} max={3000} required value={activity.year || ""} onChange={(event) => { const year = Number(event.currentTarget.value); updateField("activities", formData.activities.map((item, i) => i === index ? { ...item, year } : item)); }} />
                   <AdminSelectDropdown ariaLabel={`활동 부서 ${index + 1}`} value={activity.departmentKo} options={departmentOptions} onChange={(value) => { const dept = departments.find((item) => item.nameKo === value); updateField("activities", formData.activities.map((item, i) => i === index ? { ...item, departmentId: dept?.id ?? null, departmentKo: value, departmentEn: "" } : item)); }} />
                   <UiInput aria-label={`직책 ${index + 1}`} placeholder="직책" required value={activity.roleKo} onChange={(event) => { const roleKo = event.currentTarget.value; updateField("activities", formData.activities.map((item, i) => i === index ? { ...item, roleKo } : item)); }} />
-                  <IconButton type="button" size="sm" aria-label={`${activitySummary} 삭제`} disabled={formData.activities.length === 1} onClick={() => updateField("activities", formData.activities.filter((_, i) => i !== index))} className="text-slate-400 hover:text-rose-600"><Trash2 className="size-4" /></IconButton>
+                  <IconButton type="button" size="sm" aria-label={`${activitySummary} 삭제`} data-tooltip="이력 삭제" disabled={formData.activities.length === 1} onClick={() => updateField("activities", formData.activities.filter((_, i) => i !== index))} className="text-slate-400 hover:text-rose-600"><Trash2 className="size-4" /></IconButton>
                 </div>
               );
             })}

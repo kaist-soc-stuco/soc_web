@@ -58,7 +58,7 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
     key: "about.hero.description",
     labelKo: "소개 페이지 설명",
     multiline: true,
-    valueKo: "전산학부 학우들을 위한 사업을 기획하고 진행하는 학생자치기구, 집행위원회입니다.",
+    valueKo: "전산학부 학우들을 위한 사업을 기획하고 집행하는 학생자치기구, 전산학부 집행위원회입니다.",
     valueEn: "The SoC Student Council represents undergraduate students at KAIST's School of Computing.",
   },
   {

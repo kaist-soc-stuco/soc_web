@@ -270,7 +270,7 @@ export function EventsSurveysGrid({
             >
               <Link
                 aria-label={title}
-                to={href}
+                to={href} target={item.kind === "EVENT" ? undefined : "_blank"} rel="noopener noreferrer"
                 className="absolute inset-0 block"
               >
                 <CardMedia imageUrl={item.imageUrl} isSurvey={isSurvey} />
@@ -311,7 +311,7 @@ export function EventsSurveysGrid({
             </div>
 
             <div className="home-portal-event-body break-keep">
-              <Link aria-label={title} to={href} className="min-w-0">
+              <Link aria-label={title} to={href} target={item.kind === "EVENT" ? undefined : "_blank"} rel="noopener noreferrer" className="min-w-0">
                 <h3 className="line-clamp-2">{title}</h3>
                 {desc ? <p className="line-clamp-2">{desc}</p> : null}
               </Link>
@@ -319,7 +319,7 @@ export function EventsSurveysGrid({
                 {period ? (
                   <Link
                     aria-label={`${title} ${period}`}
-                    to={href}
+                    to={href} target={item.kind === "EVENT" ? undefined : "_blank"} rel="noopener noreferrer"
                     className="home-portal-event-time"
                   >
                     <Clock

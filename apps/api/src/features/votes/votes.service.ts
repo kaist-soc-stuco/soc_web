@@ -1,3 +1,4 @@
+import { meetsVoteQuorum } from "@soc/shared";
 import {
   BadRequestException,
   ConflictException,
@@ -45,7 +46,7 @@ export class VotesService {
       endsAt: row.endsAt.toISOString(),
       academicStatuses: row.academicStatuses,
       feePayersOnly: row.feePayersOnly,
-      quorumPercent: row.quorumPercent,
+      quorumPercent: row.quorumPercent ?? 50,
       quorumInclusive: row.quorumInclusive,
       studentNumberFrom: row.studentNumberFrom,
       studentNumberTo: row.studentNumberTo,
@@ -239,8 +240,7 @@ export class VotesService {
     if (vote.status !== "CLOSED" && vote.status !== "TALLIED") throw new ConflictException("vote_must_be_closed_before_tally");
     if (vote.status === "TALLIED") return this.results(id, { id: "", permission: Permissions.MANAGE_VOTE });
     const participation = await this.repo.counts(id);
-    if (vote.quorumPercent != null && (participation.eligibleCount === 0 ||
-      (vote.quorumInclusive ? participation.votedCount * 100 < participation.eligibleCount * vote.quorumPercent : participation.votedCount * 100 <= participation.eligibleCount * vote.quorumPercent))) {
+    if (!meetsVoteQuorum(participation.eligibleCount, participation.votedCount, vote.quorumPercent, vote.quorumInclusive)) {
       throw new ConflictException("vote_quorum_not_met");
     }
     const definition = this.mapItems(await this.repo.findDefinition(id));

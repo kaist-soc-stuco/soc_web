@@ -9,7 +9,6 @@ import {
 import {
   closestCenter,
   DndContext,
-  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -25,7 +24,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { createPortal } from "react-dom";
 import { GripVertical, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -88,15 +86,12 @@ function BoardManagementPageContent() {
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [activeBoardCode, setActiveBoardCode] = useState<string | null>(null);
-  const [activeDragWidth, setActiveDragWidth] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
   const orderDirty = boards.map((board) => board.code).join("|") !== savedOrder.join("|");
-  const activeBoard = activeBoardCode
-    ? boards.find((board) => board.code === activeBoardCode) ?? null
-    : null;
+
 
   const loadBoards = async () => {
     setLoading(true);
@@ -192,12 +187,10 @@ function BoardManagementPageContent() {
 
   const handleDragStart = ({ active }: DragStartEvent) => {
     setActiveBoardCode(String(active.id));
-    setActiveDragWidth(active.rect.current.initial?.width ?? null);
   };
 
   const handleDragCancel = () => {
     setActiveBoardCode(null);
-    setActiveDragWidth(null);
   };
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
@@ -255,14 +248,7 @@ function BoardManagementPageContent() {
                 </SortableContext>}
             </AdminTableBody>
           </AdminDataTable>
-          {typeof document !== "undefined"
-            ? createPortal(
-                <DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>
-                  {activeBoard ? <BoardDragPreview board={activeBoard} width={activeDragWidth} /> : null}
-                </DragOverlay>,
-                document.body,
-              )
-            : null}
+
         </DndContext>
       </AdminCard>
 
@@ -347,23 +333,14 @@ function BoardManagementPageContent() {
 
 function SortableBoardRow({ board, disabled, onOpen }: { board: BoardSummary; disabled: boolean; onOpen: (board: BoardSummary) => void }) {
   const { attributes, isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ id: board.code, disabled });
-  const style = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 200ms ease", willChange: isDragging ? "transform" : undefined };
+  const style = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 180ms ease", willChange: isDragging ? "transform" : undefined };
 
-  return <tr ref={setNodeRef} style={style} className={cn("transition-colors hover:bg-slate-50/60", isDragging && "relative z-0 opacity-0")} onClick={() => onOpen(board)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(board); } }} tabIndex={0}>
-    <AdminTableCell className="text-center"><button ref={setActivatorNodeRef} type="button" aria-label={`${board.nameKo} 순서 이동`} title="드래그하여 순서 변경" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="admin-list-drag-handle"><GripVertical aria-hidden="true" className="size-4" /></button></AdminTableCell>
+  return <tr ref={setNodeRef} style={style} aria-label={`${board.nameKo} 게시판 설정 열기`} role="button" className={cn("cursor-pointer transition-colors hover:bg-slate-50/60 focus-visible:bg-slate-50 focus-visible:outline-none", isDragging && "relative z-10 opacity-70")} onClick={() => onOpen(board)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(board); } }} tabIndex={0}>
+    <AdminTableCell className="text-center"><button ref={setActivatorNodeRef} type="button" aria-label={`${board.nameKo} 순서 이동`} data-tooltip="드래그하여 순서 변경" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="admin-list-drag-handle"><GripVertical aria-hidden="true" className="size-4" /></button></AdminTableCell>
     <AdminTableCell truncate><span className="admin-table-text-emphasis block truncate">{board.nameKo}</span><span className="admin-table-text mt-0.5 block truncate">{board.code}{board.nameEn ? ` · ${board.nameEn}` : ""}</span></AdminTableCell>
     <AdminTableCell truncate>{[board.allowComment && "댓글", board.allowSecret && "비밀글", board.allowLike && "추천·스크랩"].filter(Boolean).join(" · ") || "추가 기능 없음"}</AdminTableCell>
     <AdminTableCell>{board.isActive ? <AdminStatusBadge tone="positive">활성</AdminStatusBadge> : <AdminStatusBadge>비활성</AdminStatusBadge>}</AdminTableCell>
   </tr>;
-}
-
-function BoardDragPreview({ board, width }: { board: BoardSummary; width: number | null }) {
-  return <div style={{ width: width ?? undefined }} className="relative z-50 grid select-none cursor-grabbing grid-cols-[52px_minmax(0,1.5fr)_minmax(180px,1.2fr)_100px] items-center rounded-lg border border-brand-primary/45 bg-white px-0 shadow-lg">
-    <div className="flex h-16 items-center justify-center text-brand-primary"><GripVertical aria-hidden="true" className="size-4" /></div>
-    <div className="min-w-0 px-4"><p className="truncate text-sm font-semibold text-slate-900">{board.nameKo}</p><p className="truncate text-xs text-slate-500">{board.code}{board.nameEn ? ` · ${board.nameEn}` : ""}</p></div>
-    <div className="truncate px-4 text-sm text-slate-700">{[board.allowComment && "댓글", board.allowSecret && "비밀글", board.allowLike && "추천·스크랩"].filter(Boolean).join(" · ") || "추가 기능 없음"}</div>
-    <div className="px-4">{board.isActive ? <AdminStatusBadge tone="positive">활성</AdminStatusBadge> : <AdminStatusBadge>비활성</AdminStatusBadge>}</div>
-  </div>;
 }
 
 function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (checked: boolean) => void }) {

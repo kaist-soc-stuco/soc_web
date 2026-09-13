@@ -207,7 +207,7 @@ export function BoardDetailArticleCard({
 
       {article.survey && (
         <Link
-          to={`/survey/${article.survey.surveyId}`}
+          to={`/survey/${article.survey.surveyId}`} target="_blank" rel="noopener noreferrer"
           aria-label={lang === "ko" ? `${surveyTitle} 설문조사 참여하기` : `Take the ${surveyTitle} survey`}
           className="group mt-6 block rounded-xl border border-brand-primary-border bg-brand-primary-light/55 px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.025)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-brand-primary/45 hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
         >
@@ -276,15 +276,6 @@ export function BoardDetailArticleCard({
               : lang === "ko"
                 ? "게시글 공유"
                 : "Share post"
-          }
-          title={
-            shareCopied
-              ? lang === "ko"
-                ? "링크 복사됨"
-                : "Link copied"
-              : lang === "ko"
-                ? "공유"
-                : "Share"
           }
           className="rounded-md border-0 bg-transparent text-xs text-slate-500 active:text-brand-primary hover:border-0 hover:bg-slate-100 hover:text-slate-700"
         >

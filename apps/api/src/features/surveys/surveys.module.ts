@@ -1,3 +1,4 @@
+import { EmailDeliveryModule } from "../email/email-delivery.module";
 import { Module } from "@nestjs/common";
 
 import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
@@ -24,7 +25,7 @@ import { SurveyQuestionsController } from "./survey-questions.controller";
 import { SurveyResponsesController } from "./survey-responses.controller";
 
 @Module({
-  imports: [PostgresModule, AuthModule, UsersModule, AssetModule, AuditLogModule],
+  imports: [EmailDeliveryModule, PostgresModule, AuthModule, UsersModule, AssetModule, AuditLogModule],
   controllers: [
     SurveysController,
     SurveySectionsController,

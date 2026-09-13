@@ -228,7 +228,7 @@ export function ArticleTemplateControl({
                       variant="ghost"
                       size="icon"
                       aria-label={`${template.name} 삭제`}
-                      title="템플릿 삭제"
+                      data-tooltip="템플릿 삭제"
                       onClick={() => deleteTemplate(template.id)}
                       className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                     >

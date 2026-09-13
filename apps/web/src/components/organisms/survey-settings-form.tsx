@@ -7,15 +7,21 @@ import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
 import { RichTextInput } from "@/components/ui/rich-text-input";
 
-export const SURVEY_KINDS = [
-  { value: "SURVEY", label: "일반 설문" },
-  { value: "APPLICATION", label: "행사 신청" },
-];
+
 
 export const SURVEY_VISIBILITIES = [
   { value: "PUBLIC", label: "공개 (전체 공개)" },
   { value: "PRIVATE", label: "비공개 (결과 숨김)" },
 ];
+
+const SURVEY_AUDIENCE_OPTIONS = [
+  { value: "AUTHENTICATED", label: "로그인한 사용자" },
+  { value: "ANONYMOUS", label: "로그인 없이 누구나" },
+  { value: "PRIMARY_MAJOR", label: "전산학부 주전공자" },
+  { value: "FEE_PAYER", label: "과비 납부자" },
+];
+
+type SurveyAudience = (typeof SURVEY_AUDIENCE_OPTIONS)[number]["value"];
 
 export interface SurveySettingsFormValues {
   titleKo: string;
@@ -24,7 +30,6 @@ export interface SurveySettingsFormValues {
   descriptionEn?: string;
   descriptionImageUrlKo?: string | null;
   descriptionImageUrlEn?: string | null;
-  kind: "SURVEY" | "APPLICATION";
   resultVisibility: "PRIVATE" | "PUBLIC";
   feePayersOnly?: boolean;
   eligibleSocAffiliations: Array<"PRIMARY">;
@@ -304,7 +309,6 @@ export function SurveySettingsForm({
 
   const feePayersOnly = Boolean(watch("feePayersOnly"));
   const eligibleSocAffiliations = watch("eligibleSocAffiliations") ?? [];
-  const academicEligibility = watch("academicEligibility") ?? "ANY";
   const allowAnonymous = Boolean(watch("allowAnonymous"));
   const isKoreanOnly = Boolean(watch("isKoreanOnly"));
   const allowMultipleResponses = Boolean(watch("allowMultipleResponses"));
@@ -319,6 +323,14 @@ export function SurveySettingsForm({
   const titleEn = watch("titleEn") ?? "";
   const descriptionKo = watch("descriptionKo") ?? "";
   const descriptionEn = watch("descriptionEn") ?? "";
+
+  const audience: SurveyAudience = allowAnonymous
+    ? "ANONYMOUS"
+    : feePayersOnly
+      ? "FEE_PAYER"
+      : eligibleSocAffiliations.includes("PRIMARY")
+        ? "PRIMARY_MAJOR"
+        : "AUTHENTICATED";
 
   useEffect(() => {
     if (isKoreanOnly && activeTab === "en") {
@@ -369,15 +381,19 @@ export function SurveySettingsForm({
     }
   };
 
-  const toggleSocAffiliation = (value: "PRIMARY") => {
-    const isAdding = !eligibleSocAffiliations.includes(value);
-    const next = eligibleSocAffiliations.includes(value)
-      ? eligibleSocAffiliations.filter((item) => item !== value)
-      : [...eligibleSocAffiliations, value];
-    setValue("eligibleSocAffiliations", next, { shouldDirty: true, shouldValidate: true });
-    if (isAdding) {
-      setValue("allowAnonymous", false, { shouldDirty: true, shouldValidate: true });
-    }
+  const handleAudienceChange = (value: string) => {
+    if (isOngoing) return;
+    const nextAudience = value as SurveyAudience;
+    const options = { shouldDirty: true, shouldValidate: true } as const;
+
+    setValue("allowAnonymous", nextAudience === "ANONYMOUS", options);
+    setValue("feePayersOnly", nextAudience === "FEE_PAYER", options);
+    setValue(
+      "eligibleSocAffiliations",
+      nextAudience === "PRIMARY_MAJOR" ? ["PRIMARY"] : [],
+      options,
+    );
+    setValue("academicEligibility", "ANY", options);
   };
 
   const inputCls =
@@ -454,20 +470,6 @@ export function SurveySettingsForm({
                 <h3 id="survey-basic-settings" className="text-sm font-semibold text-[#172033]">기본 설정</h3>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <AdminFormField label="유형 *">
-                  <Controller
-                    name="kind"
-                    control={control}
-                    render={({ field }) => (
-                      <AdminSelectDropdown
-                        value={field.value}
-                        options={SURVEY_KINDS}
-                        onChange={field.onChange}
-                        disabled={isOngoing}
-                      />
-                    )}
-                  />
-                </AdminFormField>
                 <AdminFormField label="결과 공개 범위 *">
                   <Controller
                     name="resultVisibility"
@@ -541,42 +543,19 @@ export function SurveySettingsForm({
               <div>
                 <h3 id="survey-audience-settings" className="text-sm font-semibold text-[#172033]">참여 대상 및 접근</h3>
               </div>
-              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                <SettingCheckbox
-                  checked={allowAnonymous}
+              <AdminFormField label="참여 대상 *">
+                <AdminSelectDropdown
+                  ariaLabel="참여 대상"
+                  className="w-full sm:w-1/2"
+                  value={audience}
+                  options={SURVEY_AUDIENCE_OPTIONS}
+                  onChange={handleAudienceChange}
                   disabled={isOngoing}
-                  label="로그인 없이 응답 허용"
-                  onChange={(checked) => {
-                    if (isOngoing) return;
-                    setValue("allowAnonymous", checked, { shouldDirty: true, shouldValidate: true });
-                    if (checked) {
-                      setValue("feePayersOnly", false, { shouldDirty: true, shouldValidate: true });
-                      setValue("eligibleSocAffiliations", [], { shouldDirty: true, shouldValidate: true });
-                      setValue("academicEligibility", "ANY", { shouldDirty: true, shouldValidate: true });
-                    }
-                  }}
                 />
-                <SettingCheckbox
-                  checked={feePayersOnly}
-                  disabled={isOngoing}
-                  label="과비 납부자만 응답 가능"
-                  onChange={(checked) => {
-                    if (isOngoing) return;
-                    setValue("feePayersOnly", checked, { shouldDirty: true, shouldValidate: true });
-                    if (checked) setValue("allowAnonymous", false, { shouldDirty: true, shouldValidate: true });
-                  }}
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <SettingCheckbox
-                  checked={eligibleSocAffiliations.includes("PRIMARY")}
-                  className="sm:self-end"
-                  disabled={isOngoing}
-                  label="전산학부 주전공"
-                  onChange={() => toggleSocAffiliation("PRIMARY")}
-                />
-
-              </div>
+              </AdminFormField>
+              <p className="text-xs font-normal leading-4 text-slate-400">
+                참여 대상은 하나만 선택할 수 있습니다.
+              </p>
             </section>
 
             <section className="space-y-3 border-t border-slate-100 pt-5" aria-labelledby="survey-response-settings">
@@ -586,7 +565,7 @@ export function SurveySettingsForm({
               <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                 <SettingCheckbox
                   checked={allowMultipleResponses}
-                  disabled={isOngoing}
+                  disabled={isOngoing || allowResponseEdit}
                   label="복수 응답 허용"
                   onChange={(checked) => {
                     if (isOngoing) return;
@@ -596,7 +575,7 @@ export function SurveySettingsForm({
                 />
                 <SettingCheckbox
                   checked={allowResponseEdit}
-                  disabled={isOngoing}
+                  disabled={isOngoing || allowMultipleResponses}
                   label="응답 제출 후 수정 허용"
                   onChange={(checked) => {
                     if (isOngoing) return;

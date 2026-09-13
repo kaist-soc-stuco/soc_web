@@ -512,7 +512,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     aria-expanded={hoveredIndex === index}
                     aria-haspopup="menu"
                     aria-controls={`site-nav-flyout-${index}`}
-                    className={`interaction-link relative flex h-full w-[var(--ui-nav-column-width)] items-center justify-center whitespace-nowrap px-4 text-[length:var(--ui-text-section-size)] font-semibold transition-colors ${
+                    className={`interaction-link relative flex h-full w-[var(--ui-nav-column-width)] items-center justify-center whitespace-nowrap px-4 py-2 text-[length:var(--ui-text-section-size)] font-semibold transition-colors ${
                       variant === "home"
                         ? "home-header-nav-link"
                         : active || hoveredIndex === index
@@ -520,7 +520,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                           : "text-slate-900 hover:text-kaist-darkgreen-main"
                     }`}
                   >
-                    <span className="py-2">{item.label}</span>
+                    <span>{item.label}</span>
                     <ChevronDown
                       aria-hidden="true"
                       className={`ml-1 h-3.5 w-3.5 transition-transform duration-200 ease-out ${
@@ -539,14 +539,14 @@ export function Header({ variant = "default" }: HeaderProps) {
                     id={`site-nav-flyout-${index}`}
                     role="menu"
                     aria-label={`${item.label} ${lang === "ko" ? "하위 메뉴" : "submenu"}`}
-                    className={`absolute left-0 top-full z-50 w-full origin-top overflow-hidden rounded-b border-x border-b border-t transition-[opacity,transform,visibility] duration-200 ease-out ${
+                    className={`absolute left-0 top-full z-50 w-full origin-top overflow-hidden rounded-b border-x border-b border-t transition-[opacity,visibility] duration-150 ease-out ${
                       homeHeaderDark
-                        ? "border-white/15 bg-[rgba(8,29,23,0.84)] shadow-[0_18px_36px_-22px_rgba(0,0,0,0.72)] backdrop-blur-xl backdrop-saturate-150"
+                        ? "border-slate-200 bg-white text-slate-800 shadow-lg"
                         : "border-[var(--ui-menu-divider)] bg-white shadow-[0_10px_18px_-20px_rgba(15,23,42,0.38)]"
                     } ${
                       hoveredIndex === index
                         ? "visible pointer-events-auto translate-y-0 opacity-100"
-                        : "invisible pointer-events-none -translate-y-1 opacity-0"
+                        : "invisible pointer-events-none translate-y-0 opacity-0"
                     }`}
                     onMouseEnter={() => setHoveredIndex(index)}
                   >
@@ -567,14 +567,14 @@ export function Header({ variant = "default" }: HeaderProps) {
                               aria-current={childActive ? "page" : undefined}
                               tabIndex={hoveredIndex === index ? 0 : -1}
                               onClick={closePopovers}
-                              className={`flex h-11 items-center justify-center whitespace-nowrap px-1 text-center text-sm font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${
+                              className={`flex h-11 items-center justify-center whitespace-nowrap rounded-md px-3 text-center text-sm font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${
                                 homeHeaderDark
                                   ? childActive
-                                    ? "text-white focus-visible:ring-white/30"
-                                    : "text-white/78 hover:text-white focus-visible:text-white focus-visible:ring-white/30"
+                                    ? "text-white hover:bg-slate-50 focus-visible:ring-white/30"
+                                    : "text-white/78 hover:bg-slate-50 hover:text-white focus-visible:bg-slate-50 focus-visible:text-white focus-visible:ring-white/30"
                                   : childActive
-                                    ? "text-brand-primary focus-visible:ring-brand-primary/20"
-                                    : "text-[var(--ui-menu-item-text)] hover:text-brand-primary focus-visible:text-brand-primary focus-visible:ring-brand-primary/20"
+                                    ? "text-brand-primary hover:bg-slate-50 focus-visible:ring-brand-primary/20"
+                                    : "text-[var(--ui-menu-item-text)] hover:bg-slate-50 hover:text-brand-primary focus-visible:bg-slate-50 focus-visible:text-brand-primary focus-visible:ring-brand-primary/20"
                               }`}
                             >
                               {child.label}
@@ -659,7 +659,6 @@ export function Header({ variant = "default" }: HeaderProps) {
                 ? "text-white hover:bg-white/10 [&_svg]:text-white/70"
                 : "text-slate-700 hover:bg-slate-100 [&_svg]:text-slate-500"
             }`}
-            title={lang === "ko" ? "Switch to English" : "한국어로 변경"}
           >
             <span>{lang === "ko" ? "KO" : "EN"}</span>
           </Button>
@@ -757,7 +756,6 @@ export function Header({ variant = "default" }: HeaderProps) {
             <div ref={profileRef} className="relative">
               <IconButton
                 aria-label={lang === "ko" ? `${user.name} 프로필` : `${user.name} profile`}
-                title={user.name}
                 aria-expanded={dropdownOpen}
                 onClick={() => {
                   setDropdownOpen((value) => !value);
@@ -815,7 +813,6 @@ export function Header({ variant = "default" }: HeaderProps) {
           ) : isTemporarySession ? (
             <IconButton
               aria-label={lang === "ko" ? "임시 세션 로그아웃" : "Log out temporary session"}
-              title={lang === "ko" ? "임시 세션 로그아웃" : "Log out temporary session"}
               onClick={() => void handleLogout()}
               className={variant === "home" ? "home-header-icon" : undefined}
             >

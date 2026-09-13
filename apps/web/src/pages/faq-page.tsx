@@ -9,11 +9,14 @@ import { Button as UiButton } from "@/components/ui/button";
 import {
   DataViewBody,
   DataViewCard,
-  DataViewToolbar,
+  PageActionLink,
   PageContainer,
   PageHeader,
   PageMain,
+  PageSearchField,
   PageShell,
+  PageTabButton,
+  PageTabs,
 } from "@/components/ui/page-layout";
 import { useLanguage } from "@/hooks/use-language";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
@@ -21,15 +24,12 @@ import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { canWriteBoardFromMetadata } from "@/lib/board-metadata";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
-import {
-  BoardDataControls,
-} from "@/features/board-list/board-page-sections";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 
 const FAQ_SECTIONS = [
   {
     key: "account",
-    titleKo: "계정 및 이용",
+    titleKo: "계정·이용",
     titleEn: "Account & access",
     titles: new Set([
       "KAIST 계정으로 어떻게 로그인하나요?",
@@ -40,7 +40,7 @@ const FAQ_SECTIONS = [
   },
   {
     key: "fees",
-    titleKo: "과비",
+    titleKo: "과비 납부",
     titleEn: "Student fees",
     titles: new Set([
       "과비는 어떻게 납부하나요?",
@@ -50,7 +50,7 @@ const FAQ_SECTIONS = [
   },
   {
     key: "events-surveys",
-    titleKo: "행사 및 설문",
+    titleKo: "행사·설문",
     titleEn: "Events & surveys",
     titles: new Set([
       "행사·일정은 어디서 확인하나요?",
@@ -60,21 +60,14 @@ const FAQ_SECTIONS = [
     ]),
   },
   {
-    key: "board",
-    titleKo: "게시판 및 건의",
-    titleEn: "Boards & suggestions",
+    key: "other",
+    titleKo: "기타",
+    titleEn: "Other",
     titles: new Set([
       "학생회에 사업이나 정책을 건의하려면 어떻게 하나요?",
       "비밀 건의사항과 공식 답변은 누가 볼 수 있나요?",
       "댓글이나 공식 답변 알림은 어디서 확인하나요?",
       "사이트 오류는 어떻게 신고하나요?",
-    ]),
-  },
-  {
-    key: "council",
-    titleKo: "학생회 및 학부 정보",
-    titleEn: "Council & school information",
-    titles: new Set([
       "행사나 동아리 홍보글 게시를 요청하려면 어떻게 하나요?",
       "학번별 단체 카카오톡방에 참여하려면 어떻게 하나요?",
       "졸업 요건과 교과목 이수 순서는 어디서 확인하나요?",
@@ -87,10 +80,24 @@ const FAQ_SECTIONS = [
   },
 ] as const;
 
+type FaqFilter = "all" | (typeof FAQ_SECTIONS)[number]["key"];
+
+const FAQ_FILTERS: Array<{ value: FaqFilter; titleKo: string; titleEn: string }> = [
+  { value: "all", titleKo: "전체", titleEn: "All" },
+  { value: "account", titleKo: "계정·이용", titleEn: "Account & access" },
+  { value: "fees", titleKo: "과비 납부", titleEn: "Student fees" },
+  { value: "events-surveys", titleKo: "행사·설문", titleEn: "Events & surveys" },
+  { value: "other", titleKo: "기타", titleEn: "Other" },
+];
+
+const faqCategoryForTitle = (titleKo: string): FaqFilter =>
+  FAQ_SECTIONS.find((section) => section.titles.has(titleKo))?.key ?? "other";
+
 export function FaqPage() {
   const { lang } = useLanguage();
   const [openItems, setOpenItems] = useState<Set<string>>(() => new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState<FaqFilter>("all");
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const { data: session } = useCurrentSession();
   const apiClient = useMemo(
@@ -114,14 +121,16 @@ export function FaqPage() {
   const items = faqQuery.data?.items ?? [];
   const filteredItems = useMemo(() => {
     const query = deferredSearchQuery.trim().toLocaleLowerCase();
-    if (!query) return items;
-
-    return items.filter((item) =>
-      [item.titleKo, item.titleEn, item.snippetKo, item.snippetEn]
+    return items.filter((item) => {
+      if (activeFilter !== "all" && faqCategoryForTitle(item.titleKo) !== activeFilter) {
+        return false;
+      }
+      if (!query) return true;
+      return [item.titleKo, item.titleEn, item.snippetKo, item.snippetEn]
         .filter(Boolean)
-        .some((value) => value!.toLocaleLowerCase().includes(query)),
-    );
-  }, [deferredSearchQuery, items]);
+        .some((value) => value!.toLocaleLowerCase().includes(query));
+    });
+  }, [activeFilter, deferredSearchQuery, items]);
   const faqSections = useMemo(() => {
     const assignedIds = new Set<string>();
     const sections = FAQ_SECTIONS.flatMap((section) => {
@@ -153,25 +162,50 @@ export function FaqPage() {
       <PageMain>
         <PageHeader
           className="mb-0"
-          title="FAQ"
+          containerClassName="max-w-4xl"
+          title={lang === "ko" ? "자주 묻는 질문 (FAQ)" : "Frequently asked questions (FAQ)"}
           titleId="faq-page-title"
         />
 
-
-        <PageContainer className="pb-8">
-          <DataViewCard aria-label={lang === "ko" ? "FAQ 목록" : "FAQ list"}>
-            <DataViewToolbar>
-              <BoardDataControls
-                canWrite={canWriteFaq}
-                lang={lang}
-                onCurrentPageChange={() => undefined}
-                onSearchQueryChange={setSearchQuery}
-                searchQuery={searchQuery}
-                totalCount={filteredItems.length}
-                writeState={{ initialCategory: "faq" }}
+        <PageContainer className="faq-page-container max-w-4xl pb-12">
+         <div className="faq-page-tools">
+           <PageTabs
+             aria-label={lang === "ko" ? "FAQ 분류" : "FAQ categories"}
+              variant="segmented"
+             className="faq-filter-tabs"
+           >
+             {FAQ_FILTERS.map((filter) => (
+               <PageTabButton
+                 key={filter.value}
+                 active={activeFilter === filter.value}
+                 onClick={() => setActiveFilter(filter.value)}
+               >
+                 {lang === "ko" ? filter.titleKo : filter.titleEn}
+               </PageTabButton>
+             ))}
+           </PageTabs>
+            <div className="faq-page-actions">
+              <PageSearchField
+                ariaLabel={lang === "ko" ? "FAQ 검색" : "Search FAQ"}
+                placeholder={lang === "ko" ? "질문 키워드를 검색해 보세요" : "Search FAQ keywords"}
+                value={searchQuery}
+                onChange={setSearchQuery}
+                onClear={() => setSearchQuery("")}
+                className="faq-search-field"
               />
-            </DataViewToolbar>
-            <DataViewBody>
+              {canWriteFaq ? (
+                <PageActionLink state={{ initialCategory: "faq" }} to="/board/write" tone="primary">
+                  {lang === "ko" ? "작성" : "Write"}
+                </PageActionLink>
+              ) : null}
+            </div>
+         </div>
+
+          <span className="sr-only" aria-live="polite">
+            {lang === "ko" ? `전체 ${filteredItems.length}건` : `${filteredItems.length} items`}
+          </span>
+         <DataViewCard aria-label={lang === "ko" ? "FAQ 목록" : "FAQ list"} className="faq-list-card">
+           <DataViewBody>
               {faqQuery.isPending ? (
                 <div className="min-h-48 divide-y divide-slate-100" aria-label="FAQ 불러오는 중">
                   {Array.from({ length: 5 }, (_, index) => (
@@ -197,16 +231,36 @@ export function FaqPage() {
                 <EmptyState
                   className="min-h-48 rounded-none border-0 bg-transparent"
                   message={
-                    deferredSearchQuery.trim()
+                    deferredSearchQuery.trim() || activeFilter !== "all"
                       ? lang === "ko"
-                        ? "검색 결과가 없습니다."
-                        : "No search results."
+                        ? "조건에 맞는 FAQ가 없습니다."
+                        : "No FAQ matches these filters."
                       : lang === "ko"
                         ? "등록된 FAQ가 없습니다."
                         : "No FAQ available."
                   }
                   minHeightClassName="min-h-48"
-                />
+                >
+                  {deferredSearchQuery.trim() || activeFilter !== "all" ? (
+                    <>
+                      <span>
+                        {lang === "ko"
+                          ? "조건에 맞는 FAQ가 없습니다."
+                          : "No FAQ matches these filters."}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-brand-primary hover:underline"
+                        onClick={() => {
+                          setSearchQuery("");
+                          setActiveFilter("all");
+                        }}
+                      >
+                        {lang === "ko" ? "필터 초기화" : "Reset filters"}
+                      </button>
+                    </>
+                  ) : undefined}
+                </EmptyState>
               ) : (
                 <div className="min-h-48">
                   {faqSections.map((section, index) => (
@@ -217,7 +271,7 @@ export function FaqPage() {
                     >
                       <h3
                         id={`faq-section-${section.key}`}
-                        className="border-b border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm font-semibold tracking-tight text-slate-800 sm:px-6"
+                        className="border-b border-slate-100 px-4 py-4 text-base font-bold tracking-tight text-slate-900 sm:px-6"
                       >
                         {lang === "ko" ? section.titleKo : section.titleEn}
                       </h3>
@@ -250,7 +304,9 @@ export function FaqPage() {
                                 }}
                                 className="flex min-h-14 w-full items-center justify-between gap-4 rounded-none border-0 px-4 py-3 text-left text-[length:var(--ui-text-section-size)] font-medium leading-6 text-slate-800 hover:bg-slate-50 sm:px-6"
                               >
-                                <span className="min-w-0 flex-1 whitespace-normal">{title}</span>
+                                <span className="flex min-w-0 flex-1 items-baseline whitespace-normal">
+                                 <span>{title}</span>
+                               </span>
                                 <ChevronDown
                                   className={`size-4 shrink-0 text-slate-400 transition-transform duration-150 ${
                                     isOpen ? "rotate-180 text-brand-primary" : ""
