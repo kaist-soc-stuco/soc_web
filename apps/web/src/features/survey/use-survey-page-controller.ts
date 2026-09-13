@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type SyntheticEvent } from "react";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
-import type { SurveyDetailResponse, SurveyQuestionRecord } from "@soc/contracts";
+import { isSurveyDisplayBlock, type SurveyDetailResponse, type SurveyQuestionRecord } from "@soc/contracts";
 import { msToIso, nowMs } from "@soc/shared";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
@@ -70,7 +70,9 @@ export function useSurveyPageController(surveyId: string | undefined) {
   const [hydratedDraftKey, setHydratedDraftKey] = useState<string | null>(null);
 
   const allSurveyQuestions = useMemo(
-    () => survey?.sections.flatMap((section) => section.questions) ?? [],
+    () => survey?.sections
+      .flatMap((section) => section.questions)
+      .filter((question) => !isSurveyDisplayBlock(question.questionType)) ?? [],
     [survey],
   );
 
@@ -83,7 +85,8 @@ export function useSurveyPageController(surveyId: string | undefined) {
     () =>
       survey?.sections
         .filter((section) => visibleSectionIds.has(section.id))
-        .flatMap((section) => section.questions) ?? [],
+        .flatMap((section) => section.questions)
+        .filter((question) => !isSurveyDisplayBlock(question.questionType)) ?? [],
     [survey, visibleSectionIds],
   );
 

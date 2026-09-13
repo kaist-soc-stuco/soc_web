@@ -4170,12 +4170,6 @@ html { scrollbar-gutter: stable; }
 
 .site-primary-nav > [data-nav-index] {
   background: transparent;
-  transition: background-color 120ms ease;
-}
-
-.site-primary-nav > [data-nav-index]:hover,
-.site-primary-nav > [data-nav-index]:focus-within {
-  background: #f8fafc;
 }
 
 .site-primary-nav > [data-nav-index] > a,
@@ -4190,18 +4184,18 @@ html { scrollbar-gutter: stable; }
 }
 
 .site-primary-nav [role="menu"] li {
-  border-radius: 0.375rem;
+  margin-inline: 0;
+  border-radius: 0;
   transition: background-color 120ms ease;
+}
+
+.site-primary-nav [role="menu"] ul {
+  padding-block: 0.5rem;
 }
 
 .site-primary-nav [role="menu"] li:hover,
 .site-primary-nav [role="menu"] li:focus-within {
   background: #f8fafc;
-}
-
-.site-header-home:not(.home-header-scrolled) .site-primary-nav > [data-nav-index]:hover,
-.site-header-home:not(.home-header-scrolled) .site-primary-nav > [data-nav-index]:focus-within {
-  background: rgb(255 255 255 / 12%);
 }
 
 .faq-page-tools {
@@ -4366,6 +4360,8 @@ button[data-tooltip]:focus-visible::after {
   border-radius: 0.75rem;
   background: #fff;
   box-shadow: 0 2px 8px rgb(15 23 42 / 8%);
+  transition: top 220ms cubic-bezier(0.22, 1, 0.36, 1), left 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: top, left;
 }
 
 .survey-editor-floating-toolbar button {
@@ -4476,6 +4472,12 @@ button[data-tooltip]:focus-visible::after {
     bottom: calc(100% + 0.625rem);
     top: auto;
     transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .survey-editor-floating-toolbar {
+    transition: none;
   }
 }
 

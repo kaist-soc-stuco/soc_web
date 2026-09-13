@@ -93,6 +93,33 @@ test("accepts configured file-upload questions", () => {
   );
 });
 
+test("keeps title and description blocks non-answerable", () => {
+  const displayBlock = question({
+    questionType: "title_description",
+    isRequired: false,
+    options: null,
+    config: null,
+    answerRegex: null,
+  });
+
+  assert.doesNotThrow(() => assertSurveyQuestionDefinition(displayBlock));
+  expectBadRequest(
+    () => assertSurveyQuestionDefinition({ ...displayBlock, config: {} }),
+    "survey_display_block_cannot_have_answers",
+  );
+  expectBadRequest(
+    () => assertPublishableSurveyDefinition(
+      { isKoreanOnly: true, titleEn: null },
+      [section({ questions: [displayBlock] })],
+    ),
+    "survey_requires_question",
+  );
+  assert.doesNotThrow(() => assertPublishableSurveyDefinition(
+    { isKoreanOnly: true, titleEn: null },
+    [section({ questions: [displayBlock, question({ id: "question-2" })] })],
+  ));
+});
+
 test("accepts a complete bilingual survey", () => {
   assert.doesNotThrow(() => assertPublishableSurveyDefinition(
     { isKoreanOnly: false, titleEn: "Survey" },

@@ -1467,6 +1467,150 @@ export function QuestionInlineEditor({
   );
 }
 
+type TitleDescriptionInlineEditorProps = Pick<
+  QuestionInlineEditorProps,
+  "initial" | "isKoreanOnly" | "isOngoing" | "dragHandle" | "commitRef" | "onDuplicate" | "onDelete" | "onSave" | "onCancel"
+>;
+
+/**
+ * A title/description block is ordered with questions, but it is not a
+ * question. Keep its editor deliberately small so it cannot accidentally
+ * expose response settings or create an answerable field.
+ */
+export function TitleDescriptionInlineEditor({
+  initial,
+  isKoreanOnly = false,
+  isOngoing = false,
+  dragHandle,
+  commitRef,
+  onDuplicate,
+  onDelete,
+  onSave,
+  onCancel,
+}: TitleDescriptionInlineEditorProps) {
+  const { toast } = useToast();
+  const [form, setForm] = useState(initial);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async (): Promise<boolean> => {
+    if (saving) return false;
+    setSaving(true);
+    try {
+      await onSave({
+        ...form,
+        questionType: "title_description",
+        titleKo: form.titleKo.trim() || "제목 없음",
+        titleEn: form.titleEn.trim() || (isKoreanOnly ? "" : "Untitled title"),
+        descriptionKo: form.descriptionKo.trim(),
+        descriptionEn: form.descriptionEn.trim(),
+        options: [],
+        answerRegex: "",
+        answerValidationEnabled: false,
+        isRequired: false,
+        config: null,
+      });
+      return true;
+    } catch {
+      toast({ type: "error", message: "제목 및 설명을 저장하지 못했습니다." });
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!commitRef) return;
+    commitRef.current = handleSave;
+    return () => {
+      if (commitRef.current === handleSave) commitRef.current = null;
+    };
+  });
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onCancel();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel]);
+
+  return (
+    <div className="question-inline-editor relative overflow-visible rounded-xl border border-slate-200 bg-white p-4 pb-5 pt-8 shadow-sm sm:p-5 md:p-6 md:pb-5 md:pt-8">
+      {dragHandle ? (
+        <div className="absolute left-1/2 top-1 z-10 -translate-x-1/2" aria-label="제목 및 설명 순서 이동">
+          {dragHandle}
+        </div>
+      ) : null}
+      <div className="grid min-w-0 gap-3 md:grid-cols-2">
+        <div className="question-editor-field group relative min-w-0">
+          <RichTextInput
+            singleLine
+            ariaLabel="제목 및 설명 국문 제목"
+            value={form.titleKo}
+            disabled={isOngoing}
+            onChange={(value) => setForm((current) => ({ ...current, titleKo: value }))}
+            placeholder="제목"
+            inputClassName="!bg-transparent !px-0 !text-2xl !font-normal !leading-tight"
+          />
+          <span aria-hidden="true" className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary" />
+        </div>
+        {!isKoreanOnly ? (
+          <div className="question-editor-field group relative min-w-0">
+            <RichTextInput
+              singleLine
+              ariaLabel="제목 및 설명 영문 제목"
+              value={form.titleEn}
+              disabled={isOngoing}
+              onChange={(value) => setForm((current) => ({ ...current, titleEn: value }))}
+              placeholder="Title"
+              inputClassName="!bg-transparent !px-0 !text-2xl !font-normal !leading-tight"
+            />
+            <span aria-hidden="true" className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary" />
+          </div>
+        ) : null}
+      </div>
+      <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2">
+        <div className="question-editor-field group relative min-w-0">
+          <RichTextInput
+            ariaLabel="제목 및 설명 국문 설명"
+            value={form.descriptionKo}
+            disabled={isOngoing}
+            onChange={(value) => setForm((current) => ({ ...current, descriptionKo: value }))}
+            placeholder="설명"
+          />
+        </div>
+        {!isKoreanOnly ? (
+          <div className="question-editor-field group relative min-w-0">
+            <RichTextInput
+              ariaLabel="제목 및 설명 영문 설명"
+              value={form.descriptionEn}
+              disabled={isOngoing}
+              onChange={(value) => setForm((current) => ({ ...current, descriptionEn: value }))}
+              placeholder="Description"
+            />
+          </div>
+        ) : null}
+      </div>
+      <div className="mt-5 border-t border-slate-100 pt-4">
+        <div className="flex items-center justify-end gap-1">
+          {onDuplicate ? (
+            <IconButton type="button" size="sm" aria-label="제목 및 설명 복제" data-tooltip="문항 복제" disabled={isOngoing || saving} onClick={() => void onDuplicate()}>
+              <Copy className="size-4" />
+            </IconButton>
+          ) : null}
+          {onDelete ? (
+            <IconButton type="button" size="sm" aria-label="제목 및 설명 삭제" data-tooltip="문항 삭제" disabled={isOngoing || saving} onClick={() => void onDelete()} className="text-slate-500 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600">
+              <Trash2 className="size-4" />
+            </IconButton>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function QuestionSwitch({
   checked,
   disabled = false,

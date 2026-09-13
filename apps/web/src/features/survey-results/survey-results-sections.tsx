@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import type {
-  QuestionType,
-  SurveyAnalyticsResponse,
-  SurveyChoiceAnalyticsItem,
-  SurveyGridAnalytics,
-  SurveyQuestionAnalyticsItem,
-  SurveyAnalyticsSection,
+import {
+  isSurveyDisplayBlock,
+  type QuestionType,
+  type SurveyAnalyticsResponse,
+  type SurveyChoiceAnalyticsItem,
+  type SurveyGridAnalytics,
+  type SurveyQuestionAnalyticsItem,
+  type SurveyAnalyticsSection,
 } from "@soc/contracts";
 import {
   AlertCircle,
@@ -48,6 +49,7 @@ function getQuestionTypeLabel(type: QuestionType, lang: string) {
     file_upload: { ko: "파일 업로드", en: "File upload" },
     date: { ko: "날짜", en: "Date" },
     time: { ko: "시간", en: "Time" },
+    title_description: { ko: "제목 및 설명", en: "Title and description" },
   };
 
   return lang === "ko" ? labels[type].ko : labels[type].en;

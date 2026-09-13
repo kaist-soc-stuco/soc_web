@@ -3,6 +3,7 @@ import type {
   SurveyQuestionConfig,
   SurveyQuestionRecord,
 } from "@soc/contracts";
+import { isSurveyDisplayBlock } from "@soc/contracts";
 
 export const SUBMIT_BRANCH_TARGET = "SUBMIT" as const;
 
@@ -132,7 +133,9 @@ export function getReachableSurveyQuestions(
     );
     for (const question of questions) {
       assertQuestionBranchConfiguration(question, sectionIds, current.id);
-      reachable.push(question);
+      if (!isSurveyDisplayBlock(question.questionType)) {
+        reachable.push(question);
+      }
     }
 
     const branchQuestion = questions.find((question) =>

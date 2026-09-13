@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { isoToMs, nowMs } from "@soc/shared";
 import {
+  isSurveyDisplayBlock,
   OPERATIONAL_SURVEY_IDS,
   Permissions,
   type SurveyParticipationEligibility,
@@ -717,7 +718,8 @@ export class SurveysService {
 
     const analyticsSections = await Promise.all(
       sections.map(async (section) => {
-        const questions = await this.questionsRepo.findBySectionId(section.id);
+        const questions = (await this.questionsRepo.findBySectionId(section.id))
+          .filter((question) => !isSurveyDisplayBlock(question.questionType));
         const analyticsQuestions = await Promise.all(
           questions.map(async (q) => {
             const questionAnswers = answers.filter((a) => a.questionId === q.id);

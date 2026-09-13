@@ -87,6 +87,22 @@ test("survey branching rejects option and section references that do not exist",
   );
 });
 
+test("does not expose title and description blocks as answerable questions", () => {
+  const displayBlock = question({
+    id: "display-block",
+    questionType: "title_description",
+  });
+  const answerable = question({ id: "q-1" });
+
+  assert.deepEqual(
+    getReachableSurveyQuestions(
+      [{ id: "section-1", sortOrder: 0, questions: [displayBlock, answerable] }],
+      [],
+    ).map((item) => item.id),
+    ["q-1"],
+  );
+});
+
 test("survey sections with a shared sort order still resolve by creation order", () => {
   const first = question({
     id: "q-1",
