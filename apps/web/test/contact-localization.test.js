@@ -10,8 +10,8 @@ const localizedContact = {
   roleEn: "President",
 };
 
-test("contact create requires all Korean and English identity fields", () => {
-  for (const field of ["nameKo", "nameEn", "roleKo", "roleEn"]) {
+test("contact create requires Korean identity fields and defaults English fields", () => {
+  for (const field of ["nameKo", "roleKo"]) {
     const missing = { ...localizedContact };
     delete missing[field];
     assert.equal(CreateContactSchema.safeParse(missing).success, false, field);
@@ -22,6 +22,11 @@ test("contact create requires all Korean and English identity fields", () => {
       `${field} whitespace`,
     );
   }
+
+  const parsed = CreateContactSchema.parse({ nameKo: "홍길동", roleKo: "회장" });
+  assert.equal(parsed.nameEn, "");
+  assert.equal(parsed.roleEn, "");
+  assert.equal(parsed.privacyConsented, true);
 });
 
 test("contact update accepts partial identity fields and validates provided values", () => {
@@ -30,7 +35,7 @@ test("contact update accepts partial identity fields and validates provided valu
   });
   assert.equal(UpdateContactSchema.safeParse(localizedContact).success, true);
 
-  for (const field of ["nameKo", "nameEn", "roleKo", "roleEn"]) {
+  for (const field of ["nameKo", "roleKo"]) {
     assert.equal(
       UpdateContactSchema.safeParse({ [field]: "   " }).success,
       false,
@@ -42,6 +47,11 @@ test("contact update accepts partial identity fields and validates provided valu
       `${field} null`,
     );
   }
+
+  for (const field of ["nameEn", "roleEn"]) {
+    assert.equal(UpdateContactSchema.safeParse({ [field]: "   " }).success, true);
+    assert.equal(UpdateContactSchema.safeParse({ [field]: null }).success, false);
+  }
 });
 
 test("contact identity fields are normalized before persistence", () => {
@@ -52,5 +62,5 @@ test("contact identity fields are normalized before persistence", () => {
     roleEn: "  President  ",
   });
 
-  assert.deepEqual(parsed, { ...localizedContact, privacyConsented: true, publiclyListed: false });
+  assert.deepEqual(parsed, { ...localizedContact, privacyConsented: true });
 });
