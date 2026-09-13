@@ -1,5 +1,6 @@
 import { Injectable, InternalServerErrorException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { nowMs } from "@soc/shared";
 import { createCipheriv, createDecipheriv, createHash, createHmac, timingSafeEqual, randomBytes } from "node:crypto";
 
 interface CipherPayload {
@@ -30,7 +31,7 @@ export class VoteCryptoService {
   }
 
   issueTallyConfirmation(voteId: string, actorId: string, revision: string): string {
-    const body = Buffer.from(JSON.stringify({ voteId, actorId, revision, expires: Date.now() + 120_000 })).toString("base64url");
+    const body = Buffer.from(JSON.stringify({ voteId, actorId, revision, expires: nowMs() + 120_000 })).toString("base64url");
     return `${body}.${createHmac("sha256", this.masterKey).update(`tally-confirmation:v1:${body}`).digest("base64url")}`;
   }
 
@@ -41,7 +42,7 @@ export class VoteCryptoService {
       const actual = Buffer.from(signature, "base64url");
       if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return false;
       const value = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
-      return value.voteId === voteId && value.actorId === actorId && value.revision === revision && value.expires > Date.now();
+      return value.voteId === voteId && value.actorId === actorId && value.revision === revision && value.expires > nowMs();
     } catch { return false; }
   }
 
