@@ -250,6 +250,71 @@ test("SSO callback requires the browser transaction and does not put it in redir
   }
 });
 
+test("SSO callback accepts the documented minimal Pass-Ni userInfo response", async () => {
+  const values = new Map();
+  const redis = {
+    async set(key, value) { values.set(key, value); },
+    async get(key) { return values.get(key) ?? null; },
+    async getdel(key) {
+      const value = values.get(key) ?? null;
+      values.delete(key);
+      return value;
+    },
+    async del(key) { values.delete(key); },
+  };
+  let lookedUpKaistUid;
+  let syncedProfile;
+  const users = {
+    ...createUsersService(),
+    async findByKaistUid(value) {
+      lookedUpKaistUid = value;
+      return { userId: "user-a", isActive: true };
+    },
+    async updateProfileFromSso(_userId, input) {
+      syncedProfile = input;
+    },
+    async invalidatePermissionCache() {},
+  };
+  const session = new AuthSessionService(
+    config,
+    createSessionRepository(),
+    { consume: async () => null },
+    users,
+    { ensureRoleForUser: async () => undefined },
+  );
+  const service = new AuthService(
+    config,
+    users,
+    session,
+    { save: async () => undefined },
+    { ensureRoleForUser: async () => undefined },
+    redis,
+  );
+  const start = await service.createLoginStartPayload();
+  const originalFetch = global.fetch;
+  global.fetch = async () => new Response(JSON.stringify({
+    nonce: start.nonce,
+    userInfo: {
+      user_id: "documented-user-id",
+      user_email: "documented@example.invalid",
+      user_mbtlnum: "010-0000-0000",
+    },
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+
+  try {
+    const callback = await service.handleLoginCallback(
+      { state: start.state, code: "synthetic-code" },
+      start.state,
+    );
+    assert.ok(callback.transactionToken);
+    assert.equal(lookedUpKaistUid, "documented-user-id");
+    assert.equal(syncedProfile?.nameKo, "documented-user-id");
+    assert.equal(syncedProfile?.email, "documented@example.invalid");
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test("production auth cookies remain Secure and cross-site SSO uses None", () => {
   const previous = process.env.NODE_ENV;
   process.env.NODE_ENV = "production";
@@ -263,4 +328,33 @@ test("production auth cookies remain Secure and cross-site SSO uses None", () =>
   assert.equal(cookies[0].options.secure, true);
   assert.equal(cookies[0].options.sameSite, "none");
   process.env.NODE_ENV = previous;
+});
+
+test("development mode with HTTPS KAIST SSO also uses a cross-site transaction cookie", () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousLoginUrl = process.env.SSO_LOGIN_URL;
+  const previousRedirectUri = process.env.SSO_REDIRECT_URI;
+
+  process.env.NODE_ENV = "development";
+  process.env.SSO_LOGIN_URL = "https://ssodev.kaist.ac.kr/auth/user/single/login/authorize";
+  process.env.SSO_REDIRECT_URI = "https://soc.invalid/api/auth/login";
+
+  try {
+    const service = new AuthCookieService();
+    const cookies = [];
+    const response = {
+      cookie(name, value, options) { cookies.push({ name, value, options }); },
+      clearCookie() {},
+    };
+
+    service.setSsoTransactionCookie(response, "opaque-state", { secure: false });
+    assert.equal(cookies[0].options.secure, true);
+    assert.equal(cookies[0].options.sameSite, "none");
+  } finally {
+    process.env.NODE_ENV = previousNodeEnv;
+    if (previousLoginUrl === undefined) delete process.env.SSO_LOGIN_URL;
+    else process.env.SSO_LOGIN_URL = previousLoginUrl;
+    if (previousRedirectUri === undefined) delete process.env.SSO_REDIRECT_URI;
+    else process.env.SSO_REDIRECT_URI = previousRedirectUri;
+  }
 });

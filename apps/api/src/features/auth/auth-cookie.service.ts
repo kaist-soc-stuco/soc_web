@@ -11,23 +11,43 @@ import {
   AUTH_SSO_TRANSACTION_COOKIE_NAME,
 } from "./auth.tokens";
 
+const isHttpsUrl = (value: string | undefined): boolean => {
+  if (!value?.trim()) return false;
+
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 @Injectable()
 export class AuthCookieService {
+  private usesSecureCookiePolicy(request?: Request): boolean {
+    // The development Compose stack can still be configured with the real
+    // KAIST dev SSO. In that case the provider POSTs back from another HTTPS
+    // origin, so a development NODE_ENV must not force a Lax transaction
+    // cookie that the browser will omit.
+    return (
+      process.env.NODE_ENV === "production" ||
+      Boolean(request?.secure) ||
+      isHttpsUrl(process.env.SSO_LOGIN_URL) ||
+      isHttpsUrl(process.env.SSO_REDIRECT_URI)
+    );
+  }
+
   private getCookieOptions(maxAgeMs: number, request?: Request) {
     return {
       httpOnly: true,
       maxAge: maxAgeMs,
       path: "/",
       sameSite: "lax" as const,
-      // Production can still be served over plain HTTP behind a local or
-      // campus reverse proxy. Use the original request protocol so the
-      // browser can actually store the session cookie in that deployment.
-      secure: process.env.NODE_ENV === "production" || Boolean(request?.secure),
+      secure: this.usesSecureCookiePolicy(request),
     };
   }
 
   private getSsoTransactionOptions(request?: Request) {
-    const secure = process.env.NODE_ENV === "production" || Boolean(request?.secure);
+    const secure = this.usesSecureCookiePolicy(request);
     return {
       ...this.getCookieOptions(5 * 60 * 1000, request),
       sameSite: secure ? ("none" as const) : ("lax" as const),
