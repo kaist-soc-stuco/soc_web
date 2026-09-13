@@ -23,6 +23,20 @@ const isSchoolOfComputing = (value?: string | null): boolean => {
   );
 };
 
+const isEnrolled = (value?: string | null): boolean => {
+  const normalized = normalize(value);
+  return normalized === "재학" || normalized === "enrolled" || normalized === "active";
+};
+
+const isOnLeave = (value?: string | null): boolean => {
+  const normalized = normalize(value);
+  return (
+    normalized === "휴학" ||
+    normalized === "leave" ||
+    normalized === "leave of absence"
+  );
+};
+
 export const getSocAffiliations = (
   user: SurveyEligibilityUser,
 ): SurveySocAffiliation[] => {
@@ -54,6 +68,20 @@ export const getSurveyEligibilityFailures = (input: {
     if (!input.eligibleSocAffiliations.some((item) => userAffiliations.includes(item))) {
       failures.push("soc_affiliation_required");
     }
+  }
+
+  if (
+    input.academicEligibility === "ENROLLED_ONLY" &&
+    !isEnrolled(input.user.academicStatus)
+  ) {
+    failures.push("academic_status_required");
+  }
+  if (
+    input.academicEligibility === "ENROLLED_OR_LEAVE" &&
+    !isEnrolled(input.user.academicStatus) &&
+    !isOnLeave(input.user.academicStatus)
+  ) {
+    failures.push("academic_status_required");
   }
 
   return failures;
