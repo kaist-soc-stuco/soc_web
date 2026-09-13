@@ -255,19 +255,22 @@ export class AuthService {
         "user_id",
         "missing_user_id",
       );
-      const kaistUid = this.readRequiredUserInfoString(
-        userInfo,
-        "kaist_uid",
-        "missing_kaist_uid",
-      );
+      // Pass-Ni's documented response identifies the account with user_id;
+      // kaist_uid is present in some richer profiles but is not guaranteed.
+      // Keep the stable SSO subject as the database identity when the richer
+      // alias is absent, rather than rejecting a valid documented response.
+      const kaistUid =
+        this.readUserInfoString(userInfo, "kaist_uid") ?? ssoSubject;
       const userEmail =
         this.readUserInfoString(userInfo, "email") ??
         this.readUserInfoString(userInfo, "user_email");
-      const nameKo = this.readRequiredUserInfoString(
-        userInfo,
-        "user_nm",
-        "missing_user_nm",
-      );
+      // Older KAIST responses used user_name while the richer profile uses
+      // user_nm. The minimal API-guide response has neither, so fall back to
+      // the verified SSO subject to satisfy the non-null local display name.
+      const nameKo =
+        this.readUserInfoString(userInfo, "user_nm") ??
+        this.readUserInfoString(userInfo, "user_name") ??
+        ssoSubject;
       const nameEn = this.readUserInfoString(userInfo, "user_eng_nm");
       const stdNo = this.readUserInfoString(userInfo, "std_no");
       const departmentKo = this.readUserInfoString(userInfo, "std_dept_kor_nm");
