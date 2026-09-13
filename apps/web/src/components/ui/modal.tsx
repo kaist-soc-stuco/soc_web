@@ -80,7 +80,7 @@ export function Modal({
           <div className="flex shrink-0 items-center gap-1.5">
             {headerActions}
             {showClose ? (
-              <IconButton aria-label="닫기" onClick={onClose}>
+              <IconButton aria-label="닫기" onClick={onClose} tone="navigation">
                 <X aria-hidden="true" />
               </IconButton>
             ) : null}

@@ -10,6 +10,7 @@ import { Check, FileText, Heart, Loader2, Plus, Star, ThumbsUp, UploadCloud, X }
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
+import { useToast } from "@/components/ui/toast";
 
 import type { AnswerValue, FileAnswer } from "./survey-answer-utils";
 import { UiInput, UiTextarea } from "@/components/ui/form-control";
@@ -44,8 +45,8 @@ export function SurveyQuestionInput({
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
+  const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const base =
@@ -398,19 +399,21 @@ export function SurveyQuestionInput({
         const selectedFiles = Array.from(fileList ?? []);
         if (selectedFiles.length === 0) return;
         if (currentFiles.length + selectedFiles.length > maxFiles) {
-          setUploadError(`파일은 최대 ${maxFiles}개까지 업로드할 수 있습니다.`);
+          toast({ type: "error", message: `파일은 최대 ${maxFiles}개까지 업로드할 수 있습니다.` });
           return;
         }
         const invalidSize = selectedFiles.find((file) => file.size > maxSizeBytes);
         if (invalidSize) {
-          setUploadError(`파일은 ${(maxSizeBytes / 1_000_000).toFixed(0)}MB 이하만 업로드할 수 있습니다.`);
+          toast({
+            type: "error",
+            message: `파일은 ${(maxSizeBytes / 1_000_000).toFixed(0)}MB 이하만 업로드할 수 있습니다.`,
+          });
           return;
         }
         if (question.config?.allowedMimeTypes?.length && selectedFiles.some((file) => !question.config?.allowedMimeTypes?.includes(file.type))) {
-          setUploadError("허용되지 않은 파일 형식입니다.");
+          toast({ type: "error", message: "허용되지 않은 파일 형식입니다." });
           return;
         }
-        setUploadError(null);
         setUploading(true);
         try {
           const uploadedFiles = await Promise.all(
@@ -426,7 +429,7 @@ export function SurveyQuestionInput({
           );
           onChange({ kind: "file", files: [...currentFiles, ...uploadedFiles] });
         } catch {
-          setUploadError("파일 업로드에 실패했습니다. 다시 시도해 주세요.");
+          toast({ type: "error", message: "파일 업로드에 실패했습니다." });
         } finally {
           setUploading(false);
         }
@@ -450,7 +453,7 @@ export function SurveyQuestionInput({
             role="button"
             tabIndex={disabled || uploading ? -1 : 0}
             aria-disabled={disabled || uploading}
-            aria-invalid={Boolean(error || uploadError)}
+            aria-invalid={Boolean(error)}
             onClick={openFilePicker}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
@@ -538,19 +541,6 @@ export function SurveyQuestionInput({
             </button>
           ) : null}
 
-          {uploadError ? (
-            <div className="flex flex-wrap items-center gap-2 text-xs font-normal text-rose-600" role="alert">
-              <p>{uploadError}</p>
-              <button
-                type="button"
-                onClick={openFilePicker}
-                disabled={disabled || uploading}
-                className="min-h-11 rounded-lg px-3 font-semibold text-rose-700 underline underline-offset-2 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                다시 시도
-              </button>
-            </div>
-          ) : null}
           {renderError}
         </div>
       );
