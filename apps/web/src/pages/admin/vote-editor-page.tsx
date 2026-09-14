@@ -59,12 +59,16 @@ function SortableVoteAgendaCard({
   index,
   disabled,
   trailing,
+  selected,
+  onSelect,
   children,
 }: {
   id: string;
   index: number;
   disabled: boolean;
   trailing: ReactNode;
+  selected: boolean;
+  onSelect: () => void;
   children: ReactNode;
 }) {
   const {
@@ -80,12 +84,16 @@ function SortableVoteAgendaCard({
   return (
     <section
       ref={setNodeRef}
+      onClick={onSelect}
+      onFocus={onSelect}
+      tabIndex={disabled ? undefined : 0}
+      data-selected={selected}
       style={{
         transform: CSS.Transform.toString(transform),
         transition: transition ?? "transform 180ms ease",
         zIndex: isDragging ? 20 : undefined,
       }}
-      className={`relative rounded-xl border border-slate-200 bg-white p-5 pt-9 shadow-card sm:p-6 sm:pt-9 ${isDragging ? "relative shadow-lg" : ""}`}
+      className={`vote-agenda-card relative rounded-xl border border-slate-200 bg-white p-5 pt-9 shadow-card sm:p-6 sm:pt-9 ${isDragging ? "relative shadow-lg" : ""}`}
     >
       {!disabled ? (
         <button
@@ -116,6 +124,7 @@ export function VoteEditorPage() {
   const [results, setResults] = useState<VoteResultsResponse | null>(null);
   const [vote, setVote] = useState<VoteDetailResponse | null>(null);
   const [draft, setDraftState] = useState<Draft>(initialDraft);
+  const [selectedAgenda, setSelectedAgenda] = useState<string | null>(null);
   const [koreanOnly, setKoreanOnly] = useState(false);
   const [clock, setClock] = useState(nowMs());
   useEffect(() => { const timer = setInterval(() => setClock(nowMs()), 1000); return () => clearInterval(timer); }, []);
@@ -370,7 +379,7 @@ export function VoteEditorPage() {
           </div>
         </AdminCard> : null}
         <div className="vote-agenda-editor" hidden={editorTab !== "questions"}><AdminCard>
-          <div className="grid gap-4 p-4 sm:p-5 md:grid-cols-2">
+          <div onClick={() => setSelectedAgenda(null)} onFocus={() => setSelectedAgenda(null)} className="grid gap-4 p-4 sm:p-5 md:grid-cols-2">
             <BuilderTextField plainText singleLine
               ariaLabel="투표 제목"
               inputClassName="!text-3xl !leading-tight !font-normal"
@@ -432,6 +441,8 @@ export function VoteEditorPage() {
                       key={agendaId}
                       id={agendaId}
                       index={itemIndex}
+                      selected={selectedAgenda === agendaId}
+                      onSelect={() => setSelectedAgenda(agendaId)}
                       disabled={!editable}
                       trailing={(
                         <AdminSelectDropdown
@@ -562,8 +573,9 @@ export function VoteEditorPage() {
                               </div>
                             );
                           })}
+                          <div className="vote-agenda-details"><div className="min-h-0 overflow-hidden">
                           {editable ? (
-                            <div className="flex items-center gap-2 px-1"><span aria-hidden="true" className={`size-5 shrink-0 border border-slate-300 ${item.type === "SINGLE_CHOICE" ? "rounded-full" : "rounded"}`} /><BuilderOptionAdd onAdd={() => setItem(itemIndex, { options: [...item.options, { id: uid(), labelKo: "", labelEn: null }] })} /></div>
+                            <div className="flex items-center gap-2 px-1"><span aria-hidden="true" className={`size-5 shrink-0 border border-slate-300 ${item.type === "SINGLE_CHOICE" ? "rounded-full" : "rounded"}`} /><BuilderOptionAdd onAdd={() => { setItem(itemIndex, { options: [...item.options, { id: uid(), labelKo: "", labelEn: null }] }); requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-selected="true"] input[aria-label="옵션 ${item.options.length + 1} 국문"]`)?.focus()); }} /></div>
                           ) : null}
                           {item.type === "MULTIPLE_CHOICE" && <BuilderRuleRow>
                             {item.type === "MULTIPLE_CHOICE" ? (
@@ -576,24 +588,25 @@ export function VoteEditorPage() {
                                   max={item.options.length}
                                   disabled={!editable}
                                   value={item.maxSelections}
-                                  onChange={(e) => setItem(itemIndex, { maxSelections: Number(e.target.value) })}
+                                  onChange={(e) => setItem(itemIndex, { maxSelections: Math.max(1, Math.min(item.options.length, Number(e.target.value) || 1)) })}
                                   className="builder-text-control !h-9 w-20 px-2 text-left"
                                 />
 
                               </>
                             ) : null}
                           </BuilderRuleRow>}
+                          </div></div>
                       </div>}
 
                       {editable ? (
-                        <div className="mt-5 flex justify-end gap-1 border-t border-slate-100 pt-3">
+                        <div className="vote-agenda-details"><div className="min-h-0 overflow-hidden"><div className="mt-5 flex justify-end gap-1 border-t border-slate-100 pt-3">
                           <IconButton aria-label={`안건 ${itemIndex + 1} 복제`} data-tooltip="안건 복제" onClick={() => setDraft({ ...draft, items: [...draft.items.slice(0, itemIndex + 1), { ...item, id: uid(), options: item.options.map((option) => ({ ...option, id: uid() })) }, ...draft.items.slice(itemIndex + 1)] })}>
                             <Copy className="size-4" />
                           </IconButton>
                           <IconButton aria-label={`안건 ${itemIndex + 1} 삭제`} data-tooltip="안건 삭제" disabled={draft.items.length <= 1} onClick={() => setDraft({ ...draft, items: draft.items.filter((_, i) => i !== itemIndex) })}>
                             <Trash2 className="size-4" />
                           </IconButton>
-                        </div>
+                        </div></div></div>
                       ) : null}
                     </SortableVoteAgendaCard>
                   );
@@ -603,7 +616,7 @@ export function VoteEditorPage() {
           </DndContext>
           {editable ? (
             <div className="mt-4 flex justify-end">
-              <Button onClick={() => setDraft({ ...draft, items: [...draft.items, newItem()] })}>
+              <Button onClick={() => { const item = newItem(); setDraft({ ...draft, items: [...draft.items, item] }); setSelectedAgenda(String(item.id)); }}>
                 <Plus className="size-4" />
                 안건 추가
               </Button>

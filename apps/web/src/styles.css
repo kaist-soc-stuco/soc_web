@@ -4550,3 +4550,31 @@ button[data-tooltip]:focus-visible::after {
   .survey-editor-workspace { padding-bottom: 5rem; }
   .survey-editor-floating-toolbar { left:auto !important; top:auto !important; }
 }
+
+/* Vote cards share the builder's selection and expanding settings behavior. */
+.vote-agenda-details {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition: grid-template-rows 180ms ease, visibility 180ms;
+}
+.vote-agenda-card[data-selected="true"] .vote-agenda-details {
+  grid-template-rows: 1fr;
+  visibility: visible;
+}
+.vote-agenda-card[data-selected="true"] .builder-text-control.interaction-control {
+  border-bottom-color: var(--color-slate-300, #cbd5e1) !important;
+}
+.vote-agenda-card[data-selected="true"] .builder-text-control.interaction-control:focus {
+  border-bottom-color: var(--color-primary) !important;
+}
+.vote-agenda-card[data-selected="false"] .builder-text-control.interaction-control {
+  border-bottom-color: transparent !important;
+}
+.vote-agenda-card[data-selected="false"] .group > .flex > button,
+.vote-agenda-card[data-selected="false"] .group > .flex > div.shrink-0 {
+  visibility: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vote-agenda-details { transition: none; }
+}
