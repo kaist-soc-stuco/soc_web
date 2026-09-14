@@ -65,9 +65,7 @@ export function LoginCallbackPage() {
   const [consentSubmitting, setConsentSubmitting] = useState<
     null | "persisted" | "temporary"
   >(null);
-  const [consentErrorMessage, setConsentErrorMessage] = useState<string | null>(
-    null,
-  );
+
   const returnToPreviousPage = useCallback(
     (message: string) => {
       clearStoredAuthState();
@@ -185,16 +183,11 @@ export function LoginCallbackPage() {
 
   const submitConsentDecision = async (consent: boolean) => {
     if (!pendingConsentToken) {
-      setConsentErrorMessage(
-        lang === "ko"
-          ? "로그인 동의 세션이 없습니다. 로그인을 다시 시도해 주세요."
-          : "The login consent session is missing. Please sign in again.",
-      );
+      toast({ type: "error", message: lang === "ko" ? "로그인 동의 세션이 없습니다. 다시 로그인해 주세요." : "Please sign in again." });
       return;
     }
 
     setConsentSubmitting(consent ? "persisted" : "temporary");
-    setConsentErrorMessage(null);
 
     try {
       const payload = await apiClient.submitConsentDecision({
@@ -213,11 +206,7 @@ export function LoginCallbackPage() {
       navigate("/", { replace: true });
     } catch (error) {
       console.error(error);
-      returnToPreviousPage(
-        lang === "ko"
-          ? "동의 처리 중 오류가 발생했습니다."
-          : "An error occurred while saving your consent choice.",
-      );
+      toast({ type: "error", message: lang === "ko" ? "동의 처리에 실패했습니다. 다시 시도해 주세요." : "Could not save your choice. Please try again." });
     } finally {
       setConsentSubmitting(null);
     }
@@ -264,7 +253,8 @@ export function LoginCallbackPage() {
                 : "Sign-in was canceled.",
             )
           }
-          title={lang === "ko" ? "개인정보 제공 동의" : "Personal Data Consent"}
+          title={lang === "ko" ? "개인정보 수집 및 이용 동의" : "Consent to Collection and Use of Personal Information"}
+          showClose={false}
           className="max-w-lg"
           bodyClassName="space-y-3"
           footer={
@@ -274,15 +264,15 @@ export function LoginCallbackPage() {
                 type="button"
                 disabled={consentSubmitting !== null}
                 onClick={() => void submitConsentDecision(false)}
-                className="border-kaist-darkgreen/30 text-sm font-semibold text-kaist-darkgreen hover:border-kaist-darkgreen/50 hover:bg-kaist-darkgreen/5 hover:text-kaist-darkgreen"
+                className="text-sm font-medium"
               >
                 {consentSubmitting === "temporary"
                   ? lang === "ko"
                     ? "처리 중..."
                     : "Processing..."
                   : lang === "ko"
-                    ? "저장하지 않고 계속"
-                    : "Continue without saving"}
+                    ? "임시로 이용"
+                    : "Use temporarily"}
               </Button>
               <Button
                 variant="default"
@@ -296,8 +286,8 @@ export function LoginCallbackPage() {
                     ? "처리 중..."
                     : "Processing..."
                   : lang === "ko"
-                    ? "동의하고 저장"
-                    : "Consent and save"}
+                    ? "동의하고 계속"
+                    : "Agree and continue"}
               </Button>
             </div>
           }
@@ -312,20 +302,16 @@ export function LoginCallbackPage() {
               {lang === "ko"
                 ? (
                   <>
-                    동의하면 다음 로그인부터 필요한 기능을 바로 사용할 수 있습니다.
+                    동의하면 포털 회원 정보를 유지하여 다음 로그인에도 이용합니다.
                     <br />
-                    동의하지 않아도 이번 세션에서는 임시 로그인으로 계속 이용할 수 있습니다.
+                    임시 이용을 선택하면 회원 정보를 저장하지 않고 이번 세션에서만 이용하며, 세션 종료 시 임시 정보를 즉시 파기합니다.
                   </>
                 )
-                : "If you consent, account features will remain available on future visits. If you decline, you can continue with a temporary session for this visit."}
+                : "With consent, your portal account information is retained for future visits. Temporary access does not save an account; temporary information is discarded when the session ends."}
             </p>
           </div>
 
-          {consentErrorMessage ? (
-            <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
-              {consentErrorMessage}
-            </div>
-          ) : null}
+
         </Modal>
       ) : null}
     </main>

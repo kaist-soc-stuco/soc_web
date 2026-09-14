@@ -1,3 +1,5 @@
+import { resolveAssetUrl } from "@/lib/asset-url";
+import { useToast } from "@/components/ui/toast";
 import { VoteProgress } from "@/components/organisms/vote-progress";
 import { VoteStatusBadge } from "@/components/ui/vote-status-badge";
 import { createApiClient, ApiClientHttpError } from "@soc/api-client";
@@ -22,6 +24,8 @@ export function VotePage() {
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const [vote, setVote] = useState<VoteDetailResponse | null>(null);
   const [results, setResults] = useState<VoteResultsResponse | null>(null);
+  const { toast } = useToast();
+  const [validationAttempted, setValidationAttempted] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<string | null>(null);
@@ -77,7 +81,9 @@ export function VotePage() {
   const submit = async () => {
     if (isPreview) return;
     if (!vote || vote.items.some((item) => !(answers[item.id]?.length))) {
-      setError(t.required);
+      setValidationAttempted(true);
+      const missing = vote?.items.find((item) => !answers[item.id]?.length);
+      if (missing) document.getElementById(`vote-card-${missing.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     const accepted = await confirm({
@@ -96,7 +102,7 @@ export function VotePage() {
       setVote({ ...vote, eligibility: "ALREADY_VOTED", votedCount: vote.votedCount + 1 });
     } catch (caught) {
       const code = caught instanceof ApiClientHttpError ? caught.code : undefined;
-      setError(code === "vote_already_submitted" ? "이미 투표를 제출했습니다." : "투표를 제출하지 못했습니다.");
+      toast({ type: "error", message: code === "vote_already_submitted" ? "이미 투표를 제출했습니다." : "투표를 제출하지 못했습니다. 다시 시도해 주세요." });
     } finally {
       setSubmitting(false);
     }
@@ -129,8 +135,9 @@ export function VotePage() {
             <section className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/50 p-8 text-center">
               <Check className="mx-auto size-8 text-emerald-700" />
               <h2 className="mt-3 text-xl font-semibold text-[#172033]">{t.submitted}</h2>
-              <code className="mt-5 inline-block max-w-full break-all rounded-lg border border-emerald-200 bg-white px-4 py-3 text-sm font-normal text-[#172033]">{receipt}</code>
-              <div className="mt-4"><Button variant="outline" size="sm" onClick={async () => setReceiptVerified((await client.verifyVoteReceipt(id, receipt)).accepted)}>{receiptVerified ? t.verified : t.verify}</Button></div>
+              <p className="mt-5 text-sm text-slate-500">{lang === "ko" ? "접수 번호" : "Receipt number"}</p>
+              <code className="mt-2 inline-block max-w-full break-all rounded-lg border border-emerald-200 bg-white px-4 py-3 text-sm font-normal text-[#172033]">{receipt}</code>
+              <div className="mt-4 flex justify-center gap-2"><Button variant="ghost" size="sm" onClick={async () => { try { await navigator.clipboard.writeText(receipt); toast({ type: "success", message: lang === "ko" ? "접수 번호를 복사했습니다." : "Receipt number copied." }); } catch { toast({ type: "error", message: lang === "ko" ? "복사하지 못했습니다." : "Could not copy." }); } }}>{lang === "ko" ? "복사" : "Copy"}</Button><Button variant="outline" size="sm" onClick={async () => setReceiptVerified((await client.verifyVoteReceipt(id, receipt)).accepted)}>{receiptVerified ? t.verified : t.verify}</Button></div>
             </section>
           ) : !isPreview && results ? (
             <section className="mt-5 space-y-5 rounded-xl border border-slate-200 bg-white p-4 sm:p-6 md:p-8">
@@ -167,7 +174,7 @@ export function VotePage() {
           ) : (
             <section className="mt-5 space-y-5">
               {vote.items.map((item) => (
-                <section key={item.id} role="group" aria-labelledby={`vote-item-${item.id}`} className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 md:p-7">
+                <section key={item.id} id={`vote-card-${item.id}`} role="group" aria-labelledby={`vote-item-${item.id}`} aria-describedby={validationAttempted && !answers[item.id]?.length ? `vote-error-${item.id}` : undefined} className={`rounded-xl border bg-white p-4 sm:p-5 md:p-7 ${validationAttempted && !answers[item.id]?.length ? "border-rose-500" : "border-slate-200"}`}>
                   <h2 id={`vote-item-${item.id}`} className="break-words text-base font-semibold text-[#172033]">{lang === "en" && item.titleEn ? item.titleEn : item.titleKo}</h2>
                   {(lang === "en" && item.descriptionEn ? item.descriptionEn : item.descriptionKo) ? <p className="mt-2 break-words text-sm font-normal text-[#344054]">{lang === "en" && item.descriptionEn ? item.descriptionEn : item.descriptionKo}</p> : null}
                   {item.type === "MULTIPLE_CHOICE" ? <p className="mt-2 text-xs font-normal text-[#344054]">{lang === "ko" ? `최대 ${item.maxSelections}개 선택` : `Select up to ${item.maxSelections}`}</p> : null}
@@ -176,13 +183,14 @@ export function VotePage() {
                       const checked = answers[item.id]?.includes(option.id) ?? false;
                       const disabled = item.type === "MULTIPLE_CHOICE" && !checked && (answers[item.id]?.length ?? 0) >= item.maxSelections;
                       return (
-                        <label key={option.id} className={`flex min-h-11 items-start gap-3 rounded-lg border p-4 transition-colors ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${checked ? "border-brand-primary bg-emerald-50/40" : "border-slate-200 hover:bg-slate-50"}`}>
+                        <label key={option.id} className={`flex min-h-11 items-start gap-3 rounded-md px-1 py-3 transition-colors ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} hover:bg-slate-50`}>
                           <input type={item.type === "MULTIPLE_CHOICE" ? "checkbox" : "radio"} name={item.id} checked={checked} disabled={disabled} onChange={() => select(item.id, option.id, item.type === "MULTIPLE_CHOICE", item.maxSelections)} className="mt-0.5 accent-[var(--color-primary)]" />
-                          <span className="min-w-0 break-words"><span className="block break-words text-sm font-normal text-[#172033]">{lang === "en" && option.labelEn ? option.labelEn : option.labelKo}</span></span>
+                          <span className="min-w-0 break-words"><span className="block break-words text-sm font-normal text-[#172033]">{lang === "en" && option.labelEn ? option.labelEn : option.labelKo}</span>{option.imageUrl ? <img src={resolveAssetUrl(option.imageUrl)} alt="" className="mt-3 max-h-48 max-w-full rounded-md object-contain" /> : null}</span>
                         </label>
                       );
                     })}
                   </div>
+                  {validationAttempted && !answers[item.id]?.length ? <p id={`vote-error-${item.id}`} role="alert" className="mt-3 text-sm text-rose-600">{lang === "ko" ? "이 안건에 기표해 주세요." : "Please select an option."}</p> : null}
                 </section>
               ))}
               {error ? <p role="alert" aria-live="assertive" className="text-sm font-normal text-rose-600">{error}</p> : null}
