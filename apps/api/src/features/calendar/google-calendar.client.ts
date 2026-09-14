@@ -9,6 +9,7 @@ import { readResponseTextWithLimit } from "../../shared/http/bounded-fetch";
 export interface GoogleCalendarEventResource {
   id?: string;
   etag?: string;
+  status?: "confirmed" | "tentative" | "cancelled";
   summary?: string;
   description?: string;
   location?: string;
@@ -77,8 +78,11 @@ export class GoogleCalendarClient {
     etag?: string | null;
     resource: GoogleCalendarEventResource;
   }): Promise<{ eventId: string; etag: string | null }> {
-    const resource = {
+    const resource: GoogleCalendarEventResource = {
       ...input.resource,
+      // Google keeps deleted organizer events as cancelled tombstones. A
+      // PATCH without status only updates their details, not their visibility.
+      status: "confirmed",
       ...(input.eventId ? { id: input.eventId } : {}),
     };
 
@@ -90,6 +94,7 @@ export class GoogleCalendarClient {
           resource,
           input.etag ? { "If-Match": input.etag } : undefined,
         );
+        this.assertActive(updated);
         return this.readIdentity(updated, input.eventId);
       } catch (error) {
         if (error instanceof GoogleCalendarApiError && error.statusCode === 412) {
@@ -107,6 +112,7 @@ export class GoogleCalendarClient {
         this.collectionUrl(input.calendarId),
         resource,
       );
+      this.assertActive(created);
       return this.readIdentity(created, input.eventId ?? undefined);
     } catch (error) {
       // A deterministic event id makes a retry safe. If another request won
@@ -128,6 +134,7 @@ export class GoogleCalendarClient {
           resource,
           existing.etag ? { "If-Match": existing.etag } : undefined,
         );
+        this.assertActive(updated);
         return this.readIdentity(updated, input.eventId);
       } catch (patchError) {
         if (patchError instanceof GoogleCalendarApiError && patchError.statusCode === 412) {
@@ -305,6 +312,12 @@ export class GoogleCalendarClient {
     const eventId = resource.id ?? fallbackId;
     if (!eventId) throw new Error("google_calendar_event_id_missing");
     return { eventId, etag: resource.etag ?? null };
+  }
+
+  private assertActive(resource: GoogleCalendarEventResource): void {
+    if (resource.status === "cancelled") {
+      throw new Error("google_calendar_event_remains_cancelled");
+    }
   }
 }
 
