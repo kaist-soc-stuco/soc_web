@@ -56,46 +56,36 @@ export class CalendarSyncService {
 
   async enqueueEvent(calendarEventId: number, options: { manual?: boolean } = {}): Promise<boolean> {
     return this.db.transaction(async (tx) => {
-    const [row] = await tx
-      .select()
-      .from(calendarEvents)
-      .where(eq(calendarEvents.calendarEventId, calendarEventId));
-    if (!row) return false;
-
-    const targetCalendarId = this.targetCalendarId(row.sourceType);
-    if (!targetCalendarId || !this.googleCalendar.isConfigured() || (!options.manual && !this.isTargetEnabled(row.sourceType))) {
-      await tx
-        .update(calendarEvents)
-        .set({
-          googleSyncStatus: "NOT_CONFIGURED",
-          googleSyncError: null,
-        })
+      const [row] = await tx
+        .select()
+        .from(calendarEvents)
         .where(eq(calendarEvents.calendarEventId, calendarEventId));
-      return false;
-    }
+      if (!row) return false;
 
-    await tx
-      .insert(calendarSyncJobs)
-      .values({
-        calendarEventId,
-        targetCalendarId,
-        operation: this.shouldPublishToGoogle(row) ? UPSERT_OPERATION : DELETE_OPERATION,
-        status: PENDING_STATUS,
-        revision: 1,
-        resourceUpdatedAt: row.updatedAt,
-        attempts: 0,
-        availableAt: nowDate(),
-        lockedAt: null,
-        leaseUntil: null,
-        claimToken: null,
-        lastError: null,
-      })
-      .onConflictDoUpdate({
-        target: [calendarSyncJobs.calendarEventId, calendarSyncJobs.targetCalendarId],
-        set: {
+      // KAIST 학사일정은 사이트에서만 보여주는 read-only feed다. Google에는
+      // 학생회가 관리하는 자체 일정만 발행하고, 여기서도 방어적으로 차단한다.
+      if (row.sourceType !== MANUAL_SOURCE) return false;
+
+      const targetCalendarId = this.targetCalendarId();
+      if (!targetCalendarId || !this.googleCalendar.isConfigured() || (!options.manual && !this.isTargetEnabled())) {
+        await tx
+          .update(calendarEvents)
+          .set({
+            googleSyncStatus: "NOT_CONFIGURED",
+            googleSyncError: null,
+          })
+          .where(eq(calendarEvents.calendarEventId, calendarEventId));
+        return false;
+      }
+
+      await tx
+        .insert(calendarSyncJobs)
+        .values({
+          calendarEventId,
+          targetCalendarId,
           operation: this.shouldPublishToGoogle(row) ? UPSERT_OPERATION : DELETE_OPERATION,
           status: PENDING_STATUS,
-          revision: sql`${calendarSyncJobs.revision} + 1`,
+          revision: 1,
           resourceUpdatedAt: row.updatedAt,
           attempts: 0,
           availableAt: nowDate(),
@@ -103,22 +93,36 @@ export class CalendarSyncService {
           leaseUntil: null,
           claimToken: null,
           lastError: null,
-          updatedAt: nowDate(),
-        },
-      });
+        })
+        .onConflictDoUpdate({
+          target: [calendarSyncJobs.calendarEventId, calendarSyncJobs.targetCalendarId],
+          set: {
+            operation: this.shouldPublishToGoogle(row) ? UPSERT_OPERATION : DELETE_OPERATION,
+            status: PENDING_STATUS,
+            revision: sql`${calendarSyncJobs.revision} + 1`,
+            resourceUpdatedAt: row.updatedAt,
+            attempts: 0,
+            availableAt: nowDate(),
+            lockedAt: null,
+            leaseUntil: null,
+            claimToken: null,
+            lastError: null,
+            updatedAt: nowDate(),
+          },
+        });
 
-    const marked = await tx
-      .update(calendarEvents)
-      .set({
-        googleCalendarId: targetCalendarId,
-        googleSyncStatus: "PENDING",
-        googleSyncError: null,
-        // Sync metadata must not change the content revision captured by the job.
-      })
-      .where(and(eq(calendarEvents.calendarEventId, calendarEventId), sql`date_trunc('milliseconds', ${calendarEvents.updatedAt}) = ${row.updatedAt}`))
-      .returning({ id: calendarEvents.calendarEventId });
-    if (!marked.length) throw new Error("calendar_event_changed_during_enqueue");
-    return true;
+      const marked = await tx
+        .update(calendarEvents)
+        .set({
+          googleCalendarId: targetCalendarId,
+          googleSyncStatus: "PENDING",
+          googleSyncError: null,
+          // Sync metadata must not change the content revision captured by the job.
+        })
+        .where(and(eq(calendarEvents.calendarEventId, calendarEventId), sql`date_trunc('milliseconds', ${calendarEvents.updatedAt}) = ${row.updatedAt}`))
+        .returning({ id: calendarEvents.calendarEventId });
+      if (!marked.length) throw new Error("calendar_event_changed_during_enqueue");
+      return true;
     });
   }
 
@@ -129,7 +133,6 @@ export class CalendarSyncService {
     updatedCount: number;
     unchangedCount: number;
     archivedCount: number;
-    googleQueuedCount: number;
     failedMonths: number[];
   }> {
     const fetched = await this.kaistSource.fetchYear(year);
@@ -152,14 +155,12 @@ export class CalendarSyncService {
     let updatedCount = 0;
     let unchangedCount = 0;
     let archivedCount = 0;
-    let googleQueuedCount = 0;
-
     for (const item of fetched.items) {
       seen.add(item.sourceUid);
       const current = existingByUid.get(item.sourceUid);
 
       if (!current) {
-        const [row] = await this.db
+        await this.db
           .insert(calendarEvents)
           .values({
             titleKo: item.titleKo,
@@ -173,10 +174,8 @@ export class CalendarSyncService {
             isActive: true,
             isHiddenByAdmin: true,
             createdByUserId: null,
-          })
-          .returning();
+          });
         insertedCount += 1;
-        if (await this.enqueueEvent(row.calendarEventId)) googleQueuedCount += 1;
         continue;
       }
 
@@ -192,7 +191,7 @@ export class CalendarSyncService {
         continue;
       }
 
-      const [row] = await this.db
+      await this.db
         .update(calendarEvents)
         .set({
           titleKo: item.titleKo,
@@ -210,10 +209,8 @@ export class CalendarSyncService {
           createdByUserId: null,
           updatedAt: nowDate(),
         })
-        .where(eq(calendarEvents.calendarEventId, current.calendarEventId))
-        .returning();
+        .where(eq(calendarEvents.calendarEventId, current.calendarEventId));
       updatedCount += 1;
-      if (row && await this.enqueueEvent(row.calendarEventId)) googleQueuedCount += 1;
     }
 
     // A partially failed crawl must never hide events merely because a month
@@ -228,7 +225,6 @@ export class CalendarSyncService {
           .returning({ calendarEventId: calendarEvents.calendarEventId });
         if (!archived) continue;
         archivedCount += 1;
-        if (await this.enqueueEvent(row.calendarEventId)) googleQueuedCount += 1;
       }
     }
 
@@ -239,7 +235,6 @@ export class CalendarSyncService {
       updatedCount,
       unchangedCount,
       archivedCount,
-      googleQueuedCount,
       failedMonths: fetched.failedMonths,
     };
     await this.auditLogService?.record({
@@ -250,7 +245,6 @@ export class CalendarSyncService {
         archivedCount: result.archivedCount,
         failedMonths: result.failedMonths,
         fetchedCount: result.fetchedCount,
-        googleQueuedCount: result.googleQueuedCount,
         insertedCount: result.insertedCount,
         source: audit ? "admin" : "scheduler",
         unchangedCount: result.unchangedCount,
@@ -260,6 +254,24 @@ export class CalendarSyncService {
       targetType: "calendar",
     });
     return result;
+  }
+
+  private async detachKaistGoogleState(): Promise<void> {
+    // KAIST rows may still contain metadata from the former secondary Google
+    // target. Detach that internal state without touching the remote calendar;
+    // the application no longer owns or reconciles those Google events.
+    await this.db
+      .update(calendarEvents)
+      .set({
+        googleCalendarId: null,
+        googleEventId: null,
+        googleEtag: null,
+        googleSyncedAt: null,
+        googleSyncStatus: "NOT_CONFIGURED",
+        googleSyncError: null,
+        updatedAt: nowDate(),
+      })
+      .where(eq(calendarEvents.sourceType, KAIST_SOURCE));
   }
 
   async syncGoogleCalendars(audit?: AuditMetadata): Promise<{
@@ -273,12 +285,13 @@ export class CalendarSyncService {
     removedDuplicateCount: number;
   }> {
     if (!this.googleCalendar.isConfigured()) throw new BadRequestException("google_calendar_not_configured");
-    if (!this.targetCalendarId(MANUAL_SOURCE) && !this.targetCalendarId(KAIST_SOURCE)) throw new BadRequestException("google_calendar_target_not_configured");
+    if (!this.targetCalendarId()) throw new BadRequestException("google_calendar_target_not_configured");
+    await this.detachKaistGoogleState();
     let queuedCount = 0;
     const rows = await this.db
       .select()
       .from(calendarEvents)
-      .where(inArray(calendarEvents.sourceType, [MANUAL_SOURCE, KAIST_SOURCE]));
+      .where(eq(calendarEvents.sourceType, MANUAL_SOURCE));
 
     for (const row of rows) {
       if (await this.enqueueEvent(row.calendarEventId, { manual: true })) queuedCount += 1;
@@ -298,7 +311,7 @@ export class CalendarSyncService {
     let councilSyncedCount = 0;
     let removedDuplicateCount = 0;
     const directSyncErrors: unknown[] = [];
-    const councilCalendarId = this.targetCalendarId(MANUAL_SOURCE);
+    const councilCalendarId = this.targetCalendarId();
     if (councilCalendarId) {
       const result = await this.syncCouncilArticleEvents(councilCalendarId);
       councilSyncedCount += result.syncedCount;
@@ -307,15 +320,12 @@ export class CalendarSyncService {
       directSyncErrors.push(...result.errors);
     }
 
-    for (const source of [MANUAL_SOURCE, KAIST_SOURCE]) {
-      const targetCalendarId = this.targetCalendarId(source);
-      if (!targetCalendarId) continue;
-
+    if (councilCalendarId) {
       try {
         const result = await this.reconcileCalendarEvents(
-          targetCalendarId,
-          source,
-          rows.filter((row) => row.sourceType === source),
+          councilCalendarId,
+          MANUAL_SOURCE,
+          rows,
         );
         removedDuplicateCount += result.removedCount;
         failedCount += result.failedCount;
@@ -326,7 +336,7 @@ export class CalendarSyncService {
         failedCount += 1;
         directSyncErrors.push(error);
         this.logger.warn(
-          `Google Calendar reconciliation failed for ${source}: ${error instanceof Error ? error.message : String(error)}`,
+          `Google Calendar reconciliation failed for ${MANUAL_SOURCE}: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
@@ -653,6 +663,13 @@ export class CalendarSyncService {
       return this.markJobSucceeded(job);
     }
 
+    // Ignore any legacy outbox rows created for the removed KAIST Google
+    // target. Marking them complete prevents the worker from publishing or
+    // deleting an academic event after the integration has been disabled.
+    if (row.sourceType !== MANUAL_SOURCE) {
+      return this.markJobSucceeded(job);
+    }
+
     if (job.operation === DELETE_OPERATION) {
       if (row.googleCalendarId === job.targetCalendarId && row.googleEventId) {
         await this.googleCalendar.deleteEvent({
@@ -816,7 +833,7 @@ export class CalendarSyncService {
   }
 
   private toGoogleResource(row: CalendarEventRow): GoogleCalendarEventResource {
-    const isAllDay = row.isAllDay || row.sourceType === KAIST_SOURCE;
+    const isAllDay = row.isAllDay;
     const resource: GoogleCalendarEventResource = isAllDay
       ? {
           summary: row.titleKo,
@@ -873,28 +890,20 @@ export class CalendarSyncService {
     return resource;
   }
 
-  private targetCalendarId(sourceType: string): string | null {
-    const key = sourceType === KAIST_SOURCE ? "GOOGLE_KAIST_CALENDAR_ID" : "GOOGLE_CALENDAR_ID";
-    return this.configService.get<string>(key)?.trim() || null;
+  private targetCalendarId(): string | null {
+    return this.configService.get<string>("GOOGLE_CALENDAR_ID")?.trim() || null;
   }
 
   private shouldPublishToGoogle(row: CalendarEventRow): boolean {
-    // KAIST feed visibility is a site presentation choice. Its separate
-    // Google academic calendar should still contain every active feed item;
-    // only administrator-managed student-council events honor the hide flag.
-    return row.isActive && (row.sourceType === KAIST_SOURCE || !row.isHiddenByAdmin);
+    return row.sourceType === MANUAL_SOURCE && row.isActive && !row.isHiddenByAdmin;
   }
 
-  private isTargetEnabled(sourceType: string): boolean {
-    const key = sourceType === KAIST_SOURCE
-      ? "KAIST_CALENDAR_SYNC_ENABLED"
-      : "GOOGLE_CALENDAR_SYNC_ENABLED";
-    return this.configService.get<boolean>(key, false) && this.googleCalendar.isConfigured();
+  private isTargetEnabled(): boolean {
+    return this.configService.get<boolean>("GOOGLE_CALENDAR_SYNC_ENABLED", false) && this.googleCalendar.isConfigured();
   }
 
   private isAnyGoogleSyncEnabled(): boolean {
-    return this.configService.get<boolean>("GOOGLE_CALENDAR_SYNC_ENABLED", false) ||
-      this.configService.get<boolean>("KAIST_CALENDAR_SYNC_ENABLED", false);
+    return this.configService.get<boolean>("GOOGLE_CALENDAR_SYNC_ENABLED", false);
   }
 }
 

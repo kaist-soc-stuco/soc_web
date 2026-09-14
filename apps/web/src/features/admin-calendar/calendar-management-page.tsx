@@ -343,10 +343,10 @@ function CalendarManagementContent() {
       await refresh();
       toast({
         type: "success",
-        message: `카이스트 동기화 완료 · 추가 ${result.insertedCount} · 수정 ${result.updatedCount}`,
+        message: `KAIST 일정 갱신 완료 · 추가 ${result.insertedCount} · 수정 ${result.updatedCount}`,
       });
     } catch {
-      toast({ type: "error", message: "KAIST 일정을 동기화하지 못했습니다." });
+      toast({ type: "error", message: "KAIST 일정을 갱신하지 못했습니다." });
     } finally {
       setSyncing(null);
     }
@@ -407,7 +407,7 @@ function CalendarManagementContent() {
               </Button>
               <Button variant="outline" disabled={syncing !== null} onClick={() => void syncKaistCalendar()}>
                 <RefreshCw className={`size-4 ${syncing === "kaist" ? "animate-spin" : ""}`} aria-hidden="true" />
-                카이스트 동기화
+                KAIST 일정 갱신
               </Button>
               <Button variant="outline" disabled={syncing !== null} onClick={() => void syncGoogleCalendar()}>
                 <RefreshCw className={`size-4 ${syncing === "google" ? "animate-spin" : ""}`} aria-hidden="true" />

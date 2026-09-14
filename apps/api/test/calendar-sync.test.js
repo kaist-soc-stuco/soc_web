@@ -66,6 +66,23 @@ test("Google reconciliation removes duplicate and stale site-owned events but ke
   assert.equal(result.failedCount, 0);
 });
 
+test("Google publication is limited to site-managed calendar events", () => {
+  const service = Object.create(CalendarSyncService.prototype);
+  service.configService = {
+    get: (key, fallback) => {
+      if (key === "GOOGLE_CALENDAR_ID") return "soc_web";
+      if (key === "KAIST_CALENDAR_SYNC_ENABLED") return true;
+      return fallback;
+    },
+  };
+  service.googleCalendar = { isConfigured: () => true };
+
+  assert.equal(service.targetCalendarId(), "soc_web");
+  assert.equal(service.shouldPublishToGoogle({ sourceType: "MANUAL", isActive: true, isHiddenByAdmin: false }), true);
+  assert.equal(service.shouldPublishToGoogle({ sourceType: "KAIST_ACADEMIC", isActive: true, isHiddenByAdmin: false }), false);
+  assert.equal(service.isAnyGoogleSyncEnabled(), false, "the site-only KAIST feed must not start the Google worker");
+});
+
 test("manual Calendar publication, failure retry, and stale-worker fence on PostgreSQL", { skip: !process.env.CALENDAR_SYNC_TEST_DATABASE_URL }, async () => {
   const name = `calendar_sync_test_${randomUUID().replaceAll('-', '')}`;
   const admin = new Pool({ connectionString: process.env.CALENDAR_SYNC_TEST_DATABASE_URL });

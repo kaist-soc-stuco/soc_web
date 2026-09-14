@@ -104,7 +104,6 @@ export interface CalendarKaistSyncResponse {
   updatedCount: number;
   unchangedCount: number;
   archivedCount: number;
-  googleQueuedCount: number;
   failedMonths: number[];
 }
 

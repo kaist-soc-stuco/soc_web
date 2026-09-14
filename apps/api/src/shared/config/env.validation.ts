@@ -133,7 +133,6 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       config.CALENDAR_EXTERNAL_ICS_ALLOWED_HOSTS,
     ),
     GOOGLE_CALENDAR_ID: asOptionalString(config.GOOGLE_CALENDAR_ID),
-    GOOGLE_KAIST_CALENDAR_ID: asOptionalString(config.GOOGLE_KAIST_CALENDAR_ID),
     GOOGLE_SERVICE_ACCOUNT_KEY_FILE: asOptionalString(
       config.GOOGLE_SERVICE_ACCOUNT_KEY_FILE,
     ),
