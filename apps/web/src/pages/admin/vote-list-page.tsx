@@ -1,3 +1,4 @@
+import { stripRichText } from "@/components/ui/rich-text-content";
 import { createApiClient } from "@soc/api-client";
 import type { VoteRecord } from "@soc/contracts";
 import { Plus } from "lucide-react";
@@ -69,9 +70,9 @@ export function VoteListPage() {
                     }}
                     tabIndex={0}
                     role="link"
-                    aria-label={`${vote.titleKo} 투표 관리`}
+                    aria-label={`${stripRichText(vote.titleKo)} 투표 관리`}
                   >
-                    <AdminTableCell><div className="font-medium text-[#172033]">{vote.titleKo}</div><div className="mt-1 text-xs font-normal text-[#344054]">전산학부 주전공 학부생 명부</div></AdminTableCell>
+                    <AdminTableCell><div className="font-medium text-[#172033]">{stripRichText(vote.titleKo)}</div><div className="mt-1 text-xs font-normal text-[#344054]">전산학부 주전공 학부생 명부</div></AdminTableCell>
                     <AdminTableCell data-mobile-label="상태"><VoteStatusBadge status={vote.status} startsAt={vote.startsAt} endsAt={vote.endsAt} /></AdminTableCell>
                     <AdminTableCell data-mobile-label="기간" className="text-sm font-normal text-[#344054]"><time dateTime={vote.startsAt} className="whitespace-nowrap">{formatNumericDateRange(vote.startsAt, vote.endsAt, { includeTime: true })}</time></AdminTableCell>
                     <AdminTableCell data-mobile-label="참여" className="text-sm font-normal text-[#344054]">{vote.votedCount} / {vote.eligibleCount}명</AdminTableCell>

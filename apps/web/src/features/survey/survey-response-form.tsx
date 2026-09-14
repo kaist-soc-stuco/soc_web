@@ -6,7 +6,7 @@ import {
   getLocalizedText,
   type AnswerValue,
 } from "./survey-answer-utils";
-import { SurveyQuestionInput } from "./survey-question-input";
+import { SurveyQuestionCard } from "./survey-question-card";
 
 import { RichTextContent } from "@/components/ui/rich-text-content";
 import { Button } from "@/components/ui/button";
@@ -144,54 +144,7 @@ export function SurveyResponseForm({
                 );
               }
 
-              const questionError = questionErrors[question.id] ?? null;
-              const questionImage = lang === "ko"
-                ? question.config?.imageUrlKo
-                : question.config?.imageUrlEn || question.config?.imageUrlKo;
-
-              return (
-                <div
-                  key={question.id}
-                  id={`survey-question-${question.id}`}
-                  className={`group scroll-mt-24 rounded-2xl border bg-white px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.035)] transition-[border-color,box-shadow] ${
-                    questionError
-                      ? "border-rose-300 bg-rose-50/10 hover:border-rose-400"
-                      : "border-slate-200 hover:border-kaist-darkgreen/20"
-                  } hover:shadow-[0_2px_5px_rgba(15,23,42,0.045)]`}
-                >
-                  <div className="mb-3.5">
-                    <div className="block min-w-0 text-[length:var(--ui-text-section-size)] font-normal leading-6 text-slate-950">
-                      <span className="min-h-6 break-words leading-6">
-                        <RichTextContent inline content={getLocalizedText(lang, question.titleKo, question.titleEn)} />
-                        {question.isRequired && (
-                          <span className="ml-1 inline-block translate-y-[-0.22em] text-xs font-bold leading-none text-rose-500">
-                            *
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                  {questionImage ? (
-                    <img
-                      src={resolveAssetUrl(questionImage)}
-                      alt=""
-                      className="mb-4 max-h-[28rem] w-full rounded-xl border border-slate-200 object-contain"
-                    />
-                  ) : null}
-                  <div>
-                    <SurveyQuestionInput
-                      question={question}
-                      value={
-                        answers[question.id] ?? emptyAnswerValue(question.questionType)
-                      }
-                      onChange={(value) => onAnswerChange(question.id, value)}
-                      lang={lang}
-                      disabled={false}
-                      error={questionError}
-                    />
-                  </div>
-                </div>
-              );
+              return <SurveyQuestionCard key={question.id} question={question} value={answers[question.id] ?? emptyAnswerValue(question.questionType)} onChange={value => onAnswerChange(question.id, value)} lang={lang} error={questionErrors[question.id]} />;
             })}
           </section>
         ))}

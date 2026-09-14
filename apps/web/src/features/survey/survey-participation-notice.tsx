@@ -12,6 +12,8 @@ interface SurveyParticipationNoticeProps {
   eligibility: SurveyParticipationEligibility;
   lang: string;
   compact?: boolean;
+  description?: string;
+  subject?: "survey" | "vote";
 }
 
 const reasonLabels: Record<
@@ -41,6 +43,8 @@ export function SurveyParticipationNotice({
   eligibility,
   lang,
   compact = false,
+  subject = "survey",
+  description,
 }: SurveyParticipationNoticeProps) {
   if (
     eligibility.status !== "LOGIN_REQUIRED" &&
@@ -84,20 +88,20 @@ export function SurveyParticipationNotice({
           <h2 className="text-base font-semibold text-slate-900">
             {isLoginRequired
               ? lang === "ko"
-                ? "로그인이 필요한 설문입니다"
+                ? `로그인이 필요한 ${subject === "vote" ? "투표" : "설문"}입니다`
                 : "Login required"
               : lang === "ko"
                 ? "참여 자격을 충족하지 않습니다"
                 : "You are not eligible to participate"}
           </h2>
           <p className="mt-1.5 text-sm font-normal leading-6 text-slate-600">
-            {isLoginRequired
+            {description ?? (isLoginRequired
               ? lang === "ko"
-                ? "설문 참여 및 본인 확인을 위해 KAIST 계정으로 로그인해 주세요."
-                : "Sign in to check the participation requirements for this survey."
+                ? `${subject === "vote" ? "투표" : "설문"} 참여 및 본인 확인을 위해 KAIST 계정으로 로그인해 주세요.`
+                : `Sign in to check the participation requirements for this ${subject}.`
               : lang === "ko"
                 ? "다음 조건을 충족하지 못해 응답할 수 없습니다."
-                : "You cannot submit a response because these requirements are not met."}
+                : "You cannot submit a response because these requirements are not met.")}
           </p>
         </div>
       </div>

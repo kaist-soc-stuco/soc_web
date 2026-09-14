@@ -4578,3 +4578,22 @@ button[data-tooltip]:focus-visible::after {
 @media (prefers-reduced-motion: reduce) {
   .vote-agenda-details { transition: none; }
 }
+
+.vote-agenda-card[data-selected="false"] .rich-text-input {
+  border-bottom-color: transparent !important;
+  background: transparent !important;
+}
+.vote-agenda-card[data-selected="false"] .question-option-row > button,
+.vote-agenda-card[data-selected="false"] .question-option-row .ui-icon-button {
+  visibility: hidden;
+}
+.vote-agenda-card .question-inline-editor > .min-w-0 > .grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+@media (max-width: 767px) {
+  .vote-agenda-card .question-inline-editor > .min-w-0 > .grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.question-add-option-space { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 180ms ease, visibility 180ms; }
+.question-inline-editor[data-selected="false"] .question-add-option-space { grid-template-rows: 0fr; visibility: hidden; }
+@media (prefers-reduced-motion: reduce) { .question-add-option-space { transition: none; } }

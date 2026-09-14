@@ -15,12 +15,15 @@ import { useToast } from "@/components/ui/toast";
 import type { AnswerValue, FileAnswer } from "./survey-answer-utils";
 import { UiInput, UiTextarea } from "@/components/ui/form-control";
 
+export type ResponseQuestion = Pick<SurveyQuestionRecord, "id" | "questionType" | "options" | "config" | "titleKo" | "titleEn" | "descriptionKo" | "descriptionEn" | "isRequired">;
+
 interface QuestionInputProps {
+  maxSelections?: number;
   disabled?: boolean;
   error?: string | null;
   lang: string;
   onChange: (v: AnswerValue) => void;
-  question: SurveyQuestionRecord;
+  question: ResponseQuestion;
   value: AnswerValue;
 }
 
@@ -40,6 +43,7 @@ export function SurveyQuestionInput({
   lang,
   disabled = false,
   error = null,
+  maxSelections,
 }: QuestionInputProps) {
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -194,10 +198,11 @@ export function SurveyQuestionInput({
           <div className="flex flex-col gap-2.5">
           {displayedOptions.map((opt) => {
             const selected = (value as string[]).includes(opt.value);
+            const optionDisabled = disabled || (!selected && maxSelections !== undefined && (value as string[]).length >= maxSelections);
             return (
               <label
                 key={opt.value}
-                className={`flex cursor-pointer items-center gap-3 py-2 transition-colors ${
+                className={`flex items-center gap-3 py-2 transition-colors ${optionDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${
                   selected
                     ? "text-kaist-black"
                     : "text-kaist-black hover:bg-gray-50/50"
@@ -219,7 +224,7 @@ export function SurveyQuestionInput({
                   value={opt.value}
                   checked={selected}
                   onChange={() => {
-                    if (disabled) return;
+                    if (optionDisabled) return;
                     const prev = value as string[];
                     onChange(
                       selected
@@ -227,7 +232,7 @@ export function SurveyQuestionInput({
                         : [...prev, opt.value],
                     );
                   }}
-                  disabled={disabled}
+                  disabled={optionDisabled}
                   className="hidden"
                 />
                 <span className="min-w-0 break-words text-[length:var(--ui-text-body-size)] leading-5">

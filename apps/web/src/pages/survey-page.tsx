@@ -1,3 +1,4 @@
+import { ResponsePageMain } from "@/features/survey/response-layout";
 import { useEffect, useRef } from "react";
 import { OPERATIONAL_SURVEY_IDS } from "@soc/contracts";
 import { Navigate, useParams } from "react-router-dom";
@@ -166,12 +167,10 @@ function ActiveSurveyPage() {
         <a href={`/admin/surveys/${id}/edit`} className="inline-flex items-center gap-3 text-sm"><ArrowLeft className="size-4" />미리보기 모드</a>
         <div className="flex items-center gap-4">{survey?.isPublished && <span className="inline-flex items-center gap-2 text-sm text-emerald-600"><CheckCircle2 className="size-4" />게시됨</span>}<Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/survey/${id}`, location.origin).href); toast({type:"success",message:"응답자 링크를 복사했습니다."}); } catch { toast({type:"error",message:"링크를 복사하지 못했습니다."}); } }}><LinkIcon className="size-4" />응답자 링크 복사</Button></div>
       </header>}
-      <main className="channel-talk-safe-area flex-1 bg-[#f3f5f4] px-4 py-6 sm:py-10 lg:px-0" aria-busy={(!survey || sessionLoading || !draftHydrated) && !loadError}>
-        <div className="mx-auto max-w-[42rem] space-y-5">
+      <ResponsePageMain busy={(!survey || sessionLoading || !draftHydrated) && !loadError}>
           {survey && <SurveySummaryCard lang={lang} survey={survey} />}
           {renderBody()}
-        </div>
-      </main>
+      </ResponsePageMain>
     </PageShell>
   );
 }

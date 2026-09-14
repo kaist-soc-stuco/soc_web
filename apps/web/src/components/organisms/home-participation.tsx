@@ -1,3 +1,4 @@
+import { stripRichText } from "@/components/ui/rich-text-content";
 import { createApiClient } from "@soc/api-client";
 import { nowMs } from "@soc/shared";
 import { useEffect, useMemo, useState } from "react";
@@ -37,7 +38,7 @@ export function HomeParticipation() {
       }
       if (results[2].status === "fulfilled") for (const vote of results[2].value) {
         if (vote.status !== "PUBLISHED" || Date.parse(vote.endsAt) < nowMs()) continue;
-        next.push({ id: `vote:${vote.id}`, title: title(vote.titleKo, vote.titleEn), href: `/votes/${vote.id}`, kind: lang === "ko" ? "투표" : "Vote", start: Date.parse(vote.startsAt), end: Date.parse(vote.endsAt) });
+        next.push({ id: `vote:${vote.id}`, title: stripRichText(title(vote.titleKo, vote.titleEn)), href: `/votes/${vote.id}`, kind: lang === "ko" ? "투표" : "Vote", start: Date.parse(vote.startsAt), end: Date.parse(vote.endsAt) });
       }
       const now = nowMs();
       next.sort((a, b) => Number(a.start > now) - Number(b.start > now) || a.end - b.end || a.id.localeCompare(b.id));
