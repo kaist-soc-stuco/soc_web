@@ -154,7 +154,7 @@ test("refresh rotation accepts one concurrent use of the same JTI", async () => 
   assert.equal(repository.records.get(issued.session.sessionId).revoked, true);
 });
 
-test("persisted sessions use a sliding idle window with a 30-day absolute cap", async () => {
+test("persisted sessions use a sliding idle window with a 14-day absolute cap", async () => {
   const repository = createSessionRepository();
   const service = new AuthSessionService(
     config,
@@ -165,8 +165,8 @@ test("persisted sessions use a sliding idle window with a 30-day absolute cap", 
   );
 
   const issued = await service.issuePersistedSession("user-a");
-  const idleWindowMs = 14 * 24 * 60 * 60 * 1000;
-  const absoluteWindowMs = 30 * 24 * 60 * 60 * 1000;
+  const idleWindowMs = 3 * 24 * 60 * 60 * 1000;
+  const absoluteWindowMs = 14 * 24 * 60 * 60 * 1000;
   assert.ok(issued.session.createdAt);
   assert.equal(
     issued.session.expiresAt - issued.session.createdAt,
