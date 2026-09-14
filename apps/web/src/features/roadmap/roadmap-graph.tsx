@@ -3,8 +3,6 @@ import {
   type EdgeProps,
   Background,
   BackgroundVariant,
-  ControlButton,
-  Controls,
   Handle,
   MarkerType,
   Position,
@@ -839,26 +837,6 @@ export function RoadmapGraph({
         </div>
 
         <div ref={flowViewportRef} className={cn("roadmap-flow-viewport relative h-[calc(100svh-13rem)] min-h-[24rem] md:min-h-[38rem] max-h-[54rem] overflow-hidden rounded-xl border border-slate-200 bg-slate-50", isFullscreen && "roadmap-flow-viewport--fullscreen")}>
-          <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
-            <IconButton
-              type="button"
-              aria-label={lang === "ko" ? "로드맵 전체 보기" : "Fit roadmap to view"}
-              data-tooltip={lang === "ko" ? "로드맵 전체 보기" : "Fit roadmap to view"}
-              onClick={() => void flow?.fitView({ padding: 0.15, duration: 300 })}
-              className="size-9 border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900"
-            >
-              <RotateCcw aria-hidden="true" className="size-4" />
-            </IconButton>
-          </div>
-          <IconButton
-            type="button"
-            onClick={() => void toggleFullscreen()}
-            aria-label={isFullscreen ? (lang === "ko" ? "전체 화면 닫기" : "Exit full screen") : (lang === "ko" ? "전체 화면" : "Full screen")}
-            data-tooltip={isFullscreen ? (lang === "ko" ? "전체 화면 닫기" : "Exit full screen") : (lang === "ko" ? "전체 화면" : "Full screen")}
-            className="size-9 border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900"
-          >
-            {isFullscreen ? <Minimize2 aria-hidden="true" className="size-4" /> : <Maximize2 aria-hidden="true" className="size-4" />}
-          </IconButton>
           <RoadmapInteractionContext.Provider value={interactionValue}>
             <ReactFlow<GraphNode, Edge>
               proOptions={{ hideAttribution: true }}
@@ -893,26 +871,48 @@ export function RoadmapGraph({
               }}
             >
               <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#cbd5e1" />
-              <Controls showZoom={false} showFitView={false} showInteractive={false} position="bottom-left">
-                <ControlButton
-                  type="button"
-                  aria-label={lang === "ko" ? "확대" : "Zoom in"}
-                  data-tooltip={lang === "ko" ? "확대" : "Zoom in"}
-                  onClick={() => void flow?.zoomIn({ duration: 200 })}
-                >
-                  <Plus aria-hidden="true" />
-                </ControlButton>
-                <ControlButton
-                  type="button"
-                  aria-label={lang === "ko" ? "축소" : "Zoom out"}
-                  data-tooltip={lang === "ko" ? "축소" : "Zoom out"}
-                  onClick={() => void flow?.zoomOut({ duration: 200 })}
-                >
-                  <Minus aria-hidden="true" />
-                </ControlButton>
-              </Controls>
             </ReactFlow>
           </RoadmapInteractionContext.Provider>
+          <div className="roadmap-flow-viewport__controls roadmap-flow-viewport__controls--top" role="toolbar" aria-label={lang === "ko" ? "로드맵 보기 도구" : "Roadmap view tools"}>
+            <IconButton
+              type="button"
+              onClick={() => void toggleFullscreen()}
+              aria-label={isFullscreen ? (lang === "ko" ? "전체 화면 닫기" : "Exit full screen") : (lang === "ko" ? "전체 화면" : "Full screen")}
+              data-tooltip={isFullscreen ? (lang === "ko" ? "전체 화면 닫기" : "Exit full screen") : (lang === "ko" ? "전체 화면" : "Full screen")}
+              className="size-10 border-slate-200 bg-white/95 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900"
+            >
+              {isFullscreen ? <Minimize2 aria-hidden="true" className="size-4" /> : <Maximize2 aria-hidden="true" className="size-4" />}
+            </IconButton>
+            <IconButton
+              type="button"
+              aria-label={lang === "ko" ? "로드맵 전체 보기" : "Fit roadmap to view"}
+              data-tooltip={lang === "ko" ? "로드맵 전체 보기" : "Fit roadmap to view"}
+              onClick={() => void flow?.fitView({ padding: 0.15, duration: 300 })}
+              className="size-10 border-slate-200 bg-white/95 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900"
+            >
+              <RotateCcw aria-hidden="true" className="size-4" />
+            </IconButton>
+          </div>
+          <div className="roadmap-flow-viewport__controls roadmap-flow-viewport__controls--bottom" role="toolbar" aria-label={lang === "ko" ? "로드맵 확대 축소" : "Roadmap zoom"}>
+            <IconButton
+              type="button"
+              aria-label={lang === "ko" ? "확대" : "Zoom in"}
+              data-tooltip={lang === "ko" ? "확대" : "Zoom in"}
+              onClick={() => void flow?.zoomIn({ duration: 200 })}
+              className="size-10 border-slate-200 bg-white/95 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900"
+            >
+              <Plus aria-hidden="true" className="size-4" />
+            </IconButton>
+            <IconButton
+              type="button"
+              aria-label={lang === "ko" ? "축소" : "Zoom out"}
+              data-tooltip={lang === "ko" ? "축소" : "Zoom out"}
+              onClick={() => void flow?.zoomOut({ duration: 200 })}
+              className="size-10 border-slate-200 bg-white/95 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900"
+            >
+              <Minus aria-hidden="true" className="size-4" />
+            </IconButton>
+          </div>
         </div>
       </div>
 

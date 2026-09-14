@@ -1,3 +1,4 @@
+import { UiInput } from "./form-control";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, Unlink } from "lucide-react";
@@ -19,10 +20,10 @@ export function EditorLinkDialog({ initialText, initialUrl, onApply, onClose }: 
     if (!trimmed || !isSafeUrlReference(normalized)) { setError(true); return; }
     onApply(text.trim() || normalized, normalized);
   };
-  return <Modal open onClose={onClose} title="링크 추가" showClose={false} dividerless className="max-w-md" footer={<><Button variant="ghost" onClick={onClose}>취소</Button><Button variant="ghost" className="text-blue-600" onClick={apply}>확인</Button></>}>
-    <div data-editor-link-ui className="space-y-8 py-4" onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } if (event.key === "Enter") { event.stopPropagation(); event.preventDefault(); apply(); } }}>
-      <input aria-label="표시할 텍스트" placeholder="표시할 텍스트" value={text} onChange={event => setText(event.target.value)} className="w-full border-0 border-b border-slate-300 bg-transparent py-3 outline-none focus:border-blue-600" />
-      <input ref={urlInput} autoFocus aria-label="링크 URL" placeholder="링크 URL *" value={url} onChange={event => { setUrl(event.target.value); setError(false); }} aria-invalid={error} className="w-full border-0 border-b border-slate-300 bg-transparent py-3 outline-none focus:border-blue-600" />
+  return <Modal open onClose={onClose} title="링크 추가" className="max-w-md" footer={<><Button variant="outline" onClick={onClose}>취소</Button><Button onClick={apply}>확인</Button></>}>
+    <div data-editor-link-ui className="space-y-4" onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } if (event.key === "Enter") { event.stopPropagation(); event.preventDefault(); apply(); } }}>
+      <label className="block space-y-2 text-sm"><span>표시할 텍스트</span><UiInput aria-label="표시할 텍스트" placeholder="표시할 텍스트" value={text} onChange={event => setText(event.target.value)} className="w-full" /></label>
+      <label className="block space-y-2 text-sm"><span>링크 URL</span><UiInput ref={urlInput} autoFocus aria-label="링크 URL" placeholder="https://..." value={url} onChange={event => { setUrl(event.target.value); setError(false); }} aria-invalid={error} className="w-full" /></label>
       {error && <p role="alert" className="text-sm text-rose-600">올바른 링크를 입력해 주세요.</p>}
     </div>
   </Modal>;
