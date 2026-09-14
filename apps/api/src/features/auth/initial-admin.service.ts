@@ -29,7 +29,9 @@ export class InitialAdminService {
     private readonly repository: InitialAdminRepository,
     private readonly usersService: UsersService,
   ) {
-    const rawValue = configService.get<string>("INITIAL__ADMIN_STDNOS");
+    const canonicalValue = configService.get<string>("INITIAL__ADMIN_STDNOS");
+    const aliasValue = configService.get<string>("INITIAL_ADMIN_STDNOS");
+    const rawValue = canonicalValue?.trim() ? canonicalValue : aliasValue;
     this.studentNumbers = parseInitialAdminStudentNumbers(rawValue);
 
     const configuredCount = (rawValue ?? "")
@@ -37,14 +39,14 @@ export class InitialAdminService {
       .filter(Boolean).length;
     if (configuredCount !== this.studentNumbers.size) {
       this.logger.warn(
-        "INITIAL__ADMIN_STDNOS contains an invalid or duplicate student number; only unique 8-digit values are used.",
+        "INITIAL__ADMIN_STDNOS (or INITIAL_ADMIN_STDNOS) contains an invalid or duplicate student number; only unique 8-digit values are used.",
       );
     }
   }
 
   async ensureRoleForUser(
     userId: string,
-    studentNumber: string | undefined,
+    studentNumber: string | null | undefined,
   ): Promise<boolean> {
     const normalizedStudentNumber = studentNumber?.trim();
     if (
@@ -61,8 +63,14 @@ export class InitialAdminService {
       );
     }
 
-    if (result === "granted") {
+    // Also clear an old cache when the membership already existed. This is
+    // important after a seed repaired the system role's permission set while
+    // Redis still held the administrator's previous bitmask.
+    if (result === "granted" || result === "already_granted") {
       await this.usersService.invalidatePermissionCache(userId);
+    }
+
+    if (result === "granted") {
       this.logger.log(`Granted the initial administrator role to user ${userId}`);
     }
 

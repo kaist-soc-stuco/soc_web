@@ -87,24 +87,21 @@ function SortableVoteAgendaCard({
       }}
       className={`relative rounded-xl border border-slate-200 bg-white p-5 pt-9 shadow-card sm:p-6 sm:pt-9 ${isDragging ? "relative shadow-lg" : ""}`}
     >
-      <div className="mb-4 flex min-w-0 items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          {!disabled ? (
-            <button
-              ref={setActivatorNodeRef}
-              type="button"
-              aria-label={`안건 ${index + 1} 순서 이동`}
-              data-tooltip="드래그하여 순서 변경"
-              aria-grabbed={isDragging ? "true" : undefined}
-              className="absolute left-1/2 top-1 -translate-x-1/2 inline-flex h-6 w-10 shrink-0 touch-none select-none cursor-grab items-center justify-center rounded-md border-0 bg-transparent p-0 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30 active:cursor-grabbing"
-              {...attributes}
-              {...listeners}
-            >
-              <GripVertical aria-hidden="true" className="size-4 rotate-90" />
-            </button>
-          ) : null}
-          <span className="truncate text-sm font-medium text-slate-600">안건 {index + 1}</span>
-        </div>
+      {!disabled ? (
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          aria-label={`안건 ${index + 1} 순서 이동`}
+          data-tooltip="드래그하여 순서 변경"
+          aria-grabbed={isDragging ? "true" : undefined}
+          className="absolute left-1/2 top-2 z-10 inline-flex h-6 w-10 -translate-x-1/2 shrink-0 touch-none select-none cursor-grab items-center justify-center rounded-md border-0 bg-transparent p-0 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30 active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical aria-hidden="true" className="size-4 rotate-90" />
+        </button>
+      ) : null}
+      <div className="mb-4 flex min-w-0 items-center justify-end gap-3">
         {trailing}
       </div>
       {children}
@@ -231,7 +228,7 @@ export function VoteEditorPage() {
       startsAt: scheduleIso(value.startsAt), endsAt: scheduleIso(value.endsAt),
       titleEn: koreanRef.current ? null : value.titleEn || null,
       descriptionKo: value.descriptionKo || null, descriptionEn: koreanRef.current ? null : value.descriptionEn || null,
-      items: value.items.map((item, index) => ({...item, titleKo:item.titleKo.trim() || `안건 ${index+1}`,
+      items: value.items.map((item) => ({...item, titleKo:item.titleKo.trim() || "제목 없는 안건",
         titleEn:koreanRef.current ? null : item.titleEn || null,
         descriptionEn:koreanRef.current ? null : item.descriptionEn || null,
         options:item.options.map((option, i)=>({...option,labelKo:option.labelKo.trim() || `옵션 ${i+1}`,labelEn:koreanRef.current ? null : option.labelEn || null}))
@@ -395,7 +392,7 @@ export function VoteEditorPage() {
             <BuilderTextField plainText
               ariaLabel="투표 설명"
               className="min-w-0"
-              placeholder="투표 설명(선택사항)"
+              placeholder="투표 설명"
               disabled={!editable}
               value={draft.descriptionKo ?? ""}
               onChange={(value) => setDraft({ ...draft, descriptionKo: value })}
@@ -404,7 +401,7 @@ export function VoteEditorPage() {
               <BuilderTextField plainText
                 ariaLabel="영문 투표 설명"
                 className="min-w-0"
-                placeholder="Description (optional)"
+                placeholder="Description"
                 disabled={!editable}
                 value={draft.descriptionEn ?? ""}
                 onChange={(value) => setDraft({ ...draft, descriptionEn: value })}
@@ -455,7 +452,7 @@ export function VoteEditorPage() {
                       <div className="grid gap-3 md:grid-cols-2">
                         <BuilderTextField plainText singleLine
                           ariaLabel={`안건 ${itemIndex + 1} 국문 제목`}
-                          placeholder={`안건 ${itemIndex + 1}`}
+                          placeholder="안건 제목"
                           disabled={!editable}
                           value={item.titleKo}
                           onChange={(value) => setItem(itemIndex, { titleKo: value })}
@@ -471,7 +468,7 @@ export function VoteEditorPage() {
                         ) : null}
                         <BuilderTextField plainText
                           ariaLabel={`안건 ${itemIndex + 1} 설명`}
-                          placeholder="안건 설명(선택사항)"
+                          placeholder="안건 설명"
                           disabled={!editable}
                           value={item.descriptionKo ?? ""}
                           onChange={(value) => setItem(itemIndex, { descriptionKo: value })}
@@ -479,7 +476,7 @@ export function VoteEditorPage() {
                         {!koreanOnly ? (
                           <BuilderTextField plainText
                             ariaLabel={`안건 ${itemIndex + 1} 영문 설명`}
-                            placeholder="Description (optional)"
+                            placeholder="Description"
                             disabled={!editable}
                             value={item.descriptionEn ?? ""}
                             onChange={(value) => setItem(itemIndex, { descriptionEn: value })}

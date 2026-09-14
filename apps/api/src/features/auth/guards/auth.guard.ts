@@ -11,6 +11,7 @@ import { UsersService } from "../../users/users.service";
 import { AuthSessionRepository } from "../auth-session.repository";
 import { AUTH_SESSION_COOKIE_NAME } from "../auth.tokens";
 import { RequestRateLimitService } from "../../../infrastructure/redis/request-rate-limit.service";
+import { InitialAdminService } from "../initial-admin.service";
 
 interface AuthenticatedRequest {
   cookies?: Record<string, string | undefined>;
@@ -26,6 +27,7 @@ export class AuthGuard implements CanActivate {
     private readonly authSessionRepository: AuthSessionRepository,
     private readonly usersService: UsersService,
     private readonly requestRateLimitService: RequestRateLimitService,
+    private readonly initialAdminService: InitialAdminService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -60,6 +62,8 @@ export class AuthGuard implements CanActivate {
       await this.authSessionRepository.revoke(sessionId);
       throw new UnauthorizedException("account_expired");
     }
+
+    await this.initialAdminService.ensureRoleForUser(user.userId, user.stdNo);
 
     request.user = {
       id: user.userId,

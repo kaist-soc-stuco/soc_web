@@ -7,7 +7,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { createHmac, randomUUID } from "node:crypto";
 import jwt, { type JwtPayload } from "jsonwebtoken";
-import { nowIso, isExpired, secondsUntil, expiresAtMs, nowDate } from "@soc/shared";
+import { nowIso, isExpired, secondsUntil, expiresAtMs, nowDate, nowMs } from "@soc/shared";
 
 import type {
   AuthSessionRecord,
@@ -27,6 +27,7 @@ import { UsersService } from "../users/users.service";
 import { InitialAdminService } from "./initial-admin.service";
 import {
   AUTH_ACCESS_TOKEN_TTL_SECONDS,
+  AUTH_REFRESH_TOKEN_ABSOLUTE_TTL_SECONDS,
   AUTH_REFRESH_TOKEN_TTL_SECONDS,
   AUTH_TEMPORARY_ACCESS_TOKEN_TTL_SECONDS,
 } from "./auth.tokens";
@@ -234,7 +235,14 @@ export class AuthSessionService {
       throw new UnauthorizedException("session_not_found");
     }
 
-    if (record.revoked || isExpired(record.expiresAt)) {
+    const absoluteExpiry = record.absoluteExpiresAt;
+    if (
+      record.revoked ||
+      isExpired(record.expiresAt) ||
+      (typeof absoluteExpiry === "number" &&
+        Number.isFinite(absoluteExpiry) &&
+        isExpired(absoluteExpiry))
+    ) {
       throw new UnauthorizedException("session_expired_or_revoked");
     }
   }
@@ -249,9 +257,17 @@ export class AuthSessionService {
   }> {
     const sessionId = randomUUID();
     const refreshJti = randomUUID();
+    const createdAt = nowMs();
+    const absoluteExpiresAt =
+      createdAt + AUTH_REFRESH_TOKEN_ABSOLUTE_TTL_SECONDS * 1000;
 
     const session: AuthSessionRecord = {
-      expiresAt: expiresAtMs(AUTH_REFRESH_TOKEN_TTL_SECONDS),
+      createdAt,
+      expiresAt: Math.min(
+        createdAt + AUTH_REFRESH_TOKEN_TTL_SECONDS * 1000,
+        absoluteExpiresAt,
+      ),
+      absoluteExpiresAt,
       mode: "persisted",
       refreshJti,
       revoked: false,
@@ -356,11 +372,33 @@ export class AuthSessionService {
       throw new UnauthorizedException("refresh_token_reused_or_invalid");
     }
 
+    const now = nowMs();
+    // Sessions issued before absolute expiry was introduced do not have the
+    // new field. Their existing Redis expiry is used as a conservative
+    // migration boundary instead of silently granting another full lifetime.
+    const absoluteExpiresAt =
+      typeof session.absoluteExpiresAt === "number" &&
+      Number.isFinite(session.absoluteExpiresAt)
+        ? session.absoluteExpiresAt
+        : session.expiresAt;
+    const nextExpiresAt = Math.min(
+      now + AUTH_REFRESH_TOKEN_TTL_SECONDS * 1000,
+      absoluteExpiresAt,
+    );
+
+    if (nextExpiresAt <= now) {
+      await this.authSessionRepository.revoke(session.sessionId);
+      throw new UnauthorizedException("session_expired_or_revoked");
+    }
+
     const rotatedJti = randomUUID();
     const rotatedSession: AuthSessionRecord = {
       ...session,
-      // Active users receive a fresh sliding refresh window on rotation.
-      expiresAt: expiresAtMs(AUTH_REFRESH_TOKEN_TTL_SECONDS),
+      createdAt: session.createdAt ?? now,
+      // Active users receive a fresh idle window, capped by the absolute
+      // lifetime measured from the original persisted session issuance.
+      expiresAt: nextExpiresAt,
+      absoluteExpiresAt,
       refreshJti: rotatedJti,
     };
 
@@ -490,7 +528,14 @@ export class AuthSessionService {
 
     const session = await this.authSessionRepository.findBySessionId(sessionId);
 
-    if (!session || session.revoked || isExpired(session.expiresAt)) {
+    if (
+      !session ||
+      session.revoked ||
+      isExpired(session.expiresAt) ||
+      (typeof session.absoluteExpiresAt === "number" &&
+        Number.isFinite(session.absoluteExpiresAt) &&
+        isExpired(session.absoluteExpiresAt))
+    ) {
       return {
         authenticated: false,
         canUsePersistentFeatures: false,
@@ -510,6 +555,9 @@ export class AuthSessionService {
     if (session.mode === "persisted" && session.userId) {
       const user = await this.usersService.findById(session.userId);
       if (user?.isActive) {
+        // Reconcile users who already had a session when the bootstrap env was
+        // configured, before resolving the permission bitmask for the client.
+        await this.initialAdminService.ensureRoleForUser(user.userId, user.stdNo);
         draftNamespace = this.deriveDraftNamespace(session.sessionId);
         const [resolvedPermission, resolvedFeeStatus] = await Promise.all([
           this.usersService.resolvePermissionBitmaskByUserId(user.userId),

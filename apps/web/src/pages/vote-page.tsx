@@ -1,6 +1,5 @@
 import { VoteProgress } from "@/components/organisms/vote-progress";
 import { VoteStatusBadge } from "@/components/ui/vote-status-badge";
-import { BoardDetailBackLink } from "@/features/board-detail/board-detail-sections";
 import { createApiClient, ApiClientHttpError } from "@soc/api-client";
 import type { VoteDetailResponse, VoteResultsResponse } from "@soc/contracts";
 import { isoToMs, nowMs, meetsVoteQuorum } from "@soc/shared";
@@ -31,14 +30,14 @@ export function VotePage() {
   const [reloadKey, setReloadKey] = useState(0);
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const t = lang === "ko" ? {
-    back: "목록으로", submitted: "투표가 제출되었습니다.",
+    submitted: "투표가 제출되었습니다.",
     verify: "접수 확인", verified: "정상 접수 확인됨",
     results: "투표 결과", ballots: "표", notStarted: "아직 투표가 시작되지 않았습니다.", ended: "투표가 종료되었습니다. 결과는 공개 후 확인할 수 있습니다.",
     loginHelp: "투표 자격 확인을 위해 로그인해 주세요.", login: "로그인", ineligible: "확정된 선거인명부에 포함되지 않아 참여할 수 없습니다.",
     voted: "이미 투표를 제출했습니다.", submit: "투표 제출", submitting: "제출 중", required: "모든 안건에 기표해 주세요.",
     confirmTitle: "투표를 제출할까요?", confirmDescription: "제출한 뒤에는 선택을 확인하거나 수정할 수 없습니다.", confirmLabel: "제출", loadFailed: "투표를 불러오지 못했습니다.", retry: "다시 시도",
   } : {
-    back: "Back to list", submitted: "Your ballot was submitted.",
+    submitted: "Your ballot was submitted.",
     verify: "Verify receipt", verified: "Receipt verified",
     results: "Results", ballots: "ballots", notStarted: "Voting has not started yet.", ended: "Voting has ended. Results will appear after publication.",
     loginHelp: "Sign in to verify your eligibility.", login: "Sign in", ineligible: "You are not included in the primary-major voter roll fixed at publication.",
@@ -113,8 +112,7 @@ export function VotePage() {
     <PageShell>
       {isPreview && <header className="flex min-h-16 items-center border-b border-slate-200 bg-white px-6"><Link to={`/admin/votes/${id}`} className="inline-flex items-center gap-3 text-sm"><ArrowLeft className="size-4" />미리보기 모드</Link></header>}
       <PageMain>
-        <PageContainer className="py-6 pb-16 md:py-10">
-          <BoardDetailBackLink category="" lang={lang} to="/votes" />
+        <PageContainer className="max-w-4xl py-6 pb-16 md:py-10">
           <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4 sm:p-6 md:p-8">
             {vote.status !== "DRAFT" && <div className="mb-3"><VoteStatusBadge status={vote.status} startsAt={vote.startsAt} endsAt={vote.endsAt} /></div>}<h1 className="break-words text-2xl font-bold tracking-[-0.03em] text-[#172033] sm:text-3xl">{lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo}</h1>
             <div className="mt-3 flex">
@@ -168,9 +166,9 @@ export function VotePage() {
             <div className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-14 text-center text-sm font-normal text-[#344054]">{t.voted}</div>
           ) : (
             <section className="mt-5 space-y-5">
-              {vote.items.map((item, index) => (
+              {vote.items.map((item) => (
                 <section key={item.id} role="group" aria-labelledby={`vote-item-${item.id}`} className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 md:p-7">
-                  <span className="mb-2 block text-xs font-medium text-emerald-700">{lang === "ko" ? `안건 ${index + 1}` : `Agenda ${index + 1}`}</span><h2 id={`vote-item-${item.id}`} className="break-words text-base font-semibold text-[#172033]">{lang === "en" && item.titleEn ? item.titleEn : item.titleKo}</h2>
+                  <h2 id={`vote-item-${item.id}`} className="break-words text-base font-semibold text-[#172033]">{lang === "en" && item.titleEn ? item.titleEn : item.titleKo}</h2>
                   {(lang === "en" && item.descriptionEn ? item.descriptionEn : item.descriptionKo) ? <p className="mt-2 break-words text-sm font-normal text-[#344054]">{lang === "en" && item.descriptionEn ? item.descriptionEn : item.descriptionKo}</p> : null}
                   {item.type === "MULTIPLE_CHOICE" ? <p className="mt-2 text-xs font-normal text-[#344054]">{lang === "ko" ? `최대 ${item.maxSelections}개 선택` : `Select up to ${item.maxSelections}`}</p> : null}
                   <div className="mt-4 grid gap-2">

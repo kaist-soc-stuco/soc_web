@@ -839,7 +839,7 @@ export function RoadmapGraph({
         </div>
 
         <div ref={flowViewportRef} className={cn("roadmap-flow-viewport relative h-[calc(100svh-13rem)] min-h-[24rem] md:min-h-[38rem] max-h-[54rem] overflow-hidden rounded-xl border border-slate-200 bg-slate-50", isFullscreen && "roadmap-flow-viewport--fullscreen")}>
-          <div className="absolute right-14 top-3 z-10 flex items-center gap-2">
+          <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
             <IconButton
               type="button"
               aria-label={lang === "ko" ? "로드맵 전체 보기" : "Fit roadmap to view"}
@@ -850,15 +850,15 @@ export function RoadmapGraph({
               <RotateCcw aria-hidden="true" className="size-4" />
             </IconButton>
           </div>
-          <button
+          <IconButton
             type="button"
             onClick={() => void toggleFullscreen()}
             aria-label={isFullscreen ? (lang === "ko" ? "전체 화면 닫기" : "Exit full screen") : (lang === "ko" ? "전체 화면" : "Full screen")}
             data-tooltip={isFullscreen ? (lang === "ko" ? "전체 화면 닫기" : "Exit full screen") : (lang === "ko" ? "전체 화면" : "Full screen")}
-            className="absolute right-3 top-3 z-10 inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/25"
+            className="size-9 border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900"
           >
             {isFullscreen ? <Minimize2 aria-hidden="true" className="size-4" /> : <Maximize2 aria-hidden="true" className="size-4" />}
-          </button>
+          </IconButton>
           <RoadmapInteractionContext.Provider value={interactionValue}>
             <ReactFlow<GraphNode, Edge>
               proOptions={{ hideAttribution: true }}

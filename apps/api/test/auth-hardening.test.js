@@ -154,6 +154,65 @@ test("refresh rotation accepts one concurrent use of the same JTI", async () => 
   assert.equal(repository.records.get(issued.session.sessionId).revoked, true);
 });
 
+test("persisted sessions use a sliding idle window with a 30-day absolute cap", async () => {
+  const repository = createSessionRepository();
+  const service = new AuthSessionService(
+    config,
+    repository,
+    { consume: async () => null },
+    createUsersService(),
+    { ensureRoleForUser: async () => undefined },
+  );
+
+  const issued = await service.issuePersistedSession("user-a");
+  const idleWindowMs = 14 * 24 * 60 * 60 * 1000;
+  const absoluteWindowMs = 30 * 24 * 60 * 60 * 1000;
+  assert.ok(issued.session.createdAt);
+  assert.equal(
+    issued.session.expiresAt - issued.session.createdAt,
+    idleWindowMs,
+  );
+  assert.equal(
+    issued.session.absoluteExpiresAt - issued.session.createdAt,
+    absoluteWindowMs,
+  );
+
+  const absoluteExpiresAt = Date.now() + 60_000;
+  repository.records.set(issued.session.sessionId, {
+    ...issued.session,
+    expiresAt: Date.now() + idleWindowMs,
+    absoluteExpiresAt,
+  });
+
+  await service.rotateRefreshToken(issued.refreshToken);
+  const rotated = repository.records.get(issued.session.sessionId);
+  assert.equal(rotated.absoluteExpiresAt, absoluteExpiresAt);
+  assert.ok(rotated.expiresAt <= absoluteExpiresAt);
+});
+
+test("legacy persisted sessions do not receive a new full refresh lifetime", async () => {
+  const repository = createSessionRepository();
+  const service = new AuthSessionService(
+    config,
+    repository,
+    { consume: async () => null },
+    createUsersService(),
+    { ensureRoleForUser: async () => undefined },
+  );
+
+  const issued = await service.issuePersistedSession("user-a");
+  const legacyExpiresAt = Date.now() + 60_000;
+  const legacy = { ...issued.session, expiresAt: legacyExpiresAt };
+  delete legacy.createdAt;
+  delete legacy.absoluteExpiresAt;
+  repository.records.set(issued.session.sessionId, legacy);
+
+  await service.rotateRefreshToken(issued.refreshToken);
+  const migrated = repository.records.get(issued.session.sessionId);
+  assert.equal(migrated.absoluteExpiresAt, legacyExpiresAt);
+  assert.ok(migrated.expiresAt <= legacyExpiresAt);
+});
+
 test("consent consumes the pending login atomically", async () => {
   let consumed = 0;
   const pendingUser = {

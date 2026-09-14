@@ -1299,10 +1299,10 @@ function makeAllQuestionTypesSurvey(): SurveySeed {
 async function cleanupSeedContent() {
   await db.execute(sql`
     delete from content_block
-    where type in ('TOP_BANNER', 'QUICK_LINK', 'PLEDGE')
+    where type in ('TOP_BANNER', 'QUICK_LINK', 'ORGANIZATION_CHART', 'PLEDGE')
       and created_by in (
         select user_id from users
-        where kaist_uid = 'seed-council-author'
+        where kaist_uid in ('seed-council-author', 'reference-faq')
       )
   `);
 
@@ -1594,6 +1594,8 @@ async function seedReferenceFaqs() {
 }
 
 async function seedAboutPageContent(seedAuthorId: string) {
+  const publishedAt = new Date("2026-03-02T09:00:00+09:00");
+
   await db.insert(contentBlocks).values([
     {
       type: "QUICK_LINK",
@@ -1607,62 +1609,34 @@ async function seedAboutPageContent(seedAuthorId: string) {
       createdBy: seedAuthorId,
       updatedBy: seedAuthorId,
       publishedBy: seedAuthorId,
-      publishedAt: new Date("2026-03-02T09:00:00+09:00"),
+      publishedAt,
     },
     {
       type: "ORGANIZATION_CHART",
       status: "PUBLISHED",
       titleKo: "전산학부 집행위원회 조직도",
       titleEn: "SoC Student Council Organization Chart",
-      imageUrl: "/organization-chart.svg",
+      imageUrl: "/organization-chart.png",
       sortOrder: 0,
       createdBy: seedAuthorId,
       updatedBy: seedAuthorId,
       publishedBy: seedAuthorId,
-      publishedAt: new Date("2026-03-02T09:00:00+09:00"),
+      publishedAt,
     },
-    {
-      type: "PLEDGE",
-      status: "PUBLISHED",
-      titleKo: "과목별 겹강톡 개설",
-      titleEn: "Open course-specific group chats",
-      bodyKo: "과목별 겹강톡을 개설해 교수·조교 없이 수강생만 익명으로 질문하고 소통할 수 있도록 운영합니다.",
-      bodyEn: "Open course-specific group chats where enrolled students can ask questions and communicate anonymously without professors or TAs.",
-      pledgeStatus: "COMPLETED",
-      sortOrder: 0,
+    ...REFERENCE_PLEDGE_SEEDS.map((seed, sortOrder) => ({
+      type: "PLEDGE" as const,
+      status: "PUBLISHED" as const,
+      titleKo: seed.titleKo,
+      titleEn: seed.titleEn,
+      bodyKo: seed.bodyKo,
+      bodyEn: seed.bodyEn,
+      pledgeStatus: seed.pledgeStatus,
+      sortOrder,
       createdBy: seedAuthorId,
       updatedBy: seedAuthorId,
       publishedBy: seedAuthorId,
-      publishedAt: new Date("2026-03-02T09:00:00+09:00"),
-    },
-    {
-      type: "PLEDGE",
-      status: "PUBLISHED",
-      titleKo: "SOC LOUNGE(과방) 리뉴얼",
-      titleEn: "Renovate the SOC LOUNGE",
-      bodyKo: "N1 318호 SOC LOUNGE(과방)에 빔프로젝터·소파·빈백을 마련하고, 학생증으로 이용할 수 있도록 정비했습니다.",
-      bodyEn: "We renovated the SOC LOUNGE in N1 Room 318 with a projector, sofas, and bean bags, and made it available to students with their ID.",
-      pledgeStatus: "COMPLETED",
-      sortOrder: 1,
-      createdBy: seedAuthorId,
-      updatedBy: seedAuthorId,
-      publishedBy: seedAuthorId,
-      publishedAt: new Date("2026-03-02T09:00:00+09:00"),
-    },
-    {
-      type: "PLEDGE",
-      status: "PUBLISHED",
-      titleKo: "토크콘서트·기업체 탐방 확대",
-      titleEn: "Expand Talk Concerts and company tours",
-      bodyKo: "진로콘서트를 토크콘서트로 개편하고, 더 다양한 기업을 만나는 기업체 탐방을 준비합니다.",
-      bodyEn: "We redesigned the Career Concert as a Talk Concert and are preparing company tours that introduce students to a wider range of employers.",
-      pledgeStatus: "IN_PROGRESS",
-      sortOrder: 2,
-      createdBy: seedAuthorId,
-      updatedBy: seedAuthorId,
-      publishedBy: seedAuthorId,
-      publishedAt: new Date("2026-03-02T09:00:00+09:00"),
-    },
+      publishedAt,
+    })),
   ]);
 
   await db
@@ -3432,8 +3406,8 @@ async function main() {
     await seedReferenceFaqs();
     if (seedMode === "reference") {
       await seedReferenceAboutPageContent();
-      await seedReferenceAboutWorkContent();
     }
+    await seedReferenceAboutWorkContent();
     await seedReferenceRoadmap();
     console.log("Seed finished");
   } catch (err) {
