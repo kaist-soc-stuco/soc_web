@@ -111,6 +111,10 @@ export interface CalendarKaistSyncResponse {
 export interface CalendarGoogleSyncResponse {
   skippedCount?: number;
   errorCodes?: string[];
+  /** Google Calendar `soc_web`에 직접 반영한 행사 게시글 일정 수입니다. */
+  councilSyncedCount?: number;
+  /** 사이트가 만든 Google 일정 중 이번 동기화에서 제거한 중복/폐기 일정 수입니다. */
+  removedDuplicateCount?: number;
   queuedCount: number;
   processedCount: number;
   succeededCount: number;

@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { BadRequestException, Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Cron } from "@nestjs/schedule";
-import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { msToDate, nowDate, nowMs } from "@soc/shared";
 
 import {
@@ -11,6 +11,8 @@ import {
   PostgresDatabase,
 } from "../../infrastructure/postgres/postgres.provider";
 import {
+  articles,
+  boards,
   calendarEvents,
   calendarSyncJobs,
 } from "../../infrastructure/postgres/postgres.schema";
@@ -27,6 +29,8 @@ import type { AuditMetadata } from "../audit/audit-context";
 
 const MANUAL_SOURCE = "MANUAL";
 const KAIST_SOURCE = "KAIST_ACADEMIC";
+const ARTICLE_SOURCE = "ARTICLE";
+const EVENT_BOARD_CODE = "_EVENT";
 const UPSERT_OPERATION = "UPSERT";
 const DELETE_OPERATION = "DELETE";
 const PENDING_STATUS = "PENDING";
@@ -75,7 +79,7 @@ export class CalendarSyncService {
       .values({
         calendarEventId,
         targetCalendarId,
-        operation: row.isActive && !row.isHiddenByAdmin ? UPSERT_OPERATION : DELETE_OPERATION,
+        operation: this.shouldPublishToGoogle(row) ? UPSERT_OPERATION : DELETE_OPERATION,
         status: PENDING_STATUS,
         revision: 1,
         resourceUpdatedAt: row.updatedAt,
@@ -89,7 +93,7 @@ export class CalendarSyncService {
       .onConflictDoUpdate({
         target: [calendarSyncJobs.calendarEventId, calendarSyncJobs.targetCalendarId],
         set: {
-          operation: row.isActive && !row.isHiddenByAdmin ? UPSERT_OPERATION : DELETE_OPERATION,
+          operation: this.shouldPublishToGoogle(row) ? UPSERT_OPERATION : DELETE_OPERATION,
           status: PENDING_STATUS,
           revision: sql`${calendarSyncJobs.revision} + 1`,
           resourceUpdatedAt: row.updatedAt,
@@ -265,12 +269,14 @@ export class CalendarSyncService {
     failedCount: number;
     skippedCount: number;
     errorCodes: string[];
+    councilSyncedCount: number;
+    removedDuplicateCount: number;
   }> {
     if (!this.googleCalendar.isConfigured()) throw new BadRequestException("google_calendar_not_configured");
     if (!this.targetCalendarId(MANUAL_SOURCE) && !this.targetCalendarId(KAIST_SOURCE)) throw new BadRequestException("google_calendar_target_not_configured");
     let queuedCount = 0;
     const rows = await this.db
-      .select({ calendarEventId: calendarEvents.calendarEventId })
+      .select()
       .from(calendarEvents)
       .where(inArray(calendarEvents.sourceType, [MANUAL_SOURCE, KAIST_SOURCE]));
 
@@ -289,9 +295,57 @@ export class CalendarSyncService {
       if (result.processedCount === 0) break;
     }
 
+    let councilSyncedCount = 0;
+    let removedDuplicateCount = 0;
+    const directSyncErrors: unknown[] = [];
+    const councilCalendarId = this.targetCalendarId(MANUAL_SOURCE);
+    if (councilCalendarId) {
+      const result = await this.syncCouncilArticleEvents(councilCalendarId);
+      councilSyncedCount += result.syncedCount;
+      failedCount += result.failedCount;
+      removedDuplicateCount += result.removedCount;
+      directSyncErrors.push(...result.errors);
+    }
+
+    for (const source of [MANUAL_SOURCE, KAIST_SOURCE]) {
+      const targetCalendarId = this.targetCalendarId(source);
+      if (!targetCalendarId) continue;
+
+      try {
+        const result = await this.reconcileCalendarEvents(
+          targetCalendarId,
+          source,
+          rows.filter((row) => row.sourceType === source),
+        );
+        removedDuplicateCount += result.removedCount;
+        failedCount += result.failedCount;
+        directSyncErrors.push(...result.errors);
+      } catch (error) {
+        // A failed list request must never trigger deletes. Surface the
+        // failure while leaving the remote calendar untouched.
+        failedCount += 1;
+        directSyncErrors.push(error);
+        this.logger.warn(
+          `Google Calendar reconciliation failed for ${source}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
     const failures = failedCount > 0 ? await this.db.select({ error: calendarEvents.googleSyncError }).from(calendarEvents).where(inArray(calendarEvents.googleSyncStatus, ["FAILED", "CONFLICT"])) : [];
-    const errorCodes = [...new Set(failures.map(({ error }) => error?.includes("403") ? "permission_denied" : error?.includes("404") ? "calendar_not_found" : error?.includes("401") || error?.includes("token") ? "authentication_failed" : error?.includes("412") || error?.includes("Conflict") ? "edit_conflict" : "sync_failed"))];
-    const result = { queuedCount, processedCount, succeededCount, failedCount, skippedCount: rows.length - queuedCount, errorCodes };
+    const errorCodes = [...new Set([
+      ...failures.map(({ error }) => googleSyncErrorCode(error)),
+      ...directSyncErrors.map((error) => googleSyncErrorCode(error)),
+    ])];
+    const result = {
+      queuedCount,
+      processedCount,
+      succeededCount,
+      failedCount,
+      skippedCount: rows.length - queuedCount,
+      errorCodes,
+      councilSyncedCount,
+      removedDuplicateCount,
+    };
     await this.auditLogService?.record({
       action: "calendar.sync.google",
       actorUserId: audit?.actorUserId ?? null,
@@ -300,6 +354,182 @@ export class CalendarSyncService {
       targetType: "calendar",
     });
     return result;
+  }
+
+  private async syncCouncilArticleEvents(calendarId: string): Promise<{
+    syncedCount: number;
+    removedCount: number;
+    failedCount: number;
+    errors: unknown[];
+  }> {
+    const rows = await this.db
+      .select({
+        articleId: articles.articleId,
+        titleKo: articles.titleKo,
+        eventDescriptionKo: articles.eventDescriptionKo,
+        eventStartDate: articles.eventStartDate,
+        eventEndDate: articles.eventEndDate,
+        eventLocation: articles.eventLocation,
+      })
+      .from(articles)
+      .innerJoin(boards, eq(articles.boardId, boards.boardId))
+      .where(
+        and(
+          eq(boards.code, EVENT_BOARD_CODE),
+          eq(boards.isActive, true),
+          eq(articles.status, "PUBLISHED"),
+          eq(articles.visibilityScope, "PUBLIC"),
+          isNull(articles.deletedAt),
+          isNotNull(articles.eventStartDate),
+          isNotNull(articles.eventEndDate),
+        ),
+      )
+      .orderBy(articles.eventStartDate, articles.articleId);
+
+    const expected = new Map<string, string>();
+    let syncedCount = 0;
+    let failedCount = 0;
+    const errors: unknown[] = [];
+
+    for (const row of rows) {
+      if (!row.eventStartDate || !row.eventEndDate) continue;
+      const sourceUid = `article:${row.articleId}`;
+      const eventId = deterministicGoogleEventId(sourceUid);
+      expected.set(sourceUid, eventId);
+
+      try {
+        await this.googleCalendar.upsertEvent({
+          calendarId,
+          eventId,
+          resource: this.toGoogleArticleResource({
+            articleId: row.articleId,
+            titleKo: row.titleKo,
+            eventDescriptionKo: row.eventDescriptionKo,
+            eventLocation: row.eventLocation,
+            eventStartDate: row.eventStartDate,
+            eventEndDate: row.eventEndDate,
+          }),
+        });
+        syncedCount += 1;
+      } catch (error) {
+        failedCount += 1;
+        errors.push(error);
+        this.logger.warn(
+          `Google Calendar student council event ${row.articleId} failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    let removedCount = 0;
+    try {
+      const result = await this.reconcileGoogleEvents({
+        calendarId,
+        sourceType: ARTICLE_SOURCE,
+        expected,
+        keyForEvent: (event) => {
+          const properties = event.extendedProperties?.private;
+          if (!properties) return null;
+          if (properties.socSourceUid) return properties.socSourceUid;
+          return properties.socArticleId ? `article:${properties.socArticleId}` : null;
+        },
+      });
+      removedCount = result.removedCount;
+      failedCount += result.failedCount;
+      errors.push(...result.errors);
+    } catch (error) {
+      failedCount += 1;
+      errors.push(error);
+      this.logger.warn(
+        `Google Calendar student council event reconciliation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    return { syncedCount, removedCount, failedCount, errors };
+  }
+
+  private async reconcileCalendarEvents(
+    calendarId: string,
+    sourceType: string,
+    rows: CalendarEventRow[],
+  ): Promise<{ removedCount: number; failedCount: number; errors: unknown[] }> {
+    const expected = new Map<string, string>();
+    for (const row of rows) {
+      if (!this.shouldPublishToGoogle(row)) continue;
+      const eventId = row.googleCalendarId === calendarId && row.googleEventId
+        ? row.googleEventId
+        : deterministicGoogleEventId(`${row.calendarEventId}:${row.createdAt.toISOString()}`);
+      expected.set(`calendar:${row.calendarEventId}`, eventId);
+      if (row.sourceUid) expected.set(`${sourceType}:${row.sourceUid}`, eventId);
+    }
+
+    return this.reconcileGoogleEvents({
+      calendarId,
+      sourceType,
+      expected,
+      keyForEvent: (event) => {
+        const properties = event.extendedProperties?.private;
+        if (!properties) return null;
+        if (properties.socSourceUid) return `${sourceType}:${properties.socSourceUid}`;
+        return properties.socCalendarEventId
+          ? `calendar:${properties.socCalendarEventId}`
+          : null;
+      },
+    });
+  }
+
+  private async reconcileGoogleEvents(input: {
+    calendarId: string;
+    sourceType: string;
+    expected: ReadonlyMap<string, string>;
+    keyForEvent: (event: GoogleCalendarEventResource) => string | null;
+  }): Promise<{ removedCount: number; failedCount: number; errors: unknown[] }> {
+    if (typeof this.googleCalendar.listEvents !== "function") {
+      return { removedCount: 0, failedCount: 0, errors: [] };
+    }
+
+    const remoteEvents = await this.googleCalendar.listEvents({
+      calendarId: input.calendarId,
+      privateExtendedProperty: `socSourceType=${input.sourceType}`,
+    });
+    const groups = new Map<string, GoogleCalendarEventResource[]>();
+
+    for (const event of remoteEvents) {
+      const key = input.keyForEvent(event);
+      if (!key || !event.id) continue;
+      const group = groups.get(key) ?? [];
+      group.push(event);
+      groups.set(key, group);
+    }
+
+    let removedCount = 0;
+    let failedCount = 0;
+    const errors: unknown[] = [];
+    for (const [key, group] of groups) {
+      const expectedEventId = input.expected.get(key);
+      const keep = expectedEventId
+        ? group.find((event) => event.id === expectedEventId) ?? group[0]
+        : undefined;
+
+      for (const event of group) {
+        if (event === keep || !event.id) continue;
+        try {
+          await this.googleCalendar.deleteEvent({
+            calendarId: input.calendarId,
+            eventId: event.id,
+            etag: event.etag,
+          });
+          removedCount += 1;
+        } catch (error) {
+          failedCount += 1;
+          errors.push(error);
+          this.logger.warn(
+            `Google Calendar duplicate cleanup failed for ${event.id}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    }
+
+    return { removedCount, failedCount, errors };
   }
 
   async processPendingJobs(limit = 50): Promise<{
@@ -447,7 +677,7 @@ export class CalendarSyncService {
       : null;
     const result = await this.googleCalendar.upsertEvent({
       calendarId: job.targetCalendarId,
-      eventId: existingEventId ?? `soc${createHash("sha256").update(`${row.calendarEventId}:${row.createdAt.toISOString()}`).digest("hex").slice(0, 40)}`,
+      eventId: existingEventId ?? deterministicGoogleEventId(`${row.calendarEventId}:${row.createdAt.toISOString()}`),
       etag: existingEventId ? row.googleEtag : null,
       resource: this.toGoogleResource(row),
     });
@@ -611,9 +841,48 @@ export class CalendarSyncService {
     return resource;
   }
 
+  private toGoogleArticleResource(row: {
+    articleId: number;
+    titleKo: string;
+    eventDescriptionKo: string | null;
+    eventLocation: string | null;
+    eventStartDate: Date;
+    eventEndDate: Date;
+  }): GoogleCalendarEventResource {
+    const resource: GoogleCalendarEventResource = {
+      summary: row.titleKo,
+      start: {
+        dateTime: row.eventStartDate.toISOString(),
+        timeZone: SEOUL_TIME_ZONE,
+      },
+      end: {
+        dateTime: row.eventEndDate.toISOString(),
+        timeZone: SEOUL_TIME_ZONE,
+      },
+      extendedProperties: {
+        private: {
+          socSourceType: ARTICLE_SOURCE,
+          socSourceUid: `article:${row.articleId}`,
+          socArticleId: String(row.articleId),
+        },
+      },
+    };
+
+    if (row.eventDescriptionKo) resource.description = row.eventDescriptionKo;
+    if (row.eventLocation) resource.location = row.eventLocation;
+    return resource;
+  }
+
   private targetCalendarId(sourceType: string): string | null {
     const key = sourceType === KAIST_SOURCE ? "GOOGLE_KAIST_CALENDAR_ID" : "GOOGLE_CALENDAR_ID";
     return this.configService.get<string>(key)?.trim() || null;
+  }
+
+  private shouldPublishToGoogle(row: CalendarEventRow): boolean {
+    // KAIST feed visibility is a site presentation choice. Its separate
+    // Google academic calendar should still contain every active feed item;
+    // only administrator-managed student-council events honor the hide flag.
+    return row.isActive && (row.sourceType === KAIST_SOURCE || !row.isHiddenByAdmin);
   }
 
   private isTargetEnabled(sourceType: string): boolean {
@@ -634,4 +903,19 @@ function sanitizeError(error: unknown): string {
     return `${error.name}:${error.statusCode}:${error.message}`.slice(0, 1_000);
   }
   return (error instanceof Error ? error.message : String(error)).replace(/\s+/g, " ").slice(0, 1_000);
+}
+
+function deterministicGoogleEventId(key: string): string {
+  return `soc${createHash("sha256").update(key).digest("hex").slice(0, 40)}`;
+}
+
+function googleSyncErrorCode(error: unknown): string {
+  const message = error instanceof Error ? `${error.name} ${error.message}` : String(error);
+  if (message.includes("403")) return "permission_denied";
+  if (message.includes("404")) return "calendar_not_found";
+  if (message.includes("401") || message.toLowerCase().includes("token") || message.toLowerCase().includes("authentication")) {
+    return "authentication_failed";
+  }
+  if (message.includes("412") || message.includes("Conflict")) return "edit_conflict";
+  return "sync_failed";
 }

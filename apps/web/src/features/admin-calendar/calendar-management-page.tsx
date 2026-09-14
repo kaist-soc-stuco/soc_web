@@ -357,11 +357,19 @@ function CalendarManagementContent() {
     try {
       const result = await apiClient.syncGoogleCalendars();
       await refresh();
+      const councilSyncedCount = result.councilSyncedCount ?? 0;
+      const removedDuplicateCount = result.removedDuplicateCount ?? 0;
       toast({
-        type: result.failedCount > 0 ? "error" : result.skippedCount ? "warning" : result.queuedCount === 0 ? "info" : "success",
-        message: result.queuedCount === 0 && !result.skippedCount
-          ? "Google에 반영할 직접 등록 일정이나 학사 일정이 없습니다."
-          : `Google 반영 성공 ${result.succeededCount} · 실패 ${result.failedCount} · 처리 대기 ${Math.max(0, result.queuedCount - result.processedCount)}${result.skippedCount ? ` · 대상 캘린더 미설정 ${result.skippedCount}` : ""}${result.errorCodes?.length ? ` — ${result.errorCodes.map((code) => ({ permission_denied: "캘린더 쓰기 권한을 확인해 주세요", calendar_not_found: "캘린더 ID와 공유 설정을 확인해 주세요", authentication_failed: "서비스 계정 인증을 확인해 주세요", edit_conflict: "Google에서 변경된 일정과 충돌했습니다", sync_failed: "실패한 일정의 동기화 오류를 확인해 주세요" } as Record<string, string>)[code] ?? code).join(" · ")}` : ""}`,
+        type: result.failedCount > 0
+          ? "error"
+          : result.skippedCount
+            ? "warning"
+            : result.queuedCount === 0 && councilSyncedCount === 0 && removedDuplicateCount === 0
+              ? "info"
+              : "success",
+        message: result.queuedCount === 0 && !result.skippedCount && councilSyncedCount === 0 && removedDuplicateCount === 0
+          ? "Google에 반영할 일정이 없습니다."
+          : `Google 반영 성공 ${result.succeededCount} · 학생회 일정 ${councilSyncedCount} · 실패 ${result.failedCount} · 중복 정리 ${removedDuplicateCount} · 처리 대기 ${Math.max(0, result.queuedCount - result.processedCount)}${result.skippedCount ? ` · 대상 캘린더 미설정 ${result.skippedCount}` : ""}${result.errorCodes?.length ? ` — ${result.errorCodes.map((code) => ({ permission_denied: "캘린더 쓰기 권한을 확인해 주세요", calendar_not_found: "캘린더 ID와 공유 설정을 확인해 주세요", authentication_failed: "서비스 계정 인증을 확인해 주세요", edit_conflict: "Google에서 변경된 일정과 충돌했습니다", sync_failed: "실패한 일정의 동기화 오류를 확인해 주세요" } as Record<string, string>)[code] ?? code).join(" · ")}` : ""}`,
       });
     } catch (error) {
       const code = error instanceof ApiClientHttpError ? error.code : undefined;
