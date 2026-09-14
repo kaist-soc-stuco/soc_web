@@ -25,6 +25,31 @@ test("Calendar retries an unauthorized token once, without swallowing a second f
   } finally { global.fetch = previous; }
 });
 
+test("Google upsert explicitly confirms a previously cancelled event", async () => {
+  const previous = global.fetch;
+  const client = new GoogleCalendarClient({ get: () => undefined });
+  client.getAccessToken = async () => "test-token";
+  let request;
+  global.fetch = async (url, init) => {
+    request = { url: String(url), method: init?.method, body: init?.body ? JSON.parse(init.body) : null };
+    return new Response(JSON.stringify({ id: "event", etag: "etag-2", status: "confirmed" }), { status: 200 });
+  };
+  try {
+    const result = await client.upsertEvent({
+      calendarId: "soc_web",
+      eventId: "event",
+      resource: {
+        summary: "복구할 일정",
+        start: { dateTime: "2030-01-01T00:00:00Z" },
+        end: { dateTime: "2030-01-01T01:00:00Z" },
+      },
+    });
+    assert.deepEqual(result, { eventId: "event", etag: "etag-2" });
+    assert.equal(request.method, "PATCH");
+    assert.equal(request.body.status, "confirmed");
+  } finally { global.fetch = previous; }
+});
+
 test("Google Calendar event listing follows pages and scopes site-owned events", async () => {
   const previous = global.fetch;
   const client = new GoogleCalendarClient({ get: () => undefined });
