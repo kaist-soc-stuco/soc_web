@@ -4,7 +4,7 @@ import { createApiClient } from "@soc/api-client";
 import { useQuery } from "@tanstack/react-query";
 
 import { Header } from "@/components/organisms/header";
-import { EmptyState } from "@/components/ui/data-state";
+import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Button as UiButton } from "@/components/ui/button";
 import {
   DataViewBody,
@@ -213,20 +213,20 @@ export function FaqPage() {
                   ))}
                 </div>
               ) : faqQuery.isError ? (
-                <div className="flex min-h-48 flex-col items-center justify-center gap-3 px-5 py-8 text-center" role="alert">
-                  <p className="text-sm font-normal text-red-600">
-                    {lang === "ko"
-                      ? "FAQ를 불러오지 못했습니다."
-                      : "Failed to load FAQ."}
-                  </p>
-                  <UiButton
-                    type="button"
-                    variant="outline"
-                    onClick={() => void faqQuery.refetch()}
-                  >
-                    {lang === "ko" ? "다시 시도" : "Retry"}
-                  </UiButton>
-                </div>
+                <ErrorState
+                  description={
+                    lang === "ko"
+                      ? "일시적인 네트워크 오류일 수 있습니다. 잠시 후 다시 시도해 주세요."
+                      : "This may be a temporary network issue. Please try again."
+                  }
+                  onRetry={() => void faqQuery.refetch()}
+                  retryLabel={lang === "ko" ? "다시 시도" : "Retry"}
+                  title={
+                    lang === "ko"
+                      ? "FAQ 목록을 불러오지 못했습니다."
+                      : "We couldn't load the FAQ."
+                  }
+                />
               ) : filteredItems.length === 0 ? (
                 <EmptyState
                   className="min-h-48 rounded-none border-0 bg-transparent"

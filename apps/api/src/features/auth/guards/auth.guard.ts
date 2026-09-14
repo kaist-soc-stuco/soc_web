@@ -2,6 +2,7 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  Optional,
   UnauthorizedException,
 } from "@nestjs/common";
 import { Request } from "express";
@@ -27,7 +28,7 @@ export class AuthGuard implements CanActivate {
     private readonly authSessionRepository: AuthSessionRepository,
     private readonly usersService: UsersService,
     private readonly requestRateLimitService: RequestRateLimitService,
-    private readonly initialAdminService: InitialAdminService,
+    @Optional() private readonly initialAdminService?: InitialAdminService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -63,7 +64,7 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException("account_expired");
     }
 
-    await this.initialAdminService.ensureRoleForUser(user.userId, user.stdNo);
+    await this.initialAdminService?.ensureRoleForUser(user.userId, user.stdNo);
 
     request.user = {
       id: user.userId,

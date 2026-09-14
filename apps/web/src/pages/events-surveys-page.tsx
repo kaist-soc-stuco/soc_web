@@ -5,10 +5,9 @@ import { EventsSurveysCalendar } from "@/features/events-surveys/events-surveys-
 import { EventsSurveysFilterBar } from "@/features/events-surveys/events-surveys-filter-bar";
 import { EventsSurveysGrid } from "@/features/events-surveys/events-surveys-grid";
 import { useEventsSurveysPageController } from "@/features/events-surveys/use-events-surveys-page-controller";
-import { AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/data-state";
+import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Pagination } from "@/components/ui/pagination";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { Permissions } from "@/lib/permissions";
@@ -142,7 +141,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
         />
 
         <PageContainer className="pb-8">
-          {currentTab !== "calendar" && !loading && !error ? (
+          {currentTab !== "calendar" && !loading ? (
             <EventsSurveysFilterBar
               lang={lang}
               onQueryChange={setItemQuery}
@@ -165,22 +164,16 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
               </p>
             </div>
           ) : error ? (
-            <div
-              className="mx-auto my-12 flex min-h-[45vh] w-full max-w-lg flex-col items-center justify-center gap-5 rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600"
-              role="alert"
-            >
-              <AlertCircle className="h-12 w-12 shrink-0 text-slate-400" />
-              <span className="min-w-0">{error}</span>
-              <Button
-                className="min-h-11 shrink-0"
-                onClick={retry}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                {lang === "ko" ? "다시 시도" : "Try again"}
-              </Button>
-            </div>
+            <ErrorState
+              description={
+                lang === "ko"
+                  ? "일시적인 네트워크 오류일 수 있습니다. 잠시 후 다시 시도해 주세요."
+                  : "This may be a temporary network issue. Please try again."
+              }
+              onRetry={retry}
+              retryLabel={lang === "ko" ? "다시 시도" : "Try again"}
+              title={error}
+            />
           ) : currentTab === "calendar" ? (
             <EventsSurveysCalendar
               calendarEvents={calendarEvents}
