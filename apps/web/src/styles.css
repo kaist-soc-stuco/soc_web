@@ -4236,6 +4236,13 @@ html { scrollbar-gutter: stable; }
   transform: translateY(-50%);
 }
 
+.roadmap-flow-viewport .react-flow__panel.react-flow__controls.bottom.left {
+  bottom: 0.75rem;
+  left: 0.75rem;
+  z-index: 20;
+  margin: 0;
+}
+
 .faq-list-card {
   border-color: #e2e8f0;
   box-shadow: 0 1px 2px rgb(15 23 42 / 3%);
@@ -4259,7 +4266,7 @@ html { scrollbar-gutter: stable; }
 }
 
 /* Keep compact actions discoverable without relying on browser-native title tooltips. */
-button[data-tooltip] {
+button[data-tooltip]:not(.absolute):not(.fixed):not(.sticky) {
   position: relative;
 }
 
@@ -4291,7 +4298,7 @@ button[data-tooltip]:focus-visible::after {
   transition-delay: 300ms;
 }
 
-.survey-editor-header-actions [data-tooltip] {
+.survey-editor-header-actions [data-tooltip]:not(.absolute):not(.fixed):not(.sticky) {
   position: relative;
 }
 

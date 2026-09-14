@@ -272,7 +272,12 @@ export class AuthService {
         this.readUserInfoString(userInfo, "user_name") ??
         ssoSubject;
       const nameEn = this.readUserInfoString(userInfo, "user_eng_nm");
-      const stdNo = this.readUserInfoString(userInfo, "std_no");
+      const stdNo =
+        this.readUserInfoString(userInfo, "std_no") ??
+        this.readUserInfoString(userInfo, "student_no") ??
+        this.readUserInfoString(userInfo, "student_number") ??
+        this.readUserInfoString(userInfo, "stdNo") ??
+        this.readUserInfoString(userInfo, "studentNumber");
       const departmentKo = this.readUserInfoString(userInfo, "std_dept_kor_nm");
       const departmentEn = this.readUserInfoString(userInfo, "std_dept_eng_nm");
       const primaryMajor =
@@ -306,18 +311,18 @@ export class AuthService {
             identityCode,
             nameEn,
             nameKo,
-            stdNo,
+            stdNo: stdNo ?? existingUser.stdNo ?? undefined,
           });
         }
 
         await this.initialAdminService.ensureRoleForUser(
           existingUser.userId,
-          stdNo,
+          stdNo ?? existingUser.stdNo ?? undefined,
         );
 
         await this.usersService.applyStudentFeeBootstrap(
           existingUser.userId,
-          stdNo,
+          stdNo ?? existingUser.stdNo ?? undefined,
         );
 
         const issued = await this.authSessionService.issuePersistedSession(
@@ -466,11 +471,11 @@ export class AuthService {
   ): string | undefined {
     const value = userInfo[key];
 
-    if (typeof value !== "string") {
+    if (typeof value !== "string" && typeof value !== "number") {
       return undefined;
     }
 
-    const trimmed = value.trim();
+    const trimmed = String(value).trim();
 
     return trimmed.length > 0 ? trimmed : undefined;
   }

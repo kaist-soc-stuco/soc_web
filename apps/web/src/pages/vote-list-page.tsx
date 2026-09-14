@@ -171,9 +171,10 @@ export function VoteListPage() {
       <PageMain>
         <PageHeader
           title={lang === "ko" ? "투표" : "Voting"}
+          containerClassName="max-w-4xl"
           actions={Permissions.has(session?.permission ?? 0, Permissions.MANAGE_VOTE) ? <Button asChild><Link to="/admin/votes/new"><Plus className="size-4" />{lang === "ko" ? "등록" : "Create"}</Link></Button> : undefined}
         />
-        <PageContainer className="pb-16">
+        <PageContainer className="max-w-4xl pb-16">
           {loading ? (
             <div className="py-20 text-center text-sm font-normal text-[#344054]">
               {lang === "ko" ? "불러오는 중..." : "Loading..."}
@@ -206,7 +207,7 @@ export function VoteListPage() {
                   </span>
                 </div>
                 {featuredVotes.length > 0 ? (
-                  <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="grid gap-4">
                     {featuredVotes.map((vote) => (
                       <ActiveVoteCard key={vote.id} vote={vote} lang={lang} now={now} />
                     ))}

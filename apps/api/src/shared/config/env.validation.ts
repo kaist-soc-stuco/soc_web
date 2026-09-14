@@ -195,6 +195,7 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     ),
     VOTE_BALLOT_ENCRYPTION_KEY: asOptionalString(config.VOTE_BALLOT_ENCRYPTION_KEY),
     INITIAL__ADMIN_STDNOS: asOptionalString(config.INITIAL__ADMIN_STDNOS),
+    INITIAL_ADMIN_STDNOS: asOptionalString(config.INITIAL_ADMIN_STDNOS),
     REDIS_AUTH_TTL_SECONDS: asPositiveInt(
       config.REDIS_AUTH_TTL_SECONDS ?? 300,
       'REDIS_AUTH_TTL_SECONDS',

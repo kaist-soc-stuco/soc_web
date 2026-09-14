@@ -98,7 +98,11 @@ export interface RefreshTokenClaims {
  * - rotatedFrom / revokedAt 등을 추가할지 결정하세요.
  */
 export interface AuthSessionRecord {
+  /** 최초 persisted 세션 발급 시각입니다. */
+  createdAt?: number;
   expiresAt: number;
+  /** persisted 세션의 최초 발급 기준 절대 만료 시각입니다. */
+  absoluteExpiresAt?: number;
   mode: StorageMode;
   refreshJti?: string;
   revoked: boolean;

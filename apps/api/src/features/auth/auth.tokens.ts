@@ -7,7 +7,13 @@
  */
 
 export const AUTH_ACCESS_TOKEN_TTL_SECONDS = 30 * 60;
-export const AUTH_REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
+/**
+ * Persisted refresh/session records use this as their idle timeout. A
+ * successful rotation can move the idle expiry forward, but never beyond the
+ * absolute session lifetime below.
+ */
+export const AUTH_REFRESH_TOKEN_TTL_SECONDS = 14 * 24 * 60 * 60;
+export const AUTH_REFRESH_TOKEN_ABSOLUTE_TTL_SECONDS = 30 * 24 * 60 * 60;
 /**
  * 개인정보 저장에 동의하지 않은 세션은 refresh token을 발급하지 않고
  * 짧은 수명의 access token만 사용합니다.
