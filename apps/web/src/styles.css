@@ -4220,27 +4220,42 @@ html { scrollbar-gutter: stable; }
   flex: 0 1 24rem;
 }
 
-.faq-filter-tabs {
-  flex: 0 0 auto;
-  max-width: 100%;
+.roadmap-flow-viewport__controls {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  gap: 0.5rem;
+  pointer-events: auto;
 }
 
-.faq-filter-tabs.filter-chips,
-.faq-filter-tabs.filter-chips :is(button, a) {
-  border-radius: 999px;
+.roadmap-flow-viewport__controls--top {
+  top: 1rem;
+  right: 1rem;
 }
 
-.roadmap-flow-viewport .react-flow__controls-button[data-tooltip]::after {
+.roadmap-flow-viewport__controls--bottom {
+  bottom: 1rem;
+  left: 1rem;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid rgb(226 232 240 / 0.92);
+  border-radius: 0.75rem;
+  background: rgb(255 255 255 / 0.9);
+  box-shadow: 0 4px 12px rgb(15 23 42 / 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.roadmap-flow-viewport__controls--top [data-tooltip]::after {
+  left: 50%;
+  top: calc(100% + 0.5rem);
+  transform: translateX(-50%);
+}
+
+.roadmap-flow-viewport__controls--bottom [data-tooltip]::after {
   left: calc(100% + 0.5rem);
   top: 50%;
   transform: translateY(-50%);
-}
-
-.roadmap-flow-viewport .react-flow__panel.react-flow__controls.bottom.left {
-  bottom: 0.75rem;
-  left: 0.75rem;
-  z-index: 20;
-  margin: 0;
 }
 
 .faq-list-card {
@@ -4597,3 +4612,7 @@ button[data-tooltip]:focus-visible::after {
 .question-add-option-space { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 180ms ease, visibility 180ms; }
 .question-inline-editor[data-selected="false"] .question-add-option-space { grid-template-rows: 0fr; visibility: hidden; }
 @media (prefers-reduced-motion: reduce) { .question-add-option-space { transition: none; } }
+
+/* Keep bilingual title fields aligned when a formatting toolbar expands. */
+.vote-agenda-card .question-inline-editor > .min-w-0 > .grid { align-items: start; }
+.vote-agenda-card .question-editor-field__focus-bar { display: none; }

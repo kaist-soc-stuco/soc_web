@@ -15,9 +15,8 @@ import {
   PageMain,
   PageSearchField,
   PageShell,
-  PageTabButton,
-  PageTabs,
 } from "@/components/ui/page-layout";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useLanguage } from "@/hooks/use-language";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
@@ -169,21 +168,18 @@ export function FaqPage() {
 
         <PageContainer className="faq-page-container max-w-4xl pb-12">
          <div className="faq-page-tools">
-           <PageTabs
-             aria-label={lang === "ko" ? "FAQ 분류" : "FAQ categories"}
-              variant="segmented"
-             className="faq-filter-tabs"
-           >
-             {FAQ_FILTERS.map((filter) => (
-               <PageTabButton
-                 key={filter.value}
-                 active={activeFilter === filter.value}
-                 onClick={() => setActiveFilter(filter.value)}
-               >
-                 {lang === "ko" ? filter.titleKo : filter.titleEn}
-               </PageTabButton>
-             ))}
-           </PageTabs>
+           <div className="min-w-0 max-w-full overflow-x-auto">
+             <SegmentedControl
+               ariaLabel={lang === "ko" ? "FAQ 분류" : "FAQ categories"}
+               className="clean-segmented-control"
+               options={FAQ_FILTERS.map((filter) => ({
+                 value: filter.value,
+                 label: lang === "ko" ? filter.titleKo : filter.titleEn,
+               }))}
+               value={activeFilter}
+               onChange={setActiveFilter}
+             />
+           </div>
             <div className="faq-page-actions">
               <PageSearchField
                 ariaLabel={lang === "ko" ? "FAQ 검색" : "Search FAQ"}

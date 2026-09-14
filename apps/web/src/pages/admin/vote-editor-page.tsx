@@ -90,18 +90,18 @@ function SortableVoteAgendaCard({
   return (
     <section
       ref={setNodeRef}
-      onClick={onSelect}
-      onFocus={onSelect}
+      onClick={event => { if (!(event.target as HTMLElement).closest("[data-agenda-drag-handle]")) onSelect(); }}
+      onFocus={event => { if (!(event.target as HTMLElement).closest("[data-agenda-drag-handle]")) onSelect(); }}
       tabIndex={disabled ? undefined : 0}
       data-selected={selected}
       style={{
-        transform: CSS.Transform.toString(transform),
-        transition: transition ?? "transform 180ms ease",
+        transform: CSS.Translate.toString(transform),
+        transition: isDragging ? undefined : transition,
         zIndex: isDragging ? 20 : undefined,
       }}
       className="vote-agenda-card relative"
     >
-      {children(!disabled ? <button ref={setActivatorNodeRef} type="button" aria-label={`안건 ${index + 1} 순서 이동`} className="flex h-6 w-10 touch-none cursor-grab items-center justify-center text-slate-400" {...attributes} {...listeners}><GripVertical className="size-4 rotate-90" /></button> : null)}
+      {children(!disabled ? <button data-agenda-drag-handle onMouseDown={event => event.preventDefault()} ref={setActivatorNodeRef} type="button" aria-label={`안건 ${index + 1} 순서 이동`} className="flex h-6 w-10 touch-none cursor-grab items-center justify-center text-slate-400" {...attributes} {...listeners}><GripVertical className="size-4 rotate-90" /></button> : null)}
     </section>
   );
 }
@@ -113,6 +113,19 @@ export function VoteEditorPage() {
   const [results, setResults] = useState<VoteResultsResponse | null>(null);
   const [vote, setVote] = useState<VoteDetailResponse | null>(null);
   const [draft, setDraftState] = useState<Draft>(initialDraft);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [importingRoster, setImportingRoster] = useState(false);
+  const rosterFileRef = useRef<HTMLInputElement>(null);
+  const [dragSession, setDragSession] = useState(0);
+  const draggingRef = useRef(false);
+  useEffect(() => {
+    const reset = () => { if (draggingRef.current) { draggingRef.current = false; setDragSession(value => value + 1); } };
+    const release = () => requestAnimationFrame(reset);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", reset);
+    window.addEventListener("blur", reset);
+    return () => { window.removeEventListener("pointerup", release); window.removeEventListener("pointercancel", reset); window.removeEventListener("blur", reset); };
+  }, []);
   const [selectedAgenda, setSelectedAgenda] = useState<string | null>(null);
   const [koreanOnly, setKoreanOnly] = useState(false);
   const [clock, setClock] = useState(nowMs());
@@ -182,6 +195,7 @@ export function VoteEditorPage() {
   };
   const agendaSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const handleAgendaDragEnd = ({ active, over }: DragEndEvent) => {
+    draggingRef.current = false;
     if (!over || active.id === over.id) return;
     const activeId = String(active.id);
     const overId = String(over.id);
@@ -275,7 +289,8 @@ export function VoteEditorPage() {
   };
   const addCandidate = async (userId: string) => { try { const voteId = await ensureStored(); await client.addVoteVoters(voteId, { userIds: [userId] }); setVoters(await client.listVoteVoters(voteId)); setAddingVoter(false); setCandidateQuery(""); setCandidates([]); toast({type:"success",message:"명부에 추가했습니다."}); } catch { toast({type:"error",message:"추가하지 못했습니다."}); } };
   const importXlsx = async (event: ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files?.[0]) return;
+    if (!event.target.files?.[0] || importingRoster) return;
+    setImportingRoster(true);
     try {
       const workbook = XLSX.read(await event.target.files[0].arrayBuffer(), { type: "array" });
       const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[workbook.SheetNames[0]], { defval: "" });
@@ -285,9 +300,9 @@ export function VoteEditorPage() {
       if (!numbers.length || numbers.some(number => !/^\d{6,12}$/.test(number))) throw new Error("학번을 확인해 주세요.");
       const voteId = await ensureStored();
       const result = await client.addVoteVoters(voteId, { studentNumbers: numbers });
-      setVoters(await client.listVoteVoters(voteId)); toast({ type: "success", message: `${result.added}명을 명부에 반영했습니다.` });
+      setVoters(await client.listVoteVoters(voteId)); setUploadDialogOpen(false); toast({ type: "success", message: `${result.added}명을 명부에 반영했습니다.` });
     } catch { toast({ type: "error", message: "명부를 불러오지 못했습니다. 학번 열과 등록된 주전공 계정을 확인하세요." }); }
-    finally { event.target.value = ""; }
+    finally { event.target.value = ""; setImportingRoster(false); }
 
   };
   const effectiveVoters = voters;
@@ -341,7 +356,7 @@ export function VoteEditorPage() {
         </AdminCard> : null}
         <div className="vote-agenda-editor" hidden={editorTab !== "questions"}><AdminCard>
           <div onClick={() => setSelectedAgenda(null)} onFocus={() => setSelectedAgenda(null)} className="p-5">
-            <SectionInlineEditor isSurveyHeader placeholders={{ titleKo: "제목 없는 투표", titleEn: "Untitled vote", descriptionKo: "투표 설명", descriptionEn: "Description (optional)" }} isKoreanOnly={koreanOnly} isOngoing={!editable}
+            <SectionInlineEditor isSurveyHeader placeholders={{ titleKo: "제목 없는 투표", titleEn: "Untitled vote", descriptionKo: "투표 설명", descriptionEn: "Description" }} isKoreanOnly={koreanOnly} isOngoing={!editable}
               initial={{ titleKo: draft.titleKo, titleEn: draft.titleEn ?? "", descriptionKo: draft.descriptionKo ?? "", descriptionEn: draft.descriptionEn ?? "" }}
               value={{ titleKo: draft.titleKo, titleEn: draft.titleEn ?? "", descriptionKo: draft.descriptionKo ?? "", descriptionEn: draft.descriptionEn ?? "" }}
               onDraftChange={value => { if (editable) setDraft({ ...draft, ...value }); }} onSave={() => {}} onCancel={() => setSelectedAgenda(null)} />
@@ -351,7 +366,9 @@ export function VoteEditorPage() {
         {editorTab === "settings" ? <AdminCard><div className="grid gap-5 p-6 md:grid-cols-2">            <label className="flex items-center gap-2 text-sm md:col-span-2"><input type="checkbox" disabled={!editable} checked={koreanOnly} onChange={e=>{remember();koreanRef.current=e.target.checked;setKoreanOnly(e.target.checked);setDirty(true);}} />한국어 전용</label>            <UiFormField label="시작 일시"><UiInput type="datetime-local" step="1" disabled={!editable} value={draft.startsAt} onChange={(e) => setDraft({ ...draft, startsAt: e.target.value })} /></UiFormField>
             <UiFormField label="종료 일시"><UiInput type="datetime-local" step="1" disabled={!editable} value={draft.endsAt} onChange={(e) => setDraft({ ...draft, endsAt: e.target.value })} /></UiFormField><UiFormField label="개표 정족수 (%)"><UiInput aria-label="개표 정족수 (%)" type="number" min={0} max={100} disabled={!editable} value={draft.quorumPercent} onChange={e=>setDraft({...draft,quorumPercent:Number(e.target.value)})} /></UiFormField><UiFormField label="기준"><AdminSelectDropdown ariaLabel="정족수 기준" disabled={!editable} value={draft.quorumInclusive ? "inclusive" : "exclusive"} onChange={value=>setDraft({...draft,quorumInclusive:value === "inclusive"})} options={[{value:"inclusive",label:"이상"},{value:"exclusive",label:"초과"}]} /></UiFormField></div></AdminCard> : null}
         <div className="vote-agenda-editor" hidden={editorTab !== "questions"}>
-          <DndContext
+          <DndContext key={dragSession}
+            onDragStart={() => { draggingRef.current = true; }}
+            onDragCancel={() => { draggingRef.current = false; }}
             sensors={agendaSensors}
             collisionDetection={closestCenter}
             modifiers={[restrictListDrag]}
@@ -423,7 +440,7 @@ export function VoteEditorPage() {
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={exportRoster}><Download />내보내기</Button>
               {rosterEditable ? <>
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"><Upload className="size-4" />엑셀 업로드<input className="hidden" type="file" accept=".xlsx,.xls" onChange={e=>void importXlsx(e)} /></label>
+                <Button variant="outline" onClick={() => setUploadDialogOpen(true)}><Upload className="size-4" />엑셀 업로드</Button>
                 <Button variant="outline" onClick={()=>setAddingVoter(true)}><UserPlus />수동 추가</Button>
               </> : null}
             </div>
@@ -451,7 +468,13 @@ export function VoteEditorPage() {
           </div> : null}
         </AdminCard> : null}
 
-        <Modal
+        <Modal open={uploadDialogOpen && rosterEditable} onClose={() => { if (!importingRoster) setUploadDialogOpen(false); }} title="선거인명부 업로드" className="max-w-md"
+        footer={<><Button variant="outline" disabled={importingRoster} onClick={() => setUploadDialogOpen(false)}>취소</Button><Button disabled={importingRoster} onClick={() => rosterFileRef.current?.click()}><Upload className="size-4" />{importingRoster ? "업로드 중…" : "파일 선택"}</Button></>}>
+        <p className="text-sm leading-6 text-slate-600">양식의 학번 열을 작성한 뒤 엑셀 파일을 업로드해 주세요.</p>
+        <Button variant="outline" className="mt-4" onClick={() => { const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([["학번"]]), "선거인명부"); XLSX.writeFile(book, "선거인명부_양식.xlsx"); }}><Download className="size-4" />양식 다운로드</Button>
+        <input ref={rosterFileRef} className="hidden" type="file" accept=".xlsx,.xls" disabled={importingRoster} onChange={event => void importXlsx(event)} />
+      </Modal>
+      <Modal
           open={addingVoter && rosterEditable}
           onClose={() => { setAddingVoter(false); setCandidateQuery(""); setCandidates([]); }}
           title="선거인 수동 추가"

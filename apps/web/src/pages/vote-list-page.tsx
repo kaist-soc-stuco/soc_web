@@ -1,20 +1,19 @@
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { Permissions } from "@/lib/permissions";
-import { VoteStatusBadge } from "@/components/ui/vote-status-badge";
 import { createApiClient } from "@soc/api-client";
 import type { VoteRecord } from "@soc/contracts";
 import { isoToMs, nowMs } from "@soc/shared";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { Header } from "@/components/organisms/header";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
 import { PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { formatVoteDateTime, formatVotePeriod } from "@/lib/vote-display";
+import { formatVotePeriod } from "@/lib/vote-display";
 import { useLanguage } from "@/hooks/use-language";
 
 function isOngoingVote(vote: VoteRecord, now: number) {
@@ -29,31 +28,19 @@ function isUpcomingVote(vote: VoteRecord, now: number) {
   return vote.status === "PUBLISHED" && isoToMs(vote.startsAt) > now;
 }
 
-function ActiveVoteCard({ vote, lang, now }: { vote: VoteRecord; lang: string; now: number }) {
+function ActiveVoteCard({ vote, lang }: { vote: VoteRecord; lang: string }) {
   const title = stripRichText(lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo);
   const description =
     lang === "en" && vote.descriptionEn
       ? vote.descriptionEn
       : vote.descriptionKo;
-  const upcoming = isUpcomingVote(vote, now);
 
   return (
     <Link
       to={`/votes/${vote.id}`} target="_blank" rel="noopener noreferrer"
       className="group block rounded-xl border border-slate-200 bg-white p-5 transition-colors hover:border-emerald-500 sm:p-6"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3"><VoteStatusBadge status={vote.status} startsAt={vote.startsAt} endsAt={vote.endsAt} />
-        <span className="text-xs font-medium tabular-nums text-app-text-muted">
-          {upcoming
-            ? lang === "ko"
-              ? `시작 ${formatVoteDateTime(vote.startsAt)}`
-              : `Starts ${formatVoteDateTime(vote.startsAt)}`
-            : lang === "ko"
-              ? `마감 ${formatVoteDateTime(vote.endsAt)}`
-              : `Closes ${formatVoteDateTime(vote.endsAt)}`}
-        </span>
-      </div>
-      <h3 className="mt-5 break-words text-xl font-semibold tracking-[-0.025em] text-app-text-strong sm:text-2xl">
+      <h3 className="break-words text-xl font-semibold tracking-[-0.025em] text-app-text-strong sm:text-2xl">
         {title}
       </h3>
       {description ? (
@@ -61,7 +48,7 @@ function ActiveVoteCard({ vote, lang, now }: { vote: VoteRecord; lang: string; n
           {description}
         </p>
       ) : null}
-      <div className="mt-6 grid gap-3 border-y border-slate-100 py-4 text-sm sm:grid-cols-2">
+      <div className="mt-6 grid gap-3 border-t border-slate-100 py-4 text-sm sm:grid-cols-2">
         <div>
           <span className="block text-xs font-medium text-app-text-muted">
             {lang === "ko" ? "참여 현황" : "Participation"}
@@ -79,10 +66,6 @@ function ActiveVoteCard({ vote, lang, now }: { vote: VoteRecord; lang: string; n
           </strong>
         </div>
       </div>
-      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-primary">
-        {lang === "ko" ? "투표하기" : "Vote now"}
-        <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-      </span>
     </Link>
   );
 }
@@ -210,7 +193,7 @@ export function VoteListPage() {
                 {featuredVotes.length > 0 ? (
                   <div className="grid gap-4">
                     {featuredVotes.map((vote) => (
-                      <ActiveVoteCard key={vote.id} vote={vote} lang={lang} now={now} />
+                      <ActiveVoteCard key={vote.id} vote={vote} lang={lang} />
                     ))}
                   </div>
                 ) : (
