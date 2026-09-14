@@ -38,6 +38,11 @@ interface GoogleTokenResponse {
   expires_in?: number;
 }
 
+interface GoogleCalendarEventListResponse {
+  items?: GoogleCalendarEventResource[];
+  nextPageToken?: string;
+}
+
 export class GoogleCalendarApiError extends Error {
   constructor(
     public readonly statusCode: number,
@@ -152,6 +157,36 @@ export class GoogleCalendarClient {
       }
       throw error;
     }
+  }
+
+  async listEvents(input: {
+    calendarId: string;
+    privateExtendedProperty?: string;
+  }): Promise<GoogleCalendarEventResource[]> {
+    const events: GoogleCalendarEventResource[] = [];
+    let pageToken: string | undefined;
+
+    for (let page = 0; page < 100; page += 1) {
+      const params = new URLSearchParams({
+        maxResults: "2500",
+        showDeleted: "false",
+        singleEvents: "false",
+      });
+      if (input.privateExtendedProperty) {
+        params.set("privateExtendedProperty", input.privateExtendedProperty);
+      }
+      if (pageToken) params.set("pageToken", pageToken);
+
+      const result = await this.send<GoogleCalendarEventListResponse>(
+        "GET",
+        `${this.collectionUrl(input.calendarId)}?${params.toString()}`,
+      );
+      events.push(...(result.items ?? []));
+      pageToken = result.nextPageToken;
+      if (!pageToken) return events;
+    }
+
+    throw new Error("google_calendar_event_list_too_large");
   }
 
   private async send<T>(

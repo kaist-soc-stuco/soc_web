@@ -25,6 +25,47 @@ test("Calendar retries an unauthorized token once, without swallowing a second f
   } finally { global.fetch = previous; }
 });
 
+test("Google Calendar event listing follows pages and scopes site-owned events", async () => {
+  const previous = global.fetch;
+  const client = new GoogleCalendarClient({ get: () => undefined });
+  client.getAccessToken = async () => 'test-token';
+  const urls = [];
+  global.fetch = async (url) => {
+    urls.push(String(url));
+    return urls.length === 1
+      ? new Response('{"items":[{"id":"first"}],"nextPageToken":"next"}', { status: 200 })
+      : new Response('{"items":[{"id":"second"}]}', { status: 200 });
+  };
+  try {
+    const events = await client.listEvents({ calendarId: 'soc_web', privateExtendedProperty: 'socSourceType=ARTICLE' });
+    assert.deepEqual(events.map((event) => event.id), ['first', 'second']);
+    assert.match(urls[0], /privateExtendedProperty=socSourceType%3DARTICLE/);
+    assert.match(urls[1], /pageToken=next/);
+  } finally { global.fetch = previous; }
+});
+
+test("Google reconciliation removes duplicate and stale site-owned events but keeps the canonical event", async () => {
+  const service = Object.create(CalendarSyncService.prototype);
+  const deleted = [];
+  service.googleCalendar = {
+    listEvents: async () => [
+      { id: 'canonical', etag: 'etag-1', extendedProperties: { private: { socSourceType: 'ARTICLE', socSourceUid: 'article:1' } } },
+      { id: 'duplicate', etag: 'etag-2', extendedProperties: { private: { socSourceType: 'ARTICLE', socSourceUid: 'article:1' } } },
+      { id: 'stale', etag: 'etag-3', extendedProperties: { private: { socSourceType: 'ARTICLE', socSourceUid: 'article:99' } } },
+    ],
+    deleteEvent: async (event) => { deleted.push(event.eventId); },
+  };
+  const result = await service.reconcileGoogleEvents({
+    calendarId: 'soc_web',
+    sourceType: 'ARTICLE',
+    expected: new Map([['article:1', 'canonical']]),
+    keyForEvent: (event) => event.extendedProperties?.private?.socSourceUid ?? null,
+  });
+  assert.deepEqual(deleted, ['duplicate', 'stale']);
+  assert.equal(result.removedCount, 2);
+  assert.equal(result.failedCount, 0);
+});
+
 test("manual Calendar publication, failure retry, and stale-worker fence on PostgreSQL", { skip: !process.env.CALENDAR_SYNC_TEST_DATABASE_URL }, async () => {
   const name = `calendar_sync_test_${randomUUID().replaceAll('-', '')}`;
   const admin = new Pool({ connectionString: process.env.CALENDAR_SYNC_TEST_DATABASE_URL });
@@ -42,7 +83,7 @@ test("manual Calendar publication, failure retry, and stale-worker fence on Post
     const config = { get: (key, fallback) => key === 'GOOGLE_CALENDAR_ID' ? 'synthetic-calendar' : fallback };
     let fail = false;
     const ids = [];
-    const google = { isConfigured: () => true, upsertEvent: async (input) => { ids.push(input.eventId); if (fail) throw new Error('synthetic_transient_failure'); return { eventId: input.eventId, etag: 'test-etag' }; } };
+    const google = { isConfigured: () => true, listEvents: async () => [], deleteEvent: async () => {}, upsertEvent: async (input) => { ids.push(input.eventId); if (fail) throw new Error('synthetic_transient_failure'); return { eventId: input.eventId, etag: 'test-etag' }; } };
     const service = new CalendarSyncService(db, config, {}, google);
     const [event] = await db.insert(schema.calendarEvents).values({ titleKo: '합성 캘린더 검증', startAt: new Date('2030-01-01T00:00:00Z'), endAt: new Date('2030-01-01T01:00:00Z') }).returning();
     const before = await pool.query('select updated_at::text from calendar_event');
