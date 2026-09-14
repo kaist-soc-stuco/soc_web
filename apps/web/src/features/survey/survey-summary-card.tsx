@@ -1,3 +1,4 @@
+import { ResponseHeaderCard } from "./response-layout";
 import type { SurveyDetailResponse } from "@soc/contracts";
 import {
   Calendar,
@@ -32,10 +33,7 @@ export function SurveySummaryCard({ lang, survey }: SurveySummaryCardProps) {
   const hasInlineDescriptionImage = /<img\b/i.test(description);
 
   return (
-    <section className="rounded-lg border border-t-8 border-slate-200 border-t-brand-primary bg-white p-4 shadow-[0_6px_20px_rgba(15,23,42,0.04)] animate-in fade-in duration-300 sm:p-8">
-      <h1 className="break-words text-2xl font-normal tracking-tight text-slate-950 sm:text-3xl">
-        <RichTextContent content={getLocalizedText(lang, survey.titleKo, survey.titleEn)} />
-      </h1>
+    <ResponseHeaderCard title={getLocalizedText(lang, survey.titleKo, survey.titleEn)}>
       {description && (
         <RichTextContent
           content={description}
@@ -71,6 +69,6 @@ export function SurveySummaryCard({ lang, survey }: SurveySummaryCardProps) {
           </span>
         )}
       </div>
-    </section>
+    </ResponseHeaderCard>
   );
 }

@@ -1,3 +1,4 @@
+import { stripRichText } from "@/components/ui/rich-text-content";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { Permissions } from "@/lib/permissions";
 import { VoteStatusBadge } from "@/components/ui/vote-status-badge";
@@ -29,7 +30,7 @@ function isUpcomingVote(vote: VoteRecord, now: number) {
 }
 
 function ActiveVoteCard({ vote, lang, now }: { vote: VoteRecord; lang: string; now: number }) {
-  const title = lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo;
+  const title = stripRichText(lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo);
   const description =
     lang === "en" && vote.descriptionEn
       ? vote.descriptionEn
@@ -102,7 +103,7 @@ function VoteHistoryTable({ votes, lang }: { votes: VoteRecord[]; lang: string }
         </thead>
         <tbody className="divide-y divide-slate-100">
           {votes.map((vote) => {
-            const title = lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo;
+            const title = stripRichText(lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo);
             return (
               <tr key={vote.id} className="group transition-colors hover:bg-slate-50/75">
                 <td className="max-w-0 px-4 py-4 align-middle sm:px-5">

@@ -214,6 +214,15 @@ export interface QuestionFormState {
 }
 
 interface QuestionInlineEditorProps {
+  value?: QuestionFormState;
+  onDraftChange?: (value: QuestionFormState) => void;
+  typeControl?: ReactNode;
+  optionsLocked?: boolean;
+  createOptionValue?: () => string;
+  minimumOptions?: number;
+  footer?: ReactNode;
+  allowQuestionImage?: boolean;
+  selected?: boolean;
   initial: QuestionFormState;
   isKoreanOnly?: boolean;
   isOngoing?: boolean;
@@ -336,6 +345,7 @@ interface SortableOptionRowProps {
   option: QuestionFormState["options"][number];
   index: number;
   optionCount: number;
+  minimumOptions?: number;
   questionType: QuestionType;
   isKoreanOnly: boolean;
   isOngoing: boolean;
@@ -360,6 +370,7 @@ function SortableOptionRow({
   option,
   index,
   optionCount,
+  minimumOptions = 1,
   questionType,
   isKoreanOnly,
   isOngoing,
@@ -403,7 +414,7 @@ function SortableOptionRow({
         <button
           ref={setActivatorNodeRef}
           type="button"
-          aria-label={`${option.labelKo || option.value || "선택지"} 순서 이동`}
+          aria-label={`${option.labelKo || `옵션 ${index + 1}`} 순서 이동`}
           data-tooltip="드래그하여 순서 변경"
           aria-grabbed={isDragging ? "true" : undefined}
           className="absolute left-0 top-1/2 z-10 inline-flex size-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded text-slate-400 opacity-0 outline-none transition-opacity hover:text-slate-500 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-primary/25 group-hover:opacity-100 group-hover:text-slate-500 group-focus-within:opacity-100 group-focus-within:text-slate-500 active:cursor-grabbing"
@@ -459,10 +470,10 @@ function SortableOptionRow({
             </div>
           ) : null}
         </div>
-        {!isOngoing && optionCount > 1 ? (
+        {!isOngoing && optionCount > minimumOptions ? (
           <IconButton
             type="button"
-            aria-label={`${option.labelKo || option.value || "선택지"} 삭제`}
+            aria-label={`${option.labelKo || `옵션 ${index + 1}`} 삭제`}
             data-tooltip="선택지 삭제"
             size="sm"
             onClick={() => onRemoveOption(index)}
@@ -501,6 +512,7 @@ function SortableOptionRow({
 }
 
 export function QuestionInlineEditor({
+  value, onDraftChange, typeControl, optionsLocked = false, createOptionValue, minimumOptions = 0, footer, allowQuestionImage = true, selected = true,
   initial,
   isKoreanOnly = false,
   isOngoing = false,
@@ -515,7 +527,7 @@ export function QuestionInlineEditor({
   onCancel,
 }: QuestionInlineEditorProps) {
   const { toast } = useToast();
-  const [form, setForm] = useState<QuestionFormState>(() => ({
+  const [localForm, setLocalForm] = useState<QuestionFormState>(() => ({
     ...initial,
     questionType: normalizeQuestionType(initial.questionType),
     config: isGridQuestionType(initial.questionType)
@@ -529,6 +541,12 @@ export function QuestionInlineEditor({
           initial.config?.validationType,
       ),
   }));
+  const form = value ?? localForm;
+  const setForm = (update: QuestionFormState | ((previous: QuestionFormState) => QuestionFormState)) => {
+    if (isOngoing) return;
+    if (onDraftChange) onDraftChange(typeof update === "function" ? update(form) : update);
+    else setLocalForm(update);
+  };
   const [showDescription, setShowDescription] = useState(
     () => Boolean(initial.descriptionKo.trim() || initial.descriptionEn.trim()),
   );
@@ -560,7 +578,7 @@ export function QuestionInlineEditor({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   );
 
-  const needsOptions = ["single_choice", "multiple_choice", "dropdown"].includes(form.questionType);
+  const needsOptions = !optionsLocked && ["single_choice", "multiple_choice", "dropdown"].includes(form.questionType);
   const supportsBranching = form.questionType === "single_choice" || form.questionType === "dropdown";
   const isGrid = isGridQuestionType(form.questionType);
   const supportsValidation =
@@ -681,7 +699,7 @@ export function QuestionInlineEditor({
   };
 
   const createOption = (items: QuestionFormState["options"]) => ({
-    value: nextUniqueValue(items, "option"),
+    value: createOptionValue?.() ?? nextUniqueValue(items, "option"),
     labelKo: `옵션 ${items.length + 1}`,
     labelEn: `Option ${items.length + 1}`,
     imageUrlKo: null,
@@ -694,6 +712,7 @@ export function QuestionInlineEditor({
   };
 
   const removeOption = (i: number) => {
+    if (form.options.length <= minimumOptions) return;
     set("options", form.options.filter((_, idx) => idx !== i));
   };
 
@@ -979,7 +998,7 @@ export function QuestionInlineEditor({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (selected && event.key === "Escape") {
         if (moreMenuOpen) {
           event.preventDefault();
           setMoreMenuOpen(false);
@@ -992,7 +1011,7 @@ export function QuestionInlineEditor({
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [moreMenuOpen, onCancel]);
+  }, [moreMenuOpen, onCancel, selected]);
 
   useEffect(() => {
     if (!moreMenuOpen) return;
@@ -1073,6 +1092,7 @@ export function QuestionInlineEditor({
     "h-10 w-full !rounded-none !border-0 !bg-slate-100 px-3 text-base font-normal text-slate-900 outline-none placeholder:text-slate-400 focus:!border-0 focus:!ring-0 disabled:cursor-not-allowed disabled:!bg-slate-100 disabled:text-slate-400 disabled:opacity-70";
   return (
     <div
+      data-selected={selected}
       className="question-inline-editor relative overflow-visible rounded-xl border border-slate-200 bg-white p-4 pb-5 pt-8 shadow-sm sm:p-5 md:p-6 md:pb-5 md:pt-8"
     >
       {dragHandle ? (
@@ -1096,15 +1116,15 @@ export function QuestionInlineEditor({
              className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary"
           />
         </div>
-        <CompactImagePicker
+        {allowQuestionImage && <CompactImagePicker
           label="문항 이미지"
           value={questionImage}
           hideWhenValue
           onChange={updateQuestionImage}
           disabled={isOngoing}
           onError={(message) => toast({ type: "error", message })}
-        />
-        <AdminSelectDropdown
+        />}
+        {typeControl ?? <AdminSelectDropdown
           ariaLabel="질문 유형"
           value={form.questionType}
           options={QUESTION_TYPES}
@@ -1114,10 +1134,10 @@ export function QuestionInlineEditor({
           buttonClassName="!h-10 !text-sm"
           disableMenuScroll
           menuClassName="!max-h-none !overflow-visible"
-        />
+        />}
       </div>
 
-      {showDescription ? (
+      {showDescription || value ? (
         <div className="mt-2 grid min-w-0 gap-3 md:grid-cols-2">
           <div className="question-editor-field group relative min-w-0">
             <RichTextInput
@@ -1173,6 +1193,7 @@ export function QuestionInlineEditor({
                     option={option}
                     index={index}
                     optionCount={form.options.length}
+                    minimumOptions={minimumOptions || 1}
                     questionType={form.questionType}
                     isKoreanOnly={isKoreanOnly}
                     isOngoing={isOngoing}
@@ -1191,7 +1212,7 @@ export function QuestionInlineEditor({
               </SortableContext>
             </DndContext>
             {!isOngoing ? (
-              <div className="flex min-w-0 items-center gap-2 px-4 py-1 md:px-5">
+              <div className="question-add-option-space"><div className="min-h-0 overflow-hidden"><div className="flex min-w-0 items-center gap-2 px-4 py-1 md:px-5">
                 {form.questionType === "dropdown" ? (
                   <span className="flex size-5 shrink-0 items-center justify-center text-xs tabular-nums text-slate-400" aria-hidden="true">
                     {form.options.length + 1}
@@ -1203,7 +1224,7 @@ export function QuestionInlineEditor({
                   />
                 )}
                 <BuilderOptionAdd onAdd={addOption} disabled={isOngoing} />
-              </div>
+              </div></div></div>
             ) : null}
           </div>
         </div>
@@ -1349,7 +1370,7 @@ export function QuestionInlineEditor({
         </div>
       ) : null}
 
-      <div className="mt-5 border-t border-slate-100 pt-4">
+      {footer !== undefined ? footer : <div className="mt-5 border-t border-slate-100 pt-4">
         <div className="flex flex-wrap items-center justify-end gap-3">
           {!isOngoing && (onDuplicate || onDelete) ? (
             <div className="flex items-center gap-1">
@@ -1460,7 +1481,7 @@ export function QuestionInlineEditor({
             onRemove={() => toggleAnswerValidation(false)}
           />
         ) : null}
-      </div>
+      </div>}
 
       </div>
     </div>

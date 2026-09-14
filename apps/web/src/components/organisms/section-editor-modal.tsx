@@ -10,6 +10,10 @@ export interface SectionFormState {
 }
 
 interface SectionInlineEditorProps {
+  value?: SectionFormState;
+  onDraftChange?: (value: SectionFormState) => void;
+  titlePlaceholder?: string;
+  placeholders?: Partial<Record<keyof SectionFormState, string>>;
   commitRef?: { current: (() => Promise<boolean>) | null };
   initial: SectionFormState;
   isKoreanOnly?: boolean;
@@ -20,8 +24,13 @@ interface SectionInlineEditorProps {
   onCancel: () => void;
 }
 
-export function SectionInlineEditor({ commitRef, initial, isKoreanOnly = false, isOngoing = false, isSurveyHeader = false, initialFocus = null, onSave, onCancel }: SectionInlineEditorProps) {
-  const [form, setForm] = useState(initial);
+export function SectionInlineEditor({ value, onDraftChange, titlePlaceholder, placeholders, commitRef, initial, isKoreanOnly = false, isOngoing = false, isSurveyHeader = false, initialFocus = null, onSave, onCancel }: SectionInlineEditorProps) {
+  const [localForm, setLocalForm] = useState(initial);
+  const form = value ?? localForm;
+  const setForm = (update: (previous: SectionFormState) => SectionFormState) => {
+    if (isOngoing) return;
+    if (onDraftChange) onDraftChange(update(form)); else setLocalForm(update);
+  };
   const [error, setError] = useState<string | null>(null);
   const savedRef = useRef(JSON.stringify(initial));
   const rootRef = useRef<HTMLDivElement>(null);
@@ -30,6 +39,7 @@ export function SectionInlineEditor({ commitRef, initial, isKoreanOnly = false, 
   const latestForm = useRef(form);
   latestForm.current = form;
   const save = async (): Promise<boolean> => {
+    if (onDraftChange || isOngoing) return true;
     if (savingRef.current && !(await savingRef.current)) return false;
     const snapshot = latestForm.current;
     if (JSON.stringify(snapshot) === savedRef.current) return true;
@@ -61,7 +71,7 @@ export function SectionInlineEditor({ commitRef, initial, isKoreanOnly = false, 
         const field = `${kind}${language === "ko" ? "Ko" : "En"}` as keyof SectionFormState;
         return <div key={field} data-section-field={field}><RichTextInput
           singleLine={kind === "title"}
-          placeholder={language === "ko" ? kind === "title" ? isSurveyHeader ? "제목 없는 설문지" : "섹션 제목(선택사항)" : isSurveyHeader ? "설문지 설명" : "설명(선택사항)" : kind === "title" ? isSurveyHeader ? "Untitled form" : "Section title (optional)" : "Description (optional)"}
+          placeholder={placeholders?.[field] ?? (language === "ko" ? kind === "title" ? isSurveyHeader ? titlePlaceholder ?? "제목 없는 설문지" : "섹션 제목(선택사항)" : isSurveyHeader ? "설문지 설명" : "설명(선택사항)" : kind === "title" ? isSurveyHeader ? "Untitled form" : "Section title (optional)" : "Description (optional)")}
           value={form[field]} onChange={value => setForm(current => ({...current, [field]: value}))}
           ariaLabel={`${language === "ko" ? "국문" : "영문"} 섹션 ${kind === "title" ? "제목" : "설명"}`} disabled={isOngoing}
           inputClassName={`!bg-transparent !px-0 !h-auto !py-0 !min-h-6 !font-normal ${isSurveyHeader && kind === "title" ? "!text-3xl !leading-tight !min-h-9" : "!text-base !leading-6"}`} /></div>;

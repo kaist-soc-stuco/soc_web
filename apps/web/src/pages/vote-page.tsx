@@ -1,7 +1,9 @@
-import { resolveAssetUrl } from "@/lib/asset-url";
+import { ResponsePageMain, ResponseHeaderCard } from "@/features/survey/response-layout";
+import { SurveyParticipationNotice } from "@/features/survey/survey-participation-notice";
+import { SurveyQuestionCard } from "@/features/survey/survey-question-card";
+import { RichTextContent } from "@/components/ui/rich-text-content";
 import { useToast } from "@/components/ui/toast";
-import { VoteProgress } from "@/components/organisms/vote-progress";
-import { VoteStatusBadge } from "@/components/ui/vote-status-badge";
+import { VoteTurnout } from "@/components/organisms/vote-progress";
 import { createApiClient, ApiClientHttpError } from "@soc/api-client";
 import type { VoteDetailResponse, VoteResultsResponse } from "@soc/contracts";
 import { isoToMs, nowMs, meetsVoteQuorum } from "@soc/shared";
@@ -68,16 +70,6 @@ export function VotePage() {
     return () => { active = false; window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
   }, [client, id]);
 
-  const select = (itemId: string, optionId: string, multiple: boolean, maxSelections: number) => {
-    setAnswers((current) => {
-      const selected = current[itemId] ?? [];
-      if (!multiple) return { ...current, [itemId]: [optionId] };
-      if (selected.includes(optionId)) return { ...current, [itemId]: selected.filter((id) => id !== optionId) };
-      if (selected.length >= maxSelections) return current;
-      return { ...current, [itemId]: [...selected, optionId] };
-    });
-  };
-
   const submit = async () => {
     if (isPreview) return;
     if (!vote || vote.items.some((item) => !(answers[item.id]?.length))) {
@@ -117,18 +109,12 @@ export function VotePage() {
   return (
     <PageShell>
       {isPreview && <header className="flex min-h-16 items-center border-b border-slate-200 bg-white px-6"><Link to={`/admin/votes/${id}`} className="inline-flex items-center gap-3 text-sm"><ArrowLeft className="size-4" />미리보기 모드</Link></header>}
-      <PageMain>
-        <PageContainer className="max-w-4xl py-6 pb-16 md:py-10">
-          <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4 sm:p-6 md:p-8">
-            {vote.status !== "DRAFT" && <div className="mb-3"><VoteStatusBadge status={vote.status} startsAt={vote.startsAt} endsAt={vote.endsAt} /></div>}<h1 className="break-words text-2xl font-bold tracking-[-0.03em] text-[#172033] sm:text-3xl">{lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo}</h1>
-            <div className="mt-3 flex">
-              <span className="max-w-full break-words text-xs font-normal text-[#344054] sm:text-right">{formatVotePeriod(vote.startsAt, vote.endsAt)}</span>
-            </div>
-            {(lang === "en" && vote.descriptionEn ? vote.descriptionEn : vote.descriptionKo) ? <p className="mt-3 break-words whitespace-pre-wrap text-sm font-normal leading-6 text-[#344054]">{lang === "en" && vote.descriptionEn ? vote.descriptionEn : vote.descriptionKo}</p> : null}
-            <div className="mt-5 border-t border-slate-100 pt-5">
-              <VoteProgress vote={vote} lang={lang} />
-            </div>
-          </section>
+      <ResponsePageMain>
+          <ResponseHeaderCard title={lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo}>
+            <p className="mt-2 text-sm tabular-nums text-slate-600">{formatVotePeriod(vote.startsAt, vote.endsAt)}</p>
+            {(vote.descriptionKo || vote.descriptionEn) && <RichTextContent content={lang === "en" && vote.descriptionEn ? vote.descriptionEn : vote.descriptionKo ?? ""} className="mt-3 text-sm leading-6 text-slate-600" />}
+            <div className="mt-4 border-t border-slate-100 pt-4"><VoteTurnout vote={vote} lang={lang} /></div>
+          </ResponseHeaderCard>
 
           <div className="min-w-0">
           {!isPreview && receipt ? (
@@ -146,7 +132,7 @@ export function VotePage() {
               <p className="text-sm font-normal text-[#344054]">{lang === "ko" ? `총 ${results.totalBallots}표` : `${results.totalBallots} ${t.ballots}`}</p>
               {results.items.map((item) => (
                 <div key={item.itemId} className="border-t border-slate-100 pt-5">
-                  <h3 className="break-words font-medium text-[#172033]">{lang === "en" && item.titleEn ? item.titleEn : item.titleKo}</h3>
+                  <h3 className="break-words font-medium text-[#172033]"><RichTextContent inline content={lang === "en" && item.titleEn ? item.titleEn : item.titleKo} /></h3>
                   <div className="mt-3 space-y-3">
                     {item.options.map((option) => (
                       <div key={option.optionId}>
@@ -163,43 +149,29 @@ export function VotePage() {
               {now < isoToMs(vote.startsAt) ? t.notStarted : t.ended}
             </div>
           ) : !isPreview && vote.eligibility === "LOGIN_REQUIRED" ? (
-            <div className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-14 text-center">
-              <p className="text-sm font-normal text-[#344054]">{t.loginHelp}</p>
-              <Button asChild className="mt-5"><Link to="/login">{t.login}</Link></Button>
-            </div>
+            <SurveyParticipationNotice eligibility={{ status: "LOGIN_REQUIRED", reasons: ["LOGIN_REQUIRED"] }} lang={lang} subject="vote" />
           ) : !isPreview && vote.eligibility === "NOT_ELIGIBLE" ? (
-            <div className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-14 text-center text-sm font-normal text-[#344054]">{t.ineligible}</div>
+            <SurveyParticipationNotice eligibility={{ status: "NOT_ELIGIBLE", reasons: [] }} lang={lang} subject="vote" description={t.ineligible} />
           ) : !isPreview && vote.eligibility === "ALREADY_VOTED" ? (
             <div className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-14 text-center text-sm font-normal text-[#344054]">{t.voted}</div>
           ) : (
-            <section className="mt-5 space-y-5">
-              {vote.items.map((item) => (
-                <section key={item.id} id={`vote-card-${item.id}`} role="group" aria-labelledby={`vote-item-${item.id}`} aria-describedby={validationAttempted && !answers[item.id]?.length ? `vote-error-${item.id}` : undefined} className={`rounded-xl border bg-white p-4 sm:p-5 md:p-7 ${validationAttempted && !answers[item.id]?.length ? "border-rose-500" : "border-slate-200"}`}>
-                  <h2 id={`vote-item-${item.id}`} className="break-words text-base font-semibold text-[#172033]">{lang === "en" && item.titleEn ? item.titleEn : item.titleKo}</h2>
-                  {(lang === "en" && item.descriptionEn ? item.descriptionEn : item.descriptionKo) ? <p className="mt-2 break-words text-sm font-normal text-[#344054]">{lang === "en" && item.descriptionEn ? item.descriptionEn : item.descriptionKo}</p> : null}
-                  {item.type === "MULTIPLE_CHOICE" ? <p className="mt-2 text-xs font-normal text-[#344054]">{lang === "ko" ? `최대 ${item.maxSelections}개 선택` : `Select up to ${item.maxSelections}`}</p> : null}
-                  <div className="mt-4 grid gap-2">
-                    {item.options.map((option) => {
-                      const checked = answers[item.id]?.includes(option.id) ?? false;
-                      const disabled = item.type === "MULTIPLE_CHOICE" && !checked && (answers[item.id]?.length ?? 0) >= item.maxSelections;
-                      return (
-                        <label key={option.id} className={`flex min-h-11 items-start gap-3 rounded-md px-1 py-3 transition-colors ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} hover:bg-slate-50`}>
-                          <input type={item.type === "MULTIPLE_CHOICE" ? "checkbox" : "radio"} name={item.id} checked={checked} disabled={disabled} onChange={() => select(item.id, option.id, item.type === "MULTIPLE_CHOICE", item.maxSelections)} className="mt-0.5 accent-[var(--color-primary)]" />
-                          <span className="min-w-0 break-words"><span className="block break-words text-sm font-normal text-[#172033]">{lang === "en" && option.labelEn ? option.labelEn : option.labelKo}</span>{option.imageUrl ? <img src={resolveAssetUrl(option.imageUrl)} alt="" className="mt-3 max-h-48 max-w-full rounded-md object-contain" /> : null}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {validationAttempted && !answers[item.id]?.length ? <p id={`vote-error-${item.id}`} role="alert" className="mt-3 text-sm text-rose-600">{lang === "ko" ? "이 안건에 기표해 주세요." : "Please select an option."}</p> : null}
-                </section>
-              ))}
+            <section className="space-y-5">
+              {vote.items.map(item => <SurveyQuestionCard key={item.id} id={`vote-card-${item.id}`} lang={lang}
+                question={{ id: item.id, titleKo: item.titleKo, titleEn: item.titleEn, descriptionKo: item.descriptionKo, descriptionEn: item.descriptionEn, isRequired: true,
+                  questionType: item.type === "MULTIPLE_CHOICE" ? "multiple_choice" : "single_choice", config: null,
+                  options: item.options.map(option => ({ value: option.id, labelKo: option.labelKo, labelEn: option.labelEn ?? undefined, imageUrlKo: option.imageUrl, imageUrlEn: option.imageUrl })) }}
+                value={item.type === "MULTIPLE_CHOICE" ? answers[item.id] ?? [] : answers[item.id]?.[0] ?? ""}
+                onChange={value => setAnswers(current => ({ ...current, [item.id]: Array.isArray(value) ? value.slice(0, item.maxSelections) : typeof value === "string" ? [value] : [] }))}
+                disabled={submitting}
+                maxSelections={item.type === "MULTIPLE_CHOICE" ? item.maxSelections : undefined}
+                hint={item.type === "MULTIPLE_CHOICE" ? lang === "ko" ? `최대 ${item.maxSelections}개 선택` : `Select up to ${item.maxSelections}` : undefined}
+                error={validationAttempted && !answers[item.id]?.length ? lang === "ko" ? "이 안건에 기표해 주세요." : "Please select an option." : null} />)}
               {error ? <p role="alert" aria-live="assertive" className="text-sm font-normal text-rose-600">{error}</p> : null}
               <div className="survey-response-actions flex justify-end px-0 py-3 md:py-0"><Button className="min-h-11" onClick={() => void submit()} disabled={submitting || isPreview}>{submitting ? t.submitting : t.submit}</Button></div>
             </section>
           )}
           </div>
-        </PageContainer>
-      </PageMain>
+      </ResponsePageMain>
       {ConfirmDialog}
     </PageShell>
   );
