@@ -10,6 +10,7 @@ import { ArrowRight, Plus } from "lucide-react";
 
 import { Header } from "@/components/organisms/header";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/data-state";
 import { PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { formatVoteDateTime, formatVotePeriod } from "@/lib/vote-display";
@@ -180,17 +181,16 @@ export function VoteListPage() {
               {lang === "ko" ? "불러오는 중..." : "Loading..."}
             </div>
           ) : error ? (
-            <div role="alert" className="flex flex-col items-center gap-4 rounded-xl border border-rose-200 bg-rose-50 px-5 py-12 text-center text-sm font-medium text-rose-700">
-              <p>{error}</p>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setReloadKey((current) => current + 1)}
-                className="min-h-11 border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-100"
-              >
-                {lang === "ko" ? "다시 시도" : "Try again"}
-              </Button>
-            </div>
+            <ErrorState
+              description={
+                lang === "ko"
+                  ? "일시적인 네트워크 오류일 수 있습니다. 잠시 후 다시 시도해 주세요."
+                  : "This may be a temporary network issue. Please try again."
+              }
+              onRetry={() => setReloadKey((current) => current + 1)}
+              retryLabel={lang === "ko" ? "다시 시도" : "Try again"}
+              title={error}
+            />
           ) : votes.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-200 py-20 text-center text-sm font-normal text-[#344054]">
               {lang === "ko" ? "현재 공개된 투표가 없습니다." : "There are no published votes."}

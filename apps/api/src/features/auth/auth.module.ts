@@ -36,6 +36,10 @@ import { AuditLogModule } from "../audit/audit-log.module";
     AuthCookieService,
     AuthSessionRepository,
     AuthSessionService,
+    // AuthGuard is instantiated in feature modules that consume the exported
+    // guard class. Its initial-admin dependency must be visible from those
+    // module contexts as well as from AuthModule itself.
+    InitialAdminService,
     // Auth guards are consumed by feature controllers. Re-export the rate
     // limiter they depend on so Nest can resolve the guard across module
     // boundaries instead of creating a partially scoped provider.

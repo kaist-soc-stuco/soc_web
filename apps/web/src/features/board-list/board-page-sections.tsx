@@ -12,9 +12,8 @@ import {
   type BoardMetadata,
 } from "@/lib/board-metadata";
 
-import { EmptyState } from "@/components/ui/data-state";
+import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import {
-  PageActionButton,
   PageActionLink,
   PageContainer,
   DataViewBody,
@@ -318,16 +317,20 @@ export function BoardArticleTable({
             }`}
           >
             {articleError ? (
-              <div className="flex min-h-48 flex-col items-center justify-center gap-3 px-5 py-8 text-center" role="alert">
-                <p className="text-sm font-normal text-red-600">
-                  {lang === "ko"
-                    ? "게시글을 불러오지 못했습니다."
-                    : "Failed to load posts."}
-                </p>
-                <PageActionButton type="button" onClick={onRetry}>
-                  {lang === "ko" ? "다시 시도" : "Retry"}
-                </PageActionButton>
-              </div>
+              <ErrorState
+                description={
+                  lang === "ko"
+                    ? "일시적인 네트워크 오류일 수 있습니다. 잠시 후 다시 시도해 주세요."
+                    : "This may be a temporary network issue. Please try again."
+                }
+                onRetry={onRetry}
+                retryLabel={lang === "ko" ? "다시 시도" : "Retry"}
+                title={
+                  lang === "ko"
+                    ? "게시글 목록을 불러오지 못했습니다."
+                    : "We couldn't load the posts."
+                }
+              />
             ) : articles.length > 0
               ? articles.map((post) => renderArticleRow(post, post.isPinned))
               : !showInitialSkeleton ? (

@@ -21,7 +21,38 @@ import {
 import { buildCalendarGrid } from "./events-surveys-calendar-utils";
 
 const PUBLIC_ITEMS_PAGE_SIZE = 9;
-const PUBLIC_LIST_PAGE_REQUIRED = "public_list_page_required";
+const PUBLIC_SERVER_PAGE_SIZE = 100;
+
+type PaginatedResponse<T> = {
+  items: T[];
+  total: number;
+  pageSize?: number;
+  limit?: number;
+};
+
+async function fetchAllPages<T>(
+  fetchPage: (page: number) => Promise<PaginatedResponse<T>>,
+): Promise<T[]> {
+  const firstPage = await fetchPage(1);
+  const pageSize = Math.max(
+    1,
+    firstPage.pageSize ?? firstPage.limit ?? PUBLIC_SERVER_PAGE_SIZE,
+  );
+  const pageCount = Math.max(1, Math.ceil(firstPage.total / pageSize));
+
+  if (pageCount === 1) return firstPage.items;
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: pageCount - 1 }, (_, index) =>
+      fetchPage(index + 2),
+    ),
+  );
+
+  return [firstPage, ...remainingPages].reduce<T[]>(
+    (items, page) => items.concat(page.items),
+    [],
+  );
+}
 
 function parseSelectedCalendarDate(value: string | null) {
   if (!value) return null;
@@ -105,21 +136,22 @@ export function useEventsSurveysPageController({
   const listQuery = useQuery({
     queryKey: ["events-surveys", "list", session?.userId ?? "anonymous"],
     queryFn: async () => {
-      const [surveysData, eventsData] = await Promise.all([
-        apiClient.getPublicSurveys({ page: 1, pageSize: 100 }),
-        apiClient
-          .getArticles("_EVENT", { page: 1, limit: 100 })
-          .catch(() => ({ items: [], total: 0 })),
+      const [surveys, events] = await Promise.all([
+        fetchAllPages((page) =>
+          apiClient.getPublicSurveys({
+            page,
+            pageSize: PUBLIC_SERVER_PAGE_SIZE,
+          }),
+        ),
+        fetchAllPages((page) =>
+          apiClient.getArticles("_EVENT", {
+            page,
+            limit: PUBLIC_SERVER_PAGE_SIZE,
+          }),
+        ).catch(() => []),
       ]);
 
-      if (
-        surveysData.total > surveysData.items.length ||
-        eventsData.total > eventsData.items.length
-      ) {
-        throw new Error(PUBLIC_LIST_PAGE_REQUIRED);
-      }
-
-      const eventsWithImages = eventsData.items.map((event) => ({
+      const eventsWithImages = events.map((event) => ({
         ...event,
         imageUrl: event.thumbnailStorageKey?.trim()
           ? resolveAssetUrl(event.thumbnailStorageKey.trim())
@@ -127,7 +159,7 @@ export function useEventsSurveysPageController({
       }));
 
       return {
-        surveys: surveysData.items,
+        surveys,
         events: eventsWithImages,
       };
     },
@@ -394,14 +426,9 @@ export function useEventsSurveysPageController({
             : "Failed to load calendar events."
           : null
         : listQuery.isError
-          ? listQuery.error instanceof Error &&
-            listQuery.error.message === PUBLIC_LIST_PAGE_REQUIRED
-            ? lang === "ko"
-              ? "항목이 많아 한 번에 표시할 수 없습니다. 검색 조건을 좁혀 다시 시도해 주세요."
-              : "There are too many items to display at once. Narrow your search and try again."
-            : lang === "ko"
-              ? "목록을 불러오는 중 오류가 발생했습니다."
-              : "Failed to load events and surveys."
+          ? lang === "ko"
+            ? "목록을 불러오는 중 오류가 발생했습니다."
+            : "Failed to load events and surveys."
           : null,
     holidays,
     loading:
