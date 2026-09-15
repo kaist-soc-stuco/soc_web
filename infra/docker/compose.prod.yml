@@ -111,6 +111,42 @@ services:
       timeout: 5s
       retries: 12
 
+  audit-log-backup:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-soc_web}
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      AUDIT_LOG_BACKUP_INTERVAL_SECONDS: ${AUDIT_LOG_BACKUP_INTERVAL_SECONDS:-86400}
+      AUDIT_LOG_BACKUP_RETENTION_DAYS: ${AUDIT_LOG_BACKUP_RETENTION_DAYS:-370}
+    command: ["/bin/sh", "/usr/local/bin/backup-audit-logs.sh"]
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - type: bind
+        source: ${AUDIT_LOG_BACKUP_PATH:-/var/backups/soc_web/audit-logs}
+        target: /backups
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ./scripts/backup-audit-logs.sh
+        target: /usr/local/bin/backup-audit-logs.sh
+        read_only: true
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
   db-migrate:
     build:
       context: ../..
