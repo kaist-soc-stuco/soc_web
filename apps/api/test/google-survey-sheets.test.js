@@ -73,15 +73,15 @@ test("creates and syncs a survey response sheet through the shared Sheets client
   });
   const syncCall = calls.find((call) => call.kind === "syncSheet");
   assert.deepEqual(syncCall.definition.headers, [
-    "응답 ID",
     "제출 시각",
     "이름",
     "이메일",
     "소속",
     "학번",
+    "응답 ID",
   ]);
-  assert.deepEqual(syncCall.definition.dateTimeColumns, [1]);
-  assert.deepEqual(syncCall.definition.columnWidths, [230, 155, 105, 240, 150, 100]);
+  assert.deepEqual(syncCall.definition.dateTimeColumns, [0]);
+  assert.deepEqual(syncCall.definition.columnWidths, [155, 105, 240, 150, 100, 230]);
   assert.equal(getSurvey().spreadsheetId, "sheet-1");
   assert.equal(getSurvey().spreadsheetSyncStatus, "CONNECTED");
 });

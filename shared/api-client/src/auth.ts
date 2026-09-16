@@ -43,6 +43,7 @@ export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) =>
     return requestJson<LoginSessionResponse>(
       `${authBaseUrl}/session${query}`,
       {
+        cache: "no-store",
         method: "GET",
       },
       {
@@ -54,9 +55,7 @@ export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) =>
   getCurrentUser: async (): Promise<CurrentUserResponse> => {
     return requestJson<CurrentUserResponse>(
       `${authBaseUrl}/me`,
-      {
-        method: "GET",
-      },
+      { cache: "no-store", method: "GET" },
       { retryOnUnauthorized: true },
     );
   },

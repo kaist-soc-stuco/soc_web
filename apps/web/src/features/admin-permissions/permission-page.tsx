@@ -1,5 +1,6 @@
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type { PermissionRecord, RoleGroupCandidateListResponse, RoleGroupMemberRecord, RoleGroupRecord } from "@soc/contracts";
+import { useQueryClient } from "@tanstack/react-query";
 import { isoToDate } from "@soc/shared";
 import { Pencil, Plus, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -76,6 +77,7 @@ const displayError = (error: unknown, fallback: string) => {
 
 export function PermissionPage() {
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const [roles, setRoles] = useState<RoleGroupRecord[]>([]);
@@ -182,6 +184,7 @@ export function PermissionPage() {
       const updated = await client.updateRoleGroup(selectedRole.roleGroupId, { nameKo: draft.nameKo.trim(), permissionIds: draft.permissionIds });
       setRoles((current) => current.map((role) => role.roleGroupId === updated.roleGroupId ? updated : role));
       setDraft(draftFromRole(updated));
+      await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
     } catch (saveError) {
       setError(displayError(saveError, "역할 변경 사항을 저장하지 못했습니다."));
     } finally {
@@ -295,6 +298,7 @@ export function PermissionPage() {
       setMembers(updatedMembers);
       setRoles((current) => current.map((role) => role.roleGroupId === selectedRole.roleGroupId ? { ...role, userCount: updatedMembers.length } : role));
       setMemberEditorOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
     } catch (memberError) {
       setError(displayError(memberError, "구성원 변경 사항을 저장하지 못했습니다."));
     } finally {
@@ -311,6 +315,7 @@ export function PermissionPage() {
       const updatedMembers = await client.replaceRoleGroupMembers(selectedRole.roleGroupId, { userIds: nextUserIds });
       setMembers(updatedMembers);
       setRoles((current) => current.map((role) => role.roleGroupId === selectedRole.roleGroupId ? { ...role, userCount: updatedMembers.length } : role));
+      await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
     } catch (memberError) {
       setError(displayError(memberError, "구성원을 제외하지 못했습니다."));
     } finally {

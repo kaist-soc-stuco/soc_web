@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
@@ -24,7 +24,8 @@ export function AuthGuard({
   fallback = null,
 }: AuthGuardProps) {
   const navigate = useNavigate();
-  const { data: session, isLoading } = useCurrentSession();
+  const { data: session, isFetching, isLoading, refetch } = useCurrentSession();
+  const permissionRecheckAttempted = useRef(false);
 
   const isAuthenticated = hasPersistedProfile(session ?? null);
   const permission = session?.permission ?? 0;
@@ -39,7 +40,7 @@ export function AuthGuard({
   const hasPermission = hasRequiredPermission && hasAnyRequiredPermission;
 
   useEffect(() => {
-    if (isLoading) {
+    if (isLoading || isFetching) {
       return;
     }
 
@@ -51,19 +52,35 @@ export function AuthGuard({
       return;
     }
 
+    if (hasPermission) {
+      permissionRecheckAttempted.current = false;
+      return;
+    }
+
+    // A role can be granted from another browser while this SPA still has a
+    // cached session snapshot. Give the server one chance to return the new
+    // permission before treating the user as unauthorized.
+    if (!permissionRecheckAttempted.current) {
+      permissionRecheckAttempted.current = true;
+      void refetch();
+      return;
+    }
+
     if (!hasPermission) {
       navigate(permissionRedirectTo, { replace: true });
     }
   }, [
     hasPermission,
+    isFetching,
     isAuthenticated,
     isLoading,
     navigate,
     permissionRedirectTo,
+    refetch,
     redirectTo,
   ]);
 
-  if (isLoading) {
+  if (isLoading || isFetching) {
     return <>{fallback}</>;
   }
 

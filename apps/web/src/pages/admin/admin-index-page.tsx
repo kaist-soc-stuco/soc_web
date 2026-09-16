@@ -19,9 +19,9 @@ const ADMIN_ENTRY_ROUTES = [
 ];
 
 export function AdminIndexPage() {
-  const { data: session, isLoading } = useCurrentSession();
+  const { data: session, isFetching, isLoading } = useCurrentSession();
 
-  if (isLoading) {
+  if (isLoading || isFetching) {
     return null;
   }
 

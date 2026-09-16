@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   InternalServerErrorException,
   Post,
   Query,
@@ -200,6 +201,7 @@ export class AuthController {
    * 현재 로그인 세션 상태를 조회합니다.
    */
   @Get("session")
+  @Header("Cache-Control", "private, no-store")
   async getSession(
     @Cookies(AUTH_SESSION_COOKIE_NAME) cookieSessionId: string | undefined,
     @Query("sessionId") querySessionId: string | undefined,
@@ -215,6 +217,7 @@ export class AuthController {
    * access token 기준 현재 사용자 정보를 조회합니다.
    */
   @Get("me")
+  @Header("Cache-Control", "private, no-store")
   async getCurrentUser(
     @Cookies(AUTH_ACCESS_COOKIE_NAME) cookieAccessToken: string | undefined,
     @Req() request: Request,
