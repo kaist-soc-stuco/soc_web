@@ -16,7 +16,7 @@ import type {
   StudentFeeStatsResponse,
 } from "@soc/contracts";
 import { isoToDate, nowIso } from "@soc/shared";
-import { ChevronDown, CreditCard, FileUp, Sheet } from "lucide-react";
+import { ChevronDown, CreditCard, FileUp, Plus, Sheet } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -51,7 +51,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { Permissions } from "@/lib/permissions";
-import { FeeStatisticsPanel, type PeriodPreset } from "./fee-statistics-panel";
+import { FeeStatisticsPanel } from "./fee-statistics-panel";
 
 type FeeSortBy = "name" | "studentId" | "status" | "paidAt";
 type SortDirection = "asc" | "desc";
@@ -59,16 +59,6 @@ type StatusFilter = "ALL" | "PAID" | "PARTIAL" | "UNPAID";
 type StudentFeeRow = StudentFeeListResponse["students"][number];
 
 const DEFAULT_COVERAGE_SEMESTERS = 6;
-
-const toDateInput = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-const periodRange = (preset: Exclude<PeriodPreset, "custom">) => {
-  const end = isoToDate(nowIso());
-  const start = isoToDate(end.toISOString());
-  if (preset === "30d") start.setDate(start.getDate() - 29);
-  if (preset === "90d") start.setDate(start.getDate() - 89);
-  if (preset === "year") start.setMonth(0, 1);
-  return { dateFrom: toDateInput(start), dateTo: toDateInput(end) };
-};
 
 const formatCurrency = (value: number) => `${value.toLocaleString("ko-KR")}원`;
 
@@ -108,6 +98,13 @@ const buildSemesterOptions = () => {
     const term = (ordinal % 2) + 1;
     return { value: `${year}-${term}`, label: `${year}학년도 ${term}학기` };
   });
+};
+
+const formatSemesterLabel = (value: string) => {
+  const [year, term] = value.split("-");
+  return /^\d{4}$/.test(year ?? "") && (term === "1" || term === "2")
+    ? `${year}학년도 ${term}학기`
+    : value;
 };
 
 export function FeeManagementPage() {
@@ -172,14 +169,17 @@ export function FeeManagementPage() {
   const [detailStudentId, setDetailStudentId] = useState<string | null>(null);
   const [detail, setDetail] = useState<StudentFeeDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [detailStatus, setDetailStatus] = useState<FeeStatus>("UNPAID");
-  const [detailAmount, setDetailAmount] = useState("");
-  const [detailNote, setDetailNote] = useState("");
-  const initialStatsRange = useMemo(() => periodRange("30d"), []);
+  const [detailPaymentModalOpen, setDetailPaymentModalOpen] = useState(false);
+  const [detailPaymentAmount, setDetailPaymentAmount] = useState("");
+  const [detailPaymentType, setDetailPaymentType] = useState<FeePaymentType>("SIX_SEMESTER_LUMP_SUM");
+  const [detailPaymentMethod, setDetailPaymentMethod] = useState<FeePaymentMethod>("BANK_TRANSFER");
+  const [detailPaymentStartSemester, setDetailPaymentStartSemester] = useState(referenceSemester);
+  const [detailPaymentCoverage, setDetailPaymentCoverage] = useState(String(DEFAULT_COVERAGE_SEMESTERS));
+  const [detailPaymentDate, setDetailPaymentDate] = useState(nowIso().slice(0, 10));
+  const [detailPaymentNote, setDetailPaymentNote] = useState("");
+  const detailPaymentIdempotencyRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const [activeSection, setActiveSection] = useState<"ledger" | "stats" | "settings">("ledger");
-  const [statsPreset, setStatsPreset] = useState<PeriodPreset>("30d");
-  const [statsDateFrom, setStatsDateFrom] = useState(initialStatsRange.dateFrom);
-  const [statsDateTo, setStatsDateTo] = useState(initialStatsRange.dateTo);
+  const [statsSemester, setStatsSemester] = useState(referenceSemester);
   const [stats, setStats] = useState<StudentFeeStatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
@@ -197,6 +197,32 @@ export function FeeManagementPage() {
   }, [selectionPopoverOpen]);
 
   const semesterOptions = useMemo(buildSemesterOptions, []);
+  const detailSemesterOptions = useMemo(() => {
+    const historySemester = detail?.history[0]?.effectiveStartSemester;
+    if (!historySemester || semesterOptions.some((option) => option.value === historySemester)) return semesterOptions;
+    return [{ value: historySemester, label: formatSemesterLabel(historySemester) }, ...semesterOptions];
+  }, [detail, semesterOptions]);
+  const detailSummary = useMemo(() => {
+    if (!detail) return null;
+    const referenceOrdinal = semesterOrdinal(referenceSemester);
+    const hasCoveredPayment = referenceOrdinal !== null && detail.history.some((payment) => {
+      const startOrdinal = semesterOrdinal(payment.effectiveStartSemester);
+      return startOrdinal !== null && referenceOrdinal >= startOrdinal && referenceOrdinal < startOrdinal + payment.coverageSemesters;
+    });
+    const paidAmount = detail.history.length > 0
+      ? detail.history.reduce((sum, payment) => sum + payment.amount, 0)
+      : detail.status.paidAmount;
+    const latestNote = detail.history.find((payment) => payment.note)?.note ?? detail.status.note;
+    return {
+      status: hasCoveredPayment ? "PAID" as const : detail.history.length > 0 ? "PARTIAL" as const : detail.status.status,
+      paidAmount,
+      latestNote,
+      latestPaidAt: detail.history[0]?.paidAt ?? detail.status.paidAt,
+      latestStartSemester: detail.history[0]?.effectiveStartSemester ?? detail.status.coverageStartSemester,
+      latestCoverageSemesters: detail.history[0]?.coverageSemesters ?? detail.status.coverageSemesters,
+      paymentCount: detail.history.length,
+    };
+  }, [detail, referenceSemester]);
   const students = feeData?.students ?? [];
   const selectedStudents = useMemo(
     () => Array.from(selectedUserIds).map((id) => studentCache[id]).filter(Boolean),
@@ -258,11 +284,9 @@ export function FeeManagementPage() {
     if (sessionLoading || !Permissions.has(session?.permission ?? 0, Permissions.MANAGE_FINANCE)) return;
     setStatsLoading(true);
     try {
-      const spanDays = Math.max(1, Math.ceil((isoToDate(`${statsDateTo}T00:00:00.000+09:00`).getTime() - isoToDate(`${statsDateFrom}T00:00:00.000+09:00`).getTime()) / 86_400_000));
       const response = await apiClient.getStudentFeeStats({
-        dateFrom: statsDateFrom,
-        dateTo: statsDateTo,
-        bucket: spanDays <= 45 ? "day" : spanDays <= 180 ? "week" : "month",
+        bucket: "week",
+        referenceSemester: statsSemester,
       });
       setStats(response);
       setError(null);
@@ -271,7 +295,7 @@ export function FeeManagementPage() {
     } finally {
       setStatsLoading(false);
     }
-  }, [apiClient, session, sessionLoading, statsDateFrom, statsDateTo]);
+  }, [apiClient, session, sessionLoading, statsSemester]);
 
   useEffect(() => {
     void loadStats();
@@ -284,14 +308,6 @@ export function FeeManagementPage() {
   const updateFilter = <T,>(setter: (value: T) => void, value: T) => {
     setter(value);
     setCurrentPage(1);
-  };
-
-  const changeStatsPreset = (preset: PeriodPreset) => {
-    setStatsPreset(preset);
-    if (preset === "custom") return;
-    const range = periodRange(preset);
-    setStatsDateFrom(range.dateFrom);
-    setStatsDateTo(range.dateTo);
   };
 
   const handleSortChange = (nextSortBy: FeeSortBy) => {
@@ -457,10 +473,10 @@ export function FeeManagementPage() {
   };
   const downloadTemplate = () => {
     const workbook = XLSX.utils.book_new();
-    const data = XLSX.utils.aoa_to_sheet([["학번", "상태", "납부금액", "적용학기수", "비고"]]);
+    const data = XLSX.utils.aoa_to_sheet([["학번", "상태", "납부 금액", "납부 적용 학기 수", "비고"]]);
     data["!cols"] = [{ wch: 18 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 40 }];
     XLSX.utils.book_append_sheet(workbook, data, "납부 데이터");
-    const guide = XLSX.utils.aoa_to_sheet([["작성 안내"], ["학번은 텍스트로 입력하세요. 이름만으로 매칭하지 않습니다."], ["상태: PAID / PARTIAL / UNPAID, 납부금액: 0 이상의 정수, 적용학기수: 1~6"], ["현재 요약 상태 정정용입니다. 신규 수납은 납부 처리에서 원장에 기록하세요."], ["다음은 합성 예시입니다. 실제 학번으로 바꾸고 데이터 시트에 입력하세요."], ["20990001", "PAID", 45000, 6, "합성 예시"]]);
+    const guide = XLSX.utils.aoa_to_sheet([["작성 안내"], ["학번은 텍스트로 입력하세요. 이름만으로 매칭하지 않습니다."], ["상태: PAID / PARTIAL / UNPAID, 납부 금액: 0 이상의 정수, 납부 적용 학기 수: 1~6"], ["현재 요약 상태 정정용입니다. 신규 수납은 납부 처리에서 원장에 기록하세요."], ["다음은 합성 예시입니다. 실제 학번으로 바꾸고 데이터 시트에 입력하세요."], ["20990001", "PAID", 45000, 6, "합성 예시"]]);
     guide["!cols"] = [{ wch: 90 }];
     XLSX.utils.book_append_sheet(workbook, guide, "작성 안내");
     XLSX.writeFile(workbook, "과비_불러오기_양식.xlsx");
@@ -470,16 +486,10 @@ export function FeeManagementPage() {
     setDetailStudentId(student.userId);
     setDetail(null);
     setOperationError(null);
-    setDetailStatus(student.status);
-    setDetailAmount(String(student.paidAmount ?? 0));
-    setDetailNote(student.note ?? "");
     setDetailLoading(true);
     try {
       const response = await apiClient.getStudentFeeDetail(student.userId);
       setDetail(response);
-      setDetailStatus(response.status.status);
-      setDetailAmount(String(response.status.paidAmount));
-      setDetailNote(response.status.note ?? "");
     } catch (err) {
       toast({ type: "error", message: "납부 상세를 불러오지 못했습니다." });
     } finally {
@@ -487,26 +497,67 @@ export function FeeManagementPage() {
     }
   };
 
-  const saveDetail = async () => {
-    if (!detail?.user.userId) return;
-    const amount = Number(detailAmount);
+  const openDetailPaymentModal = () => {
+    if (!detail) return;
+    setOperationError(null);
+    setDetailPaymentAmount(String(feePolicy.amount));
+    setDetailPaymentType("SIX_SEMESTER_LUMP_SUM");
+    setDetailPaymentMethod("BANK_TRANSFER");
+    setDetailPaymentStartSemester(detail.history[0]?.effectiveStartSemester ?? referenceSemester);
+    setDetailPaymentCoverage(String(detail.history[0]?.coverageSemesters ?? feePolicy.coverageSemesters));
+    setDetailPaymentDate(nowIso().slice(0, 10));
+    setDetailPaymentNote("");
+    setDetailPaymentModalOpen(true);
+  };
+
+  const submitDetailPayment = async () => {
+    if (!detail || saving) return;
+    const amount = Number(detailPaymentAmount);
+    const coverageSemesters = Number(detailPaymentCoverage);
     if (!Number.isInteger(amount) || amount < 0) {
       setOperationError("납부 금액은 0 이상의 정수여야 합니다.");
       return;
     }
+    if (!Number.isInteger(coverageSemesters) || coverageSemesters < 1 || coverageSemesters > 6) {
+      setOperationError("납부 적용 학기 수는 1~6 사이여야 합니다.");
+      return;
+    }
+    if (!/^\d{4}-[12]$/.test(detailPaymentStartSemester)) {
+      setOperationError("납부 적용 시작 학기를 선택하세요.");
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(detailPaymentDate)) {
+      setOperationError("납부 일자를 입력하세요.");
+      return;
+    }
+    const payment: BulkProcessStudentFeePaymentsRequest["payments"][number] = {
+      userId: detail.user.userId,
+      amount,
+      paymentType: detailPaymentType,
+      paymentMethod: detailPaymentMethod,
+      effectiveStartSemester: detailPaymentStartSemester,
+      coverageSemesters,
+      paidAt: isoToDate(`${detailPaymentDate}T00:00:00.000+09:00`).toISOString(),
+      note: detailPaymentNote.trim() || null,
+    };
     try {
       setSaving(true);
-      await apiClient.updateStudentFeeStatus(detail.user.userId, {
-        status: detailStatus,
-        paidAmount: amount,
-        note: detailNote.trim() || null,
+      setOperationError(null);
+      const requestFingerprint = JSON.stringify([payment]);
+      if (detailPaymentIdempotencyRef.current?.fingerprint !== requestFingerprint) {
+        detailPaymentIdempotencyRef.current = { fingerprint: requestFingerprint, key: randomId() };
+      }
+      await apiClient.processStudentFeePayments({
+        idempotencyKey: detailPaymentIdempotencyRef.current.key,
+        payments: [payment],
       });
-      setSuccessMessage(`${detail.user.nameKo}의 요약 납부 상태를 저장했습니다.`);
+      setDetailPaymentModalOpen(false);
+      setSuccessMessage(`${detail.user.nameKo}의 납부 내역을 원장에 추가했습니다.`);
       await loadData();
       const refreshed = await apiClient.getStudentFeeDetail(detail.user.userId);
       setDetail(refreshed);
     } catch (err) {
-      toast({ type: "error", message: "납부 상세 저장에 실패했습니다." });
+      toast({ type: "error", message: "납부 내역 추가에 실패했습니다." });
     } finally {
       setSaving(false);
     }
@@ -553,13 +604,10 @@ export function FeeManagementPage() {
 
           {activeSection === "settings" ? <section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex flex-wrap items-end gap-3"><AdminFormField label="표준 과비 (원)"><UiInput type="number" min={1} value={policyAmount} onChange={event => setPolicyAmount(event.currentTarget.value)} /></AdminFormField><Button disabled={saving || !policyReady} onClick={() => void saveFeePolicy()}>저장</Button></div></section> : activeSection === "stats" ? (
             <FeeStatisticsPanel
-              dateFrom={statsDateFrom}
-              dateTo={statsDateTo}
+              semester={statsSemester}
+              semesterOptions={semesterOptions}
               loading={statsLoading}
-              onDateFromChange={(value) => { setStatsPreset("custom"); setStatsDateFrom(value); }}
-              onDateToChange={(value) => { setStatsPreset("custom"); setStatsDateTo(value); }}
-              onPresetChange={changeStatsPreset}
-              preset={statsPreset}
+              onSemesterChange={setStatsSemester}
               stats={stats}
             />
           ) : <AdminTableCard className="overflow-visible">
@@ -577,7 +625,7 @@ export function FeeManagementPage() {
                 ]}
               />
               <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-                <AdminSelectDropdown ariaLabel="기준 학기" value={referenceSemester} options={semesterOptions} onChange={(value) => updateFilter(setReferenceSemester, value)} className="w-56 shrink-0" open={openFilterDropdown === "semester"} onOpenChange={(open) => setOpenFilterDropdown(open ? "semester" : null)} />
+                <AdminSelectDropdown ariaLabel="혜택 판정 학기" value={referenceSemester} options={semesterOptions} onChange={(value) => updateFilter(setReferenceSemester, value)} className="w-56 shrink-0" open={openFilterDropdown === "semester"} onOpenChange={(open) => setOpenFilterDropdown(open ? "semester" : null)} />
                  <PageSearchField ariaLabel="학생 검색" className="w-full min-w-[220px] sm:w-64" onChange={(value) => updateFilter(setQuery, value)} onClear={() => updateFilter(setQuery, "")} placeholder="이름·학번·전공·이메일 검색" value={query} />
                 <Button type="button" variant="outline" onClick={() => { setOperationError(null); setSpreadsheetInfoOpen(true); }}><FileUp aria-hidden="true" className="size-4" /> 불러오기</Button>
               </div>
@@ -643,14 +691,28 @@ export function FeeManagementPage() {
 
         <Modal open={paymentModalOpen} onClose={() => !saving && setPaymentModalOpen(false)} title="과비 일괄 완납 처리" className="max-w-xl" bodyClassName="space-y-5 px-5 py-5" footer={<><Button variant="outline" disabled={saving} onClick={() => setPaymentModalOpen(false)}>취소</Button><Button disabled={saving || !policyReady || !selectedStudents.some(student => student.status === "UNPAID" && student.paidAmount === 0) || !paymentDate} onClick={() => void submitPayments()}>{saving ? "반영 중" : `${selectedStudents.filter(student => student.status === "UNPAID" && student.paidAmount === 0).length}명 완납 확정`}</Button></>}>
           <div><p>선택한 {selectedStudents.length}명 중 미납자 {selectedStudents.filter(student => student.status === "UNPAID" && student.paidAmount === 0).length}명을 완납 처리하시겠습니까?</p>{selectedStudents.some(student => student.status !== "UNPAID" || student.paidAmount > 0) ? <p className="mt-1 text-sm text-slate-500">(기존 납부 기록이 있는 {selectedStudents.filter(student => student.status !== "UNPAID" || student.paidAmount > 0).length}명 자동 제외)</p> : null}</div>
-          <dl className="grid grid-cols-[5rem_1fr] gap-2 text-sm"><dt>납부 기준</dt><dd>{referenceSemester.replace("-", "학년도 ")}학기 ({feePolicy.coverageSemesters}학기 완납)</dd><dt>반영 금액</dt><dd>1인당 {formatCurrency(feePolicy.amount)} · 총 {formatCurrency(selectedStudents.filter(student => student.status === "UNPAID" && student.paidAmount === 0).length * feePolicy.amount)}</dd></dl>
+          <dl className="grid grid-cols-[5rem_1fr] gap-2 text-sm"><dt>적용 학기</dt><dd>{formatSemesterLabel(referenceSemester)} ({feePolicy.coverageSemesters}학기 완납)</dd><dt>반영 금액</dt><dd>1인당 {formatCurrency(feePolicy.amount)} · 총 {formatCurrency(selectedStudents.filter(student => student.status === "UNPAID" && student.paidAmount === 0).length * feePolicy.amount)}</dd></dl>
           <AdminFormField label="납부 일자"><UiInput type="date" value={paymentDate} onChange={event => setPaymentDate(event.currentTarget.value)} /></AdminFormField>
           {operationError ? <p role="alert" className="text-sm text-rose-700">{operationError}</p> : null}
         </Modal>
 
-        <AdminDrawer open={Boolean(detailStudentId)} onClose={() => setDetailStudentId(null)} title={detail?.user ? `${detail.user.nameKo} 납부 상세` : "납부 상세"} width="max-w-2xl" footer={detail ? <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={() => setDetailStudentId(null)}>닫기</Button><Button type="button" disabled={saving} onClick={() => void saveDetail()}>{saving ? "저장 중" : "요약 정보 저장"}</Button></div> : undefined}>
+        <Modal open={detailPaymentModalOpen} onClose={() => !saving && setDetailPaymentModalOpen(false)} title="납부 내역 추가" className="max-w-xl" bodyClassName="space-y-5 px-5 py-5" footer={<><Button type="button" variant="outline" disabled={saving} onClick={() => setDetailPaymentModalOpen(false)}>취소</Button><Button type="button" disabled={saving || !detailPaymentAmount || !detailPaymentDate} onClick={() => void submitDetailPayment()}><Plus aria-hidden="true" className="size-4" /> {saving ? "추가 중" : "납부 내역 추가"}</Button></>}>
+          <p className="text-sm text-slate-600">{detail?.user.nameKo}의 납부 원장에 새 이력을 추가합니다. 상단 요약은 이 원장으로부터 자동 계산됩니다.</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <AdminFormField label="납부 금액"><UiInput type="number" min="0" step="1000" value={detailPaymentAmount} onChange={(event) => setDetailPaymentAmount(event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="납부 일자"><UiInput type="date" value={detailPaymentDate} onChange={(event) => setDetailPaymentDate(event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="납부 유형"><AdminSelectDropdown ariaLabel="납부 유형" value={detailPaymentType} onChange={(value) => setDetailPaymentType(value as FeePaymentType)} options={[{ value: "SIX_SEMESTER_LUMP_SUM", label: "6학기 일시납" }, { value: "PRIOR_PAYMENT_BALANCE", label: "기납부 차액" }]} /></AdminFormField>
+            <AdminFormField label="납부 방법"><AdminSelectDropdown ariaLabel="납부 방법" value={detailPaymentMethod} onChange={(value) => setDetailPaymentMethod(value as FeePaymentMethod)} options={[{ value: "BANK_TRANSFER", label: "계좌이체" }, { value: "CASH", label: "현금" }, { value: "OTHER", label: "기타" }]} /></AdminFormField>
+            <AdminFormField label="납부 적용 시작 학기"><AdminSelectDropdown ariaLabel="납부 적용 시작 학기" value={detailPaymentStartSemester} onChange={setDetailPaymentStartSemester} options={detailSemesterOptions} /></AdminFormField>
+            <AdminFormField label="납부 적용 학기 수"><UiInput type="number" min="1" max="6" value={detailPaymentCoverage} onChange={(event) => setDetailPaymentCoverage(event.currentTarget.value)} /></AdminFormField>
+          </div>
+          <AdminFormField label="메모"><UiInput value={detailPaymentNote} onChange={(event) => setDetailPaymentNote(event.currentTarget.value)} placeholder="입금자명 상이, 차액 사유 등" /></AdminFormField>
+          {operationError ? <p role="alert" className="text-sm text-rose-700">{operationError}</p> : null}
+        </Modal>
+
+        <AdminDrawer open={Boolean(detailStudentId)} onClose={() => setDetailStudentId(null)} title={detail?.user ? `${detail.user.nameKo} 납부 상세` : "납부 상세"} width="max-w-2xl" footer={detail ? <div className="flex justify-end"><Button type="button" variant="outline" onClick={() => setDetailStudentId(null)}>닫기</Button></div> : undefined}>
           {operationError ? <div role="alert" className="mb-4 rounded-lg bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700">{operationError}</div> : null}
-          {detailLoading ? <div className="space-y-3"><Skeleton className="h-20 w-full" /><Skeleton className="h-28 w-full" /></div> : detail ? <div className="space-y-6"><div className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700"><p className="font-medium text-slate-900">{detail.user.nameKo}{detail.user.nameEn ? ` · ${detail.user.nameEn}` : ""}</p><p className="mt-1">{detail.user.stdNo || "학번 없음"} · {detail.user.email}</p><p className="mt-1 text-xs text-slate-500">{detail.user.primaryMajor || "전공 정보 없음"}</p></div><section className="space-y-3"><h3 className="text-sm font-semibold text-slate-900">현재 요약</h3><div className="grid gap-3 md:grid-cols-2"><AdminFormField label="상태"><AdminSelectDropdown ariaLabel="상태" value={detailStatus} onChange={(value) => setDetailStatus(value as FeeStatus)} className="w-full" options={[{ value: "PAID", label: "완납" }, { value: "UNPAID", label: "미납" }]} /></AdminFormField><AdminFormField label="수납액"><UiInput type="number" min="0" step="1000" value={detailAmount} onChange={(event) => setDetailAmount(event.currentTarget.value)} className="w-full" /></AdminFormField></div><AdminFormField label="관리자 메모"><UiInput value={detailNote} onChange={(event) => setDetailNote(event.currentTarget.value)} placeholder="차액 사유, 입금자명 상이 등" className="w-full" /></AdminFormField></section><section><div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-slate-900">학기별 납부 이력</h3><span className="text-xs text-slate-500">{detail.history.length}건</span></div>{detail.history.length === 0 ? <p className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">등록된 납부 이력이 없습니다.</p> : <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">{detail.history.map((payment) => <div key={payment.paymentId} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[1fr_auto]"><div><p className="font-medium text-slate-900">{formatCurrency(payment.amount)} · {payment.effectiveStartSemester}부터 {payment.coverageSemesters}학기</p><p className="mt-1 text-xs text-slate-500">{payment.paymentType === "PRIOR_PAYMENT_BALANCE" ? "기납부 차액" : "6학기 일시납"} · {payment.paymentMethod === "BANK_TRANSFER" ? "계좌이체" : payment.paymentMethod === "CASH" ? "현금" : "기타"}{payment.note ? ` · ${payment.note}` : ""}</p></div><time className="text-xs tabular-nums text-slate-500">{formatDateTime(payment.paidAt)}</time></div>)}</div>}<p className="mt-2 text-xs leading-5 text-slate-500">납부 원장 이력은 회계 추적을 위해 보존됩니다. 정정이 필요한 경우 새 납부 내역과 사유를 추가해 기록하세요.</p></section></div> : <p className="text-sm text-slate-500">납부 상세를 불러오지 못했습니다.</p>}
+          {detailLoading ? <div className="space-y-3"><Skeleton className="h-20 w-full" /><Skeleton className="h-28 w-full" /></div> : detail && detailSummary ? <div className="space-y-6"><div className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700"><p className="font-medium text-slate-900">{detail.user.nameKo}{detail.user.nameEn ? ` · ${detail.user.nameEn}` : ""}</p><p className="mt-1">{detail.user.stdNo || "학번 없음"} · {detail.user.email}</p><p className="mt-1 text-xs text-slate-500">{detail.user.primaryMajor || "전공 정보 없음"}</p></div><section className="space-y-3"><div><h3 className="text-sm font-semibold text-slate-900">현재 요약</h3><p className="mt-1 text-xs text-slate-500">납부 이력의 합산 결과입니다.</p></div><dl className="grid gap-3 rounded-lg border border-slate-200 px-4 py-3 text-sm sm:grid-cols-2"><div><dt className="text-xs text-slate-500">상태</dt><dd className="mt-1"><AdminStatusBadge tone={detailSummary.status === "PAID" ? "positive" : detailSummary.status === "PARTIAL" ? "warning" : "danger"}>{detailSummary.status === "PAID" ? "완납" : detailSummary.status === "PARTIAL" ? "부분 납부" : "미납"}</AdminStatusBadge></dd></div><div><dt className="text-xs text-slate-500">누적 수납액</dt><dd className="mt-1 font-medium tabular-nums text-slate-900">{formatCurrency(detailSummary.paidAmount)}</dd></div><div><dt className="text-xs text-slate-500">최근 적용</dt><dd className="mt-1 text-slate-700">{detailSummary.latestStartSemester ? `${formatSemesterLabel(detailSummary.latestStartSemester)} · ${detailSummary.latestCoverageSemesters}학기` : "—"}</dd></div><div><dt className="text-xs text-slate-500">최근 반영</dt><dd className="mt-1 text-slate-700">{formatDateTime(detailSummary.latestPaidAt)}</dd></div></dl>{detailSummary.latestNote ? <p className="text-xs leading-5 text-slate-500">최근 메모 · {detailSummary.latestNote}</p> : null}</section><section><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-semibold text-slate-900">학기별 납부 이력</h3><p className="mt-1 text-xs text-slate-500">새로운 상태 변화는 이력으로만 기록합니다.</p></div><div className="flex items-center gap-2"><span className="text-xs text-slate-500">{detail.history.length}건</span><Button type="button" size="sm" onClick={openDetailPaymentModal}><Plus aria-hidden="true" className="size-4" /> 납부 내역 추가</Button></div></div>{detail.history.length === 0 ? <p className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">등록된 납부 이력이 없습니다.</p> : <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">{detail.history.map((payment) => <div key={payment.paymentId} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[1fr_auto]"><div><p className="font-medium text-slate-900">{formatCurrency(payment.amount)} · {formatSemesterLabel(payment.effectiveStartSemester)}부터 {payment.coverageSemesters}학기</p><p className="mt-1 text-xs text-slate-500">{payment.paymentType === "PRIOR_PAYMENT_BALANCE" ? "기납부 차액" : "6학기 일시납"} · {payment.paymentMethod === "BANK_TRANSFER" ? "계좌이체" : payment.paymentMethod === "CASH" ? "현금" : "기타"}{payment.note ? ` · ${payment.note}` : ""}</p></div><time className="text-xs tabular-nums text-slate-500">{formatDateTime(payment.paidAt)}</time></div>)}</div>}</section></div> : <p className="text-sm text-slate-500">납부 상세를 불러오지 못했습니다.</p>}
         </AdminDrawer>
       </AdminPageShell>
     </AuthGuard>
@@ -674,7 +736,7 @@ function parseFeeSpreadsheet(input: ArrayBuffer): { updates: BulkUpdateStudentFe
   if (rows.length < 2) return { updates: [], errors: ["헤더와 한 개 이상의 데이터 행이 필요합니다."] };
   const headers = rows[0].map(normalizeFeeSpreadsheetHeader);
   const indexOf = (...aliases: string[]) => headers.findIndex((header) => aliases.includes(header));
-  const indexes = { userId: indexOf("userid", "사용자id"), stdNo: indexOf("stdno", "학번"), status: indexOf("status", "상태", "납부여부"), paidAmount: indexOf("paidamount", "납부금액", "실납부액", "수납액", "금액"), coverageSemesters: indexOf("coveragesemesters", "적용학기", "적용학기수"), note: indexOf("note", "비고", "메모") };
+  const indexes = { userId: indexOf("userid", "사용자id"), stdNo: indexOf("stdno", "학번"), status: indexOf("status", "상태", "납부여부"), paidAmount: indexOf("paidamount", "납부금액", "실납부액", "수납액", "금액"), coverageSemesters: indexOf("coveragesemesters", "적용학기", "적용학기수", "납부적용학기수"), note: indexOf("note", "비고", "메모") };
   if (indexes.userId < 0 && indexes.stdNo < 0) return { updates: [], errors: ["userId 또는 학번 열이 필요합니다."] };
   const errors: string[] = [];
   const updates: BulkUpdateStudentFeeStatusRequest["updates"] = [];
@@ -695,7 +757,7 @@ function parseFeeSpreadsheet(input: ArrayBuffer): { updates: BulkUpdateStudentFe
     if (!value(indexes.userId) && !value(indexes.stdNo)) errors.push(`${rowLabel}: userId 또는 학번이 없습니다.`);
     if (rawStatus && !status) errors.push(`${rowLabel}: 상태 값이 올바르지 않습니다.`);
     if (amount !== undefined && (!Number.isInteger(amount) || amount < 0)) errors.push(`${rowLabel}: 납부 금액은 0 이상의 정수여야 합니다.`);
-    if (coverageSemesters !== undefined && (!Number.isInteger(coverageSemesters) || coverageSemesters < 1 || coverageSemesters > 6)) errors.push(`${rowLabel}: 적용 학기 수는 1～6 사이여야 합니다.`);
+    if (coverageSemesters !== undefined && (!Number.isInteger(coverageSemesters) || coverageSemesters < 1 || coverageSemesters > 6)) errors.push(`${rowLabel}: 납부 적용 학기 수는 1～6 사이여야 합니다.`);
     if (!status && amount === undefined && coverageSemesters === undefined && indexes.note < 0) errors.push(`${rowLabel}: 변경할 값이 없습니다.`);
     if (errors.some((error) => error.startsWith(`${rowLabel}:`))) return;
     updates.push({ ...(value(indexes.userId) ? { userId: value(indexes.userId) } : {}), ...(value(indexes.stdNo) ? { stdNo: value(indexes.stdNo) } : {}), ...(status ? { status } : {}), ...(amount !== undefined ? { paidAmount: amount } : {}), ...(coverageSemesters !== undefined ? { coverageSemesters } : {}), ...(indexes.note >= 0 ? { note: value(indexes.note) || null } : {}) });

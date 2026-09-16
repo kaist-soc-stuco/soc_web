@@ -186,9 +186,6 @@ export class RoleGroupsService {
     }
 
     await this.assertRoleMutationAllowed(roleGroup, audit?.actorUserId);
-    if (input.userId === audit?.actorUserId) {
-      throw new ForbiddenException("role_group_self_assignment_not_allowed");
-    }
 
     const user = await this.usersService.findById(String(input.userId));
     if (!user) {
@@ -255,9 +252,6 @@ export class RoleGroupsService {
     }
 
     await this.assertRoleMutationAllowed(roleGroup, audit?.actorUserId);
-    if (input.userIds.includes(audit?.actorUserId ?? "")) {
-      throw new ForbiddenException("role_group_self_assignment_not_allowed");
-    }
 
     const before = await this.roleGroupsRepository.listRoleGroupMembers(roleGroupId);
     const replaced = await this.roleGroupsRepository.replaceRoleGroupMembers(

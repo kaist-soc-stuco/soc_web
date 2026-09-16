@@ -1,6 +1,6 @@
 import { meetsVoteQuorum } from "@soc/shared";
 import { BadRequestException, ConflictException, Inject, Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import type { CreateVoteRequest, UpdateVoteRequest, VoteVoterRecord } from "@soc/contracts";
 import { isoToDate, msToDate, nowDate, nowMs } from "@soc/shared";
 
@@ -125,7 +125,7 @@ export class VotesRepository {
         descriptionKo: item.descriptionKo ?? null,
         descriptionEn: item.descriptionEn ?? null,
         type: item.type,
-        maxSelections: item.maxSelections,
+        maxSelections: item.maxSelections, selectionRule: item.selectionRule,
         sortOrder: itemIndex,
       }).returning();
       await tx.insert(voteOptions).values(item.options.map((option, optionIndex) => ({
@@ -184,6 +184,15 @@ export class VotesRepository {
       hasVoted: row.hasVoted,
       votedAt: row.votedAt?.toISOString() ?? null,
     }));
+  }
+
+  async searchVoterCandidates(query: string) {
+    const term = query.trim().slice(0, 100);
+    if (!term) return [];
+    return this.db.select({userId: users.userId, nameKo: users.nameKo, stdNo: users.stdNo})
+      .from(users).where(and(eq(users.isActive, true), schoolOfComputingPrimaryMajor,
+        or(ilike(users.nameKo, `%${term}%`), ilike(users.stdNo, `%${term}%`), ilike(users.email, `%${term}%`))))
+      .orderBy(asc(users.nameKo)).limit(30);
   }
 
   async addVoters(voteId: string, userIds: string[], studentNumbers: string[] = []) {
@@ -281,12 +290,16 @@ export class VotesRepository {
   async close(id: string) {
     return this.transaction(async (tx) => {
       const [lockedVote] = await tx
-        .select({ voteId: votes.voteId, status: votes.status })
+        .select({ voteId: votes.voteId, status: votes.status, quorumPercent: votes.quorumPercent, quorumInclusive: votes.quorumInclusive })
         .from(votes)
         .where(eq(votes.voteId, id))
         .for("update")
         .limit(1);
       if (!lockedVote || lockedVote.status !== "PUBLISHED") return null;
+      const participation = await this.counts(id, tx);
+      if (!meetsVoteQuorum(participation.eligibleCount, participation.votedCount, lockedVote.quorumPercent, lockedVote.quorumInclusive)) {
+        throw new ConflictException("vote_quorum_not_met");
+      }
       const [row] = await tx
         .update(votes)
         .set({ status: "CLOSED", updatedAt: nowDate() })

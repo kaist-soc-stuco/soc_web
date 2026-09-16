@@ -93,6 +93,7 @@ function ContactsPageContent() {
   const [orderSaving, setOrderSaving] = useState(false);
   const [activeContactId, setActiveContactId] = useState<string | null>(null);
   const [activeDragWidth, setActiveDragWidth] = useState<number | null>(null);
+  const [importGuideOpen, setImportGuideOpen] = useState(false);
   const [bulkRows, setBulkRows] = useState<ParsedContactSpreadsheetRow[]>([]);
   const [bulkErrors, setBulkErrors] = useState<string[]>([]);
   const [bulkFileName, setBulkFileName] = useState<string | null>(null);
@@ -394,7 +395,7 @@ function ContactsPageContent() {
   const headerActions = <>
     {pageSpreadsheetLink}
     <Button type="button" variant="outline" onClick={openNewDepartmentModal}>부서 관리</Button>
-    <Button type="button" variant="outline" onClick={() => bulkFileInputRef.current?.click()}><Upload aria-hidden="true" />불러오기</Button>
+    <Button type="button" variant="outline" onClick={() => setImportGuideOpen(true)}><Upload aria-hidden="true" />불러오기</Button>
     <Button type="button" onClick={openNewMemberModal}><Plus aria-hidden="true" />부원 추가</Button>
   </>;
 
@@ -403,6 +404,13 @@ function ContactsPageContent() {
       <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
         {ConfirmDialog}
         <AdminPageHeader title="집행위 연락망" actions={headerActions} />
+        <Modal open={importGuideOpen} onClose={() => setImportGuideOpen(false)} title="부원 명단 일괄 불러오기" className="max-w-lg" footer={<><Button variant="outline" onClick={() => setImportGuideOpen(false)}>취소</Button><Button onClick={() => {setImportGuideOpen(false);bulkFileInputRef.current?.click();}}>파일 선택</Button></>}>
+          <div className="space-y-5 text-sm leading-6">
+            <p>전용 양식에 명단을 작성한 뒤 XLSX 파일을 업로드해 주세요.</p>
+            <section className="space-y-2"><h3 className="font-semibold">1. 양식 준비</h3><Button variant="outline" onClick={downloadContactTemplate}>양식 다운로드</Button><p className="text-slate-500">열 이름과 순서를 유지해 주세요.</p></section>
+            <section className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5"><h3 className="font-semibold">2. 파일 업로드</h3><p className="mt-1 text-slate-500">파일을 선택하면 등록 전에 내용을 검토할 수 있습니다.</p></section>
+          </div>
+        </Modal>
         <UiInput ref={bulkFileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void handleBulkFileChange(event)} />
         {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div> : null}
 
@@ -446,7 +454,7 @@ function ContactsPageContent() {
                 <PageSearchField ariaLabel="연락망 통합 검색" className="w-full max-w-[20rem] flex-none" onChange={setQuery} onClear={() => setQuery("")} placeholder="이름·학번·직책·메일·전화번호 검색" value={query} />
               </div></div>
               <div className="min-w-0">
-                {loading && contacts.length === 0 ? <AdminLoadingState /> : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext modifiers={[restrictListDrag]} autoScroll={false} sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={handleDragCancel} onDragEnd={(event) => void handleDragEnd(event)}><AdminTableViewport className={activeContactId ? "admin-table-viewport--dragging" : undefined}><div className="admin-contacts-table min-w-[1120px]"><div role="row" className={`admin-contacts-table__header ${CONTACT_ROW_GRID} bg-slate-50/70 text-left text-sm font-medium text-[var(--j-color-text-secondary)]`}><div role="columnheader" className="flex h-12 items-center justify-center"><span className="sr-only">순서</span></div><div role="columnheader" className="flex h-12 items-center pl-1 pr-5">이름</div><div role="columnheader" className="flex h-12 items-center px-5">학번</div><div role="columnheader" className="flex h-12 items-center px-5">활동 연도</div><div role="columnheader" className="flex h-12 items-center px-5">부서</div><div role="columnheader" className="flex h-12 items-center px-5">직책</div><div role="columnheader" className="flex h-12 items-center px-5">연락처 정보</div></div><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}><div role="rowgroup">{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} activityYear={activityYearFilter} disabled={orderSaving} onEdit={openEditMemberModal} />)}</div></SortableContext></div></AdminTableViewport>{typeof document !== "undefined" ? createPortal(<DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>{activeContact ? <ContactDragPreview contact={activeContact} width={activeDragWidth} /> : null}</DragOverlay>, document.body) : null}</DndContext>}
+                {loading && contacts.length === 0 ? <AdminLoadingState /> : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext modifiers={[restrictListDrag]} autoScroll={false} sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={handleDragCancel} onDragEnd={(event) => void handleDragEnd(event)}><AdminTableViewport className={activeContactId ? "admin-contacts-table-viewport admin-table-viewport--dragging" : "admin-contacts-table-viewport"}><div className="admin-contacts-table min-w-[1120px]"><div role="row" className={`admin-contacts-table__header ${CONTACT_ROW_GRID} bg-slate-50/70 text-left text-sm font-medium text-[var(--j-color-text-secondary)]`}><div role="columnheader" className="flex h-12 items-center justify-center"><span className="sr-only">순서</span></div><div role="columnheader" className="flex h-12 items-center pl-1 pr-5">이름</div><div role="columnheader" className="flex h-12 items-center px-5">학번</div><div role="columnheader" className="flex h-12 items-center px-5">활동 연도</div><div role="columnheader" className="flex h-12 items-center px-5">부서</div><div role="columnheader" className="flex h-12 items-center px-5">직책</div><div role="columnheader" className="flex h-12 items-center px-5">연락처 정보</div></div><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}><div role="rowgroup">{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} activityYear={activityYearFilter} disabled={orderSaving} onEdit={openEditMemberModal} />)}</div></SortableContext></div></AdminTableViewport>{typeof document !== "undefined" ? createPortal(<DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>{activeContact ? <ContactDragPreview contact={activeContact} width={activeDragWidth} /> : null}</DragOverlay>, document.body) : null}</DndContext>}
               </div>
               {orderSaving ? <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">표시 순서를 저장하는 중입니다...</p> : null}
             </AdminTableCard>

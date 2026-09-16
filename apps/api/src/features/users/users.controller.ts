@@ -387,9 +387,8 @@ export class UsersController {
       auditMetadataFromRequest(req),
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["사용자ID", "학번", "이름", "이메일", "소속", "주전공", "상태", "적용학기수", "적용시작학기", "수납액", "기준금액", "납부유형", "결제수단", "기준 학기", "기준 학기 혜택 자격", "납부일", "비고"],
+      ["학번", "이름", "이메일", "소속", "주전공", "상태", "납부 적용 학기 수", "납부 적용 시작 학기", "총 수납액", "기준 납부액", "납부 유형", "결제 수단", "납부 일자", "비고", "사용자 ID"],
       ...rows.map((row) => [
-        row.userId,
         row.stdNo,
         row.nameKo,
         row.email,
@@ -402,17 +401,15 @@ export class UsersController {
         row.requiredAmount,
         row.paymentType,
         row.paymentMethod,
-        resolvedReferenceSemester,
-        row.eligible ? "예" : "아니오",
         row.paidAt,
         row.note,
+        row.userId,
       ]),
     ]);
     worksheet["!cols"] = [
-      { wch: 38 }, { wch: 14 }, { wch: 16 }, { wch: 32 }, { wch: 18 },
-      { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 12 },
-      { wch: 12 }, { wch: 22 }, { wch: 14 }, { wch: 12 }, { wch: 24 },
-      { wch: 18 }, { wch: 36 },
+      { wch: 14 }, { wch: 16 }, { wch: 32 }, { wch: 18 }, { wch: 18 },
+      { wch: 12 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 16 },
+      { wch: 22 }, { wch: 14 }, { wch: 18 }, { wch: 36 }, { wch: 38 },
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "과비 납부");

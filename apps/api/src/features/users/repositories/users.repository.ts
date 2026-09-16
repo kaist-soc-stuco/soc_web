@@ -10,7 +10,7 @@ import { DEFAULT_AUTHENTICATED_PERMISSION_BITS } from "@soc/contracts";
 import Redis from "ioredis";
 
 import { isoToDate, isoToMs, msToIso, nowDate } from "@soc/shared";
-import { and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
@@ -102,6 +102,20 @@ type UserProfileUpdateInput = {
 export type StudentFeeSortBy = "name" | "studentId" | "status" | "paidAt";
 export type SortDirection = "asc" | "desc";
 export type FeeReferenceSemester = string;
+
+/**
+ * Synthetic/system identities are useful for seeded content and QA, but they
+ * must never appear in student fee or bulk-email audiences.
+ *
+ * Keep the legacy values here as well: a production database can contain an
+ * older seed before the next seed run consolidates those users.
+ */
+export const EXCLUDED_SYSTEM_TARGET_KAIST_UIDS = [
+  "demo-author",
+  "reference-faq",
+  "DEV0001",
+  "seed-council-author",
+] as const;
 export type EmailRecipientFilters = {
   query?: string;
   studentNumber?: string;
@@ -561,7 +575,10 @@ export class UsersRepository {
             )
           : undefined;
 
-    const conditions: SQL[] = [eq(users.isActive, true)];
+    const conditions: SQL[] = [
+      eq(users.isActive, true),
+      notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]),
+    ];
     if (feeFilter) conditions.push(feeFilter);
     const query = filters?.query?.trim();
     if (query) {
@@ -1327,7 +1344,10 @@ export class UsersRepository {
     const normalizedPage = Math.max(1, Math.floor(page));
     const normalizedPageSize = Math.min(1_000, Math.max(1, Math.floor(pageSize)));
     const offset = (normalizedPage - 1) * normalizedPageSize;
-    const filters: SQL[] = [];
+    const filters: SQL[] = [
+      eq(users.isActive, true),
+      notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]),
+    ];
     const normalizedQuery = query?.trim();
 
     if (normalizedQuery) {
@@ -1492,6 +1512,9 @@ export class UsersRepository {
   }
 
   async getStudentFeeStats(options: StudentFeeStatsOptions = {}): Promise<StudentFeeStatsResponse> {
+    const normalizedReference = this.semesterOrdinal(options.referenceSemester)
+      ? options.referenceSemester!
+      : this.currentReferenceSemester();
     const start = options.dateFrom ? isoToDate(`${options.dateFrom}T00:00:00.000+09:00`) : undefined;
     const end = options.dateTo ? isoToDate(`${options.dateTo}T00:00:00.000+09:00`) : undefined;
     if (end) end.setDate(end.getDate() + 1);
@@ -1500,7 +1523,15 @@ export class UsersRepository {
     if (end) conditions.push(lt(studentFeePayments.paidAt, end));
     if (options.referenceSemester) conditions.push(eq(studentFeePayments.effectiveStartSemester, options.referenceSemester));
 
-    const [paymentRows, userRows] = await Promise.all([
+    const targetCondition = and(
+      eq(users.isActive, true),
+      notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]),
+    );
+    const selectedPaymentCondition = conditions.length > 0
+      ? and(targetCondition, ...conditions)
+      : targetCondition;
+
+    const [paymentRows, allPaymentRows, userRows, statusRows] = await Promise.all([
       this.db
         .select({
           amount: studentFeePayments.amount,
@@ -1508,12 +1539,36 @@ export class UsersRepository {
           userId: studentFeePayments.userId,
         })
         .from(studentFeePayments)
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .innerJoin(users, eq(studentFeePayments.userId, users.userId))
+        .where(selectedPaymentCondition)
+        .orderBy(asc(studentFeePayments.paidAt)),
+      this.db
+        .select({
+          amount: studentFeePayments.amount,
+          coverageSemesters: studentFeePayments.coverageSemesters,
+          effectiveStartSemester: studentFeePayments.effectiveStartSemester,
+          paidAt: studentFeePayments.paidAt,
+          userId: studentFeePayments.userId,
+        })
+        .from(studentFeePayments)
+        .innerJoin(users, eq(studentFeePayments.userId, users.userId))
+        .where(targetCondition)
         .orderBy(asc(studentFeePayments.paidAt)),
       this.db.select({
         userId: users.userId,
         primaryMajor: users.primaryMajor,
-      }).from(users),
+      }).from(users).where(targetCondition),
+      this.db
+        .select({
+          userId: studentFeeStatus.userId,
+          status: studentFeeStatus.status,
+          paidAmount: studentFeeStatus.paidAmount,
+          paidAt: studentFeeStatus.paidAt,
+          coverageSemesters: studentFeeStatus.coverageSemesters,
+        })
+        .from(studentFeeStatus)
+        .innerJoin(users, eq(studentFeeStatus.userId, users.userId))
+        .where(targetCondition),
     ]);
 
     const bucket = options.bucket ?? "day";
@@ -1567,10 +1622,48 @@ export class UsersRepository {
       };
     });
 
-    const paidUserIds = new Set(paymentRows.map((payment) => payment.userId));
     const paidAmount = paymentRows.reduce((sum, payment) => sum + Number(payment.amount), 0);
+    const feePolicy = await this.getStudentFeePolicy(normalizedReference);
     const totalStudents = userRows.length;
+    const paymentsByUserId = new Map<string, typeof allPaymentRows>();
+    for (const payment of allPaymentRows) {
+      const current = paymentsByUserId.get(payment.userId) ?? [];
+      current.push(payment);
+      paymentsByUserId.set(payment.userId, current);
+    }
+    const statusByUserId = new Map(statusRows.map((row) => [row.userId, row]));
+    const ledgerAmount = allPaymentRows.reduce((sum, payment) => sum + Number(payment.amount), 0);
+    const legacyOnlyAmount = statusRows.reduce(
+      (sum, row) => paymentsByUserId.has(row.userId) ? sum : sum + Number(row.paidAmount ?? 0),
+      0,
+    );
+    const collectedAmount = ledgerAmount + legacyOnlyAmount;
+    const paidUserIds = new Set<string>();
+    const partialUserIds = new Set<string>();
+    for (const user of userRows) {
+      const payments = paymentsByUserId.get(user.userId) ?? [];
+      const legacy = statusByUserId.get(user.userId);
+      const covered = payments.some((payment) => this.isSemesterCovered(
+        payment.effectiveStartSemester,
+        payment.coverageSemesters,
+        normalizedReference,
+      ));
+      const legacyStartSemester = this.semesterFromDate(legacy?.paidAt);
+      const legacyActive = legacy?.paidAt === null || this.isSemesterCovered(
+        legacyStartSemester,
+        legacy?.coverageSemesters ?? 6,
+        normalizedReference,
+      );
+      const hasLegacyPaid = legacy?.status === "PAID" && legacyActive;
+      const hasLegacyPartial = legacy?.status === "PARTIAL" && legacyActive && (legacy.paidAmount ?? 0) > 0;
+      const totalPaidForUser = payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+      if (covered || hasLegacyPaid) paidUserIds.add(user.userId);
+      else if (totalPaidForUser > 0 || hasLegacyPartial) partialUserIds.add(user.userId);
+    }
     const paidStudents = paidUserIds.size;
+    const partialStudents = partialUserIds.size;
+    const targetAmount = totalStudents * feePolicy.amount;
+    const outstandingAmount = Math.max(0, targetAmount - collectedAmount);
     const categoryDefinitions = [
       { category: "PRIMARY" as const, label: "주전공", field: "primaryMajor" as const },
     ];
@@ -1581,16 +1674,20 @@ export class UsersRepository {
         paidStudents,
         paidStudentCount: paidStudents,
         paymentCount: paymentRows.length,
-        partialStudents: 0,
-        unpaidStudents: Math.max(0, totalStudents - paidStudents),
+        partialStudents,
+        unpaidStudents: Math.max(0, totalStudents - paidStudents - partialStudents),
         paymentRate: totalStudents > 0 ? Math.round((paidStudents / totalStudents) * 1_000) / 10 : 0,
         paidAmount,
+        collectedAmount,
+        targetAmount,
+        outstandingAmount,
       },
       trend,
       majorBreakdown: categoryDefinitions.map(({ category, label, field }) => {
         const eligibleIds = new Set(userRows.filter((user) => Boolean(user[field])).map((user) => user.userId));
         const categoryPayments = paymentRows.filter((payment) => eligibleIds.has(payment.userId));
-        const categoryPaidIds = new Set(categoryPayments.map((payment) => payment.userId));
+        const categoryPaidIds = new Set([...paidUserIds].filter((userId) => eligibleIds.has(userId)));
+        const categoryPartialIds = new Set([...partialUserIds].filter((userId) => eligibleIds.has(userId)));
         const total = eligibleIds.size;
         const paid = categoryPaidIds.size;
         return {
@@ -1598,8 +1695,8 @@ export class UsersRepository {
           label,
           totalStudents: total,
           paidStudents: paid,
-          partialStudents: 0,
-          unpaidStudents: Math.max(0, total - paid),
+          partialStudents: categoryPartialIds.size,
+          unpaidStudents: Math.max(0, total - paid - categoryPartialIds.size),
           paymentRate: total > 0 ? Math.round((paid / total) * 1_000) / 10 : 0,
           paidAmount: categoryPayments.reduce((sum, payment) => sum + Number(payment.amount), 0),
         };

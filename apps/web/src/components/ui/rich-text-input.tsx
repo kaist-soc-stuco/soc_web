@@ -69,6 +69,7 @@ export function RichTextInput({
     emitChange();
   };
 
+  const linkButtonRef = useRef<HTMLButtonElement>(null);
   const [linkDialog, setLinkDialog] = useState<{text:string;url:string} | null>(null);
   const [linkPreview, setLinkPreview] = useState<EditorLinkPreview | null>(null);
   const selectedRange = useRef<Range | null>(null);
@@ -90,7 +91,7 @@ export function RichTextInput({
     if (selectedRange.current && selection) { selection.removeAllRanges(); selection.addRange(selectedRange.current); }
   };
   const applyLink = (text: string, url: string) => {
-    // Release the modal focus trap before restoring the contenteditable range.
+    // Unmount the link popover before restoring the contenteditable range.
     flushSync(() => setLinkDialog(null));
     restoreSelection();
     const anchor = selectedAnchor.current;
@@ -114,6 +115,7 @@ export function RichTextInput({
         className,
       )}
     >
+      <div className="rich-text-input-shell relative">
       <div
         ref={editorRef}
         contentEditable={!disabled}
@@ -143,7 +145,8 @@ export function RichTextInput({
         }}
       />
 
-      <div className="rich-input-toolbar-space" data-open={focused && !disabled}><div className="min-h-0 overflow-hidden"><div className="rich-input-toolbar flex flex-wrap items-center gap-0.5 py-1" aria-hidden={!focused} inert={!focused}>
+      </div>
+      <div className="rich-input-toolbar-space" data-open={(focused || !!linkDialog) && !disabled}><div className="min-h-0 overflow-hidden"><div className="rich-input-toolbar flex flex-wrap items-center gap-0.5 py-1" aria-hidden={!focused} inert={!focused}>
         {TOOLBAR_ITEMS.map(({ command, label, icon: Icon }) => (
           <button
             key={command}
@@ -162,6 +165,7 @@ export function RichTextInput({
         ))}
         <button
           type="button"
+          ref={linkButtonRef}
           aria-label="링크 삽입"
           data-tooltip="링크 삽입"
           disabled={disabled}
@@ -218,7 +222,7 @@ export function RichTextInput({
           <RemoveFormatting aria-hidden="true" className="size-4" />
         </button>
       </div></div></div>
-      {linkDialog && <EditorLinkDialog initialText={linkDialog.text} initialUrl={linkDialog.url} onApply={applyLink} onClose={() => { flushSync(() => setLinkDialog(null)); restoreSelection(); }} />}
+      {linkDialog && <EditorLinkDialog anchor={linkButtonRef.current} initialText={linkDialog.text} initialUrl={linkDialog.url} onApply={applyLink} onClose={() => { flushSync(() => setLinkDialog(null)); restoreSelection(); }} />}
       {linkPreview && <EditorLinkPopover link={linkPreview} onClose={() => setLinkPreview(null)} onEdit={() => { setLinkDialog({text:linkPreview.text,url:linkPreview.url});setLinkPreview(null); }} onUnlink={() => { restoreSelection(); document.execCommand("unlink"); emitChange(); setLinkPreview(null); }} />}
     </div>
   );

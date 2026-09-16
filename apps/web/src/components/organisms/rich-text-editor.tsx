@@ -699,6 +699,7 @@ function RichTextToolbar({
   variableOptions?: ReadonlyArray<RichTextVariableOption>;
 }) {
   const editorId = useId().replace(/:/g, "");
+  const linkButtonRef = useRef<HTMLSpanElement>(null);
   const [linkDialog, setLinkDialog] = useState<{text:string;url:string} | null>(null);
   const [linkPreview, setLinkPreview] = useState<EditorLinkPreview | null>(null);
   const linkSelection = useRef({from:0,to:0});
@@ -887,13 +888,13 @@ function RichTextToolbar({
           </ToolbarButton>
         </>
       ) : null}
-      <ToolbarButton
+      <span ref={linkButtonRef}><ToolbarButton
         label={lang === "ko" ? "링크 삽입" : "Insert link"}
         active={editor.isActive("link")}
         onClick={setLink}
       >
         <LinkIcon />
-      </ToolbarButton>
+      </ToolbarButton></span>
 
       {variableMenuOptions.length ? (
         <DropdownMenu.Root modal={false}>
@@ -991,7 +992,7 @@ function RichTextToolbar({
         <CircleHelp />
       </ToolbarButton>
       </div>
-      {linkDialog && <EditorLinkDialog initialText={linkDialog.text} initialUrl={linkDialog.url} onApply={saveLink} onClose={() => { flushSync(() => setLinkDialog(null));editor.commands.focus(); }} />}
+      {linkDialog && <EditorLinkDialog anchor={linkButtonRef.current} initialText={linkDialog.text} initialUrl={linkDialog.url} onApply={saveLink} onClose={() => { flushSync(() => setLinkDialog(null));editor.commands.focus(); }} />}
       {linkPreview && <EditorLinkPopover link={linkPreview} onClose={() => setLinkPreview(null)} onEdit={() => { setLinkDialog({text:linkPreview.text,url:linkPreview.url});setLinkPreview(null); }} onUnlink={() => { editor.chain().focus().setTextSelection(linkSelection.current).unsetLink().run();setLinkPreview(null); }} />}
       {toolbarSuffix ? <div className="shrink-0">{toolbarSuffix}</div> : null}
     </div>

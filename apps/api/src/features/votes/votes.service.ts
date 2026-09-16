@@ -67,7 +67,7 @@ export class VotesService {
       descriptionKo: item.descriptionKo,
       descriptionEn: item.descriptionEn,
       type: item.type as VoteItemRecord["type"],
-      maxSelections: item.maxSelections,
+      maxSelections: item.maxSelections, selectionRule: item.selectionRule as "max" | "min" | "exact",
       sortOrder: item.sortOrder,
       options: item.options.map((option) => ({
         id: option.optionId,
@@ -163,6 +163,8 @@ export class VotesService {
   }
 
 
+  searchVoterCandidates(query: string) { return this.repo.searchVoterCandidates(query); }
+
   async addVoters(id: string, input: { userIds: string[]; studentNumbers: string[] }) {
     const vote = await this.repo.findVote(id);
     if (!vote) throw new NotFoundException("vote_not_found");
@@ -205,7 +207,9 @@ export class VotesService {
       const optionIds = answerMap.get(item.id);
       if (!optionIds || optionIds.length === 0) throw new BadRequestException("vote_all_items_required");
       if (new Set(optionIds).size !== optionIds.length) throw new BadRequestException("vote_duplicate_option");
-      if (optionIds.length > item.maxSelections) throw new BadRequestException("vote_too_many_selections");
+      const rule = item.type === "MULTIPLE_CHOICE" ? item.selectionRule ?? "max" : "exact";
+      if (rule !== "min" && optionIds.length > item.maxSelections) throw new BadRequestException("vote_too_many_selections");
+      if (rule !== "max" && optionIds.length < item.maxSelections) throw new BadRequestException("vote_too_few_selections");
       const allowed = new Set(item.options.map((option) => option.id));
       if (optionIds.some((optionId) => !allowed.has(optionId))) throw new BadRequestException("vote_option_invalid");
     }

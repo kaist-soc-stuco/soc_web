@@ -1,4 +1,6 @@
 :root {
+  --ui-builder-text-size: 1.0625rem;
+  --ui-builder-title-size: 1.5625rem;
   /* Unit contract
      - rem: typography, controls, spacing, radii, fixed content geometry
      - px: 1px hairlines, raster/SVG precision and viewport collision math only

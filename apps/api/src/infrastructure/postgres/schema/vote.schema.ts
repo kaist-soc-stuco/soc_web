@@ -53,11 +53,13 @@ export const voteItems = pgTable("vote_item", {
   descriptionKo: text("description_ko"),
   descriptionEn: text("description_en"),
   type: varchar("type", { length: 30 }).notNull(),
+  selectionRule: text("selection_rule").notNull().default("max"),
   maxSelections: integer("max_selections").notNull().default(1),
   sortOrder: integer("sort_order").notNull().default(0),
 }, (table) => [
   index("vote_item_vote_sort_idx").on(table.voteId, table.sortOrder),
   check("vote_item_type_check", sql`${table.type} in ('YES_NO_ABSTAIN', 'SINGLE_CHOICE', 'MULTIPLE_CHOICE')`),
+  check("vote_item_selection_rule_check", sql`${table.selectionRule} in ('max', 'min', 'exact')`),
   check("vote_item_max_selection_check", sql`${table.maxSelections} >= 1`),
 ]);
 

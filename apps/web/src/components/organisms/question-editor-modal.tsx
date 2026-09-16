@@ -1,3 +1,4 @@
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { restrictListDrag } from "@/lib/drag-bounds";
 import { createPortal } from "react-dom";
 import { createApiClient } from "@soc/api-client";
@@ -220,9 +221,10 @@ interface QuestionInlineEditorProps {
   optionsLocked?: boolean;
   createOptionValue?: () => string;
   minimumOptions?: number;
-  footer?: ReactNode;
+  footer?: ReactNode | ((descriptionMenu: ReactNode) => ReactNode);
   allowQuestionImage?: boolean;
   selected?: boolean;
+  descriptionControl?: boolean;
   initial: QuestionFormState;
   isKoreanOnly?: boolean;
   isOngoing?: boolean;
@@ -512,7 +514,7 @@ function SortableOptionRow({
 }
 
 export function QuestionInlineEditor({
-  value, onDraftChange, typeControl, optionsLocked = false, createOptionValue, minimumOptions = 0, footer, allowQuestionImage = true, selected = true,
+  value, onDraftChange, typeControl, optionsLocked = false, createOptionValue, minimumOptions = 0, footer, allowQuestionImage = true, selected = true, descriptionControl = false,
   initial,
   isKoreanOnly = false,
   isOngoing = false,
@@ -1093,6 +1095,7 @@ export function QuestionInlineEditor({
   return (
     <div
       data-selected={selected}
+      data-korean-only={isKoreanOnly}
       className="question-inline-editor relative overflow-visible rounded-xl border border-slate-200 bg-white p-4 pb-5 pt-8 shadow-sm sm:p-5 md:p-6 md:pb-5 md:pt-8"
     >
       {dragHandle ? (
@@ -1109,13 +1112,13 @@ export function QuestionInlineEditor({
              className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary"
            />
          </div>
-         <div className="question-editor-field group relative min-w-0">
-          {!isKoreanOnly ? <RichTextInput singleLine ariaLabel="영문 질문" value={form.titleEn} disabled={isOngoing} onChange={value => set("titleEn", value)} placeholder="Question" /> : null}
+         {!isKoreanOnly && <div className="question-editor-field group relative min-w-0">
+          <RichTextInput singleLine ariaLabel="영문 질문" value={form.titleEn} disabled={isOngoing} onChange={value => set("titleEn", value)} placeholder="Question" />
           <span
             aria-hidden="true"
              className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary"
           />
-        </div>
+        </div>}
         {allowQuestionImage && <CompactImagePicker
           label="문항 이미지"
           value={questionImage}
@@ -1137,7 +1140,7 @@ export function QuestionInlineEditor({
         />}
       </div>
 
-      {showDescription || value ? (
+      {showDescription ? (
         <div className="mt-2 grid min-w-0 gap-3 md:grid-cols-2">
           <div className="question-editor-field group relative min-w-0">
             <RichTextInput
@@ -1370,7 +1373,14 @@ export function QuestionInlineEditor({
         </div>
       ) : null}
 
-      {footer !== undefined ? footer : <div className="mt-5 border-t border-slate-100 pt-4">
+      {footer !== undefined ? (typeof footer === "function" ? footer(descriptionControl && !isOngoing ? <DropdownMenu.Root modal={false}>
+        <DropdownMenu.Trigger asChild><IconButton aria-label="문항 더보기"><MoreVertical className="size-4" /></IconButton></DropdownMenu.Trigger>
+        <DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[100] min-w-36 rounded-lg border border-slate-200 bg-white p-1 pr-2 shadow-md">
+          <DropdownMenu.CheckboxItem checked={showDescription} onCheckedChange={checked => { setShowDescription(checked); if (!checked) setForm(current => ({...current, descriptionKo:"", descriptionEn:""})); }} className="flex cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm outline-none focus:bg-slate-100">
+            <span className="size-4"><DropdownMenu.ItemIndicator><Check className="size-4" /></DropdownMenu.ItemIndicator></span>설명
+          </DropdownMenu.CheckboxItem>
+        </DropdownMenu.Content></DropdownMenu.Portal>
+      </DropdownMenu.Root> : null) : footer) : <div className="mt-5 border-t border-slate-100 pt-4">
         <div className="flex flex-wrap items-center justify-end gap-3">
           {!isOngoing && (onDuplicate || onDelete) ? (
             <div className="flex items-center gap-1">
@@ -1558,7 +1568,8 @@ export function TitleDescriptionInlineEditor({
   }, [onCancel]);
 
   return (
-    <div className="question-inline-editor relative overflow-visible rounded-xl border border-slate-200 bg-white p-4 pb-5 pt-8 shadow-sm sm:p-5 md:p-6 md:pb-5 md:pt-8">
+    <div data-korean-only={isKoreanOnly}
+      className="question-inline-editor relative overflow-visible rounded-xl border border-slate-200 bg-white p-4 pb-5 pt-8 shadow-sm sm:p-5 md:p-6 md:pb-5 md:pt-8">
       {dragHandle ? (
         <div className="absolute left-1/2 top-1 z-10 -translate-x-1/2" aria-label="제목 및 설명 순서 이동">
           {dragHandle}
@@ -1573,7 +1584,7 @@ export function TitleDescriptionInlineEditor({
             disabled={isOngoing}
             onChange={(value) => setForm((current) => ({ ...current, titleKo: value }))}
             placeholder="제목"
-            inputClassName="!bg-transparent !px-0 !text-2xl !font-normal !leading-tight"
+            inputClassName="!bg-slate-50 !text-[length:var(--ui-builder-title-size)] !font-normal !leading-tight"
           />
           <span aria-hidden="true" className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary" />
         </div>
@@ -1586,7 +1597,7 @@ export function TitleDescriptionInlineEditor({
               disabled={isOngoing}
               onChange={(value) => setForm((current) => ({ ...current, titleEn: value }))}
               placeholder="Title"
-              inputClassName="!bg-transparent !px-0 !text-2xl !font-normal !leading-tight"
+              inputClassName="!bg-slate-50 !text-[length:var(--ui-builder-title-size)] !font-normal !leading-tight"
             />
             <span aria-hidden="true" className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary" />
           </div>
@@ -1595,6 +1606,7 @@ export function TitleDescriptionInlineEditor({
       <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2">
         <div className="question-editor-field group relative min-w-0">
           <RichTextInput
+            inputClassName="!bg-transparent"
             ariaLabel="제목 및 설명 국문 설명"
             value={form.descriptionKo}
             disabled={isOngoing}
@@ -1605,6 +1617,7 @@ export function TitleDescriptionInlineEditor({
         {!isKoreanOnly ? (
           <div className="question-editor-field group relative min-w-0">
             <RichTextInput
+              inputClassName="!bg-transparent"
               ariaLabel="제목 및 설명 영문 설명"
               value={form.descriptionEn}
               disabled={isOngoing}
@@ -1711,7 +1724,7 @@ function QuestionMoreMenu({
       style={menuStyle}
       role="menu"
       aria-label="문항 옵션"
-      className="question-editor-more-menu fixed z-[100] min-w-0 w-max max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
+      className="question-editor-more-menu pr-2 fixed z-[100] min-w-0 w-max max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
     >
       <MoreMenuItem
         label="설명"

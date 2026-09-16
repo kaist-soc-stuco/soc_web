@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import {
   CreateVoteSchema,
   Permissions,
@@ -42,6 +42,10 @@ export class VotesController {
   }
 
 
+
+  @Get("admin/voter-candidates")
+  @RequirePermissions(Permissions.MANAGE_VOTE)
+  candidates(@Query("q") query = "") { return this.service.searchVoterCandidates(query); }
 
   @Get("admin/:id/voters")
   @RequirePermissions(Permissions.MANAGE_VOTE)

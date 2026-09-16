@@ -88,6 +88,7 @@ test(
   "close before submit rejects the ballot at the locked database boundary",
   integrationOptions,
   async () => {
+    await db.update(schema.votes).set({quorumPercent:0}).where(eq(schema.votes.voteId,VOTE_ID));
     assert.ok(await repository.close(VOTE_ID));
     assert.equal(await repository.submitBallot(ballot("receipt-close-first")), "vote_not_open");
 

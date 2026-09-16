@@ -558,7 +558,7 @@ function UserDetailDrawer({
       onClose={onClose}
       title={user ? `${user.nameKo} 상세 정보` : "사용자 상세 정보"}
       width="max-w-xl"
-      footer={user ? <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" disabled={updating} onClick={onToggleActive}><span className="inline-flex items-center gap-2">{user.isActive ? <UserRoundX aria-hidden="true" className="size-4" /> : <UserRoundCheck aria-hidden="true" className="size-4" />}{updating ? "처리 중" : user.isActive ? "계정 비활성화" : "계정 복구"}</span></Button><Button type="button" variant={postingSuspension?.suspended ? "outline" : "destructive"} disabled={postingSuspensionLoading} onClick={onTogglePostingSuspension}><span className="inline-flex items-center gap-2"><Ban aria-hidden="true" className="size-4" />{postingSuspensionLoading ? "확인 중" : postingSuspension?.suspended ? "게시 제한 해제" : "게시 제한"}</span></Button></div> : undefined}
+      footer={user ? <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" disabled={updating} onClick={onToggleActive}><span className="inline-flex items-center gap-2">{user.isActive ? <UserRoundX aria-hidden="true" className="size-4" /> : <UserRoundCheck aria-hidden="true" className="size-4" />}{updating ? "처리 중" : user.isActive ? "계정 비활성화" : "계정 복구"}</span></Button><Button type="button" variant={postingSuspension?.suspended ? "outline" : "destructive"} disabled={postingSuspensionLoading} onClick={onTogglePostingSuspension}><span className="inline-flex items-center gap-2"><Ban aria-hidden="true" className="size-4" />{postingSuspension?.suspended ? "게시 제한 해제" : "게시 제한"}</span></Button></div> : undefined}
     >
       {user ? (
         <div className="space-y-6">

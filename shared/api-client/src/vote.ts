@@ -1,4 +1,5 @@
 import type {
+  AdminUserRecord,
   CreateVoteRequest,
   VoteEligibilityPreviewRequest,
   SubmitVoteBallotRequest,
@@ -38,6 +39,7 @@ export const createVoteApi = ({ requestJson, requestVoid, votesBaseUrl }: ApiCli
   publishVoteResults: (id: string) => requestJson<VoteResultsResponse>(`${votesBaseUrl}/admin/${id}/publish-results`, { method: "POST" }, { retryOnUnauthorized: true }),
   unpublishVoteResults: (id: string) => requestJson<{ unpublished: boolean }>(`${votesBaseUrl}/admin/${id}/unpublish-results`, { method: "POST" }, { retryOnUnauthorized: true }),
   previewVoteVoters: (body: VoteEligibilityPreviewRequest) => requestJson<VoteVoterRecord[]>(`${votesBaseUrl}/admin/eligibility-preview`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, { retryOnUnauthorized: true }),
+  searchVoteVoterCandidates: (query: string) => requestJson<Pick<AdminUserRecord, "userId" | "nameKo" | "stdNo">[]>(`${votesBaseUrl}/admin/voter-candidates?q=${encodeURIComponent(query)}`, {method:"GET"}, {retryOnUnauthorized:true}),
   listVoteVoters: (id: string) => requestJson<VoteVoterRecord[]>(`${votesBaseUrl}/admin/${id}/voters`, { method: "GET" }, { retryOnUnauthorized: true }),
   addVoteVoters: (id: string, identifiers: { userIds?: string[]; studentNumbers?: string[] }) => requestJson<{ added: number }>(`${votesBaseUrl}/admin/${id}/voters`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userIds: identifiers.userIds ?? [], studentNumbers: identifiers.studentNumbers ?? [] }),

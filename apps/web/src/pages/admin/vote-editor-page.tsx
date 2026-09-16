@@ -13,7 +13,7 @@ import { VoteProgress } from "@/components/organisms/vote-progress";
 import { VoteStatusBadge } from "@/components/ui/vote-status-badge";
 import { restrictListDrag } from "@/lib/drag-bounds";
 import { randomId } from "@/lib/random-id";
-import { createApiClient } from "@soc/api-client";
+import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type { AdminUserRecord, CreateVoteRequest, VoteDetailResponse, VoteItemType, VoteResultsResponse, VoteVoterRecord } from "@soc/contracts";
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -155,10 +155,18 @@ export function VoteEditorPage() {
     draftRef.current = next.draft; koreanRef.current = next.koreanOnly;
     setDraftState(next.draft); setKoreanOnly(next.koreanOnly); setDirty(true);
   };
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || (vote && vote.status !== "DRAFT") || (event.target instanceof HTMLElement && event.target.closest("input,textarea,[contenteditable=true]"))) return;
+      const value = event.key.toLowerCase();
+      if (value === "z" || value === "y") { event.preventDefault(); restore(value === "y" || event.shiftKey ? "redo" : "undo"); }
+    };
+    window.addEventListener("keydown", key); return () => window.removeEventListener("keydown", key);
+  });
   const [voters, setVoters] = useState<VoteVoterRecord[]>([]);
   const [voterQuery, setVoterQuery] = useState("");
   const [candidateQuery, setCandidateQuery] = useState("");
-  const [candidates, setCandidates] = useState<AdminUserRecord[]>([]);
+  const [candidates, setCandidates] = useState<Pick<AdminUserRecord, "userId" | "nameKo" | "stdNo">[]>([]);
   const [busy, setBusy] = useState(false);
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const { toast } = useToast();
@@ -173,7 +181,7 @@ export function VoteEditorPage() {
       startsAt: localValue(detail.startsAt), endsAt: localValue(detail.endsAt), academicStatuses: detail.academicStatuses,
       quorumPercent: detail.quorumPercent ?? 50, quorumInclusive: detail.quorumInclusive,
       feePayersOnly: detail.feePayersOnly, studentNumberFrom: detail.studentNumberFrom, studentNumberTo: detail.studentNumberTo,
-      items: detail.items.map(({ id, titleKo, titleEn, descriptionKo, descriptionEn, type, maxSelections, options }) => ({ id, titleKo, titleEn, descriptionKo, descriptionEn, type, maxSelections, options: options.map(({ id, labelKo, labelEn, descriptionKo, descriptionEn, imageUrl }) => ({ id, labelKo, labelEn, descriptionKo, descriptionEn, imageUrl })) })),
+      items: detail.items.map(({ id, titleKo, titleEn, descriptionKo, descriptionEn, type, maxSelections, selectionRule, options }) => ({ id, titleKo, titleEn, descriptionKo, descriptionEn, type, maxSelections, selectionRule, options: options.map(({ id, labelKo, labelEn, descriptionKo, descriptionEn, imageUrl }) => ({ id, labelKo, labelEn, descriptionKo, descriptionEn, imageUrl })) })),
     };
     draftRef.current = nextDraft; setDraftState(nextDraft); history.current = []; future.current = [];
     voteIdRef.current = voteId;
@@ -274,20 +282,31 @@ export function VoteEditorPage() {
     if (!voteId || !await confirm({ title: label === "마감" ? "투표 마감" : label === "개표" ? "투표 개표" : label === "게시" ? "투표 게시" : label, description: label === "게시" ? "업로드·추가한 선거인명부가 확정되고 투표 안건 편집이 잠깁니다. 투표를 게시하시겠습니까?" : label === "마감" ? "투표를 즉시 마감하여 더 이상 참여할 수 없게 됩니다. 제출된 투표는 유지되며, 개표와 결과 공개는 별도로 진행합니다. 정말 마감하시겠습니까?" : label === "개표" ? "마감된 투표함을 개표하여 안건별 득표 수를 집계합니다. 결과는 아직 참여자에게 공개되지 않습니다. 정말 개표하시겠습니까?" : label === "결과 비공개 전환" ? "결과 조회를 중단합니다. 이미 열람하거나 내려받은 결과는 회수할 수 없습니다. 비공개로 전환하시겠습니까?" : "집계된 결과를 사용자에게 공개합니다. 결과를 공개하시겠습니까?", confirmLabel: label })) return;
     setBusy(true);
     try { await action(); await load(voteId); toast({ type: "success", message: `${label}했습니다.` }); }
-    catch { toast({ type: "error", message: `${label}하지 못했습니다.` }); }
+    catch (error) { const code = error instanceof ApiClientHttpError ? error.code : ""; const messages: Record<string, string> = {
+      vote_voter_roll_empty:"선거인명부가 비어있습니다. 선거인을 추가한 뒤 게시해 주세요.",
+      vote_quorum_not_met:"개표 정족수가 미달입니다. 정족수에 도달해야 마감·개표할 수 있습니다.",
+      vote_invalid_schedule:"투표 시작·종료 일시를 확인해 주세요.",
+      vote_definition_incomplete:"안건마다 보기를 2개 이상 등록해 주세요.",
+      vote_already_published:"이미 게시된 투표입니다. 페이지를 새로고침해 주세요.",
+      vote_state_changed:"투표 상태가 변경되었습니다. 새로고침 후 다시 시도해 주세요.",
+    }; toast({ type: "error", message: messages[code ?? ""] ?? `${label}하지 못했습니다. ${error instanceof Error ? error.message : "다시 시도해 주세요."}` }); }
     finally { setBusy(false); }
   };
 
+  const [searchingCandidates, setSearchingCandidates] = useState(false);
+  const [searchedCandidates, setSearchedCandidates] = useState(false);
   const searchCandidates = async () => {
+    if (!candidateQuery.trim() || searchingCandidates) return;
+    setSearchingCandidates(true); setSearchedCandidates(false);
     try {
-      const rows = await client.searchUsers(candidateQuery, 30);
-      setCandidates(rows.filter((user) => /전산|computer|computing/i.test(user.primaryMajor ?? "")));
+      const rows = await client.searchVoteVoterCandidates(candidateQuery);
+      setCandidates(rows.filter(user => !voters.some(voter => voter.userId === user.userId && voter.status === "ELIGIBLE")));
     } catch {
       setCandidates([]);
       toast({ type: "error", message: "회원을 검색하지 못했습니다." });
-    }
+    } finally {setSearchingCandidates(false);setSearchedCandidates(true);}
   };
-  const addCandidate = async (userId: string) => { try { const voteId = await ensureStored(); await client.addVoteVoters(voteId, { userIds: [userId] }); setVoters(await client.listVoteVoters(voteId)); setAddingVoter(false); setCandidateQuery(""); setCandidates([]); toast({type:"success",message:"명부에 추가했습니다."}); } catch { toast({type:"error",message:"추가하지 못했습니다."}); } };
+  const addCandidate = async (userId: string) => { try { const voteId = await ensureStored(); await client.addVoteVoters(voteId, { userIds: [userId] }); setVoters(await client.listVoteVoters(voteId)); setAddingVoter(false); setCandidateQuery(""); setCandidates([]); toast({type:"success",message:"명부에 추가했습니다."}); } catch (error) { toast({type:"error",message:error instanceof ApiClientHttpError && error.code === "vote_voter_not_found_or_ineligible" ? "활성 상태인 전산학부 주전공 회원만 추가할 수 있습니다." : "추가하지 못했습니다. 다시 시도해 주세요."}); } };
   const importXlsx = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files?.[0] || importingRoster) return;
     setImportingRoster(true);
@@ -310,7 +329,7 @@ export function VoteEditorPage() {
   const [rosterPageSize, setRosterPageSize] = useState(20);
   const [addingVoter, setAddingVoter] = useState(false);
   const exportRoster = () => {
-    const sheet = XLSX.utils.json_to_sheet(effectiveVoters.map(voter => ({ 학번: voter.studentNumber, 이름: voter.nameKo, 참여: voter.hasVoted ? "참여완료" : "미참여", 상태: voter.status, "투표 일시": formatVotedTime(voter.votedAt) })));
+    const sheet = XLSX.utils.json_to_sheet(effectiveVoters.map(voter => ({ 학번: voter.studentNumber, 이름: voter.nameKo, 참여: voter.hasVoted ? "참여" : "미참여", 상태: voter.status, "투표 일시": formatVotedTime(voter.votedAt) })));
     const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, sheet, "선거인명부"); XLSX.writeFile(workbook, "선거인명부.xlsx");
   };
   const exportResults = async () => {
@@ -329,16 +348,16 @@ export function VoteEditorPage() {
       <AdminPageShell><AdminPageMain className="admin-vote-editor">
         <div className="admin-vote-editor__header sticky top-0 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-1 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
           <AdminPageHeader eyebrow={<EditorBackButton to="/admin/votes" beforeLeave={() => dirty ? save() : Promise.resolve()} />} title={<span className="flex flex-wrap items-center gap-3"><span>{stripRichText(draft.titleKo) || "제목 없는 투표"}</span>{vote && vote.status !== "DRAFT" && <VoteStatusBadge status={vote.status} startsAt={vote.startsAt} endsAt={vote.endsAt} />}</span>} actions={<>
-            <IconButton aria-label="실행 취소" disabled={!editable || !history.current.length} onClick={() => restore("undo")}><Undo2 className="size-4" /></IconButton>
-            <IconButton aria-label="다시 실행" disabled={!editable || !future.current.length} onClick={() => restore("redo")}><Redo2 className="size-4" /></IconButton>
-            <IconButton aria-label="링크 복사" className="border-0 text-slate-600" onClick={() => void ensureStored().then(voteId => navigator.clipboard.writeText(`${window.location.origin}/votes/${voteId}`)).then(()=>toast({type:"success",message:"투표 링크를 복사했습니다."})).catch(()=>toast({type:"error",message:"링크를 복사하지 못했습니다."}))}><Link2 className="size-5" /></IconButton>
-            <IconButton aria-label="미리보기" className="border-0 text-slate-600" onClick={() => { const tab=window.open("about:blank","_blank"); if(tab)tab.opener=null; void (editable ? save() : Promise.resolve()).then(()=>{if(tab)tab.location.href=`/votes/${voteIdRef.current}?preview=1`;}).catch(()=>{tab?.close();toast({type:"error",message:"미리보기를 열지 못했습니다."});}); }}><Eye className="size-5" /></IconButton>
+            <IconButton aria-label="실행 취소" data-tooltip="실행 취소" disabled={!editable || !history.current.length} onClick={() => restore("undo")}><Undo2 className="size-4" /></IconButton>
+            <IconButton aria-label="다시 실행" data-tooltip="다시 실행" disabled={!editable || !future.current.length} onClick={() => restore("redo")}><Redo2 className="size-4" /></IconButton>
+            <IconButton aria-label="링크 복사" data-tooltip="링크 복사" className="border-0 text-slate-600" onClick={() => void ensureStored().then(voteId => navigator.clipboard.writeText(`${window.location.origin}/votes/${voteId}`)).then(()=>toast({type:"success",message:"투표 링크를 복사했습니다."})).catch(()=>toast({type:"error",message:"링크를 복사하지 못했습니다."}))}><Link2 className="size-5" /></IconButton>
+            <IconButton aria-label="미리보기" data-tooltip="미리보기" className="border-0 text-slate-600" onClick={() => { const tab=window.open("about:blank","_blank"); if(tab)tab.opener=null; void (editable ? save() : Promise.resolve()).then(()=>{if(tab)tab.location.href=`/votes/${voteIdRef.current}?preview=1`;}).catch(()=>{tab?.close();toast({type:"error",message:"미리보기를 열지 못했습니다."});}); }}><Eye className="size-5" /></IconButton>
             <DropdownMenu.Root modal={false}><DropdownMenu.Trigger asChild><IconButton aria-label="투표 더보기"><MoreVertical className="size-5" /></IconButton></DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[100] w-44 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
               <DropdownMenu.Item disabled={busy} className="flex cursor-pointer items-center gap-2 rounded px-3 py-2 text-sm outline-none focus:bg-slate-100" onSelect={() => void (async()=>{try{if(editable)await save();const body=payload();const copy=await client.createVote({...body,titleKo:`${body.titleKo} 사본`,items:body.items.map(item=>({...item,id:uid(),options:item.options.map(option=>({...option,id:uid()}))}))});navigate(`/admin/votes/${copy.id}`);}catch{toast({type:"error",message:"사본을 만들지 못했습니다."});}})()}><Copy className="size-4" />사본 만들기</DropdownMenu.Item>
               {editable && <DropdownMenu.Item disabled={busy} className="flex cursor-pointer items-center gap-2 rounded px-3 py-2 text-sm text-rose-600 outline-none focus:bg-rose-50" onSelect={() => void (async()=>{if(!await confirm({title:"투표 삭제",description:"이 투표와 선거인명부를 삭제하시겠습니까?",confirmLabel:"삭제"}))return;setBusy(true);try{await save();await client.deleteVote(voteIdRef.current!);setDirty(false);navigate("/admin/votes");}catch{toast({type:"error",message:"투표를 삭제하지 못했습니다."});}finally{setBusy(false);}})()}><Trash2 className="size-4" />삭제</DropdownMenu.Item>}
             </DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
             {editable ? <Button onClick={() => void run("게시", () => client.publishVote(voteIdRef.current!))} disabled={busy}>게시</Button> : null}
-            {vote?.status === "PUBLISHED" && clock < isoToMs(vote.endsAt) ? <Button onClick={() => void run("마감", () => client.closeVote(voteIdRef.current!))} disabled={busy}>투표 조기 마감</Button> : null}
+            {vote?.status === "PUBLISHED" && clock < isoToMs(vote.endsAt) ? <Button onClick={() => void run("마감", () => client.closeVote(voteIdRef.current!))} disabled={busy || !quorumMet} title={!quorumMet ? "개표 정족수에 도달해야 마감할 수 있습니다." : undefined}>투표 조기 마감</Button> : null}
             {(vote?.status === "CLOSED" || (vote?.status === "PUBLISHED" && clock >= isoToMs(vote.endsAt))) ? <Button onClick={() => void run("개표", async () => { if (vote.status === "PUBLISHED") await client.closeVote(voteIdRef.current!); return client.tallyVote(voteIdRef.current!); })} disabled={busy || !quorumMet}>개표</Button> : null}
             {vote?.status === "TALLIED" && !vote.resultsPublishedAt ? <Button onClick={() => void run("결과 공개", () => client.publishVoteResults(voteIdRef.current!))} disabled={busy}>결과 공개</Button> : null}
             {vote?.resultsPublishedAt ? <Button onClick={() => void run("결과 비공개 전환", () => client.unpublishVoteResults(voteIdRef.current!))} disabled={busy}>결과 비공개 전환</Button> : null}
@@ -349,6 +368,7 @@ export function VoteEditorPage() {
         <div className="flex flex-wrap gap-2" aria-label="투표 편집 영역">{([["questions", "안건"], ["voters", "선거인명부"], ["settings", "설정"], ["operations", "진행·개표"]] as const).map(([value, label]) => <button type="button" key={value} className={`min-h-11 border-b-2 px-4 text-sm transition-colors ${editorTab === value ? "border-emerald-600 font-semibold text-emerald-700" : "border-transparent text-slate-500 hover:text-slate-900"}`} aria-pressed={editorTab === value} onClick={() => setEditorTab(value)}>{label}</button>)}</div>
         {editorTab === "operations" ? <AdminCard>
           <div className="space-y-5 p-5">
+            {vote?.status === "CLOSED" && <p className="text-sm text-slate-600">투표가 마감되었습니다. 상단의 ‘개표’를 누르면 결과를 집계합니다.</p>}
             {vote ? <VoteProgress vote={vote} /> : <p className="text-sm text-slate-500">투표를 저장하면 진행 현황을 확인할 수 있습니다.</p>}
             {results ? <div className="flex gap-2"><Button variant="outline" onClick={()=>void exportResults()}>결과 엑셀 다운로드</Button><Button variant="outline" onClick={()=>window.print()}>인쇄</Button></div> : null}
             {results ? <div className="space-y-6 border-t border-slate-100 pt-5"><h2 className="font-semibold">{stripRichText(vote?.titleKo)} 개표 결과</h2><p className="text-sm">총 {results.totalBallots}명 참여</p>{results.items.map(item => <section key={item.itemId} className="space-y-3"><h3 className="font-medium">{stripRichText(item.titleKo)}</h3>{item.options.map(option => <div key={option.optionId}><div className="mb-1 flex justify-between gap-3 text-sm"><span>{option.labelKo}</span><span>{option.count}표 ({option.percentage.toFixed(1)}%)</span></div><div className="h-3 rounded-full bg-slate-100"><div className={`h-full rounded-full ${option.count > 0 && option.count === Math.max(...item.options.map(value => value.count)) ? "bg-emerald-500" : "bg-emerald-500"}`} style={{ width: `${Math.min(100, option.percentage)}%` }} /></div></div>)}</section>)}</div> : null}
@@ -410,11 +430,13 @@ export function VoteEditorPage() {
                           onChange={value => changeType(itemIndex, value as VoteItemType)} options={[
                             { value: "YES_NO_ABSTAIN", label: "찬성·반대·기권" }, { value: "SINGLE_CHOICE", label: "단일 선택 (1인 1표)" }, { value: "MULTIPLE_CHOICE", label: "복수 선택" },
                           ]} className="w-full md:w-48" buttonClassName="!h-10 !text-sm" />}
-                        footer={editable ? <div className="vote-agenda-details"><div className="min-h-0 overflow-hidden">
-                          {item.type === "MULTIPLE_CHOICE" && <BuilderRuleRow><span className="text-sm">최대 선택 개수</span><UiInput type="number" min={1} max={item.options.length} value={item.maxSelections} aria-label="최대 선택 개수" className="builder-text-control w-20" onChange={event => setItem(itemIndex, { maxSelections: Math.max(1, Math.min(item.options.length, Number(event.target.value) || 1)) })} /></BuilderRuleRow>}
+                        descriptionControl={editable}
+                        footer={editable ? descriptionMenu => <div className="vote-agenda-details"><div className="min-h-0 overflow-hidden">
+                          {item.type === "MULTIPLE_CHOICE" && <BuilderRuleRow><AdminSelectDropdown ariaLabel="선택 개수 조건" value={item.selectionRule ?? "max"} onChange={value => setItem(itemIndex, {selectionRule:value as "max" | "min" | "exact"})} options={[{value:"max",label:"최대 선택 개수"},{value:"min",label:"최소 선택 개수"},{value:"exact",label:"정확한 선택 개수"}]} className="w-44" /><UiInput type="number" min={1} max={item.options.length} value={item.maxSelections} aria-label="선택 개수" className="builder-text-control w-20" onChange={event => setItem(itemIndex, { maxSelections: Math.max(1, Math.min(item.options.length, Number(event.target.value) || 1)) })} /></BuilderRuleRow>}
                           <div className="mt-5 flex justify-end gap-1 border-t border-slate-100 pt-3">
                             <IconButton aria-label="안건 복제" onClick={() => { const copy = { ...item, id: uid(), options: item.options.map(option => ({ ...option, id: uid() })) }; setDraft({ ...draft, items: [...draft.items.slice(0, itemIndex + 1), copy, ...draft.items.slice(itemIndex + 1)] }); setSelectedAgenda(copy.id); }}><Copy className="size-4" /></IconButton>
                             <IconButton aria-label="안건 삭제" disabled={draft.items.length <= 1} onClick={() => setDraft({ ...draft, items: draft.items.filter((_, index) => index !== itemIndex) })}><Trash2 className="size-4" /></IconButton>
+                            {descriptionMenu}
                           </div>
                         </div></div> : null}
                       />}
@@ -456,7 +478,7 @@ export function VoteEditorPage() {
                 ) : visibleVoters.slice((rosterPage-1)*rosterPageSize,rosterPage*rosterPageSize).map(voter=><tr key={voter.userId} className="border-t border-slate-100">
                   <td className="px-5 py-3">{voter.studentNumber}</td>
                   <td className="px-5 py-3">{voter.nameKo}</td>
-                  <td className="px-5 py-3">{voter.status ? <AdminStatusBadge tone={voter.status === "EXCLUDED" ? "danger" : voter.hasVoted ? "positive" : "neutral"}>{voter.status === "EXCLUDED" ? "제외" : voter.hasVoted ? "참여완료" : "미참여"}</AdminStatusBadge> : null}</td>
+                  <td className="px-5 py-3">{voter.status ? <AdminStatusBadge tone={voter.status === "EXCLUDED" ? "danger" : voter.hasVoted ? "positive" : "danger"}>{voter.status === "EXCLUDED" ? "제외" : voter.hasVoted ? "참여" : "미참여"}</AdminStatusBadge> : null}</td>
                   <td className="px-5 py-3">{formatVotedTime(voter.votedAt)}</td>
                   {rosterEditable ? <td className="px-5 py-3"><Button variant="ghost" size="sm" onClick={async()=>{try{if(voter.status === "EXCLUDED") await client.addVoteVoters(id!,{userIds:[voter.userId]});else await client.excludeVoteVoters(id!,[voter.userId]);setVoters(await client.listVoteVoters(id!));}catch{toast({type:"error",message:"명부를 수정하지 못했습니다."});}}}>{voter.status === "EXCLUDED" ? "복원" : "제외"}</Button></td> : null}
                 </tr>)}
@@ -485,13 +507,13 @@ export function VoteEditorPage() {
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700" htmlFor="vote-voter-search">학번 또는 이름 검색</label>
             <div className="flex gap-2">
-              <UiInput id="vote-voter-search" className="min-w-0 flex-1" autoFocus placeholder="학번, 이름, 이메일" value={candidateQuery} onChange={e=>setCandidateQuery(e.target.value)} onKeyDown={e=>{if(e.key === "Enter") { e.preventDefault(); void searchCandidates(); }}} />
-              <Button variant="outline" onClick={()=>void searchCandidates()}>검색</Button>
+              <UiInput id="vote-voter-search" className="min-w-0 flex-1" autoFocus placeholder="학번, 이름, 이메일" value={candidateQuery} onChange={e=>{setCandidateQuery(e.target.value);setSearchedCandidates(false);}} onKeyDown={e=>{if(e.key === "Enter") { e.preventDefault(); void searchCandidates(); }}} />
+              <Button variant="outline" disabled={searchingCandidates || !candidateQuery.trim()} onClick={()=>void searchCandidates()}>{searchingCandidates ? "검색 중…" : "검색"}</Button>
             </div>
           </div>
           <div className="space-y-2" aria-live="polite">
             {candidates.map(candidate=><button type="button" key={candidate.userId} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 text-left transition-colors hover:border-brand-primary/40 hover:bg-emerald-50/40" onClick={()=>void addCandidate(candidate.userId)}><span className="min-w-0 truncate font-medium text-slate-800">{candidate.nameKo}</span><span className="shrink-0 text-sm text-slate-500">{candidate.stdNo ?? "학번 없음"}</span></button>)}
-            {candidateQuery.trim() && candidates.length === 0 ? <p className="py-5 text-center text-sm text-slate-400">검색 결과가 없습니다.</p> : <p className="text-xs text-slate-400">검색 결과에서 추가할 회원을 선택하세요.</p>}
+            {searchedCandidates && candidates.length === 0 ? <p className="py-5 text-center text-sm text-slate-400">검색 결과가 없습니다.</p> : null}
           </div>
         </Modal>
 

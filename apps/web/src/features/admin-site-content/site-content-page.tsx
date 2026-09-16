@@ -447,8 +447,8 @@ function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onS
         {label ? <p className="text-sm font-medium text-slate-700">{label}</p> : null}
         <div className="group/image relative overflow-hidden rounded-lg border border-dashed border-slate-200 bg-slate-50" style={{ aspectRatio: `${spec.width} / ${spec.height}` }}>
           {previewUrl ? <img src={previewUrl} alt="" className="absolute inset-0 size-full object-contain" onError={() => setFailedPreviews((current) => ({ ...current, [key]: true }))} /> : null}
-          <label className={cn("absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-2 bg-slate-900/40 text-white transition-opacity focus-within:opacity-100", previewUrl ? "opacity-0 hover:opacity-100" : "bg-slate-100 text-slate-500 hover:bg-slate-200/70", uploading && "pointer-events-none")}>
-            <ImageUp className="size-6" />{uploading ? "업로드 중" : previewUrl ? "이미지 변경" : "이미지 업로드"}
+          <label className={cn("absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-2 bg-slate-900/40 text-white transition-opacity focus-within:opacity-100", previewUrl ? "opacity-0 hover:opacity-100" : "bg-slate-50 text-slate-500 hover:bg-slate-100/70", uploading && "pointer-events-none")}>
+            <ImageUp className="size-6" />{uploading ? "업로드 중" : previewUrl ? "이미지 변경" : "이미지를 업로드해주세요."}
             {!previewUrl && failedPreviews[key] ? <span className="text-xs text-rose-600">이미지를 불러오지 못했습니다.</span> : null}
             <input aria-label={`${label ?? spec.label} 업로드`} type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) select(file); }} />
           </label>

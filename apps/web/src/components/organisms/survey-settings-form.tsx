@@ -15,8 +15,8 @@ export const SURVEY_VISIBILITIES = [
 ];
 
 const SURVEY_AUDIENCE_OPTIONS = [
+  { value: "ANONYMOUS", label: "전체 공개 (로그인 불필요)" },
   { value: "AUTHENTICATED", label: "로그인한 사용자" },
-  { value: "ANONYMOUS", label: "로그인 없이 누구나" },
   { value: "PRIMARY_MAJOR", label: "전산학부 주전공자" },
   { value: "FEE_PAYER", label: "과비 납부자" },
 ];

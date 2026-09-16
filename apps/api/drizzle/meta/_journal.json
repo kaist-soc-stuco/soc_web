@@ -36,6 +36,13 @@
       "when": 1789160003000,
       "tag": "0004_clear_section_placeholder_titles",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789510000000,
+      "tag": "0005_vote_selection_rule",
+      "breakpoints": true
     }
   ]
 }

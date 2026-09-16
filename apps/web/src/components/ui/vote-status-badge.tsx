@@ -6,7 +6,7 @@ export function VoteStatusBadge({ status, startsAt, endsAt }: { status: string; 
   const { lang } = useLanguage();
   const now = nowMs();
   const labels = lang === "ko"
-    ? { draft: "초안", scheduled: "예정", open: "진행", ended: "마감", closed: "집계 대기", tallied: "종료" }
+    ? { draft: "초안", scheduled: "예정", open: "진행", ended: "마감", closed: "마감", tallied: "종료" }
     : { draft: "Draft", scheduled: "Scheduled", open: "Open", ended: "Ended", closed: "Awaiting tally", tallied: "Closed" };
   const config = status === "DRAFT"
     ? { label: labels.draft, tone: "neutral" as const }

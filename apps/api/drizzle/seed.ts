@@ -73,6 +73,10 @@ const db = drizzle(pool);
 const ASSET_UPLOAD_DIR =
   process.env.ASSET_UPLOAD_DIR ??
   path.resolve(process.cwd(), "uploads", "assets");
+
+const DEMO_ACCOUNT_KAIST_UID = "demo-author";
+const DEMO_ACCOUNT_EMAIL = "demo@invalid.local";
+const LEGACY_DEMO_ACCOUNT_KAIST_UIDS = ["DEV0001", "seed-council-author"] as const;
 type BoardSeed = {
   code: string;
   nameKo: string;
@@ -740,30 +744,21 @@ async function seedInitialAdminRole() {
   );
 }
 
-async function seedDemoAccount() {
+async function upsertDemoAccount() {
   const now = new Date();
-  const permissionRows = await db
-    .select({ permissionId: permissions.permissionId })
-    .from(permissions)
-    .where(eq(permissions.isActive, true));
-
-  if (permissionRows.length === 0) {
-    throw new Error("No active permissions found for dev admin seed");
-  }
-
-  const [devAdmin] = await db
+  const [demoAccount] = await db
     .insert(users)
     .values({
       academicStatus: null,
       departmentEn: "School of Computing",
       departmentKo: "전산학부",
-      email: "dev-admin@kaist.ac.kr",
+      email: DEMO_ACCOUNT_EMAIL,
       identityCode: "S",
       isActive: true,
-      kaistUid: "DEV0001",
+      kaistUid: DEMO_ACCOUNT_KAIST_UID,
       lastLoginAt: now,
-      nameEn: "Development Admin",
-      nameKo: "관리자",
+      nameEn: "SoC Student Council Demo",
+      nameKo: "전산학부 집행위원회 데모",
       primaryMajor: "전산학부",
       privacyConsentAt: now,
       stdNo: "20260001",
@@ -788,11 +783,11 @@ async function seedDemoAccount() {
     })
     .returning({ userId: users.userId });
 
-  if (!devAdmin) {
-    throw new Error("Failed to upsert dev admin user");
+  if (!demoAccount) {
+    throw new Error("Failed to upsert demo account");
   }
 
-
+  return demoAccount;
 }
 
 const recruitmentPosterSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
@@ -1302,7 +1297,7 @@ async function cleanupSeedContent() {
     where type in ('TOP_BANNER', 'QUICK_LINK', 'ORGANIZATION_CHART', 'PLEDGE')
       and created_by in (
         select user_id from users
-        where kaist_uid in ('seed-council-author', 'reference-faq')
+        where kaist_uid in ('demo-author', 'DEV0001', 'seed-council-author', 'reference-faq')
       )
   `);
 
@@ -1320,7 +1315,7 @@ async function cleanupSeedContent() {
     delete from survey
     where creator_id in (
       select user_id from users
-      where kaist_uid in ('seed-notice-author', 'seed-council-author')
+      where kaist_uid in ('seed-notice-author', 'demo-author', 'DEV0001', 'seed-council-author')
     )
   `);
 
@@ -1328,7 +1323,7 @@ async function cleanupSeedContent() {
     delete from article
     where author_user_id in (
       select user_id from users
-      where kaist_uid in ('seed-notice-author', 'seed-council-author')
+      where kaist_uid in ('seed-notice-author', 'demo-author', 'DEV0001', 'seed-council-author')
     )
   `);
 
@@ -1338,7 +1333,7 @@ async function cleanupSeedContent() {
       select vote_id from vote
       where creator_id in (
         select user_id from users
-        where kaist_uid = 'seed-council-author'
+        where kaist_uid in ('demo-author', 'DEV0001', 'seed-council-author')
       )
     )
   `);
@@ -1349,7 +1344,7 @@ async function cleanupSeedContent() {
       select vote_id from vote
       where creator_id in (
         select user_id from users
-        where kaist_uid = 'seed-council-author'
+        where kaist_uid in ('demo-author', 'DEV0001', 'seed-council-author')
       )
     )
   `);
@@ -1358,7 +1353,7 @@ async function cleanupSeedContent() {
     delete from vote
     where creator_id in (
       select user_id from users
-      where kaist_uid = 'seed-council-author'
+      where kaist_uid in ('demo-author', 'DEV0001', 'seed-council-author')
     )
   `);
 
@@ -1367,54 +1362,341 @@ async function cleanupSeedContent() {
     where storage_key like '/uploads/assets/seed-%'
       and uploaded_by in (
         select user_id from users
-        where kaist_uid in ('seed-notice-author', 'seed-council-author')
+        where kaist_uid in ('seed-notice-author', 'demo-author', 'DEV0001', 'seed-council-author')
       )
   `);
 
   await db.execute(sql`delete from users where kaist_uid = 'seed-notice-author'`);
 }
 
-async function upsertSeedAuthor() {
-  const seedAuthorResult = await db.execute<{ userId: string }>(sql`
-    insert into users (
-      kaist_uid,
-      name_ko,
-      name_en,
-      email,
-      dept_ko,
-      dept_en,
-      academic_status,
-      identity_code,
-      is_active
-    )
-    values (
-      'seed-council-author',
-      '전산학부 집행위원회',
-      'SoC Student Council',
-      'student-council@kaist.ac.kr',
-      '전산학부',
-      'School of Computing',
-      '운영',
-      'O',
-      true
-    )
-    on conflict (kaist_uid)
-    do update
-      set name_ko = excluded.name_ko,
-          name_en = excluded.name_en,
-          email = excluded.email,
-          dept_ko = excluded.dept_ko,
-          dept_en = excluded.dept_en,
-          academic_status = excluded.academic_status,
-          identity_code = excluded.identity_code,
-          updated_at = now()
-    returning user_id as "userId"
+async function prepareLegacyDemoAccounts() {
+  const legacyUidSql = sql.join(
+    LEGACY_DEMO_ACCOUNT_KAIST_UIDS.map((uid) => sql`${uid}`),
+    sql`, `,
+  );
+
+  // The old development account used the same student number as the new
+  // canonical account. Free it before the canonical upsert so the unique
+  // users.std_no constraint does not prevent the migration.
+  await db.execute(sql`
+    update users
+    set std_no = null
+    where kaist_uid in (${legacyUidSql})
+      and std_no = '20260001'
   `);
-  const seedAuthor = seedAuthorResult.rows[0];
-  if (!seedAuthor) {
-    throw new Error("Failed to upsert seed author");
-  }
-  return seedAuthor;
+}
+
+async function mergeLegacyDemoAccounts(demoUserId: string) {
+  const legacyAccounts = await db
+    .select({ userId: users.userId })
+    .from(users)
+    .where(inArray(users.kaistUid, [...LEGACY_DEMO_ACCOUNT_KAIST_UIDS]));
+  if (legacyAccounts.length === 0) return;
+
+  const legacyUserIdsSql = sql.join(
+    legacyAccounts.map((account) => sql`${account.userId}`),
+    sql`, `,
+  );
+
+  await db.transaction(async (tx) => {
+    // Keep the canonical account as the owner of any historical records left
+    // by the two legacy demo identities. Seed-owned posts, surveys, votes,
+    // and assets have already been removed by cleanupSeedContent; these
+    // updates cover login/audit metadata and any manually exercised demo
+    // paths without leaving foreign-key or orphaned-user rows behind.
+    await tx.execute(sql`
+      update user_role_group
+      set user_id = ${demoUserId}
+      where user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update user_role_group
+      set granted_by = ${demoUserId}
+      where granted_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update user_sanction
+      set user_id = ${demoUserId}
+      where user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update user_sanction
+      set issued_by = ${demoUserId}
+      where issued_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update user_sanction
+      set revoked_by = ${demoUserId}
+      where revoked_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      delete from student_fee_status legacy
+      using users legacy_user
+      where legacy.user_id = legacy_user.user_id
+        and legacy_user.kaist_uid in (${sql.join(
+          LEGACY_DEMO_ACCOUNT_KAIST_UIDS.map((uid) => sql`${uid}`),
+          sql`, `,
+        )})
+        and exists (
+          select 1 from student_fee_status canonical
+          where canonical.user_id = ${demoUserId}
+        )
+    `);
+    await tx.execute(sql`
+      update student_fee_status
+      set user_id = ${demoUserId}
+      where user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update student_fee_status
+      set verified_by = ${demoUserId}
+      where verified_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update student_fee_payment
+      set user_id = ${demoUserId}
+      where user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update student_fee_payment
+      set recorded_by = ${demoUserId}
+      where recorded_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      delete from student_fee_payment_batch legacy
+      using users legacy_user
+      where legacy.actor_user_id = legacy_user.user_id
+        and legacy_user.kaist_uid in (${sql.join(
+          LEGACY_DEMO_ACCOUNT_KAIST_UIDS.map((uid) => sql`${uid}`),
+          sql`, `,
+        )})
+        and exists (
+          select 1 from student_fee_payment_batch canonical
+          where canonical.actor_user_id = ${demoUserId}
+            and canonical.idempotency_key = legacy.idempotency_key
+        )
+    `);
+    await tx.execute(sql`
+      update student_fee_payment_batch
+      set actor_user_id = ${demoUserId}
+      where actor_user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update article_draft
+      set owner_user_id = ${demoUserId}
+      where owner_user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      delete from article_view legacy
+      using article_view canonical
+      where legacy.user_id in (${legacyUserIdsSql})
+        and canonical.article_id = legacy.article_id
+        and canonical.user_id = ${demoUserId}
+    `);
+    await tx.execute(sql`
+      update article_view
+      set user_id = ${demoUserId}
+      where user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      delete from article_engagement legacy
+      using article_engagement canonical
+      where legacy.user_id in (${legacyUserIdsSql})
+        and canonical.article_id = legacy.article_id
+        and canonical.kind = legacy.kind
+        and canonical.user_id = ${demoUserId}
+    `);
+    await tx.execute(sql`
+      update article_engagement
+      set user_id = ${demoUserId}
+      where user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update article
+      set author_user_id = ${demoUserId}
+      where author_user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update article
+      set hidden_by_user_id = ${demoUserId}
+      where hidden_by_user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update asset
+      set uploaded_by = ${demoUserId}
+      where uploaded_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update comment
+      set author_user_id = ${demoUserId}
+      where author_user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update comment
+      set hidden_by_user_id = ${demoUserId}
+      where hidden_by_user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      delete from comment_engagement legacy
+      using comment_engagement canonical
+      where legacy.user_id in (${legacyUserIdsSql})
+        and canonical.comment_id = legacy.comment_id
+        and canonical.kind = legacy.kind
+        and canonical.user_id = ${demoUserId}
+    `);
+    await tx.execute(sql`
+      update comment_engagement
+      set user_id = ${demoUserId}
+      where user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      delete from survey_responses legacy
+      using survey_responses canonical
+      where legacy.single_response_user_id in (${legacyUserIdsSql})
+        and canonical.survey_id = legacy.survey_id
+        and canonical.single_response_user_id = ${demoUserId}
+    `);
+    await tx.execute(sql`
+      update survey_responses
+      set user_id = ${demoUserId}
+      where user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update survey_responses
+      set single_response_user_id = ${demoUserId}
+      where single_response_user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update survey
+      set creator_id = ${demoUserId}
+      where creator_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update audit_log
+      set actor_user_id = ${demoUserId}
+      where actor_user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update bulk_email_template
+      set created_by = ${demoUserId}
+      where created_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      delete from bulk_email legacy
+      using bulk_email canonical
+      where legacy.sender_id in (${legacyUserIdsSql})
+        and legacy.idempotency_key is not null
+        and canonical.sender_id = ${demoUserId}
+        and canonical.idempotency_key = legacy.idempotency_key
+    `);
+    await tx.execute(sql`
+      update bulk_email
+      set sender_id = ${demoUserId}
+      where sender_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update content_block
+      set created_by = ${demoUserId}
+      where created_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update content_block
+      set updated_by = ${demoUserId}
+      where updated_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update content_block
+      set published_by = ${demoUserId}
+      where published_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update site_content
+      set updated_by = ${demoUserId}
+      where updated_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update calendar_event
+      set override_updated_by_user_id = ${demoUserId}
+      where override_updated_by_user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update calendar_event
+      set created_by_user_id = ${demoUserId}
+      where created_by_user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update notification
+      set user_id = ${demoUserId}
+      where user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update notification
+      set actor_user_id = ${demoUserId}
+      where actor_user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      delete from vote_voter legacy
+      using vote_voter canonical
+      where legacy.user_id in (${legacyUserIdsSql})
+        and canonical.vote_id = legacy.vote_id
+        and canonical.user_id = ${demoUserId}
+    `);
+    await tx.execute(sql`
+      update vote_voter
+      set user_id = ${demoUserId}
+      where user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update vote
+      set creator_id = ${demoUserId}
+      where creator_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update roadmap_offering
+      set imported_by = ${demoUserId}
+      where imported_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update roadmap_term
+      set imported_by = ${demoUserId}
+      where imported_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update student_fee_policy
+      set created_by = ${demoUserId}
+      where created_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update asset_upload_reservation
+      set uploaded_by = ${demoUserId}
+      where uploaded_by in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      update executive_contact
+      set portal_user_id = ${demoUserId}
+      where portal_user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      delete from survey_response_subscription legacy
+      using survey_response_subscription canonical
+      where legacy.user_id in (${legacyUserIdsSql})
+        and canonical.survey_id = legacy.survey_id
+        and canonical.user_id = ${demoUserId}
+    `);
+    await tx.execute(sql`
+      update survey_response_subscription
+      set user_id = ${demoUserId}
+      where user_id in (${legacyUserIdsSql})
+    `);
+    await tx.execute(sql`
+      delete from users
+      where user_id in (${legacyUserIdsSql})
+    `);
+  });
+
+  console.log(
+    `Merged ${legacyAccounts.length} legacy demo account(s) into ${DEMO_ACCOUNT_KAIST_UID}`,
+  );
 }
 
 async function seedReferenceFaqs() {
@@ -2146,7 +2428,7 @@ type SeedVoteDefinition = {
 
 async function createSeedVote(
   creatorId: string,
-  devAdmin: {
+  demoAccount: {
     userId: string;
     nameKo: string;
     stdNo: string | null;
@@ -2214,12 +2496,12 @@ async function createSeedVote(
 
   await db.insert(voteVoters).values({
     voteId: vote.voteId,
-    userId: devAdmin.userId,
-    nameKo: devAdmin.nameKo,
-    studentNumber: devAdmin.stdNo,
-    email: devAdmin.email,
-    primaryMajor: devAdmin.primaryMajor,
-    academicStatus: devAdmin.academicStatus,
+    userId: demoAccount.userId,
+    nameKo: demoAccount.nameKo,
+    studentNumber: demoAccount.stdNo,
+    email: demoAccount.email,
+    primaryMajor: demoAccount.primaryMajor,
+    academicStatus: demoAccount.academicStatus,
     feeStatus: null,
     status: "ELIGIBLE",
     source: "FILTER",
@@ -2229,7 +2511,7 @@ async function createSeedVote(
 }
 
 async function seedVotes(creatorId: string) {
-  const [devAdmin] = await db
+  const [demoAccount] = await db
     .select({
       userId: users.userId,
       nameKo: users.nameKo,
@@ -2239,11 +2521,11 @@ async function seedVotes(creatorId: string) {
       academicStatus: users.academicStatus,
     })
     .from(users)
-    .where(eq(users.kaistUid, "DEV0001"))
+    .where(eq(users.kaistUid, DEMO_ACCOUNT_KAIST_UID))
     .limit(1);
 
-  if (!devAdmin) {
-    console.log("Dev admin not found, skipping vote seed");
+  if (!demoAccount) {
+    console.log("Demo account not found, skipping vote seed");
     return;
   }
 
@@ -2325,7 +2607,7 @@ async function seedVotes(creatorId: string) {
   ];
 
   for (const definition of definitions) {
-    await createSeedVote(creatorId, devAdmin, definition);
+    await createSeedVote(creatorId, demoAccount, definition);
   }
 
   console.log(`Seeded ${definitions.length} votes with one eligible voter each`);
@@ -2501,7 +2783,9 @@ async function seedMockData() {
   }
 
   await cleanupSeedContent();
-  const seedAuthor = await upsertSeedAuthor();
+  await prepareLegacyDemoAccounts();
+  const seedAuthor = await upsertDemoAccount();
+  await mergeLegacyDemoAccounts(seedAuthor.userId);
   await seedAboutPageContent(seedAuthor.userId);
 
   const detailedNoticeContent = [
@@ -3364,9 +3648,9 @@ async function seedMockData() {
 async function seedOngoingVote() {
   const title = "[데모] 학생회 사업 추진 찬반 투표";
   if ((await db.select().from(votes).where(eq(votes.titleKo, title))).length) return;
-  const [admin] = await db.select().from(users).where(eq(users.kaistUid, "DEV0001"));
-  if (!admin) throw new Error("Development admin is required");
-  await createSeedVote(admin.userId, admin, {
+  const [demoAccount] = await db.select().from(users).where(eq(users.kaistUid, DEMO_ACCOUNT_KAIST_UID));
+  if (!demoAccount) throw new Error("Demo account is required");
+  await createSeedVote(demoAccount.userId, demoAccount, {
     titleKo: title, titleEn: "Student council initiative vote",
     descriptionKo: "로컬 테스트용 투표입니다.", descriptionEn: "Local demonstration election.",
     startsAt: new Date(Date.now() - 86400000), endsAt: new Date(Date.now() + 7 * 86400000),
@@ -3400,7 +3684,6 @@ async function main() {
     await seedBoards();
     await seedOperationalSurveys();
     if (seedMode === "demo") {
-      await seedDemoAccount();
       await seedMockData();
     }
     await seedReferenceFaqs();

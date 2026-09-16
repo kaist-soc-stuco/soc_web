@@ -141,6 +141,12 @@ export interface StudentFeeStatsResponse {
     unpaidStudents: number;
     paymentRate: number;
     paidAmount: number;
+    /** Total amount recorded in the fee ledger, independent of the selected trend range. */
+    collectedAmount: number;
+    /** Expected amount for the current target population and fee policy. */
+    targetAmount: number;
+    /** max(targetAmount - collectedAmount, 0). */
+    outstandingAmount: number;
   };
   trend: Array<{
     period: string;

@@ -610,20 +610,20 @@ function QuestionRowContent({
   if (isSurveyDisplayBlock(question.questionType)) {
     return (
       <div className="min-w-0">
-        <div className="break-words text-xl font-normal leading-7 text-slate-900">
+        <div className="break-words text-[length:var(--ui-builder-title-size)] font-normal leading-7 text-slate-900">
           {plainText(question.titleKo) || "제목 없음"}
           {question.titleEn?.trim() ? (
             <span className="ml-1 font-normal"> / {plainText(question.titleEn)}</span>
           ) : null}
         </div>
-        {question.descriptionKo?.trim() || question.descriptionEn?.trim() ? (
-          <div className="mt-2 break-words text-base font-normal leading-6 text-slate-600">
+        {(
+          <div className={`mt-2 break-words text-[length:var(--ui-builder-text-size)] font-normal leading-6 ${plainText(question.descriptionKo) ? "text-slate-600" : "text-slate-400"}`}>
             {plainText(question.descriptionKo) || "설명"}
             {question.descriptionEn?.trim() ? (
               <span className="ml-1"> / {plainText(question.descriptionEn)}</span>
             ) : null}
           </div>
-        ) : null}
+        )}
       </div>
     );
   }
@@ -631,7 +631,7 @@ function QuestionRowContent({
   return (
     <div className="min-w-0">
       <div className="flex min-w-0 items-center gap-1">
-        <span className="min-w-0 truncate text-base font-medium text-slate-900">
+        <span className="min-w-0 truncate text-[length:var(--ui-builder-text-size)] font-normal text-slate-900">
           {plainText(question.titleKo) || "질문"}
           {question.titleEn?.trim() ? (
             <span className="ml-1 font-normal"> / {plainText(question.titleEn)}</span>
@@ -1249,6 +1249,17 @@ export function SurveyEditorPage() {
     else { setSettingsFuture(source.slice(0, -1)); setSettingsPast(items => [...items, current]); }
     historyApplying.current = true; form.reset(value); historyApplying.current = false;
   };
+  useEffect(() => {
+    const handle = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key !== "z" && key !== "y") return;
+      if ((event.target as HTMLElement)?.closest("input,textarea,[contenteditable=true]")) return;
+      event.preventDefault(); restoreSettings(key === "y" || event.shiftKey ? "redo" : "undo");
+    };
+    window.addEventListener("keydown", handle); return () => window.removeEventListener("keydown", handle);
+  });
+
   const [responseCount, setResponseCount] = useState(0);
   useEffect(() => { if (loadedSurveyId) void client.getSurveyDetail(loadedSurveyId).then(detail => setResponseCount(detail.responseCount ?? 0)); }, [loadedSurveyId, tab]);
   const surveyAction = async (action: "duplicate" | "close" | "delete") => {
@@ -2197,7 +2208,7 @@ export function SurveyEditorPage() {
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
       <AdminPageShell>
         {ConfirmDialog}
-        <main className="admin-page__main admin-survey-editor mx-auto flex w-full max-w-[64rem] flex-col gap-5 px-4 py-6 sm:px-5 md:gap-6 md:px-8 md:py-7 xl:px-10">
+        <main className="admin-page__main admin-survey-editor mx-auto flex w-full max-w-[76rem] flex-col gap-5 px-4 pb-6 pt-0 sm:px-5 md:gap-6 md:px-8 md:pb-7 xl:px-10">
 
           <div data-survey-editor-header className="sticky top-0 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-1 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
           <AdminPageHeader
@@ -2226,11 +2237,11 @@ export function SurveyEditorPage() {
                 </span>}</span>}
             actions={
               <div className="survey-editor-header-actions flex items-center gap-1">
-                <IconButton aria-label="실행 취소" disabled={saving} onClick={event => { if (event.detail === 0) restoreSettings("undo"); }} onMouseDown={event => { event.preventDefault(); if (document.activeElement?.getAttribute("contenteditable") === "true") document.execCommand("undo"); else restoreSettings("undo"); }}><Undo2 className="size-4" /></IconButton>
-                <IconButton aria-label="다시 실행" disabled={saving} onClick={event => { if (event.detail === 0) restoreSettings("redo"); }} onMouseDown={event => { event.preventDefault(); if (document.activeElement?.getAttribute("contenteditable") === "true") document.execCommand("redo"); else restoreSettings("redo"); }}><Redo2 className="size-4" /></IconButton>
+                <IconButton data-tooltip="실행 취소" aria-label="실행 취소" disabled={saving} onClick={event => { if (event.detail === 0) restoreSettings("undo"); }} onMouseDown={event => { event.preventDefault(); if (document.activeElement?.getAttribute("contenteditable") === "true") document.execCommand("undo"); else restoreSettings("undo"); }}><Undo2 className="size-4" /></IconButton>
+                <IconButton data-tooltip="다시 실행" aria-label="다시 실행" disabled={saving} onClick={event => { if (event.detail === 0) restoreSettings("redo"); }} onMouseDown={event => { event.preventDefault(); if (document.activeElement?.getAttribute("contenteditable") === "true") document.execCommand("redo"); else restoreSettings("redo"); }}><Redo2 className="size-4" /></IconButton>
                 {loadedSurveyId ? <>
-                  <IconButton aria-label="링크 복사" className="border-0 text-slate-600" onClick={() => void navigator.clipboard.writeText(`${window.location.origin}/survey/${loadedSurveyId}`).then(() => toast({ type: "success", message: "설문 링크를 복사했습니다." })).catch(() => toast({ type: "error", message: "링크를 복사하지 못했습니다." }))}><Link2 className="size-5" /></IconButton>
-                  <IconButton aria-label="미리보기" className="border-0 text-slate-600" onClick={() => window.open(`/survey/${loadedSurveyId}?preview=1`, "_blank", "noopener,noreferrer")}><Eye className="size-5" /></IconButton>
+                  <IconButton data-tooltip="응답자 링크 복사" aria-label="응답자 링크 복사" className="border-0 text-slate-600" onClick={() => void navigator.clipboard.writeText(`${window.location.origin}/survey/${loadedSurveyId}`).then(() => toast({ type: "success", message: "설문 링크를 복사했습니다." })).catch(() => toast({ type: "error", message: "링크를 복사하지 못했습니다." }))}><Link2 className="size-5" /></IconButton>
+                  <IconButton data-tooltip="미리보기" aria-label="미리보기" className="border-0 text-slate-600" onClick={() => window.open(`/survey/${loadedSurveyId}?preview=1`, "_blank", "noopener,noreferrer")}><Eye className="size-5" /></IconButton>
 
                   <DropdownMenu.Root modal={false}><DropdownMenu.Trigger asChild><IconButton aria-label="설문 더보기" className="text-slate-600"><MoreVertical className="size-5" /></IconButton></DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[100] min-w-52 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{(["duplicate", "close", "delete"] as const).map(action => <DropdownMenu.Item key={action} className="flex cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm text-slate-800 outline-none focus:bg-slate-100" onSelect={() => void surveyAction(action)}>{action === "duplicate" ? <Copy className="size-4" /> : action === "close" ? <Archive className="size-4" /> : <Trash2 className="size-4" />}{action === "duplicate" ? "사본 만들기(복제)" : action === "close" ? "설문 게시 취소(마감)" : "삭제"}</DropdownMenu.Item>)}</DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
                 </> : null}

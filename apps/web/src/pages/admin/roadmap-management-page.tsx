@@ -129,6 +129,7 @@ function RoadmapManagementPageContent() {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [importGuideOpen, setImportGuideOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<AdminRoadmapOfferingListResponse>({
     courses: [],
@@ -271,13 +272,16 @@ function RoadmapManagementPageContent() {
 
   return (
     <AdminPageShell>
+      <Modal open={importGuideOpen} onClose={() => setImportGuideOpen(false)} title="전체개설교과목 목록 불러오기" className="max-w-lg" footer={<><Button variant="outline" onClick={() => setImportGuideOpen(false)}>취소</Button><Button onClick={() => {setImportGuideOpen(false);inputRef.current?.click();}}>파일 선택</Button></>}>
+        <div className="space-y-4 text-sm leading-6"><p>학사 시스템에서 내려받은 전체개설교과목 목록 엑셀 파일을 준비해 주세요.</p><p className="text-slate-500">열 이름과 순서를 변경하지 마세요. 파일을 선택한 뒤 과목·분반별 변경 내용을 검토하고 반영할 수 있습니다.</p></div>
+      </Modal>
       <AdminPageMain className="admin-roadmap-management">
         <AdminPageHeader
           title="로드맵 관리"
           actions={
             <>
               <input ref={inputRef} type="file" accept={EXCEL_ACCEPT} className="sr-only" onChange={(event) => void handleImportFile(event)} />
-              <Button type="button" variant="outline" onClick={() => inputRef.current?.click()}>
+              <Button type="button" variant="outline" onClick={() => setImportGuideOpen(true)}>
                 <Upload aria-hidden="true" /> 불러오기 (전체개설교과목 목록)
               </Button>
             </>

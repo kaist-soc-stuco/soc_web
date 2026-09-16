@@ -19,7 +19,7 @@ const permissionIdFor = (bit) =>
   permissionRecords.find((permission) => permission.bitValue === bit).permissionId;
 
 function createHarness({ actorMask = Permissions.MANAGE_ROLES, systemAdmin = false, target } = {}) {
-  const calls = { create: 0, add: 0, audit: [] };
+  const calls = { create: 0, add: 0, replace: 0, audit: [] };
   const repository = {
     listPermissions: async () => permissionRecords,
     isSystemAdministrator: async () => systemAdmin,
@@ -45,6 +45,10 @@ function createHarness({ actorMask = Permissions.MANAGE_ROLES, systemAdmin = fal
     addUserToRoleGroup: async (roleGroupId, input) => {
       calls.add += 1;
       return { roleGroupId, userId: input.userId };
+    },
+    replaceRoleGroupMembers: async (roleGroupId, userIds) => {
+      calls.replace += 1;
+      return userIds.map((userId) => ({ roleGroupId, userId }));
     },
   };
   const usersService = {
@@ -91,6 +95,32 @@ test("delegated managers can grant only non-reserved permissions they hold", asy
 
   assert.equal(calls.create, 1);
   assert.equal(created.permissionMask, Permissions.WRITE_OFFICIAL);
+});
+
+test("role managers can add themselves to a delegable role", async () => {
+  const target = {
+    isSystem: false,
+    permissionMask: Permissions.WRITE_OFFICIAL,
+    roleGroupId: 10,
+  };
+  const { calls, service } = createHarness({
+    actorMask: Permissions.MANAGE_ROLES | Permissions.WRITE_OFFICIAL,
+    target,
+  });
+
+  await service.addUserToRoleGroup(
+    target.roleGroupId,
+    { userId: "manager" },
+    { actorUserId: "manager" },
+  );
+  await service.replaceRoleGroupMembers(
+    target.roleGroupId,
+    { userIds: ["manager"] },
+    { actorUserId: "manager" },
+  );
+
+  assert.equal(calls.add, 1);
+  assert.equal(calls.replace, 1);
 });
 
 test("only an explicitly provisioned system administrator can mutate system roles", async () => {

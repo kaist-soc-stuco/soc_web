@@ -1,9 +1,10 @@
+import { BackToListLink } from "@/components/ui/back-to-list-link";
 import type {
   ArticleDetailResponse,
   ArticleAssetItem,
   ArticleEngagementKind,
 } from "@soc/contracts";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, ClipboardCheck, Edit2, EllipsisVertical, Eye, EyeOff, Share2, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ClipboardCheck, Edit2, EllipsisVertical, Eye, EyeOff, Share2, Trash2 } from "lucide-react";
 import { isoToDate } from "@soc/shared";
 import { Link } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -299,15 +300,7 @@ export function BoardDetailBackLink({
   lang: string;
   to?: string;
 }) {
-  return (
-    <Link
-      to={to ?? `/board/${category}`}
-      className="inline-flex min-h-11 items-center gap-1.5 self-start rounded-md px-2.5 text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
-    >
-      <ArrowLeft className="size-4" aria-hidden="true" />
-      {lang === "ko" ? "목록으로" : "Back to list"}
-    </Link>
-  );
+  return <BackToListLink to={to ?? `/board/${category}`} lang={lang} />;
 }
 
 type AdjacentArticle = NonNullable<ArticleDetailResponse["prevArticle"]>;

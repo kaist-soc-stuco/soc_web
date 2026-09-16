@@ -1,16 +1,15 @@
 import type { StudentFeeStatsResponse } from "@soc/contracts";
 
 import { AdminCard, AdminEmptyState } from "@/components/ui/admin-page";
-import { Button } from "@/components/ui/button";
-import { UiInput } from "@/components/ui/form-control";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 
-type PeriodPreset = "30d" | "90d" | "year" | "custom";
+type FeeSemesterOption = { value: string; label: string };
 
 const formatCurrency = (value: number) => `${value.toLocaleString("ko-KR")}원`;
 const compactCurrency = (value: number) => value >= 100_000_000 ? `${Math.round(value / 10_000_000) / 10}억원` : value >= 10_000 ? `${Math.round(value / 1_000) / 10}만원` : `${value.toLocaleString("ko-KR")}원`;
 
 function FeeTrendChart({ data }: { data: StudentFeeStatsResponse["trend"] }) {
-  if (data.length === 0) return <AdminEmptyState message="선택한 기간에 등록된 납부 내역이 없습니다." className="py-20" />;
+  if (data.length === 0) return <AdminEmptyState message="선택한 학기에 등록된 납부 내역이 없습니다." className="py-20" />;
   const width = 900;
   const height = 250;
   const left = 46;
@@ -28,7 +27,7 @@ function FeeTrendChart({ data }: { data: StudentFeeStatsResponse["trend"] }) {
 
   return (
     <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-auto min-w-[680px] w-full" role="img" aria-label="기간별 납부 금액과 누적 금액 추이">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-auto min-w-[680px] w-full" role="img" aria-label="선택 학기의 납부 금액과 누적 금액 추이">
         {[0, 0.5, 1].map((ratio) => {
           const gridY = top + chartHeight * ratio;
           const value = maximum * (1 - ratio);
@@ -41,56 +40,54 @@ function FeeTrendChart({ data }: { data: StudentFeeStatsResponse["trend"] }) {
         <polyline points={points} fill="none" stroke="#176b51" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         {data.map((item, index) => <circle key={`${item.period}-point`} cx={x(index)} cy={y(item.cumulativeAmount)} r="2.5" fill="#176b51"><title>{`${item.period} 누적 · ${formatCurrency(item.cumulativeAmount)}`}</title></circle>)}
       </svg>
-      <div className="mt-2 flex justify-end gap-4 text-xs font-normal text-[#344054]"><span className="inline-flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-[#a9cfbf]" />기간 납부액</span><span className="inline-flex items-center gap-1.5"><i className="h-0.5 w-4 bg-[#176b51]" />누적 납부액</span></div>
+      <div className="mt-2 flex justify-end gap-4 text-xs font-normal text-[#344054]"><span className="inline-flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-[#a9cfbf]" />선택 학기 납부액</span><span className="inline-flex items-center gap-1.5"><i className="h-0.5 w-4 bg-[#176b51]" />누적 납부액</span></div>
     </div>
   );
 }
 
 export function FeeStatisticsPanel({
-  dateFrom,
-  dateTo,
+  semester,
+  semesterOptions,
   loading,
-  onDateFromChange,
-  onDateToChange,
-  onPresetChange,
-  preset,
+  onSemesterChange,
   stats,
 }: {
-  dateFrom: string;
-  dateTo: string;
+  semester: string;
+  semesterOptions: readonly FeeSemesterOption[];
   loading: boolean;
-  onDateFromChange: (value: string) => void;
-  onDateToChange: (value: string) => void;
-  onPresetChange: (value: PeriodPreset) => void;
-  preset: PeriodPreset;
+  onSemesterChange: (value: string) => void;
   stats: StudentFeeStatsResponse | null;
 }) {
+  const totals = stats?.totals ?? {
+    totalStudents: 0,
+    paidStudents: 0,
+    partialStudents: 0,
+    unpaidStudents: 0,
+    paymentRate: 0,
+    paidAmount: 0,
+    collectedAmount: 0,
+    targetAmount: 0,
+    outstandingAmount: 0,
+  };
+  const collectedAmount = totals.collectedAmount ?? totals.paidAmount;
+
   return (
     <div className="space-y-4">
-      <AdminCard className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {([["30d", "최근 30일"], ["90d", "최근 90일"], ["year", "올해"]] as const).map(([value, label]) => <Button key={value} type="button" size="sm" variant={preset === value ? "secondary" : "ghost"} className="!font-normal" onClick={() => onPresetChange(value)}>{label}</Button>)}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <UiInput aria-label="조회 시작일" type="date" value={dateFrom} onChange={(event) => onDateFromChange(event.currentTarget.value)} className="w-40" />
-          <span className="text-xs font-normal text-[#344054]">—</span>
-          <UiInput aria-label="조회 종료일" type="date" value={dateTo} onChange={(event) => onDateToChange(event.currentTarget.value)} className="w-40" />
-        </div>
+      <AdminCard className="flex min-w-0 flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="shrink-0"><p className="text-xs font-medium text-slate-500">조회 기준 학기</p><p className="mt-1 text-sm font-medium text-slate-900">원장과 수납 현황을 학기별로 확인합니다.</p></div>
+        <div className="min-w-0 max-w-full overflow-x-auto"><SegmentedControl<string> ariaLabel="납부 통계 학기" value={semester} onChange={onSemesterChange} className="w-max min-w-full" options={semesterOptions} /></div>
       </AdminCard>
 
-      {!stats ? <div aria-busy="true" className="min-h-20" /> : <AdminCard className={loading ? "grid divide-y divide-[#e5eaf0] opacity-60 transition-opacity md:grid-cols-4 md:divide-x md:divide-y-0" : "grid divide-y divide-[#e5eaf0] md:grid-cols-4 md:divide-x md:divide-y-0"}>{[
-        ["납부 금액", formatCurrency(stats.totals.paidAmount)],
-        ["납부 건수", `${stats.totals.paymentCount.toLocaleString("ko-KR")}건`],
-        ["납부 학생", `${stats.totals.paidStudentCount.toLocaleString("ko-KR")}명`],
-        ["납부 학생 비율", `${stats.totals.paymentRate}%`],
-      ].map(([label, value]) => <div key={label} className="px-5 py-4"><p className="text-xs font-normal text-[#344054]">{label}</p><p className="mt-1.5 text-lg font-medium tabular-nums text-[#172033]">{value}</p></div>)}</AdminCard>}
-
-      <AdminCard className="p-5">
-        <div className="mb-5"><h2 className="text-[length:var(--ui-text-section-size)] font-medium text-[var(--ui-text-strong)]">기간별 납부 추이</h2></div>
-        {!stats ? <div aria-busy="true" className="min-h-64" /> : <div className={loading ? "opacity-60 transition-opacity" : undefined}><FeeTrendChart data={stats.trend} /></div>}
-      </AdminCard>
+      {!stats ? <div aria-busy="true" className="min-h-20" /> : <AdminCard className={loading ? "overflow-hidden opacity-60 transition-opacity" : "overflow-hidden"}>
+        <div className="grid divide-y divide-[#e5eaf0] md:grid-cols-3 md:divide-x md:divide-y-0">
+          <div className="px-5 py-4"><p className="text-xs font-normal text-[#344054]">총 수납액</p><p className="mt-1.5 text-lg font-medium tabular-nums text-[#172033]">{formatCurrency(collectedAmount)}</p><p className="mt-1 text-xs font-normal tabular-nums text-slate-500">목표 {formatCurrency(totals.targetAmount)} · 미수금 {formatCurrency(totals.outstandingAmount)}</p></div>
+          <div className="px-5 py-4"><p className="text-xs font-normal text-[#344054]">완납</p><p className="mt-1.5 text-lg font-medium tabular-nums text-[#172033]">{totals.paidStudents.toLocaleString("ko-KR")}명 <span className="text-sm font-normal text-slate-500">/ {totals.totalStudents.toLocaleString("ko-KR")}명</span></p><p className="mt-1 text-xs font-normal tabular-nums text-slate-500">완납률 {totals.paymentRate}%</p></div>
+          <div className="px-5 py-4"><p className="text-xs font-normal text-[#344054]">부분 납부</p><p className="mt-1.5 text-lg font-medium tabular-nums text-[#172033]">{totals.partialStudents.toLocaleString("ko-KR")}명</p><p className="mt-1 text-xs font-normal tabular-nums text-slate-500">미납 {totals.unpaidStudents.toLocaleString("ko-KR")}명</p></div>
+        </div>
+        <div className="border-t border-[#e5eaf0] p-5"><div className="mb-5"><h2 className="text-[length:var(--ui-text-section-size)] font-medium text-[var(--ui-text-strong)]">선택 학기 납부 추이</h2></div><FeeTrendChart data={stats.trend} /></div>
+      </AdminCard>}
     </div>
   );
 }
 
-export type { PeriodPreset };
+export type { FeeSemesterOption };

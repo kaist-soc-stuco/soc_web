@@ -259,7 +259,7 @@ function BulkEmailPageContent() {
     return entries;
   }, [filters]);
   const selectedRecipientLabel =
-    RECIPIENT_TYPES.find((option) => option.value === recipientType)?.label ?? "받는 사람";
+    RECIPIENT_TYPES.find((option) => option.value === recipientType)?.label ?? "수신자";
   const previewVariables = {
     이름: currentUser?.nameKo || session?.nameKo || "",
     학번: currentUser?.studentNumber ?? "",
@@ -436,7 +436,7 @@ function BulkEmailPageContent() {
       setReviewPreview(await apiClient.previewBulkEmailRecipients(buildRequest()));
       setReviewOpen(true);
     } catch {
-      setOperationError("발송 전 받는 사람을 확인하지 못했습니다.");
+      setOperationError("발송 전 수신자를 확인하지 못했습니다.");
     } finally {
       setSending(false);
     }
@@ -748,10 +748,10 @@ function BulkEmailPageContent() {
                 onDismiss={() => setDraftNoticeVisible(false)}
               />
             ) : null}
-            <section className="border-b border-slate-100 pb-5" aria-label="받는 사람">
+            <section className="border-b border-slate-100 pb-5" aria-label="수신자">
               <div className="flex min-h-10 flex-wrap items-start justify-between gap-3 sm:items-center sm:gap-4">
                 <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-                  <span className="shrink-0 text-sm font-medium text-slate-600">받는 사람:</span>
+                  <span className="shrink-0 text-sm font-medium text-slate-600">수신자:</span>
                   <RecipientToken label={selectedRecipientLabel} onRemove={() => setRecipientType("ALL")} />
                   {activeFilterEntries.map((entry) => (
                     <RecipientToken
@@ -807,7 +807,7 @@ function BulkEmailPageContent() {
                   </DropdownMenu.Root>
                 </div>
                 <span className="w-full shrink-0 text-right text-sm font-normal text-slate-500 sm:w-auto sm:whitespace-nowrap">
-                  받는 사람: {recipientCountLoading ? "계산 중…" : recipientCount === null ? "—" : `총 ${recipientCount}명`}
+                  수신자: {recipientCountLoading ? "계산 중…" : recipientCount === null ? "—" : `총 ${recipientCount}명`}
                 </span>
               </div>
             </section>
@@ -841,9 +841,9 @@ function BulkEmailPageContent() {
                   uploading={uploading}
                   variableLabel="변수 삽입"
                   variableOptions={[
-                    { label: "받는 사람 이름", token: "{{이름}}" },
-                    { label: "받는 사람 이메일", token: "{{이메일}}" },
-                    { label: "받는 사람 학번", token: "{{학번}}" },
+                    { label: "수신자 이름", token: "{{이름}}" },
+                    { label: "수신자 이메일", token: "{{이메일}}" },
+                    { label: "수신자 학번", token: "{{학번}}" },
                   ]}
                   toolbarSuffix={editorModeTabs}
                 />
@@ -1027,11 +1027,11 @@ function BulkEmailPageContent() {
 
             <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
               <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2">
-                <dt className="leading-6 text-slate-500">받는 사람</dt>
+                <dt className="leading-6 text-slate-500">수신자</dt>
                 <dd className="min-w-0 leading-6 text-slate-800">{[selectedRecipientLabel, ...activeFilterEntries.map((entry) => entry.tokenLabel)].join(", ")} <span className="whitespace-nowrap font-semibold">· 총 {reviewPreview.recipientCount}명</span></dd>
                 <dt className="leading-6 text-slate-500">발송 방식</dt><dd className="leading-6">{deliveryMode === "now" ? "즉시 발송" : "예약 발송"}</dd>
               </dl>
-              <div className="mt-3 max-h-28 overflow-y-auto border-t border-slate-200 pt-3 text-xs leading-6 text-slate-600" aria-label="받는 사람 명단">
+              <div className="mt-3 max-h-28 overflow-y-auto border-t border-slate-200 pt-3 text-xs leading-6 text-slate-600" aria-label="수신자 명단">
                 {reviewPreview.sample.map((sample) => <div key={sample.email} className="break-all">{sample.nameKo} &lt;{sample.email}&gt;</div>)}
                 {reviewPreview.recipientCount > reviewPreview.sample.length ? <p>외 {reviewPreview.recipientCount - reviewPreview.sample.length}명</p> : null}
               </div>
@@ -1039,7 +1039,7 @@ function BulkEmailPageContent() {
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white" aria-label="미리보기">
               <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-b border-slate-100 p-4 text-sm">
                 <dt className="text-slate-500">제목</dt><dd className="break-words font-medium">{previewSubject}</dd>
-                <dt className="text-slate-500">받는 사람</dt><dd className="break-all">{previewVariables.이름} &lt;{previewVariables.이메일}&gt;</dd>
+                <dt className="text-slate-500">수신자</dt><dd className="break-all">{previewVariables.이름} &lt;{previewVariables.이메일}&gt;</dd>
               </dl>
               <div className="max-h-72 overflow-y-auto p-4"><RichTextContent content={previewContent} className="text-sm leading-6 text-slate-700" /></div>
             </section>

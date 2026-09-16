@@ -70,11 +70,20 @@ export function VotePage() {
     return () => { active = false; window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
   }, [client, id]);
 
+  const selectionError = (item: VoteDetailResponse["items"][number]) => {
+    const count = answers[item.id]?.length ?? 0;
+    if (!count) return lang === "ko" ? "필수 입력란입니다." : "This question is required.";
+    const rule = item.selectionRule ?? "max";
+    if (item.type === "MULTIPLE_CHOICE" && ((rule !== "min" && count > item.maxSelections) || (rule !== "max" && count < item.maxSelections))) {
+      return lang === "ko" ? `${rule === "min" ? "최소" : rule === "exact" ? "정확히" : "최대"} ${item.maxSelections}개를 선택해 주세요.` : `Select ${rule === "min" ? "at least" : rule === "exact" ? "exactly" : "at most"} ${item.maxSelections} options.`;
+    }
+    return undefined;
+  };
   const submit = async () => {
     if (isPreview) return;
-    if (!vote || vote.items.some((item) => !(answers[item.id]?.length))) {
+    if (!vote || vote.items.some(item => selectionError(item))) {
       setValidationAttempted(true);
-      const missing = vote?.items.find((item) => !answers[item.id]?.length);
+      const missing = vote?.items.find(item => selectionError(item));
       if (missing) document.getElementById(`vote-card-${missing.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
@@ -161,11 +170,11 @@ export function VotePage() {
                   questionType: item.type === "MULTIPLE_CHOICE" ? "multiple_choice" : "single_choice", config: null,
                   options: item.options.map(option => ({ value: option.id, labelKo: option.labelKo, labelEn: option.labelEn ?? undefined, imageUrlKo: option.imageUrl, imageUrlEn: option.imageUrl })) }}
                 value={item.type === "MULTIPLE_CHOICE" ? answers[item.id] ?? [] : answers[item.id]?.[0] ?? ""}
-                onChange={value => setAnswers(current => ({ ...current, [item.id]: Array.isArray(value) ? value.slice(0, item.maxSelections) : typeof value === "string" ? [value] : [] }))}
+                onChange={value => setAnswers(current => ({ ...current, [item.id]: Array.isArray(value) ? value.slice(0, item.selectionRule === "min" ? item.options.length : item.maxSelections) : typeof value === "string" ? [value] : [] }))}
                 disabled={submitting}
-                maxSelections={item.type === "MULTIPLE_CHOICE" ? item.maxSelections : undefined}
-                hint={item.type === "MULTIPLE_CHOICE" ? lang === "ko" ? `최대 ${item.maxSelections}개 선택` : `Select up to ${item.maxSelections}` : undefined}
-                error={validationAttempted && !answers[item.id]?.length ? lang === "ko" ? "이 안건에 기표해 주세요." : "Please select an option." : null} />)}
+                maxSelections={item.type === "MULTIPLE_CHOICE" && item.selectionRule !== "min" ? item.maxSelections : undefined}
+                hint={item.type === "MULTIPLE_CHOICE" ? lang === "ko" ? `${item.selectionRule === "min" ? "최소" : item.selectionRule === "exact" ? "정확히" : "최대"} ${item.maxSelections}개 선택` : `Select ${item.selectionRule === "min" ? "at least" : item.selectionRule === "exact" ? "exactly" : "up to"} ${item.maxSelections}` : undefined}
+                error={validationAttempted ? selectionError(item) ?? null : null} />)}
               {error ? <p role="alert" aria-live="assertive" className="text-sm font-normal text-rose-600">{error}</p> : null}
               <div className="survey-response-actions flex justify-end px-0 py-3 md:py-0"><Button className="min-h-11" onClick={() => void submit()} disabled={submitting || isPreview}>{submitting ? t.submitting : t.submit}</Button></div>
             </section>

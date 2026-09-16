@@ -207,7 +207,7 @@ export function AdminFormField({
 }
 
 export function AdminTableViewport({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("admin-table-viewport min-w-0 overflow-x-auto", className)} {...props} />;
+  return <div role="region" aria-label="표 내용" tabIndex={0} className={cn("admin-table-viewport min-w-0 max-w-full overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary/30", className)} {...props} />;
 }
 
 export function AdminStickyActionBar({ className, ...props }: ComponentProps<"div">) {
