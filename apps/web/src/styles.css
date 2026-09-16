@@ -4244,8 +4244,8 @@ html { scrollbar-gutter: stable; }
   bottom: 1rem;
   left: 1rem;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.25rem;
+  gap: 0;
+  padding: 0;
   border: 1px solid rgb(226 232 240 / 0.92);
   border-radius: 0.75rem;
   background: rgb(255 255 255 / 0.9);
@@ -4523,20 +4523,19 @@ button[data-tooltip]:focus-visible::after {
     background-image: linear-gradient(var(--brand-primary, #007a4b), var(--brand-primary, #007a4b)), linear-gradient(#cbd5e1, #cbd5e1);
     background-position: center bottom;
     background-repeat: no-repeat;
-    background-size: 0% 2px, 100% 2px;
+    background-size: 0% 2px, 100% 1px;
     transition: background-size 180ms ease !important;
   }
   .survey-answer-control.interaction-control:focus,
   .survey-answer-control.interaction-control:focus-visible,
   .survey-answer-control.interaction-control[aria-expanded="true"] {
-    background-size: 100% 2px, 100% 2px;
+    background-size: 100% 2px, 100% 1px;
   }
   .survey-answer-control.interaction-control[aria-invalid="true"],
   .survey-answer-control.interaction-control[aria-invalid="true"]:hover,
   .survey-answer-control.interaction-control[aria-invalid="true"]:focus,
   .survey-answer-control.interaction-control[aria-invalid="true"]:focus-visible {
     background-image: linear-gradient(#e11d48, #e11d48), linear-gradient(#fda4af, #fda4af);
-    background-size: 100% 2px, 100% 2px;
   }
   @media (prefers-reduced-motion: reduce) {
     .survey-answer-control.interaction-control { transition: none !important; }

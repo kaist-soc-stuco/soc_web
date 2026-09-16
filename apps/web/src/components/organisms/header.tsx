@@ -39,7 +39,7 @@ interface HeaderProps {
 
 type HeaderNavItem = {
   activePaths?: string[];
-  megaItems: Array<{ href: string; label: string }>;
+  megaItems: Array<{ href: string; label: string; newTab?: boolean }>;
   href: string;
   label: string;
 };
@@ -344,6 +344,7 @@ export function Header({ variant = "default" }: HeaderProps) {
               {
                 label: "학번톡 참여 신청",
                 href: operationalSurveyPath(OPERATIONAL_SURVEY_IDS.cohortChatInvitation),
+                newTab: true,
               },
             ],
           },
@@ -396,6 +397,7 @@ export function Header({ variant = "default" }: HeaderProps) {
               {
                 label: "Join Cohort Chat",
                 href: operationalSurveyPath(OPERATIONAL_SURVEY_IDS.cohortChatInvitation),
+                newTab: true,
               },
             ],
           },
@@ -567,6 +569,8 @@ export function Header({ variant = "default" }: HeaderProps) {
                               aria-current={childActive ? "page" : undefined}
                               tabIndex={hoveredIndex === index ? 0 : -1}
                               onClick={closePopovers}
+                              target={child.newTab ? "_blank" : undefined}
+                              rel={child.newTab ? "noopener noreferrer" : undefined}
                               className={`flex h-11 w-full items-center justify-center whitespace-nowrap rounded-none px-3 text-center text-sm font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${
                                 homeHeaderDark
                                   ? childActive
@@ -916,6 +920,8 @@ export function Header({ variant = "default" }: HeaderProps) {
                             key={child.href}
                             to={child.href}
                             onClick={closePopovers}
+                            target={child.newTab ? "_blank" : undefined}
+                            rel={child.newTab ? "noopener noreferrer" : undefined}
                             className="flex min-h-11 items-center justify-start rounded-lg border border-slate-200 bg-white px-3 text-left text-[length:var(--ui-text-caption-size)] font-medium text-slate-600 hover:bg-slate-50 hover:text-brand-primary"
                           >
                             {child.label}

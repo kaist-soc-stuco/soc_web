@@ -2,7 +2,6 @@ import type { ReactNode, RefObject } from "react";
 import { useState } from "react";
 import type { SurveyRecord } from "@soc/contracts";
 import {
-  ArrowLeft,
   Check,
   ChevronDown,
   FileText,
@@ -75,6 +74,10 @@ export function BoardWriteHeaderControls({
   selectedCategory,
   writableBoardCodes,
 }: HeaderControlsProps) {
+  const categoryCodes = writableBoardCodes.filter(
+    (code) => code !== "faq" || code === selectedCategory,
+  );
+
   return (
     <div className="flex flex-col gap-3 bg-slate-50/40 px-4 py-3 border-b border-slate-200 rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -83,10 +86,10 @@ export function BoardWriteHeaderControls({
             id="board-category-select"
             value={selectedCategory}
             onChange={onCategoryChange}
-            disabled={writableBoardCodes.length === 0}
+            disabled={categoryCodes.length === 0}
             options={
-              writableBoardCodes.length > 0
-                ? writableBoardCodes.map((code) => ({
+              categoryCodes.length > 0
+                ? categoryCodes.map((code) => ({
                     value: code,
                     label: getBoardLabelFromMetadata(
                       boardByCode.get(code),
@@ -101,17 +104,17 @@ export function BoardWriteHeaderControls({
                     },
                   ]
             }
-            className="w-full sm:w-36"
-            buttonClassName="h-[var(--ui-control-height)] rounded-lg border-slate-200 px-2.5 py-0 text-xs font-bold text-slate-800 shadow-xs"
+            className="w-32 shrink-0"
+            buttonClassName="h-[var(--ui-control-height)] rounded-lg border-slate-200 px-2.5 py-0 text-xs !font-medium text-slate-800 shadow-xs"
             menuClassName="rounded-lg border-slate-200"
             optionClassName="text-xs"
             emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
           />
+          {leadingActions}
         </div>
       </div>
 
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {leadingActions}
         <label className="flex min-h-[var(--ui-control-height-mobile)] items-center gap-2.5 cursor-pointer group py-1.5">
           <div
             className={`flex h-4 w-4 items-center justify-center rounded border ${
@@ -169,14 +172,14 @@ export function BoardEditHeaderControls({
                 label: getBoardLabelFromMetadata(undefined, category, lang),
               },
             ]}
-            className="w-full sm:w-36"
-            buttonClassName="h-[var(--ui-control-height)] rounded-lg border-slate-200 px-2.5 py-0 text-xs font-bold shadow-xs"
+            className="w-32 shrink-0"
+            buttonClassName="h-[var(--ui-control-height)] rounded-lg border-slate-200 px-2.5 py-0 text-xs !font-medium shadow-xs"
           />
+          {leadingActions}
         </div>
       </div>
 
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {leadingActions}
         <label className="flex min-h-[var(--ui-control-height-mobile)] items-center gap-2.5 cursor-pointer group py-1.5">
           <div
             className={`flex h-4 w-4 items-center justify-center rounded border ${
@@ -834,7 +837,6 @@ export function BoardWriteFooter({
           disabled={isSubmitting || isSavingDraft}
           className="h-[var(--ui-control-height)] shrink-0 px-3 !font-medium text-slate-600"
         >
-          <ArrowLeft aria-hidden="true" className="size-4" />
           {lang === "ko" ? "취소" : "Cancel"}
         </Button>
       ) : null}

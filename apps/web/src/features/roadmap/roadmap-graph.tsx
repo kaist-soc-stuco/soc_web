@@ -577,11 +577,13 @@ export function RoadmapGraph({
 
         const sourceNode = layout.nodes.find((node) => node.id === source)!;
         const targetNode = layout.nodes.find((node) => node.id === target)!;
-        const coreLine = source.startsWith("core:") && target.startsWith("core:");
-        if (activeCourseCode ? !highlighted : !coreLine) return [];
+        // Keep the overview quiet. Dependency arrows are useful only while a
+        // course is being inspected; rendering every relation at rest makes
+        // the canvas look like a bundle of stray grey wires.
+        if (!activeCourseCode || !highlighted) return [];
         const route = routeConnection({ id: source, ...sourceNode.position }, { id: target, ...targetNode.position }, layout.nodes.filter(node => node.type === "course").map(node => ({ id: node.id, ...node.position })));
         if (!route) return [];
-        const color = highlighted ? (relation.target === activeCourseCode ? "#d97706" : "#0284c7") : "#94a3b8";
+        const color = relation.target === activeCourseCode ? "#d97706" : "#0284c7";
         return [
           {
             id: `${relation.source}-${relation.target}`,
@@ -899,16 +901,17 @@ export function RoadmapGraph({
               aria-label={lang === "ko" ? "확대" : "Zoom in"}
               data-tooltip={lang === "ko" ? "확대" : "Zoom in"}
               onClick={() => void flow?.zoomIn({ duration: 200 })}
-              className="size-10 border-slate-200 bg-white/95 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900"
+              className="size-10 rounded-none border-0 bg-white/95 text-slate-600 shadow-none backdrop-blur transition-colors hover:border-0 hover:bg-slate-50 hover:text-slate-900"
             >
               <Plus aria-hidden="true" className="size-4" />
             </IconButton>
+            <span aria-hidden="true" className="h-px w-full bg-slate-200" />
             <IconButton
               type="button"
               aria-label={lang === "ko" ? "축소" : "Zoom out"}
               data-tooltip={lang === "ko" ? "축소" : "Zoom out"}
               onClick={() => void flow?.zoomOut({ duration: 200 })}
-              className="size-10 border-slate-200 bg-white/95 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900"
+              className="size-10 rounded-none border-0 bg-white/95 text-slate-600 shadow-none backdrop-blur transition-colors hover:border-0 hover:bg-slate-50 hover:text-slate-900"
             >
               <Minus aria-hidden="true" className="size-4" />
             </IconButton>
