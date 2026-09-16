@@ -142,18 +142,17 @@ export class GoogleSurveySheetsService implements OnModuleInit {
       }
 
       const headers = [
-        "응답 ID",
         "제출 시각",
         "이름",
         "이메일",
         "소속",
         "학번",
         ...questions.map((question) => question.titleKo),
+        "응답 ID",
       ];
       const rows = responses.map((response) => {
         const responseAnswers = answersByResponse.get(response.id);
         return [
-          response.id,
           response.submittedAt ?? "",
           response.user?.nameKo ?? "익명",
           response.user?.email ?? "",
@@ -162,6 +161,7 @@ export class GoogleSurveySheetsService implements OnModuleInit {
           ...questions.map((question) =>
             this.formatAnswer(responseAnswers?.get(question.id), question),
           ),
+          response.id,
         ];
       });
 
@@ -172,8 +172,8 @@ export class GoogleSurveySheetsService implements OnModuleInit {
         sheetTitle: SHEET_TITLE,
         headers,
         rows,
-        dateTimeColumns: [1],
-        columnWidths: [230, 155, 105, 240, 150, 100, ...questions.map(() => 240)],
+        dateTimeColumns: [0],
+        columnWidths: [155, 105, 240, 150, 100, ...questions.map(() => 240), 230],
         protectionDescription: `KAIST SOC · 설문 응답 · ${survey.id} (읽기 전용)`,
       });
       if (job && !(await job.isCurrentClaim())) return;
