@@ -280,9 +280,7 @@ export class AuthService {
         this.readUserInfoString(userInfo, "studentNumber");
       const departmentKo = this.readUserInfoString(userInfo, "std_dept_kor_nm");
       const departmentEn = this.readUserInfoString(userInfo, "std_dept_eng_nm");
-      const primaryMajor =
-        this.readUserInfoString(userInfo, "std_major_kor_nm") ??
-        this.readUserInfoString(userInfo, "major_kor");
+      const primaryMajor = departmentKo;
       const gender =
         this.readUserInfoString(userInfo, "gender") ??
         this.readUserInfoString(userInfo, "gender_cd");

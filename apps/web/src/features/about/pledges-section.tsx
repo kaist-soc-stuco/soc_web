@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, Clock, Target, type LucideIcon } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock, Target, type LucideIcon } from "lucide-react";
 
 import {
   resolveContentBlockText,
@@ -20,7 +20,7 @@ function getPledgeStatus(status: string | null | undefined, lang: string): {
   icon: LucideIcon;
   iconClassName: string;
   label: string;
-} | null {
+} {
   if (status === "COMPLETED") {
     return {
       cardClassName: "is-completed",
@@ -39,7 +39,13 @@ function getPledgeStatus(status: string | null | undefined, lang: string): {
       label: lang === "ko" ? "진행 중" : "In progress",
     };
   }
-  return null;
+  return {
+    cardClassName: "is-planned",
+    badgeClassName: "border border-slate-200 bg-slate-50 text-slate-600",
+    icon: CalendarClock,
+    iconClassName: "text-slate-500",
+    label: lang === "ko" ? "시작 예정" : "Upcoming",
+  };
 }
 
 export function PledgesSection({ lang }: { lang: string }) {
@@ -122,20 +128,18 @@ export function PledgesSection({ lang }: { lang: string }) {
             {visiblePledges.map((pledge) => {
               const text = resolveContentBlockText(pledge, lang === "ko" ? "ko" : "en");
               const status = getPledgeStatus(pledge.pledgeStatus, lang);
-              const StatusIcon = status?.icon ?? Target;
+              const StatusIcon = status.icon;
 
               return (
-                <article key={pledge.contentBlockId} className={`about-pledge-item ${status?.cardClassName ?? ""}`}>
+                <article key={pledge.contentBlockId} className={`about-pledge-item ${status.cardClassName}`}>
                   <div className="about-pledge-item-heading">
-                    <StatusIcon aria-hidden="true" className={`size-5 shrink-0 ${status?.iconClassName ?? "text-slate-400"}`} />
+                    <StatusIcon aria-hidden="true" className={`size-5 shrink-0 ${status.iconClassName}`} />
                     <div className="about-pledge-title">
                       <span>{text.title}</span>
                     </div>
-                    {status ? (
-                      <span className={`about-pledge-status ${status.cardClassName} ${status.badgeClassName}`}>
-                        {status.label}
-                      </span>
-                    ) : null}
+                    <span className={`about-pledge-status ${status.cardClassName} ${status.badgeClassName}`}>
+                      {status.label}
+                    </span>
                   </div>
                   {text.body ? <p>{text.body}</p> : null}
                 </article>
