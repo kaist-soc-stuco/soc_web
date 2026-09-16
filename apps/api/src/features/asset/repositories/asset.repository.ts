@@ -22,6 +22,9 @@ import {
   surveys,
   assetCleanupLeases,
   users,
+  votes,
+  voteItems,
+  voteOptions,
 } from "../../../infrastructure/postgres/postgres.schema";
 import { msToDate, nowDate, nowMs } from "@soc/shared";
 
@@ -65,6 +68,9 @@ export class AssetRepository {
     uploadedBy: string;
     publicContentImage: boolean;
     surveyAnswerFile: boolean;
+    surveyDefinitionImage: boolean;
+    voteDefinitionImage: boolean;
+    publicVoteImage: boolean;
     uploadStatus: "PENDING" | "COMPLETED";
     uploadExpiresAt: Date | null;
     links: Array<{
@@ -130,27 +136,10 @@ export class AssetRepository {
       `)
       .limit(1);
 
-    const assetReference = `asset:${assetId}`;
-    const assetContentPath = `/assets/${assetId}/content`;
-    const [publicSurveyImage] = await this.db
-      .select({ surveyId: surveys.surveyId })
-      .from(surveys)
-      .leftJoin(surveySections, eq(surveySections.surveyId, surveys.surveyId))
-      .leftJoin(surveyQuestions, eq(surveyQuestions.sectionId, surveySections.id))
-      .where(and(
-        eq(surveys.isPublished, true),
-        or(
-          eq(surveys.descriptionImageUrlKo, assetReference),
-          eq(surveys.descriptionImageUrlEn, assetReference),
-          sql`${surveys.descriptionKo}::text LIKE ${`%${assetContentPath}%`}`,
-          sql`${surveys.descriptionEn}::text LIKE ${`%${assetContentPath}%`}`,
-          sql`${surveySections.descriptionKo}::text LIKE ${`%${assetContentPath}%`}`,
-          sql`${surveySections.descriptionEn}::text LIKE ${`%${assetContentPath}%`}`,
-          sql`${surveyQuestions.options}::text LIKE ${`%${assetReference}%`}`,
-          sql`${surveyQuestions.config}::text LIKE ${`%${assetReference}%`}`,
-        ),
-      ))
-      .limit(1);
+    const publicSurveyImage = await this.findSurveyImageReference(assetId, { publishedOnly: true });
+    const surveyDefinitionImage = await this.findSurveyImageReference(assetId);
+    const voteDefinitionImage = await this.findVoteImageReference(assetId);
+    const publicVoteImage = await this.findVoteImageReference(assetId, { publishedOnly: true });
 
     return {
       assetId: String(asset.assetId),
@@ -163,12 +152,70 @@ export class AssetRepository {
       uploadExpiresAt: asset.uploadExpiresAt,
       publicContentImage: Boolean(publicContentImage || publicContactAvatar || publicSurveyImage),
       surveyAnswerFile: Boolean(surveyAnswerFile),
+      surveyDefinitionImage: Boolean(surveyDefinitionImage),
+      voteDefinitionImage: Boolean(voteDefinitionImage),
+      publicVoteImage: Boolean(publicVoteImage),
       links: links.map((link) => ({
         articleId: String(link.articleId),
         boardCode: link.boardCode,
         usageType: link.usageType,
       })),
     };
+  }
+
+  async findSurveyImageReference(
+    assetId: string,
+    scope: { surveyId?: string; publishedOnly?: boolean } = {},
+    tx?: PostgresTransaction,
+  ): Promise<boolean> {
+    const referencePattern = `(?:asset:${assetId}(?:[^0-9]|$)|/assets/${assetId}/content)`;
+    const [reference] = await (tx ?? this.db)
+      .select({ surveyId: surveys.surveyId })
+      .from(surveys)
+      .leftJoin(surveySections, eq(surveySections.surveyId, surveys.surveyId))
+      .leftJoin(surveyQuestions, eq(surveyQuestions.sectionId, surveySections.id))
+      .where(and(
+        scope.surveyId ? eq(surveys.surveyId, scope.surveyId) : undefined,
+        scope.publishedOnly ? eq(surveys.isPublished, true) : undefined,
+        or(
+          eq(surveys.descriptionImageUrlKo, `asset:${assetId}`),
+          eq(surveys.descriptionImageUrlEn, `asset:${assetId}`),
+          sql`${surveys.descriptionKo}::text ~ ${referencePattern}`,
+          sql`${surveys.descriptionEn}::text ~ ${referencePattern}`,
+          sql`${surveySections.descriptionKo}::text ~ ${referencePattern}`,
+          sql`${surveySections.descriptionEn}::text ~ ${referencePattern}`,
+          sql`${surveyQuestions.options}::text ~ ${referencePattern}`,
+          sql`${surveyQuestions.config}::text ~ ${referencePattern}`,
+        ),
+      )).limit(1);
+    return Boolean(reference);
+  }
+
+  async findVoteImageReference(
+    assetId: string,
+    scope: { voteId?: string; publishedOnly?: boolean } = {},
+    tx?: PostgresTransaction,
+  ): Promise<boolean> {
+    const referencePattern = `(?:asset:${assetId}(?:[^0-9]|$)|/assets/${assetId}/content)`;
+    const [reference] = await (tx ?? this.db)
+      .select({ voteId: votes.voteId })
+      .from(votes)
+      .innerJoin(voteItems, eq(voteItems.voteId, votes.voteId))
+      .innerJoin(voteOptions, eq(voteOptions.itemId, voteItems.itemId))
+      .where(and(
+        scope.voteId ? eq(votes.voteId, scope.voteId) : undefined,
+        scope.publishedOnly ? inArray(votes.status, ["PUBLISHED", "CLOSED", "TALLIED"]) : undefined,
+        sql`${voteOptions.imageUrl} ~ ${referencePattern}`,
+      )).limit(1);
+    return Boolean(reference);
+  }
+
+  async canUseAsVoteReference(assetId: string, actorUserId: string, voteId?: string, tx?: PostgresTransaction): Promise<boolean> {
+    // The shared check locks the asset until the definition transaction commits,
+    // preventing orphan cleanup from deleting an upload while it is being linked.
+    if (await this.canUseAsSurveyReference(assetId, actorUserId, tx)) return true;
+    return (voteId ? await this.findVoteImageReference(assetId, { voteId }, tx) : false)
+      || await this.findVoteImageReference(assetId, { publishedOnly: true }, tx);
   }
 
   async findOwnedAssetByStorageKey(
@@ -407,14 +454,15 @@ export class AssetRepository {
   }
 
   /**
-   * Survey definitions may reuse an asset only when the actor owns it or the
-   * asset already has an explicit public reference.  A secret/private article
+   * Survey managers may retain assets already linked to the target survey.
+   * New references require ownership or an explicit public reference.  A secret/private article
    * link alone never qualifies as a public reference.
    */
   async canUseAsSurveyReference(
     assetId: string,
     actorUserId: string,
     tx?: PostgresTransaction,
+    surveyId?: string,
   ): Promise<boolean> {
     const db = tx ?? this.db;
     const [asset] = await db
@@ -426,6 +474,7 @@ export class AssetRepository {
 
     if (!asset) return false;
     if (String(asset.uploadedBy) === actorUserId) return true;
+    if (surveyId && await this.findSurveyImageReference(assetId, { surveyId }, tx)) return true;
 
     const [publicArticle] = await db
       .select({ articleAssetId: articleAssets.articleAssetId })
@@ -442,7 +491,6 @@ export class AssetRepository {
     if (publicArticle) return true;
 
     const assetReference = `asset:${assetId}`;
-    const assetContentPath = `/assets/${assetId}/content`;
     const [publicContent] = await db
       .select({ contentBlockId: contentBlocks.contentBlockId })
       .from(contentBlocks)
@@ -457,21 +505,7 @@ export class AssetRepository {
 
     if (publicContent) return true;
 
-    const [publicSurvey] = await db
-      .select({ surveyId: surveys.surveyId })
-      .from(surveys)
-      .where(and(
-        eq(surveys.isPublished, true),
-        or(
-          eq(surveys.descriptionImageUrlKo, assetReference),
-          eq(surveys.descriptionImageUrlEn, assetReference),
-          sql`${surveys.descriptionKo}::text LIKE ${`%${assetContentPath}%`}`,
-          sql`${surveys.descriptionEn}::text LIKE ${`%${assetContentPath}%`}`,
-        ),
-      ))
-      .limit(1);
-
-    return Boolean(publicSurvey);
+    return this.findSurveyImageReference(assetId, { publishedOnly: true }, tx);
   }
 
   async findLocalAssets(limit: number): Promise<
@@ -525,6 +559,7 @@ export class AssetRepository {
         eq(contentBlocks.imageUrl, sql`'asset:' || ${assets.assetId}::text`),
         eq(contentBlocks.imageUrlEn, sql`'asset:' || ${assets.assetId}::text`),
       ))
+      .leftJoin(voteOptions, or(eq(voteOptions.imageUrl, sql`'asset:' || ${assets.assetId}::text`), sql`${voteOptions.imageUrl} LIKE ('%' || ${assetContentPath} || '%')`))
       .leftJoin(executiveContacts, eq(executiveContacts.avatarStorageKey, sql`'asset:' || ${assets.assetId}::text`))
       .leftJoin(surveyAnswers, sql`
         ${surveyAnswers.content}->>'assetId' = ${assets.assetId}::text
@@ -552,6 +587,7 @@ export class AssetRepository {
       .where(
         and(
           isNull(articleAssets.articleAssetId),
+          isNull(voteOptions.optionId),
           isNull(contentBlocks.contentBlockId),
           isNull(executiveContacts.id),
           isNull(surveyAnswers.id),
@@ -745,6 +781,11 @@ function unlinkedAssetReferencesPredicate() {
     AND NOT EXISTS (
       SELECT 1 FROM "executive_contact" ec
       WHERE ec."avatar_storage_key" = ${assetReference}
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM "vote_option" vo
+      WHERE vo."image_url" = ${assetReference}
+         OR vo."image_url" LIKE ('%' || ${assetContentPath} || '%')
     )
     AND NOT EXISTS (
       SELECT 1 FROM "survey_answers" sa

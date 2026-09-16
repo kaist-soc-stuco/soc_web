@@ -48,8 +48,8 @@ export class SurveySectionsService {
     actorUserId?: string,
   ): Promise<SurveySectionRecord> {
     const created = await this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
+      await assertSurveyAssetReferences(this.assetRepository, actorUserId, dto, tx, surveyId);
       const section = await this.sectionsRepo.insert(surveyId, dto, tx);
-      await assertSurveyAssetReferences(this.assetRepository, actorUserId, section, tx);
       await this.assertBranchDefinitions(surveyId, tx);
       return section;
     });
@@ -70,6 +70,7 @@ export class SurveySectionsService {
     actorUserId?: string,
   ): Promise<SurveySectionRecord> {
     const updated = await this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
+      await assertSurveyAssetReferences(this.assetRepository, actorUserId, dto, tx, surveyId);
       const section = await this.sectionsRepo.update(
         sectionId,
         surveyId,
@@ -77,7 +78,6 @@ export class SurveySectionsService {
         tx,
       );
       if (!section) throw new NotFoundException("section_not_found");
-      await assertSurveyAssetReferences(this.assetRepository, actorUserId, section, tx);
       if (dto.sortOrder !== undefined || dto.nextSectionId !== undefined) {
         await this.assertBranchDefinitions(surveyId, tx);
       }

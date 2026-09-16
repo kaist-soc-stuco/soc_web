@@ -166,3 +166,22 @@ test("inline SVG is sandboxed even when used as a trusted seeded image", () => {
   assert.match(headers["Content-Disposition"], /^inline;/);
   assert.equal(headers["Content-Security-Policy"], "sandbox; default-src 'none'");
 });
+
+const { Permissions } = require("@soc/contracts");
+for (const [flag, permission] of [["surveyDefinitionImage", Permissions.MANAGE_SURVEY], ["voteDefinitionImage", Permissions.MANAGE_VOTE]]) {
+  test(`${flag}: other managers may preview attached draft images, ordinary members may not`, async () => {
+    const asset = { assetId: "91", uploadedBy: "creator", storageKey: "fixture", mimeType: "image/png", originalFilename: "image.png", sizeBytes: 12, links: [], [flag]: true };
+    await assert.doesNotReject(createService({ asset }).service.getFile("91", { authenticated: true, user: { id: "second-manager", permission } }));
+    for (const user of [undefined, { id: "ordinary", permission: 0 }, { id: "wrong-manager", permission: permission === Permissions.MANAGE_VOTE ? Permissions.MANAGE_SURVEY : Permissions.MANAGE_VOTE }]) {
+      const harness = createService({ asset });
+      await assert.rejects(harness.service.getFile("91", { authenticated: Boolean(user), user }), NotFoundException);
+      assert.equal(harness.getStorageReads(), 0);
+    }
+  });
+}
+
+test("published vote images are readable by respondents even when the uploader differs", async () => {
+  const asset = { assetId: "91", uploadedBy: "creator", storageKey: "fixture", mimeType: "image/png", originalFilename: "image.png", sizeBytes: 12, links: [], publicVoteImage: true };
+  const file = await createService({ asset }).service.getFile("91", { authenticated: true, user: { id: "voter", permission: 0 } });
+  assert.equal(file.inline, true);
+});

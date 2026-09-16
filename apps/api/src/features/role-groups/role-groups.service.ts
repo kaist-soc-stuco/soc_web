@@ -13,6 +13,7 @@ import type {
 } from "@soc/contracts";
 import {
   PERMISSION_REGISTRY,
+  DEFAULT_AUTHENTICATED_PERMISSION_BITS,
   Permissions,
 } from "@soc/contracts";
 
@@ -46,12 +47,27 @@ export class RoleGroupsService {
     private readonly auditLogService: AuditLogService,
   ) {}
 
-  async listPermissions(): Promise<PermissionRecord[]> {
-    return this.roleGroupsRepository.listPermissions();
+  private async delegationScope(actorUserId?: string) {
+    const systemAdmin = Boolean(actorUserId && await this.roleGroupsRepository.isSystemAdministrator(actorUserId));
+    const mask = actorUserId ? await this.usersService.resolvePermissionBitmaskByUserId(actorUserId) : 0;
+    return { systemAdmin, mask: mask & ~RESERVED_DELEGATION_BITS };
   }
 
-  async listRoleGroups(): Promise<RoleGroupRecord[]> {
-    return this.roleGroupsRepository.listRoleGroups();
+  async listPermissions(actorUserId?: string): Promise<PermissionRecord[]> {
+    const scope = await this.delegationScope(actorUserId);
+    return (await this.roleGroupsRepository.listPermissions()).map((permission) => ({
+      ...permission,
+      isBaseline: Permissions.has(DEFAULT_AUTHENTICATED_PERMISSION_BITS, permission.bitValue),
+      canDelegate: permission.isActive && (scope.systemAdmin || Permissions.has(scope.mask, permission.bitValue)),
+    }));
+  }
+
+  async listRoleGroups(actorUserId?: string): Promise<RoleGroupRecord[]> {
+    const scope = await this.delegationScope(actorUserId);
+    return (await this.roleGroupsRepository.listRoleGroups()).map((role) => {
+      const allowed = scope.systemAdmin || (!role.isSystem && (role.permissionMask & ~scope.mask) === 0);
+      return { ...role, canEdit: !role.isSystem && allowed, canManageMembers: allowed };
+    });
   }
 
   async createRoleGroup(
@@ -95,6 +111,7 @@ export class RoleGroupsService {
       throw new ForbiddenException("system_role_group_cannot_be_updated");
     }
 
+    await this.assertRoleMutationAllowed(existing, audit?.actorUserId);
     await this.assertPermissionDelegationAllowed(input.permissionIds, audit?.actorUserId);
 
     const memberIds = (await this.roleGroupsRepository.listRoleGroupMembers(roleGroupId)).map(

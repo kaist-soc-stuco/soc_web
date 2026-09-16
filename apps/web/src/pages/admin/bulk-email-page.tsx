@@ -997,7 +997,7 @@ function BulkEmailPageContent() {
                     <Users className="size-3.5" aria-hidden="true" />
                     {record.recipientCount}명 · {formatKoreanDateTime(record.scheduledAt ?? record.sentAt ?? record.updatedAt)}
                   </p>
-                  {record.status === "SCHEDULED" ? <Button type="button" variant="ghost" size="sm" onClick={() => void handleCancelScheduled(record.id)} className="mt-2 px-0 text-xs font-normal text-slate-500 hover:bg-transparent hover:text-rose-600">예약 취소</Button> : null}
+                  {record.status === "SCHEDULED" && record.senderId === session?.userId ? <Button type="button" variant="ghost" size="sm" onClick={() => void handleCancelScheduled(record.id)} className="mt-2 px-0 text-xs font-normal text-slate-500 hover:bg-transparent hover:text-rose-600">예약 취소</Button> : null}
                 </div>
               </li>
             ))}

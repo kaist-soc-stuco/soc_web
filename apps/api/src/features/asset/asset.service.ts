@@ -377,10 +377,16 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
 
     let readableUsageTypes: string[] = [];
 
-    if (asset.links.length === 0) {
-      if (asset.publicContentImage) {
-        readableUsageTypes = ["IMAGE"];
-      } else if (
+    const canReadDefinitionImage = asset.publicContentImage || asset.publicVoteImage || Boolean(
+      currentUser.user && (
+        (asset.surveyDefinitionImage && Permissions.has(currentUser.user.permission, Permissions.MANAGE_SURVEY)) ||
+        (asset.voteDefinitionImage && Permissions.has(currentUser.user.permission, Permissions.MANAGE_VOTE))
+      ),
+    );
+    if (canReadDefinitionImage) {
+      readableUsageTypes = ["IMAGE"];
+    } else if (asset.links.length === 0) {
+      if (
         asset.surveyAnswerFile &&
         currentUser.user &&
         Permissions.has(currentUser.user.permission, Permissions.MANAGE_SURVEY)

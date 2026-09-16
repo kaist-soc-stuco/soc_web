@@ -47,8 +47,8 @@ export class SurveyQuestionsService {
     const question = await this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
       const section = await this.sectionsRepo.findById(sectionId, surveyId, tx);
       if (!section) throw new NotFoundException("section_not_found");
+      await assertSurveyAssetReferences(this.assetRepository, actorUserId, dto, tx, surveyId);
       const question = await this.questionsRepo.insert(sectionId, dto, tx);
-      await assertSurveyAssetReferences(this.assetRepository, actorUserId, question, tx);
       assertSurveyQuestionDefinition(question);
       if (
         typeof (
@@ -89,6 +89,7 @@ export class SurveyQuestionsService {
     const updated = await this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
       const section = await this.sectionsRepo.findById(sectionId, surveyId, tx);
       if (!section) throw new NotFoundException("section_not_found");
+      await assertSurveyAssetReferences(this.assetRepository, actorUserId, dto, tx, surveyId);
       const question = await this.questionsRepo.update(
         questionId,
         sectionId,
@@ -96,7 +97,6 @@ export class SurveyQuestionsService {
         tx,
       );
       if (!question) throw new NotFoundException("question_not_found");
-      await assertSurveyAssetReferences(this.assetRepository, actorUserId, question, tx);
       assertSurveyQuestionDefinition(question);
       if (
         typeof (

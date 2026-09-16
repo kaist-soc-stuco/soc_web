@@ -88,6 +88,7 @@ export function PermissionPage() {
   const [loading, setLoading] = useState(true);
   const [membersLoading, setMembersLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [failedDraft, setFailedDraft] = useState<RoleDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createDraft, setCreateDraft] = useState<RoleDraft>(emptyRoleDraft());
@@ -103,6 +104,10 @@ export function PermissionPage() {
 
   const selectedRoleId = Number(searchParams.get("role")) || roles[0]?.roleGroupId || null;
   const selectedRole = roles.find((role) => role.roleGroupId === selectedRoleId) ?? null;
+  const selectedRoleIdRef = useRef(selectedRoleId);
+  selectedRoleIdRef.current = selectedRoleId;
+  const canEditRole = selectedRole?.canEdit === true;
+  const canManageMembers = selectedRole?.canManageMembers === true;
   const selectedTab: DetailTab = searchParams.get("tab") === "permissions" ? "permissions" : "members";
   const isDirty = Boolean(selectedRole && (draft.nameKo !== selectedRole.nameKo || !sameIds(draft.permissionIds, selectedRole.permissionIds)));
 
@@ -161,6 +166,7 @@ export function PermissionPage() {
     if (!selectedRole) return;
     setDraft(draftFromRole(selectedRole));
     setEditingField(null);
+    setFailedDraft(null);
   }, [selectedRole?.roleGroupId]);
   useEffect(() => {
     if (!selectedRole || selectedTab !== "members") return;
@@ -177,26 +183,30 @@ export function PermissionPage() {
   };
 
   const saveRole = useCallback(async () => {
-    if (!selectedRole || !isDirty) return;
+    if (!selectedRole || !isDirty || !canEditRole || saving) return;
     setSaving(true);
     setError(null);
     try {
       const updated = await client.updateRoleGroup(selectedRole.roleGroupId, { nameKo: draft.nameKo.trim(), permissionIds: draft.permissionIds });
-      setRoles((current) => current.map((role) => role.roleGroupId === updated.roleGroupId ? updated : role));
-      setDraft(draftFromRole(updated));
+      setRoles((current) => current.map((role) => role.roleGroupId === updated.roleGroupId ? { ...role, ...updated } : role));
+      if (selectedRoleIdRef.current === updated.roleGroupId) {
+        setDraft((current) => current === draft ? draftFromRole(updated) : current);
+        setFailedDraft(null);
+      }
       await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
     } catch (saveError) {
+      setFailedDraft(draft);
       setError(displayError(saveError, "역할 변경 사항을 저장하지 못했습니다."));
     } finally {
       setSaving(false);
     }
-  }, [client, draft, isDirty, selectedRole]);
+  }, [canEditRole, client, draft, isDirty, queryClient, saving, selectedRole]);
 
   useEffect(() => {
-    if (!selectedRole || selectedRole.isSystem || !isDirty || saving) return;
+    if (!selectedRole || !canEditRole || !isDirty || saving || failedDraft === draft) return;
     const timer = window.setTimeout(() => void saveRole(), 500);
     return () => window.clearTimeout(timer);
-  }, [isDirty, saveRole, saving, selectedRole]);
+  }, [canEditRole, draft, failedDraft, isDirty, saveRole, saving, selectedRole]);
 
   const createRole = async () => {
     if (!createDraft.nameKo.trim()) return;
@@ -204,7 +214,7 @@ export function PermissionPage() {
     setError(null);
     try {
       const created = await client.createRoleGroup({ nameKo: createDraft.nameKo.trim(), permissionIds: [] });
-      setRoles((current) => [...current, created]);
+      setRoles((current) => [...current, { ...created, canEdit: true, canManageMembers: true }]);
       setCreateDraft(emptyRoleDraft());
       setCreateOpen(false);
       setSelection(created.roleGroupId);
@@ -216,7 +226,7 @@ export function PermissionPage() {
   };
 
   const deleteRole = async () => {
-    if (!selectedRole || selectedRole.isSystem) return;
+    if (!selectedRole || !canEditRole) return;
     const approved = await confirm({
       title: "역할 삭제",
       description: <>정말 <strong className="font-semibold text-slate-900">“{selectedRole.nameKo}”</strong> 역할을 삭제할까요?</>,
@@ -273,7 +283,7 @@ export function PermissionPage() {
   }, [candidateQuery, loadCandidates, memberEditorOpen, selectedRole?.roleGroupId]);
 
   const openMemberEditor = async () => {
-    if (!selectedRole) return;
+    if (!selectedRole || !canManageMembers) return;
     try {
       const currentMembers = await client.listRoleGroupMembers(selectedRole.roleGroupId);
       setMembers(currentMembers);
@@ -307,7 +317,7 @@ export function PermissionPage() {
   };
 
   const removeMember = async (userId: string) => {
-    if (!selectedRole || candidateSaving) return;
+    if (!selectedRole || !canManageMembers || candidateSaving) return;
     const nextUserIds = members.filter((member) => member.userId !== userId).map((member) => member.userId);
     setCandidateSaving(true);
     setError(null);
@@ -329,7 +339,7 @@ export function PermissionPage() {
         {ConfirmDialog}
         <AdminPageMain>
           <AdminPageHeader title="권한 관리" actions={<Button type="button" onClick={() => setCreateOpen(true)}><Plus aria-hidden="true" /> 역할 추가</Button>} />
-          {error ? <div role="alert" className="rounded-lg border border-rose-200 bg-white px-4 py-3 text-sm font-normal text-rose-700">{error}</div> : null}
+          {error ? <div role="alert" className="rounded-lg border border-rose-200 bg-white px-4 py-3 text-sm font-normal text-rose-700">{error}{failedDraft === draft ? <Button type="button" variant="ghost" size="sm" onClick={() => setFailedDraft(null)}>다시 시도</Button> : null}</div> : null}
 
           <div className="grid min-h-[640px] gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
             <AdminCard className="self-start lg:sticky lg:top-6">
@@ -373,9 +383,9 @@ export function PermissionPage() {
                         }}
                       />
                     ) : (
-                      <button type="button" disabled={selectedRole.isSystem} onClick={() => setEditingField("name")} className="group inline-flex min-w-0 items-center gap-1.5 rounded-md text-left disabled:cursor-default">
+                      <button type="button" disabled={!canEditRole} onClick={() => setEditingField("name")} className="group inline-flex min-w-0 items-center gap-1.5 rounded-md text-left disabled:cursor-default">
                         <AdminSectionTitle className="truncate !font-semibold text-[#172033]">{draft.nameKo}</AdminSectionTitle>
-                        {!selectedRole.isSystem ? <Pencil aria-hidden="true" className="size-3.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100" /> : null}
+                        {canEditRole ? <Pencil aria-hidden="true" className="size-3.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100" /> : null}
                       </button>
                     )}
                     {selectedRole.isSystem ? <AdminStatusBadge>시스템 역할</AdminStatusBadge> : null}
@@ -383,33 +393,33 @@ export function PermissionPage() {
 
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {!selectedRole.isSystem ? <Button type="button" size="sm" variant="outline" className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void deleteRole()}><Trash2 aria-hidden="true" /> 역할 삭제</Button> : null}
+                  {canEditRole ? <Button type="button" size="sm" variant="outline" className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void deleteRole()}><Trash2 aria-hidden="true" /> 역할 삭제</Button> : null}
                 </div>
               </AdminCardHeader>
               <div className="border-b border-slate-100 px-5 pt-3"><SegmentedControl ariaLabel="역할 상세 탭" role="tablist" value={selectedTab} onChange={(tab) => setSelection(selectedRole.roleGroupId, tab)} className="clean-segmented-control mb-3 w-fit" options={[{ value: "members", label: `구성원 (${selectedRole.userCount})` }, { value: "permissions", label: `권한 설정 (${draft.permissionIds.length})` }]} /></div>
 
               {selectedTab === "permissions" ? <div className="p-5">
                 <div className="grid items-start gap-4 xl:grid-cols-2">{groupedPermissions.map((group) => {
-                  const ids = group.permissions.map((permission) => permission.permissionId);
+                  const ids = group.permissions.filter((permission) => permission.canDelegate && !permission.isBaseline).map((permission) => permission.permissionId);
                   const allSelected = ids.length > 0 && ids.every((id) => draft.permissionIds.includes(id));
                   return <section key={group.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
                     <label className="flex min-h-12 cursor-pointer items-center gap-2.5 border-b border-slate-200 px-4">
-                      <UiInput type="checkbox" checked={allSelected} disabled={selectedRole.isSystem} onChange={() => togglePermissionGroup(ids)} className="size-4 accent-brand-primary" aria-label={`${group.label} 권한 전체 선택`} />
+                      <UiInput type="checkbox" checked={allSelected} disabled={!canEditRole || ids.length === 0} onChange={() => togglePermissionGroup(ids)} className="size-4 accent-brand-primary" aria-label={`${group.label} 권한 전체 선택`} />
                       <span className="text-sm font-normal text-[#172033]">{group.label}</span>
                       <span className="ml-auto text-xs font-normal text-[#344054]">{group.permissions.length}개</span>
                     </label>
                     <div className="divide-y divide-slate-100">{group.permissions.map((permission) => {
-                      const checked = draft.permissionIds.includes(permission.permissionId);
-                      return <label key={permission.permissionId} className="flex cursor-pointer items-start gap-3 px-4 py-3.5 hover:bg-slate-50/70"><UiInput type="checkbox" checked={checked} disabled={selectedRole.isSystem} onChange={() => togglePermission(permission.permissionId)} className="mt-0.5 size-4 accent-brand-primary" /><span className="min-w-0"><span className="block text-sm font-normal text-[#172033]">{permissionLabels[permission.code] ?? permission.nameKo}</span><span className="mt-0.5 block text-xs font-normal leading-5 text-[#344054]">{permission.description || "이 권한이 허용하는 작업을 관리합니다."}</span></span></label>;
+                      const checked = Boolean(permission.isBaseline || draft.permissionIds.includes(permission.permissionId));
+                      return <label key={permission.permissionId} className="flex cursor-pointer items-start gap-3 px-4 py-3.5 hover:bg-slate-50/70"><UiInput type="checkbox" checked={checked} disabled={!canEditRole || !permission.canDelegate || permission.isBaseline} onChange={() => togglePermission(permission.permissionId)} className="mt-0.5 size-4 accent-brand-primary" /><span className="min-w-0"><span className="block text-sm font-normal text-[#172033]">{permissionLabels[permission.code] ?? permission.nameKo}{permission.isBaseline ? <span className="ml-2 text-xs text-slate-500">기본 제공</span> : null}</span><span className="mt-0.5 block text-xs font-normal leading-5 text-[#344054]">{permission.isBaseline ? "모든 로그인 회원에게 기본 제공됩니다. 역할에서 회수할 수 없습니다." : permission.description || "이 권한이 허용하는 작업을 관리합니다."}{!permission.isBaseline && !permission.canDelegate ? " (위임할 수 없는 권한)" : ""}</span></span></label>;
                     })}</div>
                   </section>;
                 })}</div>
               </div> : <div className="min-w-0">
-                <div className="flex items-center justify-between gap-3 px-5 py-4"><span className="text-sm font-normal text-[#344054]">총 {members.length}명</span><Button type="button" size="sm" onClick={() => void openMemberEditor()}><UserPlus aria-hidden="true" /> 구성원 추가</Button></div>
+                <div className="flex items-center justify-between gap-3 px-5 py-4"><span className="text-sm font-normal text-[#344054]">총 {members.length}명</span><Button type="button" size="sm" disabled={!canManageMembers} onClick={() => void openMemberEditor()}><UserPlus aria-hidden="true" /> 구성원 추가</Button></div>
                 <div className={cn("transition-opacity duration-150", membersLoading ? "opacity-60" : "opacity-100")} aria-busy={membersLoading}>
                 <AdminDataTable minWidth={0} viewportClassName="!overflow-visible"><colgroup><col style={{ width: "28%" }} /><col style={{ width: "16%" }} /><col style={{ width: "30%" }} /><col style={{ width: "18%" }} /><col style={{ width: "8%" }} /></colgroup><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>학번</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>부여일</AdminTableHead><AdminTableHead className="text-right">작업</AdminTableHead></tr></AdminTableHeader><AdminTableBody>
                   {members.length === 0 ? <AdminTableEmpty colSpan={5}>이 역할에 지정된 구성원이 없습니다.</AdminTableEmpty>
-                    : members.map((member) => <tr key={member.userId}><AdminTableCell truncate className="admin-table-text-emphasis">{member.nameKo}</AdminTableCell><AdminTableCell truncate>{member.stdNo ?? member.kaistUid}</AdminTableCell><AdminTableCell truncate>{member.email}</AdminTableCell><AdminTableCell truncate>{formatDate(member.grantedAt)}</AdminTableCell><AdminTableCell className="text-right"><Button type="button" variant="ghost" size="icon" aria-label={`${member.nameKo} 제외`} data-tooltip="구성원 제외" className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => void removeMember(member.userId)} disabled={candidateSaving}><Trash2 aria-hidden="true" className="size-4" /></Button></AdminTableCell></tr>)}
+                    : members.map((member) => <tr key={member.userId}><AdminTableCell truncate className="admin-table-text-emphasis">{member.nameKo}</AdminTableCell><AdminTableCell truncate>{member.stdNo ?? member.kaistUid}</AdminTableCell><AdminTableCell truncate>{member.email}</AdminTableCell><AdminTableCell truncate>{formatDate(member.grantedAt)}</AdminTableCell><AdminTableCell className="text-right"><Button type="button" variant="ghost" size="icon" aria-label={`${member.nameKo} 제외`} data-tooltip="구성원 제외" className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => void removeMember(member.userId)} disabled={candidateSaving || !canManageMembers}><Trash2 aria-hidden="true" className="size-4" /></Button></AdminTableCell></tr>)}
                 </AdminTableBody></AdminDataTable>
                 </div>
               </div>}

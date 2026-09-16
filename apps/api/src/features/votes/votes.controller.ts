@@ -70,7 +70,7 @@ export class VotesController {
   @Patch("admin/:id")
   @RequirePermissions(Permissions.MANAGE_VOTE)
   async update(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest, @Body(new ZodValidationPipe(UpdateVoteSchema)) body: UpdateVoteRequest) {
-    const result = await this.service.update(id, body);
+    const result = await this.service.update(id, body, req.user.id);
     await this.audit.record({ action: "vote.update", ...auditMetadataFromRequest(req), payload: { changedFields: Object.keys(body) }, targetId: id, targetType: "vote" });
     return result;
   }

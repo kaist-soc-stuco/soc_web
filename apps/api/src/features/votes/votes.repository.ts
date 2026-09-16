@@ -72,7 +72,7 @@ export class VotesRepository {
     return row ?? { eligibleCount: 0, votedCount: 0 };
   }
 
-  async create(creatorId: string, input: CreateVoteRequest) {
+  async create(creatorId: string, input: CreateVoteRequest, validateAssets?: (tx: PostgresTransaction) => Promise<void>) {
     return this.transaction(async (tx) => {
       const [vote] = await tx.insert(votes).values({
         creatorId,
@@ -89,12 +89,13 @@ export class VotesRepository {
         studentNumberFrom: input.studentNumberFrom ?? null,
         studentNumberTo: input.studentNumberTo ?? null,
       }).returning();
+      await validateAssets?.(tx);
       await this.replaceDefinition(vote.voteId, input.items, tx);
       return vote;
     });
   }
 
-  async updateDraft(id: string, input: UpdateVoteRequest) {
+  async updateDraft(id: string, input: UpdateVoteRequest, validateAssets?: (tx: PostgresTransaction) => Promise<void>) {
     return this.transaction(async (tx) => {
       const values: Partial<typeof votes.$inferInsert> = { updatedAt: nowDate() };
       if (input.titleKo !== undefined) values.titleKo = input.titleKo;
@@ -110,6 +111,7 @@ export class VotesRepository {
       if (input.studentNumberFrom !== undefined) values.studentNumberFrom = input.studentNumberFrom ?? null;
       if (input.studentNumberTo !== undefined) values.studentNumberTo = input.studentNumberTo ?? null;
       const [vote] = await tx.update(votes).set(values).where(and(eq(votes.voteId, id), eq(votes.status, "DRAFT"))).returning();
+      if (vote) await validateAssets?.(tx);
       if (vote && input.items) await this.replaceDefinition(id, input.items, tx);
       return vote ?? null;
     });

@@ -9,6 +9,8 @@ import type {
 } from "../schemas.js";
 
 export interface PermissionRecord {
+  canDelegate?: boolean;
+  isBaseline?: boolean;
   permissionId: number;
   code: string;
   bitValue: number;
@@ -95,6 +97,8 @@ export interface RoleGroupCandidateListResponse {
 }
 
 export interface RoleGroupRecord {
+  canEdit?: boolean;
+  canManageMembers?: boolean;
   roleGroupId: number;
   nameKo: string;
   description: string | null;

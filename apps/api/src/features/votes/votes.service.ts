@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import {
   Permissions,
@@ -21,6 +22,10 @@ import { isoToDate, nowIso, nowMs } from "@soc/shared";
 import { VoteCryptoService } from "./vote-crypto.service";
 import { VotesRepository } from "./votes.repository";
 
+import { AssetRepository } from "../asset/repositories/asset.repository";
+import { collectAssetReferenceIds } from "../asset/asset-reference";
+import type { PostgresTransaction } from "../../infrastructure/postgres/postgres.provider";
+
 interface Caller { id: string; permission: number }
 
 @Injectable()
@@ -28,7 +33,16 @@ export class VotesService {
   constructor(
     private readonly repo: VotesRepository,
     private readonly crypto: VoteCryptoService,
+    @Optional() private readonly assets?: AssetRepository,
   ) {}
+
+  private async assertAssets(input: unknown, actorId: string | undefined, tx: PostgresTransaction, voteId?: string) {
+    for (const assetId of collectAssetReferenceIds(input)) {
+      if (!actorId || !this.assets || !await this.assets.canUseAsVoteReference(assetId, actorId, voteId, tx)) {
+        throw new ForbiddenException("vote_asset_not_owned");
+      }
+    }
+  }
 
   private isManager(caller?: Caller): boolean {
     return Boolean(caller && Permissions.has(caller.permission, Permissions.MANAGE_VOTE));
@@ -121,18 +135,18 @@ export class VotesService {
   }
 
   async create(creatorId: string, input: CreateVoteRequest): Promise<VoteDetailResponse> {
-    const vote = await this.repo.create(creatorId, input);
+    const vote = await this.repo.create(creatorId, input, (tx) => this.assertAssets(input, creatorId, tx));
     return this.detail(vote.voteId, { id: creatorId, permission: Permissions.MANAGE_VOTE });
   }
 
-  async update(id: string, input: UpdateVoteRequest): Promise<VoteDetailResponse> {
+  async update(id: string, input: UpdateVoteRequest, actorId?: string): Promise<VoteDetailResponse> {
     const current = await this.repo.findVote(id);
     if (!current) throw new NotFoundException("vote_not_found");
     if (current.status !== "DRAFT") throw new ConflictException("published_vote_definition_locked");
     const startsAt = input.startsAt ? isoToDate(input.startsAt) : current.startsAt;
     const endsAt = input.endsAt ? isoToDate(input.endsAt) : current.endsAt;
     if (startsAt >= endsAt) throw new BadRequestException("vote_invalid_schedule");
-    const updated = await this.repo.updateDraft(id, input);
+    const updated = await this.repo.updateDraft(id, input, (tx) => this.assertAssets(input, actorId, tx, id));
     if (!updated) throw new ConflictException("vote_state_changed");
     return this.detail(id, { id: current.creatorId ?? "", permission: Permissions.MANAGE_VOTE });
   }

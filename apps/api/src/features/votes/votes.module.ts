@@ -1,3 +1,4 @@
+import { AssetRepository } from "../asset/repositories/asset.repository";
 import { Module } from "@nestjs/common";
 
 import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
@@ -12,6 +13,6 @@ import { VotesService } from "./votes.service";
 @Module({
   imports: [PostgresModule, AuthModule, UsersModule, AuditLogModule],
   controllers: [VotesController],
-  providers: [VoteCryptoService, VotesRepository, VotesService],
+  providers: [AssetRepository, VoteCryptoService, VotesRepository, VotesService],
 })
 export class VotesModule {}

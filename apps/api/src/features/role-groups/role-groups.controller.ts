@@ -21,13 +21,13 @@ export class RoleGroupsController {
   constructor(private readonly roleGroupsService: RoleGroupsService) {}
 
   @Get("permissions")
-  listPermissions() {
-    return this.roleGroupsService.listPermissions();
+  listPermissions(@Req() request: AuthenticatedRequest) {
+    return this.roleGroupsService.listPermissions(request.user?.id);
   }
 
   @Get()
-  listRoleGroups() {
-    return this.roleGroupsService.listRoleGroups();
+  listRoleGroups(@Req() request: AuthenticatedRequest) {
+    return this.roleGroupsService.listRoleGroups(request.user?.id);
   }
 
   @Post()

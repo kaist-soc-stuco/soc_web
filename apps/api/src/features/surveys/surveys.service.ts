@@ -416,6 +416,7 @@ export class SurveysService {
         actorUserId,
         candidate,
         tx,
+        id,
       );
 
       const isAlwaysOpen = dto.isAlwaysOpen ?? current.isAlwaysOpen;
@@ -443,6 +444,7 @@ export class SurveysService {
           actorUserId,
           withQuestions,
           tx,
+          id,
         );
       }
 
@@ -550,6 +552,7 @@ export class SurveysService {
         creatorId,
         { original, sections: sectionsWithQuestions },
         tx,
+        id,
       );
 
       const newSurvey = await this.surveysRepo.insert(
