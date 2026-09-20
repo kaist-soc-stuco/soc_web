@@ -297,8 +297,8 @@ function RoadmapManagementPageContent() {
             <AdminToolbar className="rounded-none border-0">
               <AdminToolbarGroup className="w-full sm:w-auto">
                 <div className="flex rounded-lg bg-slate-100 p-1" role="tablist" aria-label="로드맵 관리 탭">
-                  <button type="button" role="tab" aria-selected={activeTab === "courses"} onClick={() => setActiveTab("courses")} className={cn("rounded-md px-3 py-2 text-sm font-medium", activeTab === "courses" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900")}>전체 교과목</button>
-                  <button type="button" role="tab" aria-selected={activeTab === "offerings"} onClick={() => setActiveTab("offerings")} className={cn("rounded-md px-3 py-2 text-sm font-medium", activeTab === "offerings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900")}>학기별 개설 관리</button>
+                  <button type="button" role="tab" aria-selected={activeTab === "courses"} onClick={() => setActiveTab("courses")} className={cn("inline-flex h-10 items-center justify-center rounded-md px-3 text-sm font-medium", activeTab === "courses" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900")}>전체 교과목</button>
+                  <button type="button" role="tab" aria-selected={activeTab === "offerings"} onClick={() => setActiveTab("offerings")} className={cn("inline-flex h-10 items-center justify-center rounded-md px-3 text-sm font-medium", activeTab === "offerings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900")}>학기별 개설 관리</button>
                 </div>
               </AdminToolbarGroup>
               <AdminToolbarGroup className="ml-auto w-full justify-end sm:flex-1 sm:flex-nowrap">
@@ -497,7 +497,7 @@ function CourseEditorModal({ apiClient, course, data, isNew, onClose, onSaved, o
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={isNew ? "새 과목 등록" : `${course?.courseCode ?? "과목"} 통합 편집`} mobileFullscreen className="max-w-4xl" bodyClassName="space-y-5 px-4 py-5 sm:px-5" footer={tab === "master" ? <><Button type="button" variant="outline" onClick={onClose}>취소</Button><Button type="button" disabled={saving} onClick={() => void saveCourse()}><Save aria-hidden="true" />{saving ? "저장 중..." : "저장하기"}</Button></> : null}>
+    <Modal open={open} onClose={onClose} title={isNew ? "새 과목 등록" : `${course?.courseCode ?? "과목"} 통합 편집`} mobileFullscreen className="max-w-4xl sm:h-[45.5rem]" bodyClassName="flex-1 space-y-5 px-4 py-5 sm:px-5" footer={tab === "master" ? <><Button type="button" variant="outline" onClick={onClose}>취소</Button><Button loading={saving} type="button" disabled={saving} onClick={() => void saveCourse()}><Save aria-hidden="true" />{"저장하기"}</Button></> : null}>
       <div className="flex gap-1 rounded-lg bg-slate-100 p-1" role="tablist" aria-label="과목 편집 탭">
         <button type="button" role="tab" aria-selected={tab === "master"} onClick={() => setTab("master")} className={cn("min-h-11 flex-1 rounded-md px-3 py-2 text-sm font-medium", tab === "master" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500")}>기본 정보 (마스터)</button>
         <button type="button" role="tab" aria-selected={tab === "offerings"} onClick={() => setTab("offerings")} className={cn("min-h-11 flex-1 rounded-md px-3 py-2 text-sm font-medium", tab === "offerings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500")}>학기별 개설 ({offeringCount})</button>
@@ -640,9 +640,9 @@ function OfferingEditor({
               {editingExisting ? <Trash2 aria-hidden="true" /> : <X aria-hidden="true" />}
               {editingExisting ? "삭제" : "취소"}
             </Button>
-            <Button type="button" disabled={saving} onClick={onSave}>
+            <Button loading={saving} type="button" disabled={saving} onClick={onSave}>
               {editingExisting ? <Save aria-hidden="true" /> : <Plus aria-hidden="true" />}
-              {saving ? (editingExisting ? "저장 중..." : "추가 중...") : editingExisting ? "저장" : "추가"}
+              {editingExisting ? "저장" : "추가"}
             </Button>
           </div>
         </div>
@@ -660,7 +660,7 @@ function ImportPreviewModal({ importing, onClose, onCommit, preview }: { importi
     setDecisions(Object.fromEntries(preview.newCourses.map((course) => [course.courseCode, { action: "ADD_TO_ROADMAP", category: "major-elective", trackIds: [] }])));
   }, [preview]);
   return (
-    <Modal open={Boolean(preview)} onClose={onClose} title="전체개설교과목 목록 불러오기 검토" mobileFullscreen className="max-w-3xl" bodyClassName="space-y-5 px-4 py-5 sm:px-5" footer={preview ? <><Button type="button" variant="outline" onClick={onClose} disabled={importing}>취소</Button><Button type="button" onClick={() => onCommit(decisions)} disabled={importing}>{importing ? "반영 중..." : "이번 학기 반영"}</Button></> : null}>
+    <Modal open={Boolean(preview)} onClose={onClose} title="전체개설교과목 목록 불러오기 검토" mobileFullscreen className="max-w-3xl" bodyClassName="space-y-5 px-4 py-5 sm:px-5" footer={preview ? <><Button type="button" variant="outline" onClick={onClose} disabled={importing}>취소</Button><Button loading={importing} type="button" onClick={() => onCommit(decisions)} disabled={importing}>{"이번 학기 반영"}</Button></> : null}>
       {preview ? <><div className="grid gap-3 sm:grid-cols-3"><Stat label="학기" value={preview.terms.map(formatTerm).join(", ")} /><Stat label="개설 정보" value={`${preview.importedCount}건`} /><Stat label="신규 과목" value={`${preview.newCourses.length}개`} /></div><p className="text-sm leading-6 text-slate-600">새 학기는 자동으로 추가되고, 신규 과목은 로드맵 표시 여부와 교육 분야를 확인한 뒤 반영합니다. 연구 과목은 자동 제외됩니다.</p>{preview.newCourses.length === 0 ? <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">새로 추가되는 전체 교과목이 없습니다. 기존 마스터와 개설 정보만 갱신합니다.</div> : <div className="overflow-hidden rounded-lg border border-slate-200"><div className="hidden grid-cols-[minmax(0,1fr)_10rem_6rem] gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500 sm:grid"><span>신규 과목</span><span>교육 분야</span><span>로드맵</span></div>{preview.newCourses.map((course) => { const decision = decisions[course.courseCode]; return <div key={course.courseCode} className="grid gap-3 border-b border-slate-100 px-3 py-3 last:border-0 sm:grid-cols-[minmax(0,1fr)_10rem_6rem] sm:items-center"><div className="min-w-0"><p className="truncate text-sm font-medium text-slate-900">{course.nameKo}</p><p className="mt-1 text-xs tabular-nums text-slate-500">{course.courseCode} · {course.currentCode} · {course.term}</p></div><div className="flex items-center justify-between gap-2 sm:contents"><span className="text-xs text-slate-500 sm:hidden">교육 분야</span><AdminSelectDropdown className="w-full sm:w-auto" value={decision?.category ?? "major-elective"} options={CATEGORY_OPTIONS} onChange={(value) => setDecisions((current) => ({ ...current, [course.courseCode]: { ...current[course.courseCode], category: value as RoadmapCourseCategory } }))} ariaLabel={`${course.nameKo} 교육 분야`} /></div><label className="inline-flex items-center justify-start gap-1.5 text-xs text-slate-600 sm:justify-center"><input type="checkbox" checked={decision?.action === "ADD_TO_ROADMAP"} onChange={(event) => setDecisions((current) => ({ ...current, [course.courseCode]: { ...current[course.courseCode], action: event.currentTarget.checked ? "ADD_TO_ROADMAP" : "SKIP" } }))} className="size-4 accent-emerald-700" />표시</label></div>; })}</div>}{preview.warnings.length > 0 ? <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">{preview.warnings.join(" · ")}</div> : null}</> : null}
     </Modal>
   );

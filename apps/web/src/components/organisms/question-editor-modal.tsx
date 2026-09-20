@@ -1,3 +1,4 @@
+import { useDebouncedEditorSave } from "@/hooks/use-debounced-editor-save";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { restrictListDrag } from "@/lib/drag-bounds";
 import { createPortal } from "react-dom";
@@ -246,6 +247,7 @@ function CompactImagePicker({
   disabled,
   onError,
   hideWhenValue = false,
+  buttonClassName,
 }: {
   label: string;
   value?: string | null;
@@ -253,6 +255,7 @@ function CompactImagePicker({
   disabled?: boolean;
   onError?: (message: string) => void;
   hideWhenValue?: boolean;
+  buttonClassName?: string;
 }) {
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -292,6 +295,7 @@ function CompactImagePicker({
       <IconButton
         type="button"
         size="sm"
+        className={buttonClassName}
         aria-label={`${label} ${value ? "변경" : "추가"}`}
         aria-busy={uploading}
         disabled={disabled || uploading}
@@ -417,7 +421,6 @@ function SortableOptionRow({
           ref={setActivatorNodeRef}
           type="button"
           aria-label={`${option.labelKo || `옵션 ${index + 1}`} 순서 이동`}
-          data-tooltip="드래그하여 순서 변경"
           aria-grabbed={isDragging ? "true" : undefined}
           className="absolute left-0 top-1/2 z-10 inline-flex size-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded text-slate-400 opacity-0 outline-none transition-opacity hover:text-slate-500 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-primary/25 group-hover:opacity-100 group-hover:text-slate-500 group-focus-within:opacity-100 group-focus-within:text-slate-500 active:cursor-grabbing"
           {...attributes}
@@ -468,6 +471,7 @@ function SortableOptionRow({
                 disabled={isOngoing}
                 onError={onError}
                 hideWhenValue
+                buttonClassName="!h-9 !w-9"
               />
             </div>
           ) : null}
@@ -971,6 +975,8 @@ export function QuestionInlineEditor({
     }
   };
 
+  useDebouncedEditorSave(form, handleSave, value === undefined && !isOngoing);
+
   const handleDuplicate = () => {
     if (!onDuplicate) return;
     void onDuplicate(isNewQuestion ? form : undefined);
@@ -1106,14 +1112,14 @@ export function QuestionInlineEditor({
       <div className="min-w-0 flex-1">
         <div className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
         <div className="question-editor-field group relative min-w-0">
-          <RichTextInput singleLine ariaLabel="국문 질문" value={form.titleKo} disabled={isOngoing} onChange={value => set("titleKo", value)} placeholder="질문" />
+          <RichTextInput singleLine ariaLabel="국문 질문" value={form.titleKo} disabled={isOngoing} onChange={value => set("titleKo", value)} placeholder="질문" inputClassName="!h-10 !min-h-10 !py-2" />
           <span
             aria-hidden="true"
              className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary"
            />
          </div>
          {!isKoreanOnly && <div className="question-editor-field group relative min-w-0">
-          <RichTextInput singleLine ariaLabel="영문 질문" value={form.titleEn} disabled={isOngoing} onChange={value => set("titleEn", value)} placeholder="Question" />
+          <RichTextInput singleLine ariaLabel="영문 질문" value={form.titleEn} disabled={isOngoing} onChange={value => set("titleEn", value)} placeholder="Question" inputClassName="!h-10 !min-h-10 !py-2" />
           <span
             aria-hidden="true"
              className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary"
@@ -1126,6 +1132,7 @@ export function QuestionInlineEditor({
           onChange={updateQuestionImage}
           disabled={isOngoing}
           onError={(message) => toast({ type: "error", message })}
+          buttonClassName="!h-10 !w-10"
         />}
         {typeControl ?? <AdminSelectDropdown
           ariaLabel="질문 유형"
@@ -1177,7 +1184,7 @@ export function QuestionInlineEditor({
 
       {needsOptions ? (
           <div className="mt-4 pb-4 pt-1">
-          <div className="scrollbar-hidden -ml-4 max-h-80 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain pr-1 md:-ml-5">
+          <div className="-ml-4 space-y-1 pr-1 md:-ml-5">
             <DndContext
               sensors={optionSensors}
               collisionDetection={closestCenter}
@@ -1241,13 +1248,13 @@ export function QuestionInlineEditor({
               const isRow = kind === "rows";
               return (
                 <div key={kind} className="min-w-0">
-                  <div className="mb-2 text-xs font-medium text-slate-600">
+                  <div className="mb-2 px-1 text-xs font-medium text-slate-600">
                     {isRow ? "행" : "열"}
                   </div>
                   <div className="space-y-1">
                     {items.map((option, index) => (
                       <div key={`${kind}-${index}`} className="flex min-w-0 items-center gap-2 px-1 py-1">
-                        <span className="flex size-5 shrink-0 items-center justify-center text-xs tabular-nums text-slate-500" aria-hidden="true">
+                        <span className="flex size-5 shrink-0 items-center justify-start text-xs tabular-nums text-slate-500" aria-hidden="true">
                           {index + 1}
                         </span>
                         <UiInput
@@ -1283,7 +1290,7 @@ export function QuestionInlineEditor({
                     ))}
                     {!isOngoing ? (
                       <div className="flex min-w-0 items-center gap-2 px-1 py-1">
-                        <span className="flex size-5 shrink-0 items-center justify-center text-xs tabular-nums text-slate-300" aria-hidden="true">
+                        <span className="flex size-5 shrink-0 items-center justify-start text-xs tabular-nums text-slate-300" aria-hidden="true">
                           {items.length + 1}
                         </span>
                         <UiInput
@@ -1339,12 +1346,12 @@ export function QuestionInlineEditor({
             {Array.from({ length: ratingPreviewMax }, (_, index) => (
               <div
                 key={index + 1}
-                className="flex min-w-10 flex-1 flex-col items-center gap-2 text-base text-slate-700"
+                className="flex min-w-10 flex-1 flex-col items-center gap-1 text-center text-sm text-slate-700"
               >
                 <span>{index + 1}</span>
                 <RatingPreviewIcon
                   aria-hidden="true"
-                  className="size-7 text-slate-500"
+                  className="size-5 text-slate-500"
                   strokeWidth={1.8}
                 />
               </div>
@@ -1380,7 +1387,7 @@ export function QuestionInlineEditor({
             <span className="size-4"><DropdownMenu.ItemIndicator><Check className="size-4" /></DropdownMenu.ItemIndicator></span>설명
           </DropdownMenu.CheckboxItem>
         </DropdownMenu.Content></DropdownMenu.Portal>
-      </DropdownMenu.Root> : null) : footer) : <div className="mt-5 border-t border-slate-100 pt-4">
+      </DropdownMenu.Root> : null) : footer) : <div className="mt-6 border-t border-slate-100 pt-4">
         <div className="flex flex-wrap items-center justify-end gap-3">
           {!isOngoing && (onDuplicate || onDelete) ? (
             <div className="flex items-center gap-1">
@@ -1549,6 +1556,8 @@ export function TitleDescriptionInlineEditor({
     }
   };
 
+  useDebouncedEditorSave(form, handleSave, !isOngoing);
+
   useEffect(() => {
     if (!commitRef) return;
     commitRef.current = handleSave;
@@ -1627,7 +1636,7 @@ export function TitleDescriptionInlineEditor({
           </div>
         ) : null}
       </div>
-      <div className="mt-5 border-t border-slate-100 pt-4">
+      <div className="mt-6 border-t border-slate-100 pt-4">
         <div className="flex items-center justify-end gap-1">
           {onDuplicate ? (
             <IconButton type="button" size="sm" aria-label="제목 및 설명 복제" data-tooltip="문항 복제" disabled={isOngoing || saving} onClick={() => void onDuplicate()}>

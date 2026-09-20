@@ -21,6 +21,7 @@
     "src/lib/site-content-value.ts",
     "src/lib/draft-storage.ts",
     "src/lib/survey-display.ts",
-    "src/lib/survey-results-display.ts"
+    "src/lib/survey-results-display.ts",
+    "src/features/admin-finance/fee-trend.ts"
   ]
 }

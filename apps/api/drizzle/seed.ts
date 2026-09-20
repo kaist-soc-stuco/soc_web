@@ -1,9 +1,10 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 
 import {
   articleAssets,
@@ -18,6 +19,7 @@ import {
   roleGroupPermissions,
   roleGroups,
   surveyQuestions,
+  surveyResponses,
   surveySections,
   surveys,
   siteContents,
@@ -942,36 +944,68 @@ const OPERATIONAL_SURVEY_SEEDS: OperationalSurveySeed[] = [
     kind: "SURVEY",
     titleKo: "전산학부 학번톡 초대 요청",
     titleEn: "SoC Cohort Chat Invitation Request",
-    descriptionKo: "전산학부 주전공 학생의 학번별 카카오톡 대화방 초대를 요청합니다.",
-    descriptionEn: "Request an invitation to the cohort KakaoTalk chat for School of Computing primary-major students.",
-    eligibleSocAffiliations: ["PRIMARY"],
+    descriptionKo: "전산학부 주전공·복수전공·부전공 학생 중 학번별 카카오톡 대화방에 초대되지 않은 학생을 위한 신청서입니다. 매주 월요일에 신청을 취합하여 초대합니다.",
+    descriptionEn: "For School of Computing major, double-major, and minor students who have not joined their cohort KakaoTalk chat. Requests are collected every Monday.",
+    eligibleSocAffiliations: [],
     academicEligibility: "ENROLLED_OR_LEAVE",
     allowAnonymous: false,
     allowMultipleResponses: false,
     questions: [
       {
-        id: "7a130000-0000-4000-8000-000000000001",
-        titleKo: "초대를 받을 카카오톡 ID 또는 전화번호",
-        titleEn: "KakaoTalk ID or phone number for the invitation",
-        descriptionKo: "초대 확인에 필요한 연락처만 입력해 주세요.",
-        descriptionEn: "Enter only the contact information needed for the invitation.",
-        questionType: "short_text",
-        sortOrder: 0,
+        "id": "7a130000-0000-4000-8000-000000000101",
+        "titleKo": "이메일",
+        "titleEn": "Email",
+        "questionType": "short_text",
+        "sortOrder": 0
       },
       {
-        id: "7a130000-0000-4000-8000-000000000002",
-        titleKo: "입학 연도",
-        titleEn: "Admission year",
-        questionType: "short_text",
-        sortOrder: 1,
+        "id": "7a130000-0000-4000-8000-000000000102",
+        "titleKo": "이름을 적어주세요.",
+        "titleEn": "Please write down your name.",
+        "questionType": "short_text",
+        "sortOrder": 1
       },
       {
-        id: "7a130000-0000-4000-8000-000000000003",
-        titleKo: "연락처를 학번톡 초대 목적으로 사용하는 데 동의합니다.",
-        titleEn: "I agree that my contact information may be used for the cohort chat invitation.",
-        questionType: "single_choice",
-        options: [{ value: "agree", labelKo: "동의합니다", labelEn: "I agree" }],
-        sortOrder: 2,
+        "id": "7a130000-0000-4000-8000-000000000103",
+        "titleKo": "학번을 적어주세요.",
+        "titleEn": "Please write down your student number.",
+        "questionType": "short_text",
+        "descriptionKo": "예: 20241234",
+        "descriptionEn": "Example: 20241234",
+        "sortOrder": 2
+      },
+      {
+        "id": "7a130000-0000-4000-8000-000000000104",
+        "titleKo": "자신의 전산학부 전공 유형을 선택해주세요.",
+        "titleEn": "Please choose your type of major in School of Computing",
+        "questionType": "single_choice",
+        "options": [
+          {
+            "value": "primary",
+            "labelKo": "주전공",
+            "labelEn": "Major"
+          },
+          {
+            "value": "double",
+            "labelKo": "복수전공",
+            "labelEn": "Double major"
+          },
+          {
+            "value": "minor",
+            "labelKo": "부전공",
+            "labelEn": "Minor"
+          }
+        ],
+        "sortOrder": 3
+      },
+      {
+        "id": "7a130000-0000-4000-8000-000000000105",
+        "titleKo": "전화번호를 적어주세요.",
+        "titleEn": "Please write down your telephone number.",
+        "questionType": "short_text",
+        "descriptionKo": "예: 010-1234-5678",
+        "descriptionEn": "Example: 010-1234-5678",
+        "sortOrder": 4
       },
     ],
   },
@@ -1040,74 +1074,176 @@ const OPERATIONAL_SURVEY_SEEDS: OperationalSurveySeed[] = [
     sectionTitleKo: "홍보 신청 정보",
     sectionTitleEn: "Promotion request details",
     kind: "SURVEY",
-    titleKo: "외부 홍보글 게시 요청",
-    titleEn: "External Promotion Post Request",
-    descriptionKo: "전산학부 구성원을 대상으로 하는 외부 행사, 채용, 연구실 등의 홍보글 게시를 요청합니다. 제출한 내용은 담당자가 검토하며, 제출만으로 게시 여부나 일정이 확정되지는 않습니다.",
-    descriptionEn: "Request publication of external events, recruitment, research lab opportunities, and other announcements for the School of Computing community. Requests are reviewed by staff; submission does not guarantee publication or a publication date.",
+    titleKo: "2026학년도 전산학부 채팅방 홍보 요청 양식",
+    titleEn: "2026 SoC Chat room promotion request form",
+    descriptionKo: `[2026학년도 전산학부 채팅방 홍보 요청 안내] [Guide for SoC Chat room promotion request in 2026] (Only for Korean Speakers)(Not Translated)
+
+안녕하세요, KAIST 전산학부 집행위원회입니다.
+집행위원회에서는 전산학부 학생들에게 이익이 될 수 있는 학과 외부의 정보를 공유하기 위해, 외부 홍보 글 게시 요청을 받고 있습니다. KAIST 전산학부 학생들을 대상으로 홍보를 원하는 내용이 있으신 경우, 아래의 안내를 따라주시기를 바랍니다.
+
+1️⃣ 게시 대상 및 방법
+- 전산학부 게시판 (https://c11.kr/kaistsoc)에 게시
+- 매주 월요일에 학번별 채팅방에 홍보 글 목록 게시 (더 빠른 홍보를 원할 경우 아래 메일을 통해 문의 바랍니다.)
+- 2026학년도에 접수된 홍보 글은 20~25학번 채팅방에 공지될 예정입니다.
+
+2️⃣ 승인 절차
+- 구글 설문지 (https://bit.ly/4bF7Zi)를 통해 홍보 요청 양식을 제출합니다.
+- 문서 하단의 '4. 승인 기준'에 따라 검토 후 승인되는 경우, 전산학부 게시판에 업로드 이후 매주 월요일에 학번별 채팅방에 게시됩니다.
+- 문서의 보완이 필요하거나 채팅방 성격에 맞지 않는 공지인 경우, 기재해주신 연락처로 연락드릴 예정입니다.
+
+3️⃣ 문의처
+- 전산학부 학생회장 변희승: 010-3543-6050
+- 전산학부 집행위원회 공식 메일: kaist.helloworld@gmail.com
+
+4️⃣ 승인 기준
+1. 전산학부 학생들에게 이익이 되는 내용이어야 합니다.
+2. 형평성에 어긋나는 내용이 없어야 합니다. (예시: 설명회의 여러 부스 중 특정 부스만 따로 홍보하는 경우)
+3. 아래의 내용을 포함해야 합니다.
+[공통]
+- 홍보를 요청하는 회사/개인에 대한 간단한 설명
+- 실제 연락이 가능한 회사/담당자 이메일 또는 전화번호 등
+[채용 공고/인원 모집의 경우]
+- 스타트업의 경우 회사 이름, 사업 아이템 소개, 비전 등
+- 모집 기간, 포지션, 각 포지션에 대한 설명, 인원, 대우 등 (첨부된 링크에 포함된 경우에도 인정)
+[행사/대회/설명회의 경우]
+- 행사/대회에 대한 소개, 날짜 또는 기간 등
+- 사전 신청이 필요한 경우 사전 신청 기간, 방법, 참고 링크 등`,
+    descriptionEn: `[Guide for SoC Chat room promotion request in 2026] (Only for Korean Speakers)(Not Translated)
+
+This form is for requesting promotion of external events, recruitment, research opportunities, and other information for School of Computing students. Please follow the Korean guide above when submitting a request.`,
     eligibleSocAffiliations: [],
     academicEligibility: "ANY",
     allowAnonymous: true,
     allowMultipleResponses: true,
     questions: [
       {
-        id: "7a130000-0000-4000-8000-000000000031",
-        titleKo: "홍보 카테고리",
-        titleEn: "Promotion category",
-        questionType: "dropdown",
-        options: [
-          { value: "event", labelKo: "행사", labelEn: "Event" },
-          { value: "recruitment", labelKo: "채용", labelEn: "Recruitment" },
-          { value: "competition", labelKo: "공모전·대회", labelEn: "Competition" },
-          { value: "lab", labelKo: "연구실", labelEn: "Research lab" },
-          { value: "other", labelKo: "기타", labelEn: "Other" },
+        "id": "7a130000-0000-4000-8000-000000000034",
+        "titleKo": "이메일",
+        "titleEn": "Email",
+        "questionType": "short_text",
+        "sortOrder": 0
+      },
+      {
+        "id": "7a130000-0000-4000-8000-000000000032",
+        "titleKo": "홍보를 요청하는 회사/단체/개인의 이름을 입력해 주세요.",
+        "titleEn": "Name of the company, organization, research lab, or individual",
+        "questionType": "short_text",
+        "sortOrder": 1
+      },
+      {
+        "id": "7a130000-0000-4000-8000-000000000039",
+        "titleKo": "연락처를 입력해 주세요.",
+        "titleEn": "Contact information",
+        "questionType": "short_text",
+        "sortOrder": 2
+      },
+      {
+        "id": "7a130000-0000-4000-8000-000000000031",
+        "titleKo": "홍보 내용에 가장 가까운 분류를 선택해 주세요.",
+        "titleEn": "Promotion category",
+        "questionType": "dropdown",
+        "options": [
+          {
+            "value": "course",
+            "labelKo": "수강",
+            "labelEn": "Course"
+          },
+          {
+            "value": "competition",
+            "labelKo": "대회",
+            "labelEn": "Competition"
+          },
+          {
+            "value": "work",
+            "labelKo": "근로",
+            "labelEn": "Work"
+          },
+          {
+            "value": "recruitment",
+            "labelKo": "채용",
+            "labelEn": "Recruitment"
+          },
+          {
+            "value": "event",
+            "labelKo": "행사",
+            "labelEn": "Event"
+          },
+          {
+            "value": "lab",
+            "labelKo": "연구실",
+            "labelEn": "Research lab"
+          },
+          {
+            "value": "other",
+            "labelKo": "기타",
+            "labelEn": "Other"
+          }
         ],
-        sortOrder: 0,
+        "sortOrder": 3
       },
       {
-        id: "7a130000-0000-4000-8000-000000000032",
-        titleKo: "기관·단체·연구실명",
-        titleEn: "Organization or research lab name",
-        questionType: "short_text",
-        sortOrder: 1,
+        "id": "7a130000-0000-4000-8000-000000000040",
+        "titleKo": "홍보를 요청할 글의 제목을 입력해 주세요.",
+        "titleEn": "Title of the requested promotion post",
+        "questionType": "short_text",
+        "sortOrder": 4
       },
       {
-        id: "7a130000-0000-4000-8000-000000000033",
-        titleKo: "담당자 이름",
-        titleEn: "Contact name",
-        questionType: "short_text",
-        sortOrder: 2,
+        "id": "7a130000-0000-4000-8000-000000000035",
+        "titleKo": "홍보를 요청할 글을 입력해 주세요.",
+        "titleEn": "Requested promotion post",
+        "questionType": "long_text",
+        "sortOrder": 5
       },
       {
-        id: "7a130000-0000-4000-8000-000000000034",
-        titleKo: "회신 받을 이메일",
-        titleEn: "Reply email",
-        questionType: "short_text",
-        sortOrder: 3,
+        "id": "7a130000-0000-4000-8000-000000000041",
+        "titleKo": "글과 함께 첨부할 사진 등의 자료가 있다면 업로드해 주세요.",
+        "titleEn": "Upload any images or supporting materials.",
+        "questionType": "file_upload",
+        "isRequired": false,
+        "config": {
+          "maxFiles": 10,
+          "maxSizeBytes": 10000000,
+          "allowedMimeTypes": [
+            "application/pdf",
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/gif",
+            "audio/mpeg",
+            "audio/wav",
+            "video/mp4",
+            "video/webm"
+          ]
+        },
+        "sortOrder": 6
       },
       {
-        id: "7a130000-0000-4000-8000-000000000035",
-        titleKo: "게시를 원하는 내용",
-        titleEn: "Requested post content",
-        questionType: "long_text",
-        sortOrder: 4,
+        "id": "7a130000-0000-4000-8000-000000000036",
+        "titleKo": "홍보를 시작할 날짜를 입력해 주세요.",
+        "titleEn": "Promotion start date",
+        "questionType": "date",
+        "descriptionKo": "게시판 업로드 기준입니다. 채팅방 업로드는 1주간 게시판에 업로드된 글에 대해 매주 월요일에 실시됩니다.",
+        "descriptionEn": "The date refers to publication on the board. Posts uploaded during the week are shared in cohort chats every Monday.",
+        "sortOrder": 7
       },
       {
-        id: "7a130000-0000-4000-8000-000000000036",
-        titleKo: "게시 희망일",
-        titleEn: "Preferred publication date",
-        questionType: "date",
-        sortOrder: 5,
+        "id": "7a130000-0000-4000-8000-000000000038",
+        "titleKo": "홍보를 끝낼 날짜를 입력해 주세요.",
+        "titleEn": "Promotion end date",
+        "questionType": "date",
+        "sortOrder": 8
       },
       {
-        id: "7a130000-0000-4000-8000-000000000037",
-        titleKo: "포스터와 참고 자료 링크",
-        titleEn: "Poster and supporting material links",
-        descriptionKo: "담당자가 열람할 수 있는 링크를 입력해 주세요.",
-        descriptionEn: "Provide links that the reviewing staff can access.",
-        questionType: "long_text",
-        isRequired: false,
-        sortOrder: 6,
-      },
+        "id": "7a130000-0000-4000-8000-000000000037",
+        "titleKo": "포스터와 참고 자료 링크",
+        "titleEn": "Poster and supporting material links",
+        "questionType": "long_text",
+        "descriptionKo": "로그인 없이 자료를 전달하려면 담당자가 열람할 수 있는 공유 링크를 입력해 주세요.",
+        "descriptionEn": "To provide materials without signing in, enter a shared link that staff can access.",
+        "isRequired": false,
+        "sortOrder": 9
+      }
     ],
   },
 ];
@@ -2058,7 +2194,7 @@ async function seedAboutPageContent(seedAuthorId: string) {
       },
     });
 
-  await db.insert(executiveContacts).values([
+  const referenceContacts = [
     {
       nameKo: "김성찬",
       nameEn: "Seongchan Kim",
@@ -2115,7 +2251,32 @@ async function seedAboutPageContent(seedAuthorId: string) {
       privacyConsented: true,
       sortOrder: 3,
     },
-  ]);
+  ];
+
+  // Contacts are identified by the stable student number/email pair, not the
+  // generated UUID. Keep the reference rows idempotent so running the seed in
+  // local and production environments does not append another copy each time.
+  for (const contact of referenceContacts) {
+    const matches = await db
+      .select({ id: executiveContacts.id })
+      .from(executiveContacts)
+      .where(or(
+        eq(executiveContacts.studentNumber, contact.studentNumber),
+        eq(executiveContacts.email, contact.email),
+      ))
+      .orderBy(asc(executiveContacts.createdAt), asc(executiveContacts.id));
+    const [keeper, ...duplicates] = matches;
+
+    if (!keeper) {
+      await db.insert(executiveContacts).values(contact);
+      continue;
+    }
+
+    await db.update(executiveContacts).set({ ...contact, updatedAt: new Date() }).where(eq(executiveContacts.id, keeper.id));
+    if (duplicates.length > 0) {
+      await db.delete(executiveContacts).where(inArray(executiveContacts.id, duplicates.map(({ id }) => id)));
+    }
+  }
 
   console.log("Seeded pledge progress and executive contacts");
 }
@@ -2403,6 +2564,53 @@ async function createSurveyWithQuestions(
 
 async function seedOperationalSurveys() {
   for (const seed of OPERATIONAL_SURVEY_SEEDS) {
+    // Refresh only pristine reference forms. Never mix new questions into a
+    // customized form or change the meaning of questions with saved responses.
+    const [existing] = await db.select().from(surveys).where(eq(surveys.surveyId, seed.surveyId));
+    if (existing) {
+      const [response] = await db.select({ id: surveyResponses.id }).from(surveyResponses)
+        .where(eq(surveyResponses.surveyId, seed.surveyId)).limit(1);
+      const sections = await db.select().from(surveySections).where(eq(surveySections.surveyId, seed.surveyId));
+      const questions = sections.length ? await db.select().from(surveyQuestions)
+        .where(inArray(surveyQuestions.sectionId, sections.map(section => section.id))) : [];
+      const unchanged = questions.length === seed.questions.length && seed.questions.every(definition => {
+        const row = questions.find(question => question.id === definition.id);
+        return row && row.titleKo === definition.titleKo && row.titleEn === definition.titleEn &&
+          row.descriptionKo === (definition.descriptionKo ?? null) && row.descriptionEn === (definition.descriptionEn ?? null) &&
+          row.questionType === definition.questionType && row.sortOrder === definition.sortOrder &&
+          row.isRequired === (definition.isRequired ?? true) &&
+          isDeepStrictEqual(row.options, definition.options ?? null) &&
+          isDeepStrictEqual(row.config, definition.config ?? null);
+      });
+      if (unchanged && existing.descriptionKo === seed.descriptionKo && existing.descriptionEn === seed.descriptionEn &&
+        JSON.stringify(existing.eligibleSocAffiliations) === JSON.stringify(seed.eligibleSocAffiliations)) continue;
+      const pristine = existing.creatorId === null && !response &&
+        existing.createdAt.getTime() === existing.updatedAt.getTime() &&
+        sections.length === 1 && sections[0].id === seed.sectionId &&
+        sections.every(row => row.createdAt.getTime() === row.updatedAt.getTime()) &&
+        questions.every(row => row.createdAt.getTime() === row.updatedAt.getTime() && row.id.startsWith("7a130000-0000-4000-8000-"));
+      if (!pristine) {
+        console.log(`Preserved existing operational survey: ${seed.surveyId}`);
+        continue;
+      }
+      await db.transaction(async tx => {
+        // Prevent a submission from appearing between the check and replacement.
+        await tx.execute(sql`LOCK TABLE survey_responses IN SHARE ROW EXCLUSIVE MODE`);
+        const [latestResponse] = await tx.select({ id: surveyResponses.id }).from(surveyResponses)
+          .where(eq(surveyResponses.surveyId, seed.surveyId)).limit(1);
+        if (latestResponse) return;
+        await tx.delete(surveyQuestions).where(eq(surveyQuestions.sectionId, seed.sectionId));
+        await tx.update(surveys).set({
+          titleKo: seed.titleKo, titleEn: seed.titleEn,
+          descriptionKo: seed.descriptionKo, descriptionEn: seed.descriptionEn,
+          eligibleSocAffiliations: seed.eligibleSocAffiliations,
+        }).where(eq(surveys.surveyId, seed.surveyId));
+        await tx.insert(surveyQuestions).values(seed.questions.map(question => ({
+          ...question, sectionId: seed.sectionId, isRequired: question.isRequired ?? true,
+        })));
+      });
+      continue;
+    }
     await db
       .insert(surveys)
       .values({

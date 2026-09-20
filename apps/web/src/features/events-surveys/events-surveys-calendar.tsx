@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { KoreanHolidayRecord } from "@soc/contracts";
-import { localDate, nowDate } from "@soc/shared";
+import { localDate } from "@soc/shared";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import type { Language } from "@/hooks/use-language";
@@ -11,14 +11,11 @@ import {
   type CalendarEvent,
 } from "@/lib/events-surveys";
 import { EventsSurveysCalendarGrid } from "./events-surveys-calendar-grid";
-import { EventsSurveysCalendarManagement } from "./events-surveys-calendar-management";
 import { EventsSurveysDayDetails } from "./events-surveys-day-details";
 import {
   buildCalendarGrid,
-  toDateKey,
 } from "./events-surveys-calendar-utils";
 import { IconButton } from "@/components/ui/icon-button";
-import { Button } from "@/components/ui/button";
 import { PageSearchField } from "@/components/ui/page-layout";
 
 interface EventsSurveysCalendarProps {
@@ -76,18 +73,28 @@ export function EventsSurveysCalendar({
     lang === "ko"
       ? ["일", "월", "화", "수", "목", "금", "토"]
       : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const handleToday = () => {
-    const today = nowDate();
-    onCurrentDateChange(localDate(today.getFullYear(), today.getMonth(), 1));
-    onSelectedDateChange(today);
-  };
-
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-4">
         <div className="flex h-full min-w-0 flex-col rounded-lg border border-card-border-subtle bg-white p-4 sm:p-5 lg:col-span-3">
-          <div className="mb-5 grid min-w-0 grid-cols-1 items-center gap-3 border-b border-slate-200 pb-4 select-none sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-            <div className="hidden sm:block" aria-hidden="true" />
+          <div className="mb-3 grid min-w-0 grid-cols-1 items-center gap-2 border-b border-slate-200 pb-3 select-none sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+            <div
+              className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--ui-text-caption-size)] font-semibold text-slate-500"
+              aria-label={lang === "ko" ? "캘린더 공급원 안내" : "Calendar sources"}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-brand-primary" aria-hidden="true" />
+                {lang === "ko" ? "학생회 행사·일정" : "Council Schedule"}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-sky-500" aria-hidden="true" />
+                {lang === "ko" ? "설문" : "Surveys"}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-slate-400" aria-hidden="true" />
+                {lang === "ko" ? "학사일정" : "Academic schedule"}
+              </span>
+            </div>
             <div className="flex min-w-0 flex-wrap items-center justify-center gap-1.5 sm:gap-2">
               <IconButton
                 size="md"
@@ -114,15 +121,6 @@ export function EventsSurveysCalendar({
               >
                 <ChevronRight className="h-4 w-4" />
               </IconButton>
-              <Button
-                className="min-h-11 px-3 text-xs"
-                onClick={handleToday}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                {lang === "ko" ? "오늘" : "Today"}
-              </Button>
             </div>
             <div className="min-w-0 w-full justify-self-end sm:max-w-56">
               <PageSearchField
@@ -134,27 +132,6 @@ export function EventsSurveysCalendar({
                 value={calendarQuery}
               />
             </div>
-          </div>
-
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div
-              className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[length:var(--ui-text-caption-size)] font-semibold text-slate-500"
-              aria-label={lang === "ko" ? "캘린더 공급원 안내" : "Calendar sources"}
-            >
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-brand-primary" aria-hidden="true" />
-                {lang === "ko" ? "학생회 행사·일정" : "Council Schedule"}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-sky-500" aria-hidden="true" />
-                {lang === "ko" ? "설문" : "Surveys"}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-slate-400" aria-hidden="true" />
-                {lang === "ko" ? "학사일정" : "Academic schedule"}
-              </span>
-            </div>
-            <EventsSurveysCalendarManagement />
           </div>
 
           <div

@@ -1,16 +1,16 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Download, FileSpreadsheet, MoreVertical, SquareCheck, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { SurveyQuestionInput } from "@/features/survey/survey-question-input";
 import { answerContentToValue } from "@/features/survey/survey-answer-utils";
-import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import { formatKoreanDateTime } from "@soc/shared";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/data-state";
 import { UiInput } from "@/components/ui/form-control";
 import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -53,6 +53,7 @@ export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sh
   };
   const [params, setParams] = useSearchParams();
   const view = params.get("view") === "questions" ? "questions" : params.get("view") === "individual" ? "individual" : "summary";
+  const [renderedView, setRenderedView] = useState(view);
   const responseId = params.get("response");
   const page = positiveInteger(params.get(view === "individual" ? "entry" : "answerPage"));
   const pageSize = view === "individual" ? 1 : 50;
@@ -66,6 +67,7 @@ export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sh
   const records = useQuery({
     queryKey: ["survey-response-records", surveyId, page, pageSize],
     queryFn: () => client.listResponsesWithAnswers(surveyId, { page, pageSize, sortOrder: "asc" }),
+    placeholderData: (previousData) => previousData,
   });
   const selected = useQuery({ queryKey: ["survey-response", surveyId, responseId], queryFn: () => client.getResponseDetail(surveyId, responseId!), enabled: view === "individual" && Boolean(responseId) });
   const questions = definition.data?.sections.flatMap((section) => section.questions) ?? [];
@@ -73,14 +75,28 @@ export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sh
   const question = questions[questionIndex];
   const response = responseId ? selected.data : records.data?.items[0];
   const total = records.data?.total ?? statistics.data?.totalResponses ?? 0;
-  const pages = Math.max(1, Math.ceil(total / pageSize));
-  const pending = definition.isPending || statistics.isPending || records.isPending;
+  const renderedPage = positiveInteger(params.get(renderedView === "individual" ? "entry" : "answerPage"));
+  const renderedPageSize = renderedView === "individual" ? 1 : 50;
+  const renderedPages = Math.max(1, Math.ceil(total / renderedPageSize));
+  const pending = definition.isFetching || statistics.isFetching || records.isFetching || (view === "individual" && Boolean(responseId) && selected.isFetching);
   const error = definition.isError || statistics.isError || records.isError;
-  const setPage = (value: number) => update({ [view === "individual" ? "entry" : "answerPage"]: String(Math.max(1, Math.min(pages, value))), response: null });
+  const hasResponseData = Boolean(statistics.data || records.data || selected.data);
+  const contentView = pending ? renderedView : view;
+  useEffect(() => {
+    if (!pending && !error) setRenderedView(view);
+  }, [error, pending, view]);
+  const retryResponses = () => {
+    void Promise.all([
+      definition.refetch(),
+      statistics.refetch(),
+      records.refetch(),
+    ]);
+  };
+  const setPage = (value: number) => update({ [contentView === "individual" ? "entry" : "answerPage"]: String(Math.max(1, Math.min(renderedPages, value))), response: null });
   const pager = <div className="flex flex-wrap items-center justify-center gap-3">
-    <Button variant="ghost" size="icon" aria-label={view === "individual" ? "이전 응답" : "이전 페이지"} disabled={page <= 1} onClick={() => setPage(page - 1)}><ChevronLeft className="size-4" /></Button>
-    <label className="flex items-center gap-2 text-sm"><span className="sr-only">{view === "individual" ? "응답 번호" : "답변 페이지"}</span><UiInput aria-label={view === "individual" ? "응답 번호" : "답변 페이지"} type="number" min={1} max={pages} value={page} onChange={(event) => setPage(positiveInteger(event.currentTarget.value))} className="w-20 text-center" /> / {view === "individual" ? total : pages}</label>
-    <Button variant="ghost" size="icon" aria-label={view === "individual" ? "다음 응답" : "다음 페이지"} disabled={page >= pages} onClick={() => setPage(page + 1)}><ChevronRight className="size-4" /></Button>
+    <Button variant="ghost" size="icon" aria-label={contentView === "individual" ? "이전 응답" : "이전 페이지"} disabled={renderedPage <= 1} onClick={() => setPage(renderedPage - 1)}><ChevronLeft className="size-4" /></Button>
+    <label className="flex items-center gap-2 text-sm"><span className="sr-only">{contentView === "individual" ? "응답 번호" : "답변 페이지"}</span><UiInput aria-label={contentView === "individual" ? "응답 번호" : "답변 페이지"} type="number" min={1} max={renderedPages} value={renderedPage} onChange={(event) => setPage(positiveInteger(event.currentTarget.value))} className={`${contentView === "individual" ? "w-14" : "w-20"} text-center`} /> / {contentView === "individual" ? total : renderedPages}</label>
+    <Button variant="ghost" size="icon" aria-label={contentView === "individual" ? "다음 응답" : "다음 페이지"} disabled={renderedPage >= renderedPages} onClick={() => setPage(renderedPage + 1)}><ChevronRight className="size-4" /></Button>
   </div>;
 
 
@@ -132,9 +148,14 @@ export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sh
       <p>응답 {total}개를 모두 삭제하시겠습니까? 삭제한 응답은 복구할 수 없습니다.</p>
       {definition.data?.spreadsheetUrl && <p className="mt-3 text-sm text-slate-500">연결된 Sheets의 응답도 동기화됩니다.</p>}
     </Modal>
-    {pending ? <p role="status">응답을 불러오는 중입니다.</p> : error ? <p role="alert">응답을 불러오지 못했습니다. 새로고침으로 다시 시도해 주세요.</p> : total === 0 ? <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-500">아직 제출된 응답이 없습니다.</div> : <>
-      {view !== "individual" && statistics.data ? <>
-        {view === "questions" && question ? <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
+    {error ? <ErrorState
+      className="rounded-xl border border-slate-200 bg-white shadow-[0_8px_28px_rgba(15,23,42,0.04)]"
+      description="일시적인 네트워크 오류일 수 있습니다. 잠시 후 다시 시도해 주세요."
+      onRetry={retryResponses}
+      title="응답을 불러오지 못했습니다."
+    /> : pending && !hasResponseData ? null : total === 0 ? <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-500">아직 제출된 응답이 없습니다.</div> : <>
+      {contentView !== "individual" && statistics.data ? <>
+        {contentView === "questions" && question ? <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
           <SelectDropdown
             ariaLabel="질문 선택"
             className="min-w-0 flex-1"
@@ -144,15 +165,19 @@ export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sh
           />
           <Button variant="outline" size="sm" disabled={questionIndex === 0} onClick={() => update({ question: questions[questionIndex - 1].id })}>이전 질문</Button><span className="text-sm">{questionIndex + 1} / {questions.length}</span><Button variant="outline" size="sm" disabled={questionIndex >= questions.length - 1} onClick={() => update({ question: questions[questionIndex + 1].id })}>다음 질문</Button>
         </div> : null}
-        {view === "summary" ? <SurveyQuestionSummary analytics={statistics.data} questions={questions} responses={records.data?.items ?? []} /> : question ? <div className="space-y-3"><h3 className="px-1 font-semibold">{stripRichText(question.titleKo)}</h3>{Array.from((records.data?.items ?? []).reduce((groups, entry) => {
+        {contentView === "summary" ? <SurveyQuestionSummary analytics={statistics.data} questions={questions} responses={records.data?.items ?? []} /> : question ? <div className="space-y-3"><h3 className="px-1 font-semibold">{stripRichText(question.titleKo)}</h3>{Array.from((records.data?.items ?? []).reduce((groups, entry) => {
  const text = formatSurveyAnswer(entry.answers.find(a=>a.questionId===question.id),question) || "응답 없음";
  const list=groups.get(text) ?? [];list.push(entry.id);groups.set(text,list);return groups;
 },new Map<string,string[]>())).map(([text,ids])=><article key={text} className="rounded-xl border border-slate-200 bg-white p-5"><p className="whitespace-pre-wrap break-words">{text}</p><div className="mt-4 border-t border-slate-100 pt-3"><span className="text-sm text-slate-500">응답 {ids.length}개</span><div className="mt-2 flex flex-wrap gap-2">{ids.map((id,index)=><Button key={id} variant="ghost" size="sm" onClick={()=>update({view:"individual",response:id})}>개별 응답 {index+1}</Button>)}</div></div></article>)}</div> : null}
-        {total > pageSize ? <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4"><p className="text-center text-sm text-slate-500">{view === "questions" ? `현재 페이지의 응답 ${pageSize}개를 기준으로 답변을 묶어 표시합니다.` : `집계는 전체 응답 기준입니다. 서술형·첨부 답변은 ${pageSize}개씩 표시합니다.`}</p>{pager}</div> : null}
+        {total > renderedPageSize ? <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4"><p className="text-center text-sm text-slate-500">{contentView === "questions" ? `현재 페이지의 응답 ${renderedPageSize}개를 기준으로 답변을 묶어 표시합니다.` : `집계는 전체 응답 기준입니다. 서술형·첨부 답변은 ${renderedPageSize}개씩 표시합니다.`}</p>{pager}</div> : null}
       </> : null}
-      {view === "individual" ? <>
+      {contentView === "individual" ? <>
         <div className="rounded-xl border border-slate-200 bg-white p-4">{responseId ? <Button variant="outline" onClick={() => update({ response: null, entry: "1" })}>전체 응답 순서로 보기</Button> : pager}</div>
-        {selected.isError && responseId ? <p role="alert">선택한 응답을 찾을 수 없습니다.</p> : !response ? <p role="status">{responseId && selected.isPending ? "응답을 불러오는 중입니다." : "이 번호에 응답이 없습니다. 이전 응답을 선택해 주세요."}</p> : <>
+        {selected.isError && responseId ? <ErrorState
+          className="rounded-xl border border-slate-200 bg-white"
+          description="다른 응답을 선택해 다시 확인해 주세요."
+          title="선택한 응답을 찾을 수 없습니다."
+        /> : !response ? responseId && selected.isPending ? <div aria-busy="true" className="min-h-24" /> : <p role="status">이 번호에 응답이 없습니다. 이전 응답을 선택해 주세요.</p> : <>
           <div className="rounded-xl border border-slate-200 bg-white p-5"><h3 className="font-semibold">{response.user?.nameKo ?? "익명 응답"}</h3><p className="mt-1 text-sm text-slate-500">{response.submittedAt ? formatKoreanDateTime(response.submittedAt) : "미제출"} · 읽기 전용</p></div>
           {questions.map((item, index) => {
             const answer = response.answers.find((value) => value.questionId === item.id);

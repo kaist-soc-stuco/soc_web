@@ -22,7 +22,9 @@ export const VoteItemInputSchema = z.object({
   titleEn: z.string().trim().max(500).nullable().optional(),
   descriptionKo: z.string().trim().max(5_000).nullable().optional(),
   descriptionEn: z.string().trim().max(5_000).nullable().optional(),
+  imageUrl: z.string().trim().max(2_000).nullable().optional(),
   type: VoteItemTypeSchema,
+  selectionErrorMessage: z.string().trim().max(500).nullable().optional(),
   selectionRule: z.enum(["max", "min", "exact"]).optional(),
   maxSelections: z.number().int().min(1).max(100).default(1),
   options: z.array(VoteOptionInputSchema).min(2).max(100),
@@ -106,7 +108,9 @@ export interface VoteItemRecord {
   titleEn: string | null;
   descriptionKo: string | null;
   descriptionEn: string | null;
+  imageUrl: string | null;
   type: VoteItemType;
+  selectionErrorMessage?: string | null;
   selectionRule?: "max" | "min" | "exact";
   maxSelections: number;
   sortOrder: number;

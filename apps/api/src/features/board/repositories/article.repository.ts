@@ -240,6 +240,7 @@ export class ArticleRepository {
         updatedAt: articles.updatedAt,
         authorId: users.userId,
         authorName: users.nameKo,
+        authorNameEn: users.nameEn,
         viewCount: articles.viewCount,
         likeCount: articleEngagementCount("LIKE"),
         scrapCount: articleEngagementCount("SCRAP"),
@@ -302,6 +303,7 @@ export class ArticleRepository {
         author: {
           userId: String(row.authorId ?? ""),
           name: row.authorName ?? "unknown",
+          nameEn: row.authorNameEn,
         },
         commentCount: Number(row.commentCount ?? 0),
         viewCount: row.viewCount,
@@ -412,6 +414,7 @@ export class ArticleRepository {
         updatedAt: articles.updatedAt,
         authorId: users.userId,
         authorName: users.nameKo,
+        authorNameEn: users.nameEn,
         viewCount: articles.viewCount,
         likeCount: articleEngagementCount("LIKE"),
         scrapCount: articleEngagementCount("SCRAP"),
@@ -477,6 +480,7 @@ export class ArticleRepository {
         author: {
           userId: String(row.authorId ?? ""),
           name: row.authorName ?? "unknown",
+          nameEn: row.authorNameEn,
         },
         commentCount: Number(row.commentCount ?? 0),
         viewCount: row.viewCount,
@@ -549,6 +553,7 @@ export class ArticleRepository {
         updatedAt: articles.updatedAt,
         authorId: users.userId,
         authorName: users.nameKo,
+        authorNameEn: users.nameEn,
         viewCount: articles.viewCount,
         likeCount: articleEngagementCount("LIKE"),
         scrapCount: articleEngagementCount("SCRAP"),
@@ -600,6 +605,7 @@ export class ArticleRepository {
       author: {
         userId: String(row.authorId ?? ""),
         name: row.authorName ?? "unknown",
+          nameEn: row.authorNameEn,
       },
       commentCount: 0, // Not needed for search
       viewCount: row.viewCount,
@@ -648,6 +654,7 @@ export class ArticleRepository {
         updatedAt: articles.updatedAt,
         authorId: users.userId,
         authorName: users.nameKo,
+        authorNameEn: users.nameEn,
         viewCount: articles.viewCount,
         commentCount: sql<number>`(
           select count(*)
@@ -715,6 +722,7 @@ export class ArticleRepository {
         postedAt: articles.postedAt,
         authorId: users.userId,
         authorName: users.nameKo,
+        authorNameEn: users.nameEn,
         isAnonymous: articles.isAnonymous,
       })
       .from(articles)
@@ -739,6 +747,7 @@ export class ArticleRepository {
         postedAt: articles.postedAt,
         authorId: users.userId,
         authorName: users.nameKo,
+        authorNameEn: users.nameEn,
         isAnonymous: articles.isAnonymous,
       })
       .from(articles)
@@ -778,6 +787,7 @@ export class ArticleRepository {
       author: {
         userId: String(row[0].authorId ?? ""),
         name: row[0].authorName ?? "unknown",
+          nameEn: row[0].authorNameEn,
       },
       canEdit: false,
       assets: assetRows.map((assetRow) => ({
@@ -825,6 +835,7 @@ export class ArticleRepository {
             author: {
               userId: String(prevRow[0].authorId ?? ""),
               name: prevRow[0].authorName ?? "unknown",
+          nameEn: prevRow[0].authorNameEn,
             },
           }
         : null,
@@ -838,6 +849,7 @@ export class ArticleRepository {
             author: {
               userId: String(nextRow[0].authorId ?? ""),
               name: nextRow[0].authorName ?? "unknown",
+          nameEn: nextRow[0].authorNameEn,
             },
           }
         : null,
@@ -970,6 +982,7 @@ export class ArticleRepository {
       .select({
         authorUserId: articles.authorUserId,
         authorName: users.nameKo,
+        authorNameEn: users.nameEn,
       })
       .from(articles)
       .innerJoin(users, eq(articles.authorUserId, users.userId))
@@ -1299,6 +1312,7 @@ export class ArticleRepository {
       .select({
         articleId: articles.articleId,
         authorName: users.nameKo,
+        authorNameEn: users.nameEn,
         hiddenAt: articles.hiddenAt,
         hiddenReason: articles.hiddenReason,
         titleKo: articles.titleKo,

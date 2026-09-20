@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   Query,
   Req,
+  UseGuards,
 } from "@nestjs/common";
 import {
   CalendarEventCreateSchema,
@@ -36,20 +37,22 @@ import type {
 import { isoToDate } from "@soc/shared";
 import type { Request } from "express";
 
-import { RequirePermissions } from "../auth/guards";
+import { OptionalAuthGuard, RequirePermissions } from "../auth/guards";
 import { auditMetadataFromRequest } from "../audit/audit-context";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { CalendarService } from "./calendar.service";
 import { seoulYear } from "./calendar.utils";
 
-type AuthenticatedRequest = Request & { user?: { id: string } };
+type AuthenticatedRequest = Request & { user?: { id: string; permission: number } };
 
 @Controller("calendar")
 export class CalendarController {
   constructor(private readonly calendarService: CalendarService) {}
 
   @Get("events")
+  @UseGuards(OptionalAuthGuard)
   async listPublicCalendarEvents(
+    @Req() req: AuthenticatedRequest,
     @Query("from") from: string,
     @Query("to") to: string,
     @Query("q") query?: string,
@@ -66,15 +69,17 @@ export class CalendarController {
       throw new BadRequestException("Date range is too large");
     }
 
-    return this.calendarService.listPublicCalendarEvents(fromDate, toDate, query);
+    return this.calendarService.listPublicCalendarEvents(fromDate, toDate, query, req.user);
   }
 
   @Get("search")
+  @UseGuards(OptionalAuthGuard)
   async searchPublicCalendarEvents(
+    @Req() req: AuthenticatedRequest,
     @Query("q") query?: string,
     @Query("limit", new ParseIntPipe({ optional: true })) limit?: number,
   ): Promise<PublicCalendarEventsResponse> {
-    return this.calendarService.searchPublicCalendarEvents(query, limit ?? 40);
+    return this.calendarService.searchPublicCalendarEvents(query, limit ?? 40, req.user);
   }
 
   @Get("manual")

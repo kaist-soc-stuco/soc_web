@@ -1,3 +1,4 @@
+import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { Permissions } from "@/lib/permissions";
@@ -117,36 +118,41 @@ export function VoteListPage() {
   const { data: session } = useCurrentSession();
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const [votes, setVotes] = useState<VoteRecord[]>([]);
+  const [period, setPeriod] = useState<DateRange>({ from: "", to: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    let active = true;
     setLoading(true);
     setError(null);
     void client
       .listPublicVotes()
-      .then(setVotes)
+      .then(result => { if (active) setVotes(result); })
       .catch(() => {
+        if (!active) return;
         setError(
           lang === "ko"
             ? "투표 목록을 불러오지 못했습니다."
             : "Failed to load votes.",
         );
       })
-      .finally(() => setLoading(false));
-  }, [client, lang, reloadKey]);
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [client, lang, reloadKey, session?.userId, session?.permission]);
 
   const now = nowMs();
-  const ongoingVotes = votes.filter((vote) => isOngoingVote(vote, now));
-  const upcomingVotes = votes.filter((vote) => isUpcomingVote(vote, now));
+  const filteredVotes = votes.filter(vote => (!period.from || isoToMs(vote.endsAt) >= isoToMs(`${period.from}T00:00:00+09:00`)) && (!period.to || isoToMs(vote.startsAt) <= isoToMs(`${period.to}T23:59:59.999+09:00`)));
+  const ongoingVotes = filteredVotes.filter((vote) => isOngoingVote(vote, now));
+  const upcomingVotes = filteredVotes.filter((vote) => isUpcomingVote(vote, now));
   const featuredVotes = [...ongoingVotes, ...upcomingVotes].sort((left, right) => {
     const leftIsOngoing = isOngoingVote(left, now);
     const rightIsOngoing = isOngoingVote(right, now);
     if (leftIsOngoing !== rightIsOngoing) return leftIsOngoing ? -1 : 1;
     return isoToMs(left.startsAt) - isoToMs(right.startsAt);
   });
-  const pastVotes = votes
+  const pastVotes = filteredVotes
     .filter((vote) => !isOngoingVote(vote, now) && !isUpcomingVote(vote, now))
     .sort((left, right) => isoToMs(right.startsAt) - isoToMs(left.startsAt));
 
@@ -160,6 +166,7 @@ export function VoteListPage() {
           actions={Permissions.has(session?.permission ?? 0, Permissions.MANAGE_VOTE) ? <Button asChild><Link to="/admin/votes/new"><Plus className="size-4" />{lang === "ko" ? "등록" : "Create"}</Link></Button> : undefined}
         />
         <PageContainer className="max-w-4xl pb-16">
+          <div className="mb-5 flex justify-end"><DateRangePicker lang={lang} value={period} onChange={setPeriod} /></div>
           {loading ? (
             <div className="py-20 text-center text-sm font-normal text-[#344054]">
               {lang === "ko" ? "불러오는 중..." : "Loading..."}
@@ -177,7 +184,7 @@ export function VoteListPage() {
             />
           ) : votes.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-200 py-20 text-center text-sm font-normal text-[#344054]">
-              {lang === "ko" ? "현재 공개된 투표가 없습니다." : "There are no published votes."}
+              {lang === "ko" ? "현재 참여할 수 있는 투표가 없습니다." : "There are no votes available to you."}
             </div>
           ) : (
             <div>

@@ -805,7 +805,6 @@ interface BoardWriteFooterProps {
   onSaveDraft?: () => void | Promise<void>;
   onSubmit: () => void;
   submitLabel?: string;
-  submittingLabel?: string;
 }
 
 export function BoardWriteFooter({
@@ -819,12 +818,8 @@ export function BoardWriteFooter({
   onSaveDraft,
   onSubmit,
   submitLabel,
-  submittingLabel,
 }: BoardWriteFooterProps) {
   const defaultSubmitLabel = lang === "ko" ? "등록" : "Publish Post";
-  const defaultSubmittingLabel = lang === "ko" ? "등록 중..." : "Publishing...";
-  const defaultSaveLabel = lang === "ko" ? "임시저장" : "Save draft";
-  const defaultSavingLabel = lang === "ko" ? "저장 중..." : "Saving...";
   const isSavingDraft = draftStatus === "saving";
 
   return (
@@ -842,20 +837,13 @@ export function BoardWriteFooter({
       ) : null}
       <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
         {leadingActions}
-        <Button
+        <Button loading={isSubmitting}
           type="button"
           onClick={onSubmit}
           disabled={isSubmitting || !canWriteSelected}
           className="h-[var(--ui-control-height)] min-w-0 px-3 !font-medium bg-kaist-darkgreen text-white hover:bg-kaist-darkgreen/90"
         >
-          {isSubmitting ? (
-            <span className="flex items-center gap-1.5">
-              <Loader2 className="size-4 animate-spin" />
-              <span>{submittingLabel ?? defaultSubmittingLabel}</span>
-            </span>
-          ) : (
-            <span>{submitLabel ?? defaultSubmitLabel}</span>
-          )}
+          {submitLabel ?? defaultSubmitLabel}
         </Button>
       </div>
     </div>

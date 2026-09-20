@@ -465,7 +465,7 @@ function ContactsPageContent() {
           onClose={closeDepartmentModal}
           title="부서 관리"
           className="max-w-md"
-          footer={<><Button type="button" variant="outline" onClick={closeDepartmentModal} disabled={departmentSaving}>취소</Button><Button type="button" onClick={() => void handleDepartmentSave()} disabled={departmentSaving || !departmentForm.nameKo.trim()}>{departmentSaving ? "저장 중..." : "저장"}</Button></>}
+          footer={<><Button type="button" variant="outline" onClick={closeDepartmentModal} disabled={departmentSaving}>취소</Button><Button loading={departmentSaving} type="button" onClick={() => void handleDepartmentSave()} disabled={departmentSaving || !departmentForm.nameKo.trim()}>{"저장"}</Button></>}
         >
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
@@ -521,7 +521,7 @@ function SortableContactRow({ contact, activityYear, disabled, onEdit }: { conta
   const { attributes, isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ id: contact.id, disabled });
   const style: CSSProperties = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 200ms ease" };
   return <div ref={setNodeRef} style={style} role="row" className={`admin-contacts-table__row ${CONTACT_ROW_GRID} items-center ${isDragging ? "relative z-10 opacity-0" : "cursor-pointer transition-colors hover:bg-slate-50/60"}`} onClick={() => onEdit(contact)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onEdit(contact); } }} tabIndex={0}>
-    <div role="cell" className="flex min-h-16 items-center pl-5 pr-1"><button ref={setActivatorNodeRef} type="button" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="admin-list-drag-handle" aria-label={`${contact.nameKo} 표시 순서 변경`} data-tooltip="드래그하여 순서 변경"><GripVertical aria-hidden="true" className="size-4" /></button></div>
+    <div role="cell" className="flex min-h-16 items-center pl-5 pr-1"><button ref={setActivatorNodeRef} type="button" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="admin-list-drag-handle" aria-label={`${contact.nameKo} 표시 순서 변경`}><GripVertical aria-hidden="true" className="size-4" /></button></div>
     <ContactCells contact={contact} activityYear={activityYear} />
   </div>;
 }

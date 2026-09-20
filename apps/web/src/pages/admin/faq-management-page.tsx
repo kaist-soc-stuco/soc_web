@@ -201,7 +201,7 @@ function FaqManagementPageContent() {
   return (
     <AdminPageShell>
       {ConfirmDialog}
-      <AdminPageMain>
+      <AdminPageMain tableLayout>
         <AdminPageHeader
           title="FAQ 관리"
           actions={(
@@ -210,7 +210,7 @@ function FaqManagementPageContent() {
             </Button>
           )}
         />
-        <AdminTableCard>
+        <AdminTableCard className="min-w-0">
           {loading && items.length === 0 ? <AdminLoadingState /> : (
             <DndContext modifiers={[restrictListDrag]}
               autoScroll={false}
@@ -265,8 +265,8 @@ function FaqManagementPageContent() {
         footer={(
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>취소</Button>
-            <Button type="button" onClick={() => void save()} disabled={saving || !form.titleKo.trim() || !form.contentKo.trim()}>
-              {saving ? "저장 중" : "저장"}
+            <Button loading={saving} type="button" onClick={() => void save()} disabled={saving || !form.titleKo.trim() || !form.contentKo.trim()}>
+              {"저장"}
             </Button>
           </div>
         )}
@@ -314,7 +314,7 @@ function SortableFaqRow({
   return (
     <tr ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition: transition ?? "transform 180ms ease" }} className={cn("group cursor-pointer transition-colors hover:bg-slate-50/60", isDragging && "relative z-10 opacity-70")} tabIndex={disabled ? -1 : 0} onClick={() => { if (!disabled) onEdit(item); }} onKeyDown={(event) => { if (event.target === event.currentTarget && !disabled && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onEdit(item); } }}>
       <AdminTableCell className="text-center">
-        <button ref={setActivatorNodeRef} type="button" aria-label="FAQ 순서 이동" data-tooltip="드래그하여 순서 변경" onClick={(event) => event.stopPropagation()} {...attributes} {...listeners} className="admin-list-drag-handle">
+        <button ref={setActivatorNodeRef} type="button" aria-label="FAQ 순서 이동" onClick={(event) => event.stopPropagation()} {...attributes} {...listeners} className="admin-list-drag-handle">
           <GripVertical className="size-4" aria-hidden="true" />
         </button>
       </AdminTableCell>

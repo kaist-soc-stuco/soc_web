@@ -44,12 +44,13 @@ const defaultOptions = () => [
   { id: uid(), labelKo: "반대", labelEn: "No", descriptionKo: null, descriptionEn: null, imageUrl: null },
   { id: uid(), labelKo: "기권", labelEn: "Abstain", descriptionKo: null, descriptionEn: null, imageUrl: null },
 ];
-const newItem = (): DraftItem => ({ id: uid(), titleKo: "", titleEn: null, descriptionKo: null, descriptionEn: null, type: "YES_NO_ABSTAIN", maxSelections: 1, options: defaultOptions() });
+const newItem = (): DraftItem => ({ id: uid(), titleKo: "", titleEn: null, descriptionKo: null, descriptionEn: null, imageUrl: null, type: "YES_NO_ABSTAIN", maxSelections: 1, options: defaultOptions() });
 const agendaForm = (item: DraftItem): QuestionFormState => ({
   titleKo: item.titleKo, titleEn: item.titleEn ?? "", descriptionKo: item.descriptionKo ?? "", descriptionEn: item.descriptionEn ?? "",
   questionType: item.type === "MULTIPLE_CHOICE" ? "multiple_choice" : "single_choice",
   options: item.options.map(option => ({ value: option.id!, labelKo: option.labelKo, labelEn: option.labelEn ?? "", imageUrlKo: option.imageUrl, imageUrlEn: option.imageUrl })),
-  isRequired: true, answerRegex: "", answerValidationEnabled: false, config: null,
+  isRequired: true, answerRegex: "", answerValidationEnabled: false,
+  config: item.imageUrl ? { imageUrlKo: item.imageUrl, imageUrlEn: item.imageUrl } : null,
 });
 const formatVotedTime = (value?: string | null) => {
   if (!value) return "";
@@ -181,7 +182,7 @@ export function VoteEditorPage() {
       startsAt: localValue(detail.startsAt), endsAt: localValue(detail.endsAt), academicStatuses: detail.academicStatuses,
       quorumPercent: detail.quorumPercent ?? 50, quorumInclusive: detail.quorumInclusive,
       feePayersOnly: detail.feePayersOnly, studentNumberFrom: detail.studentNumberFrom, studentNumberTo: detail.studentNumberTo,
-      items: detail.items.map(({ id, titleKo, titleEn, descriptionKo, descriptionEn, type, maxSelections, selectionRule, options }) => ({ id, titleKo, titleEn, descriptionKo, descriptionEn, type, maxSelections, selectionRule, options: options.map(({ id, labelKo, labelEn, descriptionKo, descriptionEn, imageUrl }) => ({ id, labelKo, labelEn, descriptionKo, descriptionEn, imageUrl })) })),
+      items: detail.items.map(({ id, titleKo, titleEn, descriptionKo, descriptionEn, imageUrl, type, maxSelections, selectionRule, selectionErrorMessage, options }) => ({ id, titleKo, titleEn, descriptionKo, descriptionEn, imageUrl, type, maxSelections, selectionRule, selectionErrorMessage, options: options.map(({ id, labelKo, labelEn, descriptionKo, descriptionEn, imageUrl }) => ({ id, labelKo, labelEn, descriptionKo, descriptionEn, imageUrl })) })),
     };
     draftRef.current = nextDraft; setDraftState(nextDraft); history.current = []; future.current = [];
     voteIdRef.current = voteId;
@@ -295,18 +296,50 @@ export function VoteEditorPage() {
 
   const [searchingCandidates, setSearchingCandidates] = useState(false);
   const [searchedCandidates, setSearchedCandidates] = useState(false);
-  const searchCandidates = async () => {
-    if (!candidateQuery.trim() || searchingCandidates) return;
-    setSearchingCandidates(true); setSearchedCandidates(false);
-    try {
-      const rows = await client.searchVoteVoterCandidates(candidateQuery);
-      setCandidates(rows.filter(user => !voters.some(voter => voter.userId === user.userId && voter.status === "ELIGIBLE")));
-    } catch {
-      setCandidates([]);
-      toast({ type: "error", message: "회원을 검색하지 못했습니다." });
-    } finally {setSearchingCandidates(false);setSearchedCandidates(true);}
+  const [candidateError, setCandidateError] = useState<string | null>(null);
+  const [selectedCandidates, setSelectedCandidates] = useState<typeof candidates>([]);
+  const [addingCandidates, setAddingCandidates] = useState(false);
+  const candidateSearchVersion = useRef(0);
+  const candidateAddLock = useRef(false);
+  const closeCandidateModal = () => {
+    if (candidateAddLock.current) return;
+    candidateSearchVersion.current += 1;
+    setAddingVoter(false); setCandidateQuery(""); setCandidates([]); setSelectedCandidates([]);
+    setSearchedCandidates(false); setSearchingCandidates(false); setCandidateError(null);
   };
-  const addCandidate = async (userId: string) => { try { const voteId = await ensureStored(); await client.addVoteVoters(voteId, { userIds: [userId] }); setVoters(await client.listVoteVoters(voteId)); setAddingVoter(false); setCandidateQuery(""); setCandidates([]); toast({type:"success",message:"명부에 추가했습니다."}); } catch (error) { toast({type:"error",message:error instanceof ApiClientHttpError && error.code === "vote_voter_not_found_or_ineligible" ? "활성 상태인 전산학부 주전공 회원만 추가할 수 있습니다." : "추가하지 못했습니다. 다시 시도해 주세요."}); } };
+  const searchCandidates = async () => {
+    const query = candidateQuery.trim();
+    if (!query || candidateAddLock.current) return;
+    const version = ++candidateSearchVersion.current;
+    setSearchingCandidates(true); setSearchedCandidates(false); setCandidateError(null); setCandidates([]);
+    try {
+      const rows = await client.searchVoteVoterCandidates(query);
+      if (version !== candidateSearchVersion.current) return;
+      setCandidates(rows); setSearchedCandidates(true);
+    } catch {
+      if (version === candidateSearchVersion.current) setCandidateError("검색하지 못했습니다. 연결을 확인하고 다시 검색해 주세요.");
+    } finally { if (version === candidateSearchVersion.current) setSearchingCandidates(false); }
+  };
+  const addCandidates = async () => {
+    if (candidateAddLock.current || !selectedCandidates.length || !rosterEditable) return;
+    candidateAddLock.current = true; setAddingCandidates(true); setCandidateError(null);
+    let added = false;
+    try {
+      const voteId = await ensureStored();
+      const result = await client.addVoteVoters(voteId, { userIds: selectedCandidates.map(candidate => candidate.userId) });
+      added = true;
+      toast({type:"success",message:`${result.added}명을 선거인명부에 추가했습니다.`});
+      try { setVoters(await client.listVoteVoters(voteId)); setRosterPage(1); }
+      catch { toast({type:"error",message:"추가는 완료했지만 명부를 새로 불러오지 못했습니다. 새로고침해 주세요."}); }
+    } catch (error) {
+      setCandidateError(error instanceof ApiClientHttpError && error.code === "vote_voter_not_found_or_ineligible"
+        ? "추가할 수 없는 회원이 포함되어 있습니다. 활성 상태인 전산학부 주전공 회원인지 확인해 주세요."
+        : "선거인을 추가하지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      candidateAddLock.current = false; setAddingCandidates(false);
+      if (added) closeCandidateModal();
+    }
+  };
   const importXlsx = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files?.[0] || importingRoster) return;
     setImportingRoster(true);
@@ -414,7 +447,7 @@ export function VoteEditorPage() {
                       {dragHandle => <QuestionInlineEditor
                         initial={agendaForm(item)} value={agendaForm(item)} createOptionValue={uid} minimumOptions={2}
                         selected={selectedAgenda === agendaId} isKoreanOnly={koreanOnly} isOngoing={!editable}
-                        dragHandle={dragHandle} optionsLocked={item.type === "YES_NO_ABSTAIN"} allowQuestionImage={false}
+                        dragHandle={dragHandle} optionsLocked={item.type === "YES_NO_ABSTAIN"} allowQuestionImage
                         onDraftChange={form => {
                           if (!editable) return;
                           const options = item.type === "YES_NO_ABSTAIN" ? item.options : form.options.map(option => ({
@@ -422,7 +455,7 @@ export function VoteEditorPage() {
                             id: option.value, labelKo: option.labelKo, labelEn: option.labelEn,
                             imageUrl: option.imageUrlKo ?? option.imageUrlEn ?? null,
                           }));
-                          setItem(itemIndex, { titleKo: form.titleKo, titleEn: form.titleEn, descriptionKo: form.descriptionKo, descriptionEn: form.descriptionEn, options,
+                          setItem(itemIndex, { titleKo: form.titleKo, titleEn: form.titleEn, descriptionKo: form.descriptionKo, descriptionEn: form.descriptionEn, imageUrl: form.config?.imageUrlKo ?? form.config?.imageUrlEn ?? null, options,
                             maxSelections: item.type === "MULTIPLE_CHOICE" ? Math.max(1, Math.min(item.maxSelections, options.length)) : 1 });
                         }}
                         onSave={() => {}} onCancel={() => setSelectedAgenda(null)}
@@ -432,8 +465,8 @@ export function VoteEditorPage() {
                           ]} className="w-full md:w-48" buttonClassName="!h-10 !text-sm" />}
                         descriptionControl={editable}
                         footer={editable ? descriptionMenu => <div className="vote-agenda-details"><div className="min-h-0 overflow-hidden">
-                          {item.type === "MULTIPLE_CHOICE" && <BuilderRuleRow><AdminSelectDropdown ariaLabel="선택 개수 조건" value={item.selectionRule ?? "max"} onChange={value => setItem(itemIndex, {selectionRule:value as "max" | "min" | "exact"})} options={[{value:"max",label:"최대 선택 개수"},{value:"min",label:"최소 선택 개수"},{value:"exact",label:"정확한 선택 개수"}]} className="w-44" /><UiInput type="number" min={1} max={item.options.length} value={item.maxSelections} aria-label="선택 개수" className="builder-text-control w-20" onChange={event => setItem(itemIndex, { maxSelections: Math.max(1, Math.min(item.options.length, Number(event.target.value) || 1)) })} /></BuilderRuleRow>}
-                          <div className="mt-5 flex justify-end gap-1 border-t border-slate-100 pt-3">
+                          {item.type === "MULTIPLE_CHOICE" && <BuilderRuleRow><AdminSelectDropdown ariaLabel="선택 개수 조건" value={item.selectionRule ?? "max"} onChange={value => setItem(itemIndex, {selectionRule:value as "max" | "min" | "exact"})} options={[{value:"max",label:"최대 선택 개수"},{value:"min",label:"최소 선택 개수"},{value:"exact",label:"정확한 선택 개수"}]} className="w-44" buttonClassName="!rounded-lg" /><UiInput type="number" min={1} max={item.options.length} value={item.maxSelections} aria-label="선택 개수" className="builder-text-control builder-rule-value-control w-20" onChange={event => setItem(itemIndex, { maxSelections: Math.max(1, Math.min(item.options.length, Number(event.target.value) || 1)) })} /><UiInput aria-label="맞춤 오류 메시지" placeholder="맞춤 오류 메시지" maxLength={500} value={item.selectionErrorMessage ?? ""} className="builder-text-control min-w-48 flex-1" onChange={event => setItem(itemIndex, { selectionErrorMessage: event.target.value })} /></BuilderRuleRow>}
+                          <div className="mt-6 flex justify-end gap-1 border-t border-slate-100 pt-4">
                             <IconButton aria-label="안건 복제" onClick={() => { const copy = { ...item, id: uid(), options: item.options.map(option => ({ ...option, id: uid() })) }; setDraft({ ...draft, items: [...draft.items.slice(0, itemIndex + 1), copy, ...draft.items.slice(itemIndex + 1)] }); setSelectedAgenda(copy.id); }}><Copy className="size-4" /></IconButton>
                             <IconButton aria-label="안건 삭제" disabled={draft.items.length <= 1} onClick={() => setDraft({ ...draft, items: draft.items.filter((_, index) => index !== itemIndex) })}><Trash2 className="size-4" /></IconButton>
                             {descriptionMenu}
@@ -491,29 +524,39 @@ export function VoteEditorPage() {
         </AdminCard> : null}
 
         <Modal open={uploadDialogOpen && rosterEditable} onClose={() => { if (!importingRoster) setUploadDialogOpen(false); }} title="선거인명부 업로드" className="max-w-md"
-        footer={<><Button variant="outline" disabled={importingRoster} onClick={() => setUploadDialogOpen(false)}>취소</Button><Button disabled={importingRoster} onClick={() => rosterFileRef.current?.click()}><Upload className="size-4" />{importingRoster ? "업로드 중…" : "파일 선택"}</Button></>}>
+        footer={<><Button variant="outline" disabled={importingRoster} onClick={() => setUploadDialogOpen(false)}>취소</Button><Button loading={importingRoster} disabled={importingRoster} onClick={() => rosterFileRef.current?.click()}><Upload className="size-4" />{"파일 선택"}</Button></>}>
         <p className="text-sm leading-6 text-slate-600">양식의 학번 열을 작성한 뒤 엑셀 파일을 업로드해 주세요.</p>
         <Button variant="outline" className="mt-4" onClick={() => { const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([["학번"]]), "선거인명부"); XLSX.writeFile(book, "선거인명부_양식.xlsx"); }}><Download className="size-4" />양식 다운로드</Button>
         <input ref={rosterFileRef} className="hidden" type="file" accept=".xlsx,.xls" disabled={importingRoster} onChange={event => void importXlsx(event)} />
       </Modal>
       <Modal
           open={addingVoter && rosterEditable}
-          onClose={() => { setAddingVoter(false); setCandidateQuery(""); setCandidates([]); }}
+          onClose={closeCandidateModal}
           title="선거인 수동 추가"
-          className="max-w-lg"
+          className="max-w-xl"
           bodyClassName="space-y-4"
-          footer={<Button variant="outline" onClick={() => { setAddingVoter(false); setCandidateQuery(""); setCandidates([]); }}>취소</Button>}
+          footer={<div className="flex w-full items-center justify-between gap-3"><span className="text-sm text-slate-500" aria-live="polite">{selectedCandidates.length}명 선택</span><div className="flex gap-2"><Button variant="outline" disabled={addingCandidates} onClick={closeCandidateModal}>취소</Button><Button loading={addingCandidates} disabled={!selectedCandidates.length || addingCandidates} onClick={() => void addCandidates()}>명부에 추가</Button></div></div>}
         >
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700" htmlFor="vote-voter-search">학번 또는 이름 검색</label>
-            <div className="flex gap-2">
-              <UiInput id="vote-voter-search" className="min-w-0 flex-1" autoFocus placeholder="학번, 이름, 이메일" value={candidateQuery} onChange={e=>{setCandidateQuery(e.target.value);setSearchedCandidates(false);}} onKeyDown={e=>{if(e.key === "Enter") { e.preventDefault(); void searchCandidates(); }}} />
-              <Button variant="outline" disabled={searchingCandidates || !candidateQuery.trim()} onClick={()=>void searchCandidates()}>{searchingCandidates ? "검색 중…" : "검색"}</Button>
-            </div>
-          </div>
-          <div className="space-y-2" aria-live="polite">
-            {candidates.map(candidate=><button type="button" key={candidate.userId} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 text-left transition-colors hover:border-brand-primary/40 hover:bg-emerald-50/40" onClick={()=>void addCandidate(candidate.userId)}><span className="min-w-0 truncate font-medium text-slate-800">{candidate.nameKo}</span><span className="shrink-0 text-sm text-slate-500">{candidate.stdNo ?? "학번 없음"}</span></button>)}
-            {searchedCandidates && candidates.length === 0 ? <p className="py-5 text-center text-sm text-slate-400">검색 결과가 없습니다.</p> : null}
+          <p className="text-sm leading-6 text-slate-500">활성 상태인 전산학부 주전공 회원을 검색해 추가합니다.</p>
+          <form className="flex gap-2" onSubmit={event => { event.preventDefault(); void searchCandidates(); }}>
+            <UiInput aria-label="선거인 검색" className="min-w-0 flex-1" autoFocus disabled={addingCandidates} placeholder="학번, 이름, 이메일 검색" value={candidateQuery} onChange={event => {
+              candidateSearchVersion.current += 1;
+              setCandidateQuery(event.target.value); setCandidates([]); setSearchedCandidates(false); setSearchingCandidates(false); setCandidateError(null);
+            }} />
+            <Button type="submit" loading={searchingCandidates} variant="outline" disabled={searchingCandidates || addingCandidates || !candidateQuery.trim()}>검색</Button>
+          </form>
+          {selectedCandidates.length > 0 ? <div className="flex flex-wrap gap-2" aria-label="선택한 선거인">{selectedCandidates.map(candidate => <button type="button" key={candidate.userId} disabled={addingCandidates} aria-label={`${candidate.nameKo} ${candidate.stdNo ?? ""} 선택 해제`} onClick={() => setSelectedCandidates(current => current.filter(user => user.userId !== candidate.userId))} className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs text-emerald-800 hover:bg-emerald-100 disabled:opacity-50">{candidate.nameKo}<span>{candidate.stdNo}</span><X aria-hidden="true" className="size-3" /></button>)}</div> : null}
+          {candidateError ? <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{candidateError}</p> : null}
+          <div className="max-h-72 min-h-40 overflow-y-auto rounded-lg border border-slate-200" aria-busy={searchingCandidates}>
+            {searchingCandidates ? <div role="status" aria-label="회원 검색" className="space-y-3 p-4">{[0,1,2].map(index => <div key={index} className="h-10 animate-pulse rounded bg-slate-100 motion-reduce:animate-none" />)}</div> : candidates.length ? <div className="divide-y divide-slate-100">{candidates.map(candidate => {
+              const existing = voters.some(voter => voter.userId === candidate.userId && voter.status === "ELIGIBLE");
+              const checked = selectedCandidates.some(user => user.userId === candidate.userId);
+              return <label key={candidate.userId} className={`flex min-h-16 items-center gap-3 px-4 py-3 ${existing ? "bg-slate-50 text-slate-400" : "cursor-pointer hover:bg-slate-50"}`}>
+                <input type="checkbox" className="size-4 accent-emerald-700" disabled={existing || addingCandidates} checked={checked} aria-label={`${candidate.nameKo} ${candidate.stdNo ?? "학번 없음"} 선택`} onChange={() => setSelectedCandidates(current => checked ? current.filter(user => user.userId !== candidate.userId) : [...current,candidate])} />
+                <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{candidate.nameKo}</span><span className="mt-0.5 block text-xs text-slate-500">{candidate.stdNo || "학번 없음"}</span></span>
+                {existing ? <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs">등록됨</span> : null}
+              </label>;
+            })}</div> : <p className="flex min-h-40 items-center justify-center px-5 text-center text-sm text-slate-500" role="status">{searchedCandidates ? "검색 결과가 없습니다. 다른 이름이나 학번으로 검색해 보세요." : "이름이나 학번으로 회원을 검색하세요."}</p>}
           </div>
         </Modal>
 

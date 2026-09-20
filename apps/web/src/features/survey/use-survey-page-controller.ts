@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type SyntheticEvent } from "react";
+import { getResponseError } from "./survey-response-validation";
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import { isSurveyDisplayBlock, type SurveyDetailResponse, type SurveyQuestionRecord } from "@soc/contracts";
 import { msToIso, nowMs } from "@soc/shared";
@@ -53,6 +54,10 @@ export function useSurveyPageController(surveyId: string | undefined) {
   );
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const { lang } = useLanguage();
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const requestedSurveyIdRef = useRef<string | undefined>(undefined);
+  const loadedSurveyIdRef = useRef<string | null>(null);
 
   const [survey, setSurvey] = useState<SurveyDetailResponse | null>(null);
   const previewRequested = new URLSearchParams(window.location.search).get("preview") === "1";
@@ -68,6 +73,10 @@ export function useSurveyPageController(surveyId: string | undefined) {
   );
   const [draftRestored, setDraftRestored] = useState(false);
   const [hydratedDraftKey, setHydratedDraftKey] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const sessionIdentity = session
+    ? `${session.authenticated ? "authenticated" : "anonymous"}:${session.storageMode ?? ""}:${session.draftNamespace ?? ""}`
+    : "unavailable";
 
   const allSurveyQuestions = useMemo(
     () => survey?.sections
@@ -90,19 +99,25 @@ export function useSurveyPageController(surveyId: string | undefined) {
     [survey, visibleSectionIds],
   );
 
-  const requiredQuestions = useMemo(
-    () => allQuestions.filter((question) => question.isRequired),
-    [allQuestions],
-  );
-
   useEffect(() => {
     if (!surveyId) return;
 
     if (sessionLoading) return;
 
-    const storageKey = getDraftStorageKey("survey-response", surveyId, session);
+    const currentSession = sessionRef.current;
+    const storageKey = getDraftStorageKey("survey-response", surveyId, currentSession);
     if (!storageKey) return;
     let active = true;
+
+    if (requestedSurveyIdRef.current !== surveyId) {
+      requestedSurveyIdRef.current = surveyId;
+      loadedSurveyIdRef.current = null;
+      setSurvey(null);
+      setAnswers({});
+      setQuestionErrors({});
+    }
+
+    if (loadedSurveyIdRef.current === surveyId && loadAttempt === 0) return;
 
     setLoadError(null);
     setSubmitted(false);
@@ -114,6 +129,8 @@ export function useSurveyPageController(surveyId: string | undefined) {
       .then((data) => {
         if (!active) return;
 
+        loadedSurveyIdRef.current = surveyId;
+        if (loadAttempt > 0) setLoadAttempt(0);
         setSurvey(data);
         setResponseSubmittedAt(data.currentResponse?.submittedAt ?? null);
         const answerByQuestionId = new Map(
@@ -138,17 +155,19 @@ export function useSurveyPageController(surveyId: string | undefined) {
       })
       .catch(() => {
         if (!active) return;
+        // A background auth refresh can briefly return an empty session. Keep
+        // the already loaded survey usable instead of replacing it with a
+        // transient error screen; explicit retries still surface failures.
+        if (loadedSurveyIdRef.current === surveyId && loadAttempt === 0) return;
         setLoadError(
-          lang === "ko"
-            ? "설문을 불러오지 못했습니다."
-            : "Failed to load survey.",
+          "survey_load_failed",
         );
       });
 
     return () => {
       active = false;
     };
-  }, [surveyId, apiClient, lang, session, sessionLoading]);
+  }, [apiClient, sessionIdentity, sessionLoading, surveyId, loadAttempt, previewRequested]);
 
   const draftStorageKey = surveyId
     ? getDraftStorageKey("survey-response", surveyId, session)
@@ -230,33 +249,16 @@ export function useSurveyPageController(surveyId: string | undefined) {
     });
   };
 
-  const validateRequiredQuestions = (questions: SurveyQuestionRecord[]) => {
-    const missingRequired = questions.filter(
-      (question) =>
-        question.isRequired &&
-        !isAnswerFilled(question.questionType, answers[question.id]),
-    );
-
-    setQuestionErrors((previous) => {
+  const validateRequiredQuestions = async (questions: SurveyQuestionRecord[]) => {
+    const results = await Promise.all(questions.map(async question => ({ id: question.id, error: await getResponseError(question, answers[question.id], lang) })));
+    setQuestionErrors(previous => {
       const next = { ...previous };
-      for (const question of questions) {
-        delete next[question.id];
-      }
-      for (const question of missingRequired) {
-        next[question.id] =
-          lang === "ko" ? "필수 문항입니다." : "This question is required.";
-      }
+      for (const result of results) { delete next[result.id]; if (result.error) next[result.id] = result.error; }
       return next;
     });
-
-    if (missingRequired.length === 0) return true;
-
-    const firstMissingQuestion = missingRequired[0];
-    window.requestAnimationFrame(() => {
-      document
-        .getElementById(`survey-question-${firstMissingQuestion.id}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
+    const invalid = results.find(result => result.error);
+    if (!invalid) return true;
+    window.requestAnimationFrame(() => document.getElementById(`survey-question-${invalid.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
     return false;
   };
 
@@ -278,7 +280,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
     }
 
     setQuestionErrors({});
-    if (!validateRequiredQuestions(requiredQuestions)) {
+    if (!(await validateRequiredQuestions(allQuestions))) {
       setSubmitting(false);
       return;
     }
@@ -378,6 +380,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
     handleSubmit,
     lang,
     loadError,
+    retryLoad: () => setLoadAttempt((attempt) => attempt + 1),
     session,
     sessionLoading,
     responseSubmittedAt,

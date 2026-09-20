@@ -2,6 +2,24 @@ const assert = require("node:assert/strict");
 const {test} = require("node:test");
 const {VotesService} = require("../dist/apps/api/src/features/votes/votes.service.js");
 const {VotesRepository} = require("../dist/apps/api/src/features/votes/votes.repository.js");
+const {VoteItemInputSchema} = require("@soc/contracts");
+
+test("custom selection feedback survives request validation and the response contract", async () => {
+  const item = VoteItemInputSchema.parse({
+    titleKo: "Agenda", type: "MULTIPLE_CHOICE", maxSelections: 2, selectionRule: "exact",
+    selectionErrorMessage: "  Choose two programmes.  ",
+    options: [{labelKo: "A"}, {labelKo: "B"}],
+  });
+  assert.equal(item.selectionErrorMessage, "Choose two programmes.");
+  const now = new Date();
+  const service = new VotesService({
+    findVote: async () => ({status: "PUBLISHED", startsAt: now, endsAt: now, createdAt: now, updatedAt: now}),
+    findDefinition: async () => [{...item, itemId: "item", options: []}],
+    counts: async () => ({eligibleCount: 0, votedCount: 0}),
+  }, {});
+  assert.equal((await service.detail("vote")).items[0].selectionErrorMessage, item.selectionErrorMessage);
+  assert.equal(VoteItemInputSchema.safeParse({...item, selectionErrorMessage: "x".repeat(501)}).success, false);
+});
 
 function serviceFor(rule, limit = 2) {
   let submitted = false;

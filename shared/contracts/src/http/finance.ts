@@ -148,6 +148,7 @@ export interface StudentFeeStatsResponse {
     /** max(targetAmount - collectedAmount, 0). */
     outstandingAmount: number;
   };
+  paymentHalfBreakdown?: Array<{ period: string; paidAmount: number; paymentCount: number; paidStudents: number }>;
   trend: Array<{
     period: string;
     paidAmount: number;

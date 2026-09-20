@@ -259,35 +259,23 @@ export function LoginCallbackPage() {
           bodyClassName="space-y-3"
           footer={
             <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button
+              <Button loading={consentSubmitting === "temporary"}
                 variant="outline"
                 type="button"
                 disabled={consentSubmitting !== null}
                 onClick={() => void submitConsentDecision(false)}
                 className="text-sm font-medium"
               >
-                {consentSubmitting === "temporary"
-                  ? lang === "ko"
-                    ? "처리 중..."
-                    : "Processing..."
-                  : lang === "ko"
-                    ? "임시로 이용"
-                    : "Use temporarily"}
+                {lang === "ko" ? "임시로 이용" : "Use temporarily"}
               </Button>
-              <Button
+              <Button loading={consentSubmitting === "persisted"}
                 variant="default"
                 type="button"
                 disabled={consentSubmitting !== null}
                 onClick={() => void submitConsentDecision(true)}
                 className="text-sm font-semibold shadow-sm"
               >
-                {consentSubmitting === "persisted"
-                  ? lang === "ko"
-                    ? "처리 중..."
-                    : "Processing..."
-                  : lang === "ko"
-                    ? "동의하고 계속"
-                    : "Agree and continue"}
+                {lang === "ko" ? "동의하고 계속" : "Agree and continue"}
               </Button>
             </div>
           }

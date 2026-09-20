@@ -16,6 +16,7 @@ import {
 import { SurveySummaryCard } from "@/features/survey/survey-summary-card";
 import { useSurveyPageController } from "@/features/survey/use-survey-page-controller";
 import { PageShell } from "@/components/ui/page-layout";
+import { ErrorState } from "@/components/ui/data-state";
 import { useToast } from "@/components/ui/toast";
 
 export function SurveyPage() {
@@ -34,6 +35,7 @@ function ActiveSurveyPage() {
     handleSubmit,
     lang,
     loadError,
+    retryLoad,
     questionErrors,
     resetResponseDraft,
     session,
@@ -74,14 +76,27 @@ function ActiveSurveyPage() {
       },
     });
   }, [draftRestored, isPreview, lang, resetResponseDraft, toast]);
+
+  if (loadError) {
+    return (
+      <PageShell>
+        <ResponsePageMain>
+          <ErrorState
+            className="rounded-xl border border-slate-200 bg-white shadow-[0_8px_28px_rgba(15,23,42,0.04)]"
+            description={
+              lang === "ko"
+                ? "일시적인 네트워크 오류일 수 있습니다. 잠시 후 다시 시도해 주세요."
+                : "This may be a temporary network issue. Please try again in a moment."
+            }
+            onRetry={retryLoad}
+            title={lang === "ko" ? "설문을 불러오지 못했습니다." : "We couldn't load this survey."}
+          />
+        </ResponsePageMain>
+      </PageShell>
+    );
+  }
+
   const renderBody = () => {
-    if (loadError) {
-      return (
-        <div className="bg-white border border-kaist-grey/15 rounded-3xl p-12 text-center text-red-500 font-bold shadow-xl">
-          {loadError}
-        </div>
-      );
-    }
     if (!survey || sessionLoading || !draftHydrated) return null;
     if (submitted) {
       return (

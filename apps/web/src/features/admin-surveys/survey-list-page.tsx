@@ -134,6 +134,8 @@ export function SurveyListPage() {
   const showInitialLoading = loading && surveys.length === 0;
 
   const fetchSurveys = async () => {
+    setError(null);
+    setLoading(true);
     try {
       const data = await client.listSurveys();
       setSurveys(data);
@@ -353,7 +355,7 @@ export function SurveyListPage() {
           </div>
 
           <div className="flex min-w-0 flex-col overflow-visible">
-            {error ? <AdminErrorState message={error} /> : null}
+            {error ? <AdminErrorState message={error} onRetry={() => void fetchSurveys()} /> : null}
 
             {showInitialLoading ? <AdminLoadingState /> : null}
 

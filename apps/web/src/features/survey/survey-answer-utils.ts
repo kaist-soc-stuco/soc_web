@@ -56,7 +56,6 @@ export function toAnswerContent(
       const files = (value as FileAnswerValue).files;
       if (files.length === 0) return {};
       return {
-        assetId: files[0]?.assetId,
         assetIds: files.map((file) => file.assetId),
         files: files.map((file) => ({
           assetId: file.assetId,

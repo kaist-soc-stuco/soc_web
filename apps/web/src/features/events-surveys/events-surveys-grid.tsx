@@ -166,9 +166,7 @@ function getAudienceText(item: UnifiedItem, lang: string) {
           ? "과비 납부자만"
           : "Fee-paying members only"
         : item.allowAnonymous
-          ? lang === "ko"
-            ? "로그인 없이 참여"
-            : "No login required"
+          ? ""
         : lang === "ko"
           ? "로그인 필요"
           : "Login required";

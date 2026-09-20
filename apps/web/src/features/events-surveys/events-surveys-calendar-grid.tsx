@@ -360,7 +360,7 @@ export function EventsSurveysCalendarGrid({
                     : ""
                 }`}
                 aria-pressed={selected}
-                className={`relative flex h-full min-h-0 min-w-0 flex-col overflow-visible p-1.5 text-left transition-colors duration-150 focus:outline-none focus-visible:outline-none focus-visible:ring-0 ${selected ? "bg-slate-100" : "bg-white hover:bg-slate-50/80"}`}
+                className={`relative !z-auto !transform-none !shadow-none flex h-full min-h-0 min-w-0 flex-col overflow-visible p-1.5 text-left focus:outline-none focus-visible:outline-none focus-visible:ring-0 ${selected ? "bg-slate-100" : "bg-white hover:bg-slate-50/80"}`}
                 key={toDateKey(cell.date)}
                 onClick={() => onSelectedDateChange(cell.date)}
                 title={holidayName || undefined}

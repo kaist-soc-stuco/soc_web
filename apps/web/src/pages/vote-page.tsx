@@ -40,14 +40,14 @@ export function VotePage() {
     verify: "접수 확인", verified: "정상 접수 확인됨",
     results: "투표 결과", ballots: "표", notStarted: "아직 투표가 시작되지 않았습니다.", ended: "투표가 종료되었습니다. 결과는 공개 후 확인할 수 있습니다.",
     loginHelp: "투표 자격 확인을 위해 로그인해 주세요.", login: "로그인", ineligible: "확정된 선거인명부에 포함되지 않아 참여할 수 없습니다.",
-    voted: "이미 투표를 제출했습니다.", submit: "투표 제출", submitting: "제출 중", required: "모든 안건에 기표해 주세요.",
+    voted: "이미 투표를 제출했습니다.", submit: "투표 제출", required: "모든 안건에 기표해 주세요.",
     confirmTitle: "투표를 제출할까요?", confirmDescription: "제출한 뒤에는 선택을 확인하거나 수정할 수 없습니다.", confirmLabel: "제출", loadFailed: "투표를 불러오지 못했습니다.", retry: "다시 시도",
   } : {
     submitted: "Your ballot was submitted.",
     verify: "Verify receipt", verified: "Receipt verified",
     results: "Results", ballots: "ballots", notStarted: "Voting has not started yet.", ended: "Voting has ended. Results will appear after publication.",
     loginHelp: "Sign in to verify your eligibility.", login: "Sign in", ineligible: "You are not included in the primary-major voter roll fixed at publication.",
-    voted: "You have already submitted a ballot.", submit: "Submit ballot", submitting: "Submitting", required: "Please vote on every agenda item.",
+    voted: "You have already submitted a ballot.", submit: "Submit ballot", required: "Please vote on every agenda item.",
     confirmTitle: "Submit this ballot?", confirmDescription: "You cannot review or change your selections after submission.", confirmLabel: "Submit", loadFailed: "Failed to load this vote.", retry: "Try again",
   };
 
@@ -75,7 +75,7 @@ export function VotePage() {
     if (!count) return lang === "ko" ? "필수 입력란입니다." : "This question is required.";
     const rule = item.selectionRule ?? "max";
     if (item.type === "MULTIPLE_CHOICE" && ((rule !== "min" && count > item.maxSelections) || (rule !== "max" && count < item.maxSelections))) {
-      return lang === "ko" ? `${rule === "min" ? "최소" : rule === "exact" ? "정확히" : "최대"} ${item.maxSelections}개를 선택해 주세요.` : `Select ${rule === "min" ? "at least" : rule === "exact" ? "exactly" : "at most"} ${item.maxSelections} options.`;
+      return item.selectionErrorMessage?.trim() || (lang === "ko" ? `${rule === "min" ? "최소" : rule === "exact" ? "정확히" : "최대"} ${item.maxSelections}개를 선택해 주세요.` : `Select ${rule === "min" ? "at least" : rule === "exact" ? "exactly" : "at most"} ${item.maxSelections} options.`);
     }
     return undefined;
   };
@@ -167,7 +167,7 @@ export function VotePage() {
             <section className="space-y-5">
               {vote.items.map(item => <SurveyQuestionCard key={item.id} id={`vote-card-${item.id}`} lang={lang}
                 question={{ id: item.id, titleKo: item.titleKo, titleEn: item.titleEn, descriptionKo: item.descriptionKo, descriptionEn: item.descriptionEn, isRequired: true,
-                  questionType: item.type === "MULTIPLE_CHOICE" ? "multiple_choice" : "single_choice", config: null,
+                  questionType: item.type === "MULTIPLE_CHOICE" ? "multiple_choice" : "single_choice", config: item.imageUrl ? { imageUrlKo: item.imageUrl, imageUrlEn: item.imageUrl } : null,
                   options: item.options.map(option => ({ value: option.id, labelKo: option.labelKo, labelEn: option.labelEn ?? undefined, imageUrlKo: option.imageUrl, imageUrlEn: option.imageUrl })) }}
                 value={item.type === "MULTIPLE_CHOICE" ? answers[item.id] ?? [] : answers[item.id]?.[0] ?? ""}
                 onChange={value => setAnswers(current => ({ ...current, [item.id]: Array.isArray(value) ? value.slice(0, item.selectionRule === "min" ? item.options.length : item.maxSelections) : typeof value === "string" ? [value] : [] }))}
@@ -176,7 +176,7 @@ export function VotePage() {
                 hint={item.type === "MULTIPLE_CHOICE" ? lang === "ko" ? `${item.selectionRule === "min" ? "최소" : item.selectionRule === "exact" ? "정확히" : "최대"} ${item.maxSelections}개 선택` : `Select ${item.selectionRule === "min" ? "at least" : item.selectionRule === "exact" ? "exactly" : "up to"} ${item.maxSelections}` : undefined}
                 error={validationAttempted ? selectionError(item) ?? null : null} />)}
               {error ? <p role="alert" aria-live="assertive" className="text-sm font-normal text-rose-600">{error}</p> : null}
-              <div className="survey-response-actions flex justify-end px-0 py-3 md:py-0"><Button className="min-h-11" onClick={() => void submit()} disabled={submitting || isPreview}>{submitting ? t.submitting : t.submit}</Button></div>
+              <div className="survey-response-actions flex justify-end px-0 py-3 md:py-0"><Button loading={submitting} className="min-h-11" onClick={() => void submit()} disabled={submitting || isPreview}>{t.submit}</Button></div>
             </section>
           )}
           </div>

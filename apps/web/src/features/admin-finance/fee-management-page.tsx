@@ -1,3 +1,4 @@
+import { type DateRange } from "@/components/ui/date-range-picker";
 import { useToast } from "@/components/ui/toast";
 import { randomId } from "@/lib/random-id";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -172,6 +173,13 @@ export function FeeManagementPage() {
   const detailPaymentIdempotencyRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const [activeSection, setActiveSection] = useState<"ledger" | "stats" | "settings">("ledger");
   const [statsSemester, setStatsSemester] = useState(referenceSemester);
+  const [statsRange, setStatsRange] = useState<DateRange>(() => {
+    const today = new Date();
+    const start = new Date(today); start.setDate(start.getDate() - 29);
+    const stamp = (date: Date) => date.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+    return { from: stamp(start), to: stamp(today) };
+  });
+  const statsRequest = useRef(0);
   const [stats, setStats] = useState<StudentFeeStatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
@@ -269,20 +277,24 @@ export function FeeManagementPage() {
 
   const loadStats = useCallback(async () => {
     if (sessionLoading || !Permissions.has(session?.permission ?? 0, Permissions.MANAGE_FINANCE)) return;
+    const request = ++statsRequest.current;
     setStatsLoading(true);
     try {
       const response = await apiClient.getStudentFeeStats({
-        bucket: "week",
+        bucket: "day",
+        dateFrom: statsRange.from || undefined,
+        dateTo: statsRange.to || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }),
         referenceSemester: statsSemester,
       });
+      if (request !== statsRequest.current) return;
       setStats(response);
       setError(null);
     } catch (err) {
-      setError("납부 통계를 불러오지 못했습니다.");
+      if (request === statsRequest.current) setError("납부 통계를 불러오지 못했습니다.");
     } finally {
-      setStatsLoading(false);
+      if (request === statsRequest.current) setStatsLoading(false);
     }
-  }, [apiClient, session, sessionLoading, statsSemester]);
+  }, [apiClient, session?.permission, sessionLoading, statsSemester, statsRange]);
 
   useEffect(() => {
     void loadStats();
@@ -579,6 +591,8 @@ export function FeeManagementPage() {
 
           {activeSection === "settings" ? <section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex flex-wrap items-end gap-3"><AdminFormField label="표준 과비 (원)"><UiInput type="number" min={1} value={policyAmount} onChange={event => setPolicyAmount(event.currentTarget.value)} /></AdminFormField><Button disabled={saving || !policyReady} onClick={() => void saveFeePolicy()}>저장</Button></div></section> : activeSection === "stats" ? (
             <FeeStatisticsPanel
+              range={statsRange}
+              onRangeChange={setStatsRange}
               semester={statsSemester}
               semesterOptions={semesterOptions}
               loading={statsLoading}
@@ -621,7 +635,7 @@ export function FeeManagementPage() {
                             <div className="flex h-full items-center justify-between gap-3">
                               <div className="relative">
                           <Button type="button" variant="ghost" size="sm" className="h-8 !font-medium" onClick={() => setSelectionPopoverOpen((value) => !value)}>{selectedUserIds.size}명 선택됨 <ChevronDown aria-hidden="true" className="size-4" /></Button>
-                          {selectionPopoverOpen ? <><button type="button" aria-label="선택 목록 닫기" className="fixed inset-0 z-40 cursor-default" onClick={() => setSelectionPopoverOpen(false)} /><PopoverPanel className="left-0 top-full z-50 mt-2 w-80 p-3"><Button type="button" variant="ghost" size="sm" className="mb-2 w-full justify-start !font-medium" onClick={() => void selectAllFiltered()} disabled={selectingAllFiltered}>{selectingAllFiltered ? "현재 필터를 불러오는 중" : `현재 필터 전체 선택 (${totalCount.toLocaleString("ko-KR")})`}</Button><p className="mb-2 text-xs font-medium text-slate-500">선택한 학생</p><div className="scrollbar-hidden flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">{selectedStudents.map((student) => <button key={student.userId} type="button" className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-normal text-slate-700 hover:bg-slate-200" onClick={() => toggleSelectedUser(student.userId)}>{student.nameKo} <span aria-hidden="true">×</span></button>)}</div></PopoverPanel></> : null}
+                          {selectionPopoverOpen ? <><button type="button" aria-label="선택 목록 닫기" className="fixed inset-0 z-40 cursor-default" onClick={() => setSelectionPopoverOpen(false)} /><PopoverPanel className="left-0 top-full z-50 mt-2 w-80 p-3"><Button loading={selectingAllFiltered} type="button" variant="ghost" size="sm" className="mb-2 w-full justify-start !font-medium" onClick={() => void selectAllFiltered()} disabled={selectingAllFiltered}>{`현재 필터 전체 선택 (${totalCount.toLocaleString("ko-KR")})`}</Button><p className="mb-2 text-xs font-medium text-slate-500">선택한 학생</p><div className="scrollbar-hidden flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">{selectedStudents.map((student) => <button key={student.userId} type="button" className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-normal text-slate-700 hover:bg-slate-200" onClick={() => toggleSelectedUser(student.userId)}>{student.nameKo} <span aria-hidden="true">×</span></button>)}</div></PopoverPanel></> : null}
                               </div>
                               <Button type="button" size="sm" className="h-8 min-h-11 md:min-h-8" onClick={() => openPaymentModal()} disabled={saving}><CreditCard aria-hidden="true" className="size-4" /> 일괄 납부 처리</Button>
                             </div>
@@ -640,7 +654,7 @@ export function FeeManagementPage() {
                       <AdminTableCell className="truncate py-2.5 text-slate-700" title={student.email}>{student.email}</AdminTableCell>
                       <AdminTableCell className="py-2.5 text-slate-700">{student.primaryMajor || null}</AdminTableCell>
                       <AdminTableCell className="py-2.5"><AdminStatusBadge tone={student.status === "PAID" ? "positive" : student.status === "PARTIAL" ? "warning" : "danger"}>{student.status === "PAID" ? "완납" : student.status === "PARTIAL" ? "부분 납부" : "미납"}</AdminStatusBadge></AdminTableCell>
-                      <AdminTableCell className="py-2.5 text-right font-medium tabular-nums text-slate-900">{formatCurrency(student.paidAmount)}</AdminTableCell>
+                      <AdminTableCell className="py-2.5 text-right font-medium tabular-nums text-slate-900">{formatCurrency(student.paidAmount)}{student.paidAt && <div className="mt-1 text-xs font-normal text-slate-500">{formatPaymentHalf(student.paidAt)}</div>}</AdminTableCell>
                     </tr>)}</AdminTableBody>
                   </AdminDataTable>
                 )}
@@ -651,7 +665,7 @@ export function FeeManagementPage() {
           </AdminTableCard>}
         </AdminPageMain>
 
-        <Modal open={Boolean(importPreview)} onClose={() => { if (!saving) setImportPreview(null); }} title="과비 불러오기 미리보기" className="max-w-3xl" footer={<><Button variant="outline" disabled={saving} onClick={() => setImportPreview(null)}>취소</Button><Button disabled={saving || !importPreview?.length || !importMatches?.canApply} onClick={() => void applyImport()}>{saving ? "반영 중…" : `${importPreview?.length ?? 0}건 반영`}</Button></>}>
+        <Modal open={Boolean(importPreview)} onClose={() => { if (!saving) setImportPreview(null); }} title="과비 불러오기 미리보기" className="max-w-3xl" footer={<><Button variant="outline" disabled={saving} onClick={() => setImportPreview(null)}>취소</Button><Button loading={saving} disabled={saving || !importPreview?.length || !importMatches?.canApply} onClick={() => void applyImport()}>{`${importPreview?.length ?? 0}건 반영`}</Button></>}>
           <p className="mb-3 text-sm text-slate-600">아직 저장하지 않았습니다. 학번 또는 사용자 ID가 일치하는 계정의 요약 상태를 정정합니다. 기존 수납 원장은 변경하지 않습니다.</p>
           {operationError ? <p role="alert" className="text-sm text-rose-700">{operationError}</p> : null}
           <div className="max-h-96 overflow-auto"><table className="w-full text-left text-sm"><thead><tr><th>학번 / 사용자 ID</th><th>계정 확인 / 현재 상태</th><th>변경할 상태</th><th>납부금액</th><th>학기 수</th></tr></thead><tbody>{importPreview?.map((item, index) => <tr key={index}><td className="py-2">{item.stdNo ?? item.userId}</td><td>{importMatches?.rows[index]?.error === "USER_NOT_FOUND" ? "일치 계정 없음" : importMatches?.rows[index]?.error === "DUPLICATE_USER" ? "중복 계정" : `${importMatches?.rows[index]?.current?.status ?? "UNPAID"} · ${formatCurrency(importMatches?.rows[index]?.current?.paidAmount ?? 0)}`}</td><td>{item.status ?? "유지"}</td><td>{item.paidAmount ?? "유지"}</td><td>{item.coverageSemesters ?? "유지"}</td></tr>)}</tbody></table></div>
@@ -664,7 +678,7 @@ export function FeeManagementPage() {
           <div className="space-y-3 text-sm font-normal leading-6 text-slate-600"><p>XLSX 형식을 확인한 뒤 기존 납부 상태를 반영합니다. 새 납부 원장 기록은 화면의 납부 처리에서 남겨 주세요.</p><ul className="list-disc space-y-1 pl-5"><li><code>userId</code> 또는 <code>stdNo</code> 열이 필요합니다.</li><li><code>status</code>, <code>paidAmount</code>, <code>coverageSemesters</code>, <code>note</code> 열을 지원합니다.</li><li>오류가 있는 행은 저장하지 않고 오류 내용을 보여줍니다.</li></ul></div>
         </Modal>
 
-        <Modal open={paymentModalOpen} onClose={() => !saving && setPaymentModalOpen(false)} title="과비 일괄 완납 처리" className="max-w-xl" bodyClassName="space-y-5 px-5 py-5" footer={<><Button variant="outline" disabled={saving} onClick={() => setPaymentModalOpen(false)}>취소</Button><Button disabled={saving || !policyReady || !selectedStudents.some(student => student.status === "UNPAID" && student.paidAmount === 0) || !paymentDate} onClick={() => void submitPayments()}>{saving ? "반영 중" : `${selectedStudents.filter(student => student.status === "UNPAID" && student.paidAmount === 0).length}명 완납 확정`}</Button></>}>
+        <Modal open={paymentModalOpen} onClose={() => !saving && setPaymentModalOpen(false)} title="과비 일괄 완납 처리" className="max-w-xl" bodyClassName="space-y-5 px-5 py-5" footer={<><Button variant="outline" disabled={saving} onClick={() => setPaymentModalOpen(false)}>취소</Button><Button loading={saving} disabled={saving || !policyReady || !selectedStudents.some(student => student.status === "UNPAID" && student.paidAmount === 0) || !paymentDate} onClick={() => void submitPayments()}>{`${selectedStudents.filter(student => student.status === "UNPAID" && student.paidAmount === 0).length}명 완납 확정`}</Button></>}>
           <div><p>선택한 {selectedStudents.length}명 중 미납자 {selectedStudents.filter(student => student.status === "UNPAID" && student.paidAmount === 0).length}명을 완납 처리하시겠습니까?</p>{selectedStudents.some(student => student.status !== "UNPAID" || student.paidAmount > 0) ? <p className="mt-1 text-sm text-slate-500">(기존 납부 기록이 있는 {selectedStudents.filter(student => student.status !== "UNPAID" || student.paidAmount > 0).length}명 자동 제외)</p> : null}</div>
           <dl className="grid grid-cols-[5rem_1fr] gap-2 text-sm"><dt>적용 학기</dt><dd>{formatSemesterLabel(referenceSemester)} ({feePolicy.coverageSemesters}학기 완납)</dd><dt>반영 금액</dt><dd>1인당 {formatCurrency(feePolicy.amount)} · 총 {formatCurrency(selectedStudents.filter(student => student.status === "UNPAID" && student.paidAmount === 0).length * feePolicy.amount)}</dd></dl>
           <AdminFormField label="납부 일자"><UiInput type="date" value={paymentDate} onChange={event => setPaymentDate(event.currentTarget.value)} /></AdminFormField>
@@ -779,8 +793,8 @@ export function FeeManagementPage() {
                       <Button type="button" variant="ghost" disabled={saving} onClick={() => setDetailPaymentFormOpen(false)}>
                         취소
                       </Button>
-                      <Button type="submit" disabled={saving || !detailPaymentAmount || !detailPaymentDate}>
-                        <Plus aria-hidden="true" className="size-4" /> {saving ? "추가 중" : "추가"}
+                      <Button loading={saving} type="submit" disabled={saving || !detailPaymentAmount || !detailPaymentDate}>
+                        <Plus aria-hidden="true" className="size-4" /> {"추가"}
                       </Button>
                     </div>
                   </form>
@@ -796,7 +810,7 @@ export function FeeManagementPage() {
                           <p className="font-medium text-slate-900">{formatCurrency(payment.amount)} · {formatSemesterLabel(payment.effectiveStartSemester)}부터 {payment.coverageSemesters}학기</p>
                           <p className="mt-1 text-xs text-slate-500">{payment.paymentType === "PRIOR_PAYMENT_BALANCE" ? "기납부 차액" : "6학기 일시납"} · {payment.paymentMethod === "BANK_TRANSFER" ? "계좌이체" : payment.paymentMethod === "CASH" ? "현금" : "기타"}{payment.note ? ` · ${payment.note}` : ""}</p>
                         </div>
-                        <time className="text-xs tabular-nums text-slate-500">{formatDateTime(payment.paidAt)}</time>
+                        <time className="text-xs tabular-nums text-slate-500">{formatDateTime(payment.paidAt)} · {formatPaymentHalf(payment.paidAt)}</time>
                       </div>
                     ))}
                   </div>
@@ -856,4 +870,11 @@ function parseFeeSpreadsheet(input: ArrayBuffer): { updates: BulkUpdateStudentFe
     updates.push({ ...(value(indexes.userId) ? { userId: value(indexes.userId) } : {}), ...(value(indexes.stdNo) ? { stdNo: value(indexes.stdNo) } : {}), ...(status ? { status } : {}), ...(amount !== undefined ? { paidAmount: amount } : {}), ...(coverageSemesters !== undefined ? { coverageSemesters } : {}), ...(indexes.note >= 0 ? { note: value(indexes.note) || null } : {}) });
   });
   return { updates, errors };
+}
+
+function formatPaymentHalf(iso: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "numeric" }).formatToParts(new Date(iso));
+  const year = parts.find(part => part.type === "year")?.value;
+  const month = Number(parts.find(part => part.type === "month")?.value);
+  return `${year}년 ${month <= 6 ? "상반기" : "하반기"} 납부`;
 }

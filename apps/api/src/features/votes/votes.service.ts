@@ -80,7 +80,9 @@ export class VotesService {
       titleEn: item.titleEn,
       descriptionKo: item.descriptionKo,
       descriptionEn: item.descriptionEn,
+      imageUrl: item.imageUrl,
       type: item.type as VoteItemRecord["type"],
+      selectionErrorMessage: item.selectionErrorMessage,
       maxSelections: item.maxSelections, selectionRule: item.selectionRule as "max" | "min" | "exact",
       sortOrder: item.sortOrder,
       options: item.options.map((option) => ({
@@ -100,8 +102,9 @@ export class VotesService {
     return rows.map(({ vote, eligibleCount, votedCount }) => this.mapVote(vote, { eligibleCount, votedCount }));
   }
 
-  async listPublic(): Promise<VoteRecord[]> {
-    const rows = await this.repo.list(true);
+  async listPublic(user?: { id: string; permission: number }): Promise<VoteRecord[]> {
+    if (!user) return [];
+    const rows = await this.repo.list(true, Permissions.has(user.permission, Permissions.MANAGE_VOTE) ? undefined : user.id);
     return rows.map(({ vote, eligibleCount, votedCount }) => this.mapVote(vote, { eligibleCount, votedCount }));
   }
 

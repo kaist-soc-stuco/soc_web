@@ -147,12 +147,13 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
   };
 
   const isEvent = selectedCategory === "_EVENT";
+  const isEventLike = isEvent || selectedCategory === "promotions";
   const boardHref = isEvent
     ? "/events"
     : selectedCategory
       ? `/board/${selectedCategory}`
       : "/board";
-  const eventFields = isEvent ? (
+  const eventFields = isEventLike ? (
     <BoardWriteEventFields
       eventDescriptionKo={eventDescriptionKo}
       eventDescriptionEn={eventDescriptionEn}
@@ -201,16 +202,16 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
       surveys={surveys}
       isAnonymous={isAnonymous}
       boardCode={selectedCategory}
-      isEvent={isEvent}
+      isEvent={isEventLike}
       isPinned={isPinned}
       homeVisible={homeVisible}
       isSecret={isSecret}
       allowSecret={selectedBoard?.allowSecret ?? false}
       onAnonymousChange={setIsAnonymous}
       onPinnedChange={setIsPinned}
-      onHomeVisibleChange={setHomeVisible}
+      onHomeVisibleChange={isEvent ? setHomeVisible : undefined}
       onSecretChange={setIsSecret}
-      stacked={isEvent}
+      stacked={isEventLike}
     />
   );
   const editorCard = (includeSettings: boolean) => (
@@ -321,7 +322,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
             />
           ) : null}
 
-          {isEvent ? (
+          {isEventLike ? (
             <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
               {editorCard(false)}
               <DataViewCard className="min-w-0">

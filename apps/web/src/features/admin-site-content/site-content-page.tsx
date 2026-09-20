@@ -7,7 +7,7 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type D
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { GripVertical, ImageUp, LayoutTemplate, Link2, Plus, Trash2 } from "lucide-react";
+import { GripVertical, ImageUp, LayoutTemplate, Link2, Loader2, Plus, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
@@ -378,10 +378,10 @@ function SiteContentPageContent() {
         {selectedBlock ? <div className="admin-site-content__editor min-w-0 space-y-4">
           <AdminCard>
             <AdminCardHeader className="min-h-[72px] px-5 py-4">
-              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><AdminSectionTitle className="truncate">{selectedBlock.titleKo}</AdminSectionTitle></div></div>
-              <AdminToolbarGroup>
+              <div className="min-w-0"><AdminSectionTitle className="truncate !text-lg !font-semibold">{categoryMeta[category].singleton ? categoryMeta[category].label : selectedBlock.titleKo}</AdminSectionTitle>{!categoryMeta[category].singleton ? <p className="mt-1 text-xs text-slate-500">{categoryMeta[category].label}</p> : null}</div>
+              {!categoryMeta[category].singleton ? <AdminToolbarGroup>
                 <Button type="button" variant="ghost" size="sm" className="text-slate-500 hover:bg-rose-50 hover:text-rose-600" onClick={() => void deleteBlock()} disabled={saving}><Trash2 aria-hidden="true" /> 삭제</Button>
-              </AdminToolbarGroup>
+              </AdminToolbarGroup> : null}
             </AdminCardHeader>
             <div className="grid gap-5 p-4 sm:p-5">
               {!isImageOnlyType(draft.type) ? <div className="grid gap-4 lg:grid-cols-2">
@@ -400,13 +400,13 @@ function SiteContentPageContent() {
 
           <AdminStickyActionBar className="admin-site-content__action-bar">
             <div><p className="text-sm font-medium text-slate-800">{isDirty ? "저장하지 않은 변경 사항이 있습니다." : `마지막 수정 ${formatDateTime(selectedBlock.updatedAt)}`}</p></div>
-            <AdminToolbarGroup><Button type="button" variant="outline" onClick={() => setDraft(draftFromBlock(selectedBlock))} disabled={!isDirty || saving}>되돌리기</Button><Button type="button" onClick={() => void applyBlock()} disabled={saving || imageUploading || (!isDirty && selectedBlock.status === "PUBLISHED") || !draft.titleKo.trim()}>{saving ? "적용 중" : "변경 적용"}</Button></AdminToolbarGroup>
+            <AdminToolbarGroup><Button type="button" variant="outline" onClick={() => setDraft(draftFromBlock(selectedBlock))} disabled={!isDirty || saving}>되돌리기</Button><Button loading={saving} type="button" onClick={() => void applyBlock()} disabled={saving || imageUploading || (!isDirty && selectedBlock.status === "PUBLISHED") || !draft.titleKo.trim()}>{"변경 적용"}</Button></AdminToolbarGroup>
           </AdminStickyActionBar>
         </div> : <AdminCard className="grid min-h-[420px] place-items-center p-8 text-center"><div><LayoutTemplate aria-hidden="true" className="mx-auto mb-3 size-9 text-slate-300" /><p className="text-sm font-medium text-slate-700">관리할 콘텐츠를 선택하거나 새로 만드세요.</p></div></AdminCard>}
       </div>
     </AdminPageMain>
 
-    <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={categoryMeta[category].createLabel} mobileFullscreen className="max-w-xl" bodyClassName="space-y-4 px-4 py-5 sm:px-5" footer={<><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>취소</Button><Button type="button" onClick={() => void createBlock()} disabled={saving || imageUploading || !createDraft.titleKo.trim() || (isImageOnlyType(createDraft.type) && !createDraft.imageUrl.trim())}>{saving ? "등록 중" : "등록"}</Button></>}>
+    <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={categoryMeta[category].createLabel} mobileFullscreen className="max-w-xl" bodyClassName="space-y-4 px-4 py-5 sm:px-5" footer={<><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>취소</Button><Button loading={saving} type="button" onClick={() => void createBlock()} disabled={saving || imageUploading || !createDraft.titleKo.trim() || (isImageOnlyType(createDraft.type) && !createDraft.imageUrl.trim())}>{"등록"}</Button></>}>
       <div className="grid gap-4">
         {!isImageOnlyType(createDraft.type) ? <AdminFormField label="한국어 제목"><UiInput value={createDraft.titleKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleKo: value })); }} placeholder="공개 화면에 표시할 제목" /></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) ? <AdminFormField label="영문 제목"><UiInput value={createDraft.titleEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleEn: value })); }} /></AdminFormField> : null}
@@ -444,23 +444,23 @@ function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onS
 
     return (
       <div className="space-y-3">
-        {label ? <p className="text-sm font-medium text-slate-700">{label}</p> : null}
+        <div className="flex flex-wrap items-baseline justify-between gap-2"><p className="text-sm font-medium text-slate-700">{label ?? spec.label}</p><span className="text-xs font-normal text-slate-400">권장 {spec.width.toLocaleString()} × {spec.height.toLocaleString()} px</span></div>
         <div className="group/image relative overflow-hidden rounded-lg border border-dashed border-slate-200 bg-slate-50" style={{ aspectRatio: `${spec.width} / ${spec.height}` }}>
           {previewUrl ? <img src={previewUrl} alt="" className="absolute inset-0 size-full object-contain" onError={() => setFailedPreviews((current) => ({ ...current, [key]: true }))} /> : null}
           <label className={cn("absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-2 bg-slate-900/40 text-white transition-opacity focus-within:opacity-100", previewUrl ? "opacity-0 hover:opacity-100" : "bg-slate-50 text-slate-500 hover:bg-slate-100/70", uploading && "pointer-events-none")}>
-            <ImageUp className="size-6" />{uploading ? "업로드 중" : previewUrl ? "이미지 변경" : "이미지를 업로드해주세요."}
+            {uploading ? <Loader2 aria-hidden="true" className="size-6 animate-spin motion-reduce:animate-none" /> : <ImageUp aria-hidden="true" className="size-6" />}{previewUrl ? "이미지 변경" : "이미지를 업로드해주세요."}
             {!previewUrl && failedPreviews[key] ? <span className="text-xs text-rose-600">이미지를 불러오지 못했습니다.</span> : null}
             <input aria-label={`${label ?? spec.label} 업로드`} type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) select(file); }} />
           </label>
-          {slotValue && remove ? <Button type="button" variant="ghost" size="icon" aria-label={`${label ?? spec.label} 제거`} data-tooltip={`${label ?? spec.label} 삭제`} className="absolute right-2 top-2 bg-white/90 text-slate-500 hover:bg-white hover:text-rose-600" onClick={remove} disabled={uploading}><Trash2 className="size-4" /></Button> : null}
+          {slotValue && remove ? <Button type="button" variant="ghost" size="icon" aria-label={`${label ?? spec.label} 제거`} data-tooltip={`${label ?? spec.label} 제거`} className="absolute right-2 top-2 !border-0 !bg-transparent text-slate-600 shadow-none hover:!bg-slate-100/90 hover:text-rose-600" onClick={remove} disabled={uploading}><X aria-hidden="true" className="size-4" /></Button> : null}
         </div>
       </div>
     );
   };
 
   const hasSecondary = Boolean(secondaryLabel && onSecondarySelect);
-  return <div className="space-y-2"><p className="text-sm font-medium text-slate-700">{spec.label} ({spec.width} × {spec.height})</p>
-    <div className="grid gap-5">
+  return <div className="space-y-4">
+    <div className={cn("grid gap-6", hasSecondary && "lg:grid-cols-2")}>
       {renderSlot("primary", hasSecondary ? "한국어 조직도" : null, value, onSelect, onRemove)}
       {hasSecondary ? renderSlot("secondary", secondaryLabel!, secondaryValue ?? "", onSecondarySelect!, onSecondaryRemove) : null}
     </div>
@@ -471,7 +471,7 @@ function SortableContentBlockItem({ block, disabled, onSelect, selected, sortabl
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: block.contentBlockId, disabled: disabled || !sortable });
   const style: CSSProperties = { transform: CSS.Translate.toString(transform), transition };
   return <div ref={setNodeRef} style={style} className={cn("group flex min-w-0 w-full select-none items-stretch overflow-hidden rounded-lg", selected ? "bg-emerald-50" : "hover:bg-slate-50", isDragging && "z-10 opacity-40")}>
-    {sortable ? <button type="button" {...attributes} {...listeners} disabled={disabled} className="admin-list-drag-handle self-center ml-1 mr-1 disabled:cursor-default disabled:opacity-30" aria-label={`${block.titleKo} 노출 순서 변경`} data-tooltip="드래그하여 순서 변경"><GripVertical aria-hidden="true" className="size-4" /></button> : null}
+    {sortable ? <button type="button" {...attributes} {...listeners} disabled={disabled} className="admin-list-drag-handle self-center ml-1 mr-1 disabled:cursor-default disabled:opacity-30" aria-label={`${block.titleKo} 노출 순서 변경`}><GripVertical aria-hidden="true" className="size-4" /></button> : null}
     <button type="button" onClick={onSelect} className={cn("min-w-0 flex-1 overflow-hidden pl-0 pr-2 py-3 text-left", sortable ? "rounded-none" : "rounded-lg")}>
       <span className="flex min-w-0 items-center justify-between gap-3"><span className="min-w-0 flex-1 truncate text-sm font-normal text-[#172033]">{block.titleKo}</span></span>
     </button>

@@ -82,6 +82,7 @@ export class CommentRepository {
         updatedAt: comments.updatedAt,
         authorId: users.userId,
         authorName: users.nameKo,
+        authorNameEn: users.nameEn,
         likeCount,
         viewerHasLiked,
       })
@@ -114,6 +115,7 @@ export class CommentRepository {
         updatedAt: msToIso(row.updatedAt.valueOf()),
         author: {
           userId: String(row.authorId ?? ""),
+          nameEn: row.isOfficial ? "SoC Executive Committee" : row.authorNameEn,
           name: row.isOfficial
             ? "전산학부 집행위원회"
             : row.authorName ?? "unknown",
@@ -212,11 +214,13 @@ export class CommentRepository {
   ): Promise<{
     authorUserId: string;
     status: string;
+    content: string;
   } | null> {
     const row = await this.db
       .select({
         authorUserId: comments.authorUserId,
         status: comments.status,
+        content: comments.content,
       })
       .from(comments)
       .innerJoin(articles, eq(comments.articleId, articles.articleId))
@@ -234,6 +238,7 @@ export class CommentRepository {
     return {
       authorUserId: String(row[0].authorUserId),
       status: row[0].status,
+      content: row[0].content,
     };
   }
 
@@ -422,6 +427,7 @@ export class CommentRepository {
         boardCode: sql<string>`(select code from board where board_id = ${articles.boardId} limit 1)`,
         content: comments.content,
         authorName: users.nameKo,
+        authorNameEn: users.nameEn,
         hiddenAt: comments.hiddenAt,
         hiddenReason: comments.hiddenReason,
       })

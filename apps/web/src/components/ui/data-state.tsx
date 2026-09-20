@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { AlertCircle, FileText, RotateCcw } from "lucide-react";
+import { FileQuestion, FileText, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ interface DataStateProps {
 }
 
 interface ErrorStateProps {
+  actions?: ReactNode;
   className?: string;
   description?: string;
   onRetry?: () => void;
@@ -40,30 +41,32 @@ export function EmptyState({
 }
 
 export function ErrorState({
+  actions,
   className,
-  description = "일시적인 네트워크 오류일 수 있습니다. 잠시 후 다시 시도해 주세요.",
+  description = "잠시 후 다시 시도해 주세요. 문제가 계속되면 관리자에게 문의해 주세요.",
   onRetry,
   retryLabel = "다시 시도",
-  title = "목록을 불러오지 못했습니다.",
+  title = "내용을 불러올 수 없습니다",
 }: ErrorStateProps) {
   return (
     <div
       className={cn(
-        "flex min-h-48 flex-col items-center justify-center px-5 py-12 text-center",
+        "flex min-h-64 flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white px-6 py-10 text-center shadow-[0_2px_8px_rgba(15,23,42,0.025)]",
         className,
       )}
       role="alert"
     >
-      <div className="mb-3 flex size-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-        <AlertCircle aria-hidden="true" className="size-6" strokeWidth={1.8} />
+      <div className="mb-5 flex size-14 items-center justify-center rounded-2xl bg-slate-50 text-slate-400">
+        <FileQuestion aria-hidden="true" className="size-7" strokeWidth={1.5} />
       </div>
-      <h3 className="text-base font-semibold text-slate-800">{title}</h3>
-      <p className="mt-1 max-w-sm text-sm font-normal leading-6 text-slate-500">
+      <h3 className="max-w-full break-words text-base font-semibold leading-6 text-slate-800">{title}</h3>
+      <p className="mt-2 max-w-full break-words whitespace-normal text-sm font-normal leading-6 text-slate-500">
         {description}
       </p>
+      {onRetry || actions ? <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
       {onRetry ? (
         <Button
-          className="mt-5 gap-1.5 border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900"
+          className="gap-1.5 border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"
           onClick={onRetry}
           size="sm"
           type="button"
@@ -73,6 +76,8 @@ export function ErrorState({
           {retryLabel}
         </Button>
       ) : null}
+      {actions}
+      </div> : null}
     </div>
   );
 }

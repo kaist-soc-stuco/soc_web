@@ -195,7 +195,7 @@ export function ExecutiveMemberModal({
           ) : <span />}
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>취소</Button>
-            <Button type="submit" form={formId} disabled={saving}>{saving ? "저장 중..." : "저장"}</Button>
+            <Button loading={saving} type="submit" form={formId} disabled={saving}>{"저장"}</Button>
           </div>
         </div>
       }

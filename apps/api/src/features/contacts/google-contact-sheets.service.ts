@@ -101,7 +101,6 @@ export class GoogleContactSheetsService implements OnModuleInit {
           "활동 연도",
           "이메일",
           "전화번호",
-          "연락처 ID",
           "활동 이력",
         ],
         rows: contacts.items.map((contact) => [
@@ -112,10 +111,9 @@ export class GoogleContactSheetsService implements OnModuleInit {
           contact.cohort ? formatActivityYear(contact.cohort) : "",
           contact.email ?? "",
           contact.phoneNumber ?? "",
-          contact.id,
           (contact.activities ?? []).map((activity) => `${activity.year} / ${activity.departmentKo} / ${activity.roleKo}`).join("\n"),
         ]),
-        columnWidths: [120, 100, 140, 140, 100, 230, 140, 280, 360],
+        columnWidths: [120, 100, 140, 140, 100, 230, 140, 360],
         protectionDescription: "KAIST SOC · 집행부원 연락망 (읽기 전용)",
       });
 

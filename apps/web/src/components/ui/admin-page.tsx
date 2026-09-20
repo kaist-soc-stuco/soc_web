@@ -1,7 +1,7 @@
-import { CircleAlert, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 
-import { EmptyState } from "@/components/ui/data-state";
+import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
 import { AdminPageTitle } from "@/components/ui/page-layout";
@@ -19,11 +19,12 @@ export function AdminPageShell({ children, className, ...props }: AdminPageShell
   );
 }
 
-export function AdminPageMain({ className, ...props }: ComponentProps<"main">) {
+export function AdminPageMain({ className, tableLayout = false, ...props }: ComponentProps<"main"> & { tableLayout?: boolean }) {
   return (
     <main
       className={cn(
         "admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-5 px-4 py-6 sm:px-5 md:gap-6 md:px-8 md:py-7 xl:px-10",
+        tableLayout && "admin-page__main--table",
         className,
       )}
       {...props}
@@ -67,7 +68,7 @@ export function AdminCard({ className, ...props }: ComponentProps<"section">) {
   return (
     <section
       className={cn(
-        "admin-card overflow-hidden rounded-xl border border-[#e5eaf0] bg-white shadow-none",
+        "admin-card min-w-0 max-w-full overflow-hidden rounded-xl border border-[#e5eaf0] bg-white shadow-none",
         className,
       )}
       {...props}
@@ -266,18 +267,6 @@ export function AdminLoadingState({ message = "불러오는 중…", className, 
   );
 }
 
-export function AdminErrorState({ message, className, ...props }: ComponentProps<"div"> & { message: string }) {
-  return (
-    <div
-      role="alert"
-      aria-live="assertive"
-      className={cn("flex min-h-32 items-center justify-center px-4 py-8 text-center text-sm font-normal text-rose-600", className)}
-      {...props}
-    >
-      <span className="inline-flex items-center gap-2">
-        <CircleAlert aria-hidden="true" className="size-4 shrink-0" />
-        <span>{message}</span>
-      </span>
-    </div>
-  );
+export function AdminErrorState({ message, className, onRetry, ...props }: ComponentProps<"div"> & { message: string; onRetry?: () => void }) {
+  return <div {...props}><ErrorState title={message} className={className} onRetry={onRetry} /></div>;
 }

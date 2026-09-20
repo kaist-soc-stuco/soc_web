@@ -834,10 +834,10 @@ export const UpdateContactDepartmentSchema = CreateContactDepartmentSchema.parti
 // ─── Bulk Email ──────────────────────────────────────────────────────────────
 
 export const BulkEmailRecipientFiltersSchema = z.object({
-  query: z.string().trim().max(100).optional(),
-  studentNumber: z.string().trim().max(30).optional(),
-  primaryMajor: z.string().trim().max(100).optional(),
-  academicStatus: z.string().trim().max(30).optional(),
+  query: z.string().trim().max(1000).optional(),
+  studentNumber: z.string().trim().max(300).optional(),
+  primaryMajor: z.string().trim().max(1000).optional(),
+  academicStatus: z.string().trim().max(300).optional(),
 });
 
 const BulkEmailAttachmentIdsSchema = z

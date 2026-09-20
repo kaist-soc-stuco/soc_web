@@ -138,6 +138,17 @@ test("update sanitizes only supplied article bodies and preserves safe editor fo
   assert.match(stored.contentEn, />protocol relative<\/span>/);
 });
 
+test("article highlighting preserves safe colors without allowing CSS URLs", async () => {
+  const { calls, service } = createServiceHarness();
+  await service.createArticle("notice", createPayload(
+    '<p><span style="background-color:#ffff00;color:rgb(10,20,30)">highlight</span><span style="background-color:url(https://example.invalid/track)">unsafe</span></p>',
+  ), { id: "user-1", permission: Permissions.POST_CREATE });
+  const html = calls.create[0].payload.contentKo;
+  assert.match(html, /background-color:#ffff00/);
+  assert.match(html, /color:rgb\(10,20,30\)/);
+  assert.doesNotMatch(html, /url\(|example\.invalid/);
+});
+
 test("article links use the shared URL policy at the persistence boundary", async () => {
   const { calls, service } = createServiceHarness();
 

@@ -27,7 +27,8 @@ export class VotesController {
   constructor(private readonly service: VotesService, private readonly audit: AuditLogService) {}
 
   @Get("public")
-  listPublic() { return this.service.listPublic(); }
+  @UseGuards(OptionalAuthGuard)
+  listPublic(@Req() req: OptionalAuthedRequest) { return this.service.listPublic(req.user); }
 
   @Get("admin")
   @RequirePermissions(Permissions.MANAGE_VOTE)

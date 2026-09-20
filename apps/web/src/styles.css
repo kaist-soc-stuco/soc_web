@@ -3595,6 +3595,35 @@
   cursor: default;
 }
 
+.ui-modal__footer button[data-slot="button"] {
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+  padding-inline: 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.ui-modal__footer button[data-variant="outline"] {
+  border-color: transparent;
+  background: #f5f5f5;
+  color: #525252;
+}
+
+.ui-modal__footer button[data-variant="outline"]:hover {
+  background: #e5e5e5;
+}
+
+.ui-modal__footer button[data-variant="destructive"] {
+  border-color: #dc2626;
+  background: #dc2626;
+}
+
+.ui-modal__footer button[data-variant="destructive"]:hover {
+  border-color: #b91c1c;
+  background: #b91c1c;
+}
+
 .ui-modal__body,
 .ui-modal__footer,
 .ui-modal__header {
@@ -3715,12 +3744,12 @@
 
 @media (max-width: 39.9375rem) {
   .email-review-footer {
-    flex-direction: column;
-    align-items: stretch;
+    align-items: center;
+    justify-content: flex-end;
   }
 
   .email-review-footer > .interaction-button {
-    width: 100%;
+    width: auto;
     margin-left: 0;
     margin-right: 0;
   }
@@ -4142,7 +4171,7 @@ html { scrollbar-gutter: stable; }
 .rich-input-toolbar-space[data-open="true"] { grid-template-rows:1fr; }
 .rich-input-toolbar-space[data-open="false"] .rich-input-toolbar { visibility:hidden; pointer-events:none; }
 .section-inline-editor { padding:16px 24px; padding-right:96px; }
-.section-inline-editor.survey-section-header { padding:24px; padding-right:96px; }
+.section-inline-editor.survey-section-header { padding:24px 24px 28px; padding-right:96px; }
 .survey-section-surface { border:1px solid #e2e8f0; border-radius:0 8px 8px 8px; background:white; box-shadow:0 1px 2px rgb(0 0 0 / .05); }
 @media (prefers-reduced-motion:reduce) { .rich-input-toolbar-space { transition:none; } }
 
@@ -4389,8 +4418,12 @@ button[data-tooltip]:focus-visible::after {
   border-radius: 0.75rem;
   background: #fff;
   box-shadow: 0 2px 8px rgb(15 23 42 / 8%);
-  transition: top 220ms cubic-bezier(0.22, 1, 0.36, 1), left 220ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: top, left;
+  transition: top 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: top;
+}
+
+.survey-editor-floating-toolbar[data-positioned="false"] {
+  transition: none;
 }
 
 .survey-editor-floating-toolbar button {
@@ -4523,19 +4556,19 @@ button[data-tooltip]:focus-visible::after {
     background-image: linear-gradient(var(--brand-primary, #007a4b), var(--brand-primary, #007a4b)), linear-gradient(#cbd5e1, #cbd5e1);
     background-position: center bottom;
     background-repeat: no-repeat;
-    background-size: 0% 2px, 100% 1px;
+    background-size: 0% 2px, 100% 2px;
     transition: background-size 180ms ease !important;
   }
   .survey-answer-control.interaction-control:focus,
   .survey-answer-control.interaction-control:focus-visible,
   .survey-answer-control.interaction-control[aria-expanded="true"] {
-    background-size: 100% 2px, 100% 1px;
+    background-size: 100% 2px, 100% 2px;
   }
   .survey-answer-control.interaction-control[aria-invalid="true"],
   .survey-answer-control.interaction-control[aria-invalid="true"]:hover,
   .survey-answer-control.interaction-control[aria-invalid="true"]:focus,
   .survey-answer-control.interaction-control[aria-invalid="true"]:focus-visible {
-    background-image: linear-gradient(#e11d48, #e11d48), linear-gradient(#fda4af, #fda4af);
+    background-image: linear-gradient(#ef4444, #ef4444), linear-gradient(#ef4444, #ef4444);
   }
   @media (prefers-reduced-motion: reduce) {
     .survey-answer-control.interaction-control { transition: none !important; }
@@ -4563,7 +4596,7 @@ button[data-tooltip]:focus-visible::after {
   .builder-text-control.interaction-control:hover { border-bottom-color: #cbd5e1 !important; }
   .builder-text-control.interaction-control:focus,
   .builder-text-control.interaction-control:focus-visible { border-bottom-color: var(--brand-primary, #007a4b) !important; }
-  .builder-rule-row .interaction-control { border-radius: 0 !important; box-shadow: none !important; }
+  .builder-rule-row input.interaction-control { border-radius: 0 !important; box-shadow: none !important; }
 }
 .survey-editor-floating-toolbar { position: fixed; }
 .survey-editor-toolbar-slot { width: 3.5rem; }
@@ -4591,6 +4624,15 @@ button[data-tooltip]:focus-visible::after {
 }
 .vote-agenda-card[data-selected="false"] .builder-text-control.interaction-control {
   border-bottom-color: transparent !important;
+}
+.vote-agenda-card[data-selected="true"] .builder-rule-value-control.interaction-control,
+.builder-rule-value-control.interaction-control {
+  border-bottom-color: #cbd5e1 !important;
+}
+.vote-agenda-card[data-selected="true"] .builder-rule-value-control.interaction-control:focus,
+.builder-rule-value-control.interaction-control:focus,
+.builder-rule-value-control.interaction-control:focus-visible {
+  border-bottom-color: var(--brand-primary, #007a4b) !important;
 }
 .vote-agenda-card[data-selected="false"] .group > .flex > button,
 .vote-agenda-card[data-selected="false"] .group > .flex > div.shrink-0 {
@@ -4644,6 +4686,36 @@ button[data-tooltip]:focus-visible::after {
 .admin-table-card:has(.ui-pagination) .admin-table-viewport { max-height:none !important; height:auto !important; overflow-y:hidden; }
 .admin-table-viewport { max-width:100%; }
 .admin-table-viewport table { width:100%; }
+
+/* Unpaginated management lists own the available viewport height. Keep the
+   header and actions outside the sole table scroll container. */
+@media (min-width: 48rem) {
+  .admin-page__main--table {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .admin-page__main--table > * { flex-shrink: 0; }
+  .admin-page__main--table > :is(.admin-card, .admin-table-card) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0%;
+    min-height: 0;
+    min-width: 0;
+  }
+  .admin-page__main--table .admin-table-viewport {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  .admin-page__main--table .admin-table-viewport thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+}
 
 .rich-text-input-shell::after { content:""; position:absolute; pointer-events:none; inset-inline:0; bottom:0; height:2px; background:var(--color-brand-primary); transform:scaleX(0); transition:transform 160ms ease; }
 .rich-text-input-shell:focus-within::after { transform:scaleX(1); }

@@ -10,7 +10,6 @@ export function Modal({
   children,
   className,
   bodyClassName,
-  dividerless = false,
   footer,
   headerActions,
   mobileFullscreen = false,
@@ -49,12 +48,12 @@ export function Modal({
   if (!open) return null;
 
   return createPortal(
-    <div className="ui-modal fixed inset-0 z-[70] flex items-end justify-center p-0 sm:items-center sm:px-4 sm:py-6">
+    <div className={cn("ui-modal fixed inset-0 z-[70] flex items-center justify-center p-4 sm:py-6", mobileFullscreen && "max-sm:p-0")}>
       <button
         type="button"
         aria-label="닫기"
         tabIndex={-1}
-        className="ui-modal__scrim absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
+        className="ui-modal__scrim absolute inset-0 bg-slate-950/30"
         onClick={onClose}
       />
       <div
@@ -65,18 +64,17 @@ export function Modal({
         tabIndex={-1}
         onKeyDown={handleOverlayKeyDown}
         className={cn(
-          "ui-modal__surface relative flex max-h-[calc(100dvh-1rem)] w-full max-w-md flex-col overflow-hidden rounded-t-[var(--ui-panel-radius)] border border-[var(--ui-border-subtle)] bg-[var(--card)] shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[var(--ui-panel-radius)]",
+          "ui-modal__surface relative flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[var(--ui-border-subtle)] bg-[var(--card)] shadow-[0_16px_48px_rgba(15,23,42,0.14)] sm:max-h-[calc(100dvh-3rem)] ",
           mobileFullscreen && "ui-modal__surface--mobile-fullscreen",
           className,
         )}
       >
         <div
           className={cn(
-            "ui-modal__header flex min-h-14 shrink-0 items-center justify-between gap-3",
-            dividerless ? "px-6" : "px-5",
+            "ui-modal__header flex shrink-0 items-center justify-between gap-3 px-6 pt-6",
           )}
         >
-          <h2 id={titleId} className="min-w-0 break-words text-lg font-semibold leading-6 text-[var(--ui-text-strong)]">{title}</h2>
+          <h2 id={titleId} className="min-w-0 break-words text-xl font-semibold leading-7 text-[var(--ui-text-strong)]">{title}</h2>
           <div className="flex shrink-0 items-center gap-1.5">
             {headerActions}
             {showClose ? (
@@ -86,14 +84,11 @@ export function Modal({
             ) : null}
           </div>
         </div>
-        {children ? <div className={cn("ui-modal__body scrollbar-hidden min-h-0 overflow-y-auto px-5 py-5", bodyClassName)}>{children}</div> : null}
+        {children ? <div className={cn("ui-modal__body scrollbar-hidden min-h-0 overflow-y-auto px-6 pb-6 pt-3 text-sm font-normal leading-6 text-neutral-600", bodyClassName)}>{children}</div> : null}
         {footer ? (
           <div
             className={cn(
-              "ui-modal__footer flex shrink-0 flex-wrap justify-end gap-2",
-              dividerless
-                ? "bg-transparent px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-0"
-                : "bg-transparent px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-0",
+              "ui-modal__footer flex shrink-0 flex-wrap justify-end gap-2 bg-transparent px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-0",
             )}
           >
             {footer}

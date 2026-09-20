@@ -31,8 +31,11 @@ export class VotesRepository {
     return this.db.transaction(callback);
   }
 
-  async list(publicOnly = false) {
-    const condition = publicOnly ? sql`${votes.status} <> 'DRAFT'` : undefined;
+  async list(publicOnly = false, eligibleUserId?: string) {
+    const condition = and(
+      publicOnly ? sql`${votes.status} <> 'DRAFT'` : undefined,
+      eligibleUserId ? sql`exists (select 1 from vote_voter eligible_voter where eligible_voter.vote_id = ${votes.voteId} and eligible_voter.user_id = ${eligibleUserId} and eligible_voter.status = 'ELIGIBLE')` : undefined,
+    );
     return this.db
       .select({
         vote: votes,
@@ -126,7 +129,9 @@ export class VotesRepository {
         titleEn: item.titleEn ?? null,
         descriptionKo: item.descriptionKo ?? null,
         descriptionEn: item.descriptionEn ?? null,
+        imageUrl: item.imageUrl ?? null,
         type: item.type,
+        selectionErrorMessage: item.selectionErrorMessage ?? null,
         maxSelections: item.maxSelections, selectionRule: item.selectionRule,
         sortOrder: itemIndex,
       }).returning();

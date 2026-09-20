@@ -99,6 +99,15 @@ const FONT_SIZE_OPTIONS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 30, 36,
   (size) => ({ value: `${size}px`, labelKo: `${size}px`, labelEn: `${size}px` }),
 );
 
+function normalizeFontSize(value: unknown) {
+  const normalized = typeof value === "string" && /^\d+(?:\.\d+)?(?:px)?$/.test(value.trim())
+    ? value.trim().replace(/px$/, "") + "px"
+    : DEFAULT_FONT_SIZE;
+  return FONT_SIZE_OPTIONS.some((option) => option.value === normalized)
+    ? normalized
+    : DEFAULT_FONT_SIZE;
+}
+
 const TEXT_COLOR_PALETTE = [
   { value: "#111827", label: "검정" },
   { value: "#b42318", label: "빨강" },
@@ -474,19 +483,21 @@ function ToolbarButton({
 
 function ColorPopover({
   colors,
+  clearLabel,
   currentValue,
   label,
   onApply,
+  onClear,
   onClose,
 }: {
   colors: ReadonlyArray<{ value: string; label: string }>;
+  clearLabel: string;
   currentValue: string;
   label: string;
   onApply: (value: string) => void;
+  onClear: () => void;
   onClose: () => void;
 }) {
-  const [hexValue, setHexValue] = useState(currentValue || "");
-  const [error, setError] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -506,16 +517,6 @@ function ColorPopover({
     };
   }, [onClose]);
 
-  const applyHex = () => {
-    const normalized = hexValue.trim();
-    if (!/^#[0-9a-f]{6}$/i.test(normalized)) {
-      setError(true);
-      return;
-    }
-    onApply(normalized.toLowerCase());
-    onClose();
-  };
-
   return (
     <div
       ref={popoverRef}
@@ -523,17 +524,21 @@ function ColorPopover({
       aria-label={label}
       className="absolute left-0 top-full z-50 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgb(15_23_42_/_0.14)]"
     >
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs font-semibold text-slate-700">{label}</span>
+      <div className="mb-3 flex items-center justify-end">
         <Button
           type="button"
           variant="ghost"
-          size="icon"
-          aria-label="닫기"
-          onClick={onClose}
-          className="size-7 rounded-md text-slate-400"
+          size="sm"
+          aria-label={clearLabel}
+          onClick={() => {
+            onClear();
+            onClose();
+          }}
+          disabled={!currentValue}
+          className="h-7 rounded-md px-2 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800"
         >
-          <X />
+          <X aria-hidden="true" className="size-3.5" />
+          {clearLabel}
         </Button>
       </div>
       <div className="grid grid-cols-8 gap-2" role="listbox" aria-label={`${label} 팔레트`}>
@@ -548,7 +553,10 @@ function ColorPopover({
               onApply(color.value);
               onClose();
             }}
-            className="relative size-6 rounded-full border border-slate-200 outline-none transition-transform hover:scale-105"
+            className={cn(
+              "relative size-6 rounded-full border border-slate-200 outline-none transition-transform hover:scale-105",
+              currentValue.toLowerCase() === color.value && "border-slate-950 ring-1 ring-black ring-offset-1",
+            )}
             style={{ backgroundColor: color.value }}
           >
             {currentValue.toLowerCase() === color.value ? (
@@ -564,28 +572,6 @@ function ColorPopover({
             ) : null}
           </button>
         ))}
-      </div>
-      <div className="my-3 h-px bg-slate-100" aria-hidden="true" />
-      <div className="flex items-center">
-        <input
-          aria-label={`${label} HEX 코드`}
-          value={hexValue}
-          onChange={(event) => {
-            setHexValue(event.target.value);
-            setError(false);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              applyHex();
-            }
-          }}
-          placeholder="#RRGGBB"
-          className={cn(
-            "h-8 min-w-0 flex-1 rounded-md border bg-white px-2 text-xs text-slate-800 outline-none placeholder:text-slate-400",
-            error ? "border-rose-400" : "border-slate-200",
-          )}
-        />
       </div>
     </div>
   );
@@ -699,6 +685,7 @@ function RichTextToolbar({
   variableOptions?: ReadonlyArray<RichTextVariableOption>;
 }) {
   const editorId = useId().replace(/:/g, "");
+  const [, forceToolbarUpdate] = useState(0);
   const linkButtonRef = useRef<HTMLSpanElement>(null);
   const [linkDialog, setLinkDialog] = useState<{text:string;url:string} | null>(null);
   const [linkPreview, setLinkPreview] = useState<EditorLinkPreview | null>(null);
@@ -735,7 +722,8 @@ function RichTextToolbar({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const currentTextColor = editor.getAttributes("textStyle").color ?? "";
   const currentBackgroundColor = editor.getAttributes("textStyle").backgroundColor ?? "";
-  const sizeValue = editor.getAttributes("textStyle").fontSize ?? DEFAULT_FONT_SIZE;
+  const sizeValue = normalizeFontSize(editor.getAttributes("textStyle").fontSize);
+  const editorIsFocused = editor.isFocused;
   const variableMenuOptions = variableOptions?.length
     ? variableOptions
     : variableToken
@@ -755,6 +743,20 @@ function RichTextToolbar({
     if (!src || editor.isDestroyed) return;
     editor.chain().focus().setImage({ src, alt: "" }).run();
   };
+
+  useEffect(() => {
+    const updateToolbarState = () => forceToolbarUpdate((current) => current + 1);
+    editor.on("selectionUpdate", updateToolbarState);
+    editor.on("transaction", updateToolbarState);
+    editor.on("focus", updateToolbarState);
+    editor.on("blur", updateToolbarState);
+    return () => {
+      editor.off("selectionUpdate", updateToolbarState);
+      editor.off("transaction", updateToolbarState);
+      editor.off("focus", updateToolbarState);
+      editor.off("blur", updateToolbarState);
+    };
+  }, [editor]);
 
   return (
     <div className="rich-text-toolbar flex min-w-0 max-w-full items-center justify-between gap-3 bg-slate-50/60 px-3 py-2">
@@ -824,7 +826,7 @@ function RichTextToolbar({
           <div className="relative">
             <ToolbarButton
               label={lang === "ko" ? "글자 색상" : "Text color"}
-              active={Boolean(currentTextColor) || colorPopover === "text"}
+              active={editorIsFocused && (Boolean(currentTextColor) || colorPopover === "text")}
               expanded={colorPopover === "text"}
               hasPopup="dialog"
               onClick={() => {
@@ -836,9 +838,11 @@ function RichTextToolbar({
             {colorPopover === "text" ? (
               <ColorPopover
                 colors={TEXT_COLOR_PALETTE}
+                clearLabel={lang === "ko" ? "색상 제거" : "Clear color"}
                 currentValue={currentTextColor}
                 label={lang === "ko" ? "글자 색상" : "Text color"}
                 onApply={(value) => editor.chain().focus().setColor(value).run()}
+                onClear={() => editor.chain().focus().unsetColor().run()}
                 onClose={() => setColorPopover(null)}
               />
             ) : null}
@@ -846,7 +850,7 @@ function RichTextToolbar({
           <div className="relative">
             <ToolbarButton
               label={lang === "ko" ? "배경 색상" : "Background color"}
-              active={Boolean(currentBackgroundColor) || colorPopover === "background"}
+              active={editorIsFocused && (Boolean(currentBackgroundColor) || colorPopover === "background")}
               expanded={colorPopover === "background"}
               hasPopup="dialog"
               onClick={() => {
@@ -858,9 +862,11 @@ function RichTextToolbar({
             {colorPopover === "background" ? (
               <ColorPopover
                 colors={BACKGROUND_COLOR_PALETTE}
+                clearLabel={lang === "ko" ? "색상 제거" : "Clear color"}
                 currentValue={currentBackgroundColor}
                 label={lang === "ko" ? "배경 색상" : "Background color"}
                 onApply={(value) => editor.chain().focus().setBackgroundColor(value).run()}
+                onClear={() => editor.chain().focus().unsetBackgroundColor().run()}
                 onClose={() => setColorPopover(null)}
               />
             ) : null}

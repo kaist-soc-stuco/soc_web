@@ -1,19 +1,28 @@
+import { useState } from "react";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 import { resolveAssetUrl } from "@/lib/asset-url";
-import { getLocalizedText, type AnswerValue } from "./survey-answer-utils";
+import { getLocalizedText, isAnswerFilled, type AnswerValue } from "./survey-answer-utils";
 import { SurveyQuestionInput, type ResponseQuestion } from "./survey-question-input";
 
 export function SurveyQuestionCard({ question, value, onChange, lang, error: questionError = null, disabled = false, maxSelections, hint, id }: {
   question: ResponseQuestion; value: AnswerValue; onChange: (value: AnswerValue) => void; lang: string;
   error?: string | null; disabled?: boolean; maxSelections?: number; hint?: string; id?: string;
 }) {
+  const [touched, setTouched] = useState(false);
+  const error = questionError || (touched && !disabled && question.isRequired && !isAnswerFilled(question.questionType, value)
+    ? lang === "ko" ? "필수 질문입니다." : "This question is required."
+    : null);
   const questionImage = lang === "ko" ? question.config?.imageUrlKo : question.config?.imageUrlEn || question.config?.imageUrlKo;
   return (
     <div
       id={id ?? `survey-question-${question.id}`}
-      className={`group scroll-mt-24 rounded-2xl border bg-white px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.035)] transition-[border-color,box-shadow] ${
-        questionError
-          ? "border-rose-300 bg-rose-50/10 hover:border-rose-400"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)
+          && !(event.relatedTarget instanceof Element && event.relatedTarget.closest('[role="listbox"]'))) setTouched(true);
+      }}
+      className={`group scroll-mt-24 rounded-lg border bg-white px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.035)] transition-[border-color,box-shadow] ${
+        error
+          ? "border-red-500 hover:border-red-500"
           : "border-slate-200 hover:border-kaist-darkgreen/20"
       } hover:shadow-[0_2px_5px_rgba(15,23,42,0.045)]`}
     >
@@ -46,7 +55,7 @@ export function SurveyQuestionCard({ question, value, onChange, lang, error: que
           lang={lang}
           disabled={disabled}
           maxSelections={maxSelections}
-          error={questionError}
+          error={error}
         />
       </div>
     </div>

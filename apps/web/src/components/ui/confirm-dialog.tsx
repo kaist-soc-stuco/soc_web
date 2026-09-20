@@ -69,13 +69,8 @@ export function useConfirmDialog() {
           onClose={() => close(false)}
           showClose={state.tone !== "danger"}
           dividerless={state.tone === "danger"}
-          title={
-            <span className="text-lg font-semibold leading-6 text-slate-900">
-              {state.title}
-            </span>
-          }
-          className="max-w-md"
-          bodyClassName="px-6 py-5"
+          title={state.title}
+          className="max-w-[25rem]"
           footer={
             <>
               <Button
@@ -99,7 +94,7 @@ export function useConfirmDialog() {
         >
           <div className="min-w-0 space-y-1">
             {state.description ? (
-              <p className="break-keep text-sm font-medium leading-6 text-slate-600">
+              <p className="break-keep text-sm font-normal leading-6 text-neutral-600">
                 {state.description}
               </p>
             ) : null}

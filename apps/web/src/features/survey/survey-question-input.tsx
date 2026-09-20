@@ -5,12 +5,13 @@ import type {
   QuestionType,
   SurveyQuestionRecord,
 } from "@soc/contracts";
-import { Check, FileText, Heart, Loader2, Plus, Star, ThumbsUp, UploadCloud, X } from "lucide-react";
+import { CircleAlert, Check, FileText, Heart, Loader2, Plus, Star, ThumbsUp, UploadCloud, X } from "lucide-react";
 
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { useToast } from "@/components/ui/toast";
+import { useCurrentSession } from "@/hooks/use-current-session";
 
 import type { AnswerValue, FileAnswer } from "./survey-answer-utils";
 import { UiInput, UiTextarea } from "@/components/ui/form-control";
@@ -50,14 +51,16 @@ export function SurveyQuestionInput({
     [],
   );
   const { toast } = useToast();
+  const { data: session } = useCurrentSession();
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const base =
-    "survey-answer-control min-h-11 w-full rounded-none border-0 border-b border-slate-300 bg-transparent px-0 py-2 text-base outline-none transition-[border-color,box-shadow] placeholder:text-[length:var(--ui-text-body-size)] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-0 md:text-sm";
+    "survey-answer-control min-h-11 w-full rounded-none border-0 border-b border-slate-300 bg-transparent px-0 py-1 text-base outline-none transition-[border-color,box-shadow] placeholder:text-[length:var(--ui-text-body-size)] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-0 md:text-sm";
   const controlClass = base;
   const renderError = error ? (
-    <p className="mt-1 text-xs font-normal text-rose-600" role="alert">
+    <p className="mb-2 mt-5 flex items-center gap-3 text-sm font-normal text-red-500" role="alert">
+      <CircleAlert className="size-5 shrink-0" aria-hidden="true" />
       {error}
     </p>
   ) : null;
@@ -83,15 +86,13 @@ export function SurveyQuestionInput({
       return (
         <div>
           <UiInput
-            className={controlClass}
+            className={`${controlClass} !w-1/2`}
             type="text"
             value={value as string}
             onChange={(e) => onChange(e.target.value)}
             aria-invalid={Boolean(error)}
             disabled={disabled}
-            placeholder={
-              lang === "ko" ? "답변을 입력하세요" : "Enter your answer"
-            }
+            placeholder={lang === "ko" ? "내 답변" : "My answer"}
           />
           {renderError}
         </div>
@@ -101,15 +102,13 @@ export function SurveyQuestionInput({
       return (
         <div>
           <UiTextarea
-            autoResize={false}
-            className={`${controlClass} min-h-[100px] resize-none`}
+            rows={1}
+            className={`${controlClass} min-h-11 leading-normal resize-none`}
             value={value as string}
             onChange={(e) => onChange(e.target.value)}
             aria-invalid={Boolean(error)}
             disabled={disabled}
-            placeholder={
-              lang === "ko" ? "답변을 입력하세요" : "Enter your answer"
-            }
+            placeholder={lang === "ko" ? "내 답변" : "My answer"}
           />
           {renderError}
         </div>
@@ -128,16 +127,17 @@ export function SurveyQuestionInput({
               options={[
                 {
                   value: "",
-                  label: lang === "ko" ? "선택하세요" : "Select an option",
+                  label: lang === "ko" ? "선택" : "Select",
                 },
-                ...displayedOptions.map((opt) => ({
+                ...displayedOptions.map((opt, index) => ({
                   value: opt.value,
                   label: getOptionLabel(opt),
+                  separatorBefore: index === 0,
                 })),
               ]}
               className="w-full max-w-xs"
-              buttonClassName={`${controlClass} justify-between text-left`}
-              menuClassName="rounded-xl border-gray-200"
+              buttonClassName="!h-11 !min-h-11 !rounded-lg !border !border-slate-200 !bg-white !px-3.5 text-left !shadow-none hover:!border-slate-300 hover:!bg-slate-50"
+              menuClassName="animate-in fade-in zoom-in-95 duration-150 rounded-xl border-gray-200 opacity-100"
               emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
             />
             {renderError}
@@ -393,6 +393,11 @@ export function SurveyQuestionInput({
     }
 
     case "file_upload": {
+      if (!session?.userId) {
+        return <p className="text-sm text-slate-500">{lang === "ko"
+          ? "파일 첨부는 로그인 후 이용할 수 있습니다. 자료 링크 입력란이 있다면 공유 링크를 입력해 주세요."
+          : "Sign in to attach files. If a material-link field is available, you can provide a shared link there."}</p>;
+      }
       const maxSizeBytes = question.config?.maxSizeBytes ?? 20_000_000;
       const maxFiles = question.config?.maxFiles ?? 1;
       const accept = question.config?.allowedMimeTypes?.join(",") || undefined;
@@ -423,7 +428,7 @@ export function SurveyQuestionInput({
         try {
           const uploadedFiles = await Promise.all(
             selectedFiles.map(async (file): Promise<FileAnswer> => {
-              const asset = await apiClient.uploadAsset(file);
+              const asset = await apiClient.uploadAsset(file, { transport: "server" });
               return {
                 assetId: asset.assetId,
                 fileName: asset.originalFilename,

@@ -224,7 +224,7 @@ function BoardManagementPageContent() {
 
   return <AdminPageShell>
     {ConfirmDialog}
-    <AdminPageMain>
+    <AdminPageMain tableLayout>
       <AdminPageHeader title="게시판 관리" actions={<Button type="button" onClick={startCreate}><Plus aria-hidden="true" /> 게시판 추가</Button>} />
       {message ? <div role="status" className={cn("rounded-lg border px-4 py-3 text-sm font-medium", message.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-700")}>{message.text}</div> : null}
 
@@ -260,7 +260,7 @@ function BoardManagementPageContent() {
       onClose={() => setFormOpen(false)}
       title={editingCode ? "게시판 설정" : "새 게시판"}
       width="max-w-2xl"
-      footer={<div className="flex items-center justify-between gap-2"><div>{editingCode ? <Button type="button" variant="ghost" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void removeBoard()} disabled={saving}><Trash2 aria-hidden="true" /> 게시판 삭제</Button> : null}</div><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setFormOpen(false)}>취소</Button><Button type="button" onClick={() => void saveBoard()} disabled={saving || !form.code.trim() || !form.nameKo.trim()}>{saving ? "저장 중" : "저장"}</Button></div></div>}
+      footer={<div className="flex items-center justify-between gap-2"><div>{editingCode ? <Button type="button" variant="ghost" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void removeBoard()} disabled={saving}><Trash2 aria-hidden="true" /> 게시판 삭제</Button> : null}</div><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setFormOpen(false)}>취소</Button><Button loading={saving} type="button" onClick={() => void saveBoard()} disabled={saving || !form.code.trim() || !form.nameKo.trim()}>{"저장"}</Button></div></div>}
     >
       <div className="space-y-8">
         <section className="space-y-4">
@@ -336,7 +336,7 @@ function SortableBoardRow({ board, disabled, onOpen }: { board: BoardSummary; di
   const style = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 180ms ease", willChange: isDragging ? "transform" : undefined };
 
   return <tr ref={setNodeRef} style={style} aria-label={`${board.nameKo} 게시판 설정 열기`} role="button" className={cn("cursor-pointer transition-colors hover:bg-slate-50/60 focus-visible:bg-slate-50 focus-visible:outline-none", isDragging && "relative z-10 opacity-70")} onClick={() => onOpen(board)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(board); } }} tabIndex={0}>
-    <AdminTableCell className="text-center"><button ref={setActivatorNodeRef} type="button" aria-label={`${board.nameKo} 순서 이동`} data-tooltip="드래그하여 순서 변경" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="admin-list-drag-handle"><GripVertical aria-hidden="true" className="size-4" /></button></AdminTableCell>
+    <AdminTableCell className="text-center"><button ref={setActivatorNodeRef} type="button" aria-label={`${board.nameKo} 순서 이동`} {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="admin-list-drag-handle"><GripVertical aria-hidden="true" className="size-4" /></button></AdminTableCell>
     <AdminTableCell truncate><span className="admin-table-text-emphasis block truncate">{board.nameKo}</span><span className="admin-table-text mt-0.5 block truncate">{board.code}{board.nameEn ? ` · ${board.nameEn}` : ""}</span></AdminTableCell>
     <AdminTableCell truncate>{[board.allowComment && "댓글", board.allowSecret && "비밀글", board.allowLike && "추천·스크랩"].filter(Boolean).join(" · ") || "추가 기능 없음"}</AdminTableCell>
     <AdminTableCell>{board.isActive ? <AdminStatusBadge tone="positive">활성</AdminStatusBadge> : <AdminStatusBadge>비활성</AdminStatusBadge>}</AdminTableCell>

@@ -3,8 +3,10 @@ import type {
   CommentItem,
 } from "@soc/contracts";
 import { isoToDate, nowDate } from "@soc/shared";
-import { ArrowUp, Edit2, Eye, EyeOff, Heart, Loader2, Trash2 } from "lucide-react";
+import { ArrowUp, Edit2, Eye, EyeOff, Heart, Loader2, MessageCircle, MoreVertical, Trash2 } from "lucide-react";
 import { useState } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { AdminActionMenuPanel, AdminActionMenuItem } from "@/components/ui/admin-action-menu";
 
 import { Button } from "@/components/ui/button";
 import { EngagementActionButton } from "@/components/ui/article-engagement-actions";
@@ -143,7 +145,7 @@ export function CommentSection({
                   />
 
                   {showReplyComposer && canCreateComment && isAuthenticated ? (
-                    <div className="ml-5 min-w-0 border-l-2 border-brand-primary/15 pb-2 pl-2 pt-1 sm:ml-9 sm:pl-3">
+                    <div className="ml-5 min-w-0 border-l border-slate-200 pb-3 pl-4 pt-1 sm:ml-9 sm:pl-5">
                       <CommentComposer
                         ariaLabel={lang === "ko" ? "대댓글 입력" : "Reply input"}
                         disabled={!canCreateComment}
@@ -152,7 +154,7 @@ export function CommentSection({
                         onSubmit={() => onCreateReply(comment.commentId)}
                         placeholder={
                           lang === "ko"
-                            ? "대댓글을 입력해 주세요."
+                            ? "대댓글을 입력하세요."
                             : "Write a reply..."
                         }
                         value={replyText}
@@ -160,6 +162,8 @@ export function CommentSection({
                     </div>
                   ) : null}
 
+                  {replies.length > 0 ? (
+                    <div className="mb-3 ml-5 border-l border-slate-200 pl-4 sm:ml-9 sm:pl-5">
                   {replies.map((reply) => (
                     <CommentRow
                       key={reply.commentId}
@@ -180,6 +184,8 @@ export function CommentSection({
                       showReplyButton={false}
                     />
                   ))}
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
@@ -207,7 +213,7 @@ export function CommentSection({
           placeholder={
             isAuthenticated
               ? lang === "ko"
-                ? "댓글을 입력해 주세요."
+                ? "댓글을 입력하세요."
                 : "Write a comment..."
               : lang === "ko"
                 ? "로그인 후 댓글을 작성해 보세요."
@@ -294,20 +300,23 @@ function CommentRow({
   const handleSaveEdit = async () => {
     if (!editText.trim() || editSubmitting) return;
     setEditSubmitting(true);
-    await onUpdateComment(comment.commentId, editText);
-    setEditSubmitting(false);
-    setEditing(false);
+    try {
+      await onUpdateComment(comment.commentId, editText);
+      setEditing(false);
+    } finally {
+      setEditSubmitting(false);
+    }
   };
 
   return (
     <article
       className={cn(
-        "group flex items-start gap-2.5 py-3.5",
-        isNested ? "ml-5 border-l border-r border-t border-slate-100 pl-2 sm:ml-9 sm:pl-3" : "",
+        "group flex items-start gap-2.5",
+        isNested ? "py-2.5" : "py-4",
         comment.status === "HIDDEN" && "rounded-lg bg-amber-50/70 px-3 py-3",
       )}
     >
-      <div className="size-6 shrink-0 overflow-hidden rounded-full">
+      <div className={cn("shrink-0 overflow-hidden rounded-full", isNested ? "size-6" : "size-7")}>
         <img
           src="/default-avatar.svg"
           alt=""
@@ -320,7 +329,7 @@ function CommentRow({
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="min-w-0 break-words text-[length:var(--ui-text-body-size)] font-semibold text-slate-800 [overflow-wrap:anywhere]">
-              {comment.author.name}
+              {(lang === "en" ? comment.author.nameEn || comment.author.name : comment.author.name)}
             </span>
             {comment.isOfficial ? (
               <span className="shrink-0 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[length:var(--ui-text-caption-size)] font-normal text-emerald-700">
@@ -340,7 +349,7 @@ function CommentRow({
               {formatRelativeTime(comment.createdAt, lang)}
             </time>
           </div>
-          <div className="flex shrink-0 items-center gap-0.5 self-start sm:self-auto">
+          {!editing ? <div className="flex shrink-0 items-center gap-0.5 self-start sm:self-auto">
             {allowEngagement ? <EngagementActionButton
               active={likeActive}
               className="comment-engagement-action h-7 gap-1 rounded-md border-0 px-2 text-xs font-medium"
@@ -369,70 +378,45 @@ function CommentRow({
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
+                size="icon"
+                aria-label={lang === "ko" ? "답글" : "Reply"}
+                data-tooltip={lang === "ko" ? "답글" : "Reply"}
                 onClick={onReplyToggle}
-                className="comment-reply-action h-7 rounded-md border-0 bg-transparent px-2 text-xs font-medium text-slate-400 hover:border-0 hover:bg-slate-100 hover:text-slate-400"
+                className="comment-reply-action !size-7 !min-h-0 rounded-md border-0 bg-transparent !p-0 text-slate-400 hover:border-0 hover:bg-slate-100 hover:text-slate-500"
               >
-                {lang === "ko" ? "답글" : "Reply"}
+                <MessageCircle className="size-3.5" aria-hidden="true" />
               </Button>
             ) : null}
             {(canDelete || canHide || canRestore) && (
-              <div className="relative">
-                {canDelete ? <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={canDelete ? (lang === "ko" ? "댓글 삭제" : "Delete comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
-                  data-tooltip={canDelete ? (lang === "ko" ? "댓글 삭제" : "Delete comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
-                  aria-expanded={canDelete ? deleteModalOpen : hideModalOpen}
-                  onClick={() => {
-                    if (canDelete) {
-                      setDeleteModalOpen(true);
-                      return;
-                    }
-                    setHideReason("");
-                    setHideModalOpen(true);
-                  }}
-                  className="comment-moderation-action pointer-events-none size-7 rounded-md border-0 bg-transparent text-rose-600 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-                >
-                  {canDelete ? <Trash2 className="size-3.5" aria-hidden="true" /> : <EyeOff className="size-3.5" aria-hidden="true" />}
-                </Button> : null}
-                {canHide || canRestore ? <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={canRestore ? (lang === "ko" ? "댓글 숨김 해제" : "Unhide comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
-                  data-tooltip={canRestore ? (lang === "ko" ? "댓글 숨김 해제" : "Unhide comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
-                  onClick={() => {
-                    if (canRestore) {
-                      void onRestoreComment(comment.commentId);
-                      return;
-                    }
-                    setHideReason("");
-                    setHideModalOpen(true);
-                  }}
-                  className="comment-moderation-action pointer-events-none size-7 rounded-md border-0 bg-transparent text-rose-600 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-                >
-                  {canRestore ? <Eye className="size-3.5" aria-hidden="true" /> : <EyeOff className="size-3.5" aria-hidden="true" />}
-                </Button> : null}
-              </div>
+              <DropdownMenu.Root modal={false}>
+                <DropdownMenu.Trigger asChild>
+                  <Button type="button" variant="ghost" size="icon" aria-label={lang === "ko" ? "댓글 더보기" : "Comment actions"} className="!size-7 !min-h-0 rounded-md border-0 text-slate-500">
+                    <MoreVertical className="size-4" />
+                  </Button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content asChild align="end" sideOffset={4}>
+                    <AdminActionMenuPanel className="z-50">
+                      {canDelete ? <DropdownMenu.Item asChild onSelect={() => { setEditText(comment.content); setEditing(true); }}>
+                        <AdminActionMenuItem icon={<Edit2 />}>{lang === "ko" ? "수정" : "Edit"}</AdminActionMenuItem>
+                      </DropdownMenu.Item> : null}
+                      {canHide || canRestore ? <DropdownMenu.Item asChild onSelect={() => {
+                        if (canRestore) { void onRestoreComment(comment.commentId); return; }
+                        setHideReason(""); setHideModalOpen(true);
+                      }}>
+                        <AdminActionMenuItem icon={canRestore ? <Eye /> : <EyeOff />}>
+                          {canRestore ? (lang === "ko" ? "숨김 해제" : "Unhide") : (lang === "ko" ? "숨기기" : "Hide")}
+                        </AdminActionMenuItem>
+                      </DropdownMenu.Item> : null}
+                      {canDelete ? <DropdownMenu.Item asChild onSelect={() => setDeleteModalOpen(true)}>
+                        <AdminActionMenuItem tone="danger" icon={<Trash2 />}>{lang === "ko" ? "삭제" : "Delete"}</AdminActionMenuItem>
+                      </DropdownMenu.Item> : null}
+                    </AdminActionMenuPanel>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
             )}
-            {canDelete ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={lang === "ko" ? "댓글 수정" : "Edit comment"}
-                onClick={() => {
-                  setEditText(comment.content);
-                  setEditing(true);
-                }}
-                className="comment-moderation-action pointer-events-none size-7 rounded-md border-0 bg-transparent text-rose-600 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-              >
-                <Edit2 className="size-3.5" aria-hidden="true" />
-              </Button>
-            ) : null}
-          </div>
+          </div> : null}
         </div>
         {canDelete ? (
           <Modal
@@ -442,9 +426,9 @@ function CommentRow({
                 setDeleteModalOpen(false);
               }
             }}
-            title={lang === "ko" ? "댓글 삭제" : "Delete comment"}
+            title={lang === "ko" ? "댓글을 삭제할까요?" : "Delete this comment?"}
             showClose={false}
-            className="max-w-sm"
+            className="max-w-[25rem]"
             footer={(
               <>
                 <Button
@@ -466,22 +450,12 @@ function CommentRow({
               </>
             )}
           >
-            <p className="text-sm font-normal leading-6 text-slate-600">
-              {lang === "ko" ? (
-                <>
-                  <span className="block">이 댓글을 영구적으로 삭제하시겠습니까?</span>
-                  <span className="block">삭제된 댓글은 되돌릴 수 없습니다.</span>
-                </>
-              ) : (
-                <>
-                  <span className="block">Delete this comment permanently?</span>
-                  <span className="block">Deleted comments cannot be restored.</span>
-                </>
-              )}
+            <p className="text-sm font-normal leading-6 text-neutral-600">
+              {lang === "ko" ? "삭제한 댓글은 복구할 수 없습니다." : "Deleted comments cannot be restored."}
             </p>
           </Modal>
         ) : null}
-        {!canDelete && canHide ? (
+        {canHide ? (
           <Modal
             open={hideModalOpen}
             onClose={() => {
@@ -491,7 +465,7 @@ function CommentRow({
             }}
             title={lang === "ko" ? "댓글 숨기기" : "Hide comment"}
             showClose={false}
-            className="max-w-sm"
+            className="max-w-[25rem]"
             footer={(
               <>
                 <Button
@@ -531,10 +505,11 @@ function CommentRow({
           <div className="mt-2">
               <UiTextarea
                 autoFocus
-                rows={3}
+                autoResize
+                rows={1}
                 value={editText}
                 onChange={(event) => setEditText(event.target.value)}
-                className={cn(COMMENT_TEXTAREA_CLASS, "min-h-[5rem] font-medium")}
+                className={cn(COMMENT_TEXTAREA_CLASS, "!min-h-0 font-medium")}
               />
             <div className="mt-2 flex justify-end gap-1.5">
               <Button
@@ -604,7 +579,7 @@ function CommentComposer({
         disabled={disabled}
         className={cn(COMMENT_TEXTAREA_CLASS, "min-h-[var(--ui-control-height-mobile)] pr-14 font-medium")}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey && hasText && !disabled) {
+          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229 && hasText && !disabled && !isSubmitting) {
             event.preventDefault();
             void onSubmit();
           }
@@ -619,7 +594,7 @@ function CommentComposer({
           onClick={() => void onSubmit()}
           disabled={disabled || isSubmitting || !hasText}
           className={cn(
-            "animate-in fade-in zoom-in-95 absolute right-1 top-1/2 size-11 -translate-y-1/2 rounded-full p-0 text-white duration-200",
+            "absolute right-2 top-1/2 !size-8 !min-h-0 -translate-y-1/2 rounded-full !p-0 !text-white hover:!text-white focus-visible:!text-white",
             hasText
               ? "bg-brand-primary hover:bg-brand-primary/90"
               : "bg-brand-primary/20 hover:bg-brand-primary/20",

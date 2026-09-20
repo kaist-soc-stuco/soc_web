@@ -1,3 +1,4 @@
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
@@ -137,21 +138,6 @@ function formatPeriod(event: CalendarEventRecord) {
   return formatNumericDateRange(event.startAt, event.endAt, {
     includeTime: event.sourceType !== "KAIST_ACADEMIC" && !event.isAllDay,
   });
-}
-
-function toDateInputValue(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function getCurrentMonthRange() {
-  const today = msToDate(nowMs());
-  return {
-    from: toDateInputValue(localDate(today.getFullYear(), today.getMonth(), 1)),
-    to: toDateInputValue(localDate(today.getFullYear(), today.getMonth() + 1, 0)),
-  };
 }
 
 function dateInputToMs(value: string, endOfDay = false) {
@@ -437,35 +423,7 @@ function CalendarManagementContent() {
                   ]}
                 />
                 <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto">
-                  <UiInput
-                    type="date"
-                    aria-label="조회 시작일"
-                    value={dateFrom}
-                    max={dateTo || undefined}
-                    onChange={(event) => { setDateFrom(event.currentTarget.value); setPage(1); }}
-                    className="w-[9.25rem]"
-                  />
-                  <span className="text-sm font-normal text-slate-400" aria-hidden="true">–</span>
-                  <UiInput
-                    type="date"
-                    aria-label="조회 종료일"
-                    value={dateTo}
-                    min={dateFrom || undefined}
-                    onChange={(event) => { setDateTo(event.currentTarget.value); setPage(1); }}
-                    className="w-[9.25rem]"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      const range = getCurrentMonthRange();
-                      setDateFrom(range.from);
-                      setDateTo(range.to);
-                      setPage(1);
-                    }}
-                  >
-                    이번 달
-                  </Button>
+                  <DateRangePicker presetType="future" align="start" value={{ from: dateFrom, to: dateTo }} onChange={({ from, to }) => { setDateFrom(from); setDateTo(to); setPage(1); }} />
                   <AdminSelectDropdown
                     ariaLabel="일정 분류"
                     value={categoryFilter}
@@ -567,9 +525,9 @@ function CalendarManagementContent() {
         footer={editingEvent?.sourceType === "ARTICLE" ? undefined : (
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setDrawerOpen(false)} disabled={saving}>취소</Button>
-            <Button type="submit" form="calendar-management-form" disabled={saving}>
+            <Button loading={saving} type="submit" form="calendar-management-form" disabled={saving}>
               <Save className="size-4" aria-hidden="true" />
-              {saving ? "저장 중" : "저장"}
+              {"저장"}
             </Button>
           </div>
         )}

@@ -7,7 +7,7 @@ import type {
 } from "@soc/contracts";
 import { normalizeBoardCode } from "@soc/contracts";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
-import { createElement, useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -244,8 +244,11 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     setCommentPageTotal(response.topLevelTotal ?? response.total);
   };
 
+  const commentRequestPending = useRef(false);
+  const replyRequestPending = useRef(false);
   const handleCreateComment = async () => {
-    if (!articleId || !commentText.trim()) return;
+    if (!articleId || !commentText.trim() || commentRequestPending.current) return;
+    commentRequestPending.current = true;
 
     setCommentSubmitting(true);
     setCommentError(null);
@@ -253,9 +256,9 @@ export function useBoardDetailPageController(forcedCategory?: string) {
       await apiClient.createComment(category, articleId, {
         content: commentText.trim(),
       });
+      await refreshComments(1);
       setCommentText("");
       setCommentPage(1);
-      await refreshComments(1);
     } catch {
       setCommentError(
         lang === "ko"
@@ -263,6 +266,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
           : "Failed to post the comment.",
       );
     } finally {
+      commentRequestPending.current = false;
       setCommentSubmitting(false);
     }
   };
@@ -424,7 +428,8 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   };
 
   const handleCreateReply = async (parentCommentId: string) => {
-    if (!articleId || !replyText.trim() || !canCreateComment) return;
+    if (!articleId || !replyText.trim() || !canCreateComment || replyRequestPending.current) return;
+    replyRequestPending.current = true;
 
     setReplySubmitting(true);
     setCommentError(null);
@@ -433,9 +438,9 @@ export function useBoardDetailPageController(forcedCategory?: string) {
         content: replyText.trim(),
         parentCommentId,
       });
+      await refreshComments();
       setReplyText("");
       setReplyTargetId(null);
-      await refreshComments();
     } catch {
       setCommentError(
         lang === "ko"
@@ -443,6 +448,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
           : "Failed to post the reply.",
       );
     } finally {
+      replyRequestPending.current = false;
       setReplySubmitting(false);
     }
   };

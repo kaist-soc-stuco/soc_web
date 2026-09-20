@@ -1,6 +1,7 @@
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
+import { Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -30,19 +31,27 @@ const buttonVariants = cva(
   },
 );
 
-type ButtonProps = React.ComponentProps<'button'> & VariantProps<typeof buttonVariants> & { asChild?: boolean; "data-tooltip"?: string };
+type ButtonProps = React.ComponentProps<'button'> & VariantProps<typeof buttonVariants> & { asChild?: boolean; loading?: boolean; "data-tooltip"?: string };
 
 function Button({
   className,
   variant,
   size,
   asChild = false,
+  loading,
+  children,
+  disabled,
   ...props
 }: ButtonProps) {
   const Comp = asChild ? Slot : 'button';
   const tooltip = props["data-tooltip"];
 
-  return <Comp data-slot="button" data-variant={variant ?? "default"} key={variant ?? "default"} className={cn(buttonVariants({ variant, size, className }))} data-tooltip={tooltip} {...props} />;
+  return <Comp data-slot="button" data-variant={variant ?? "default"} key={variant ?? "default"} className={cn(buttonVariants({ variant, size, className }), loading && !asChild && 'relative !px-9')} data-tooltip={tooltip} {...props} disabled={disabled || loading} aria-busy={loading || props['aria-busy']}>
+    {asChild ? children : <>
+      {loading !== undefined ? <span aria-hidden="true" className={cn('absolute left-3 top-1/2 -translate-y-1/2', !loading && 'invisible')}><Loader2 className="size-4 animate-spin motion-reduce:animate-none" /></span> : null}
+      {children}
+    </>}
+  </Comp>;
 }
 
 export { Button, buttonVariants };

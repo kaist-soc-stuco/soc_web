@@ -19,7 +19,7 @@ interface SurveyResponseFormProps {
   lang: string;
   onAnswerChange: (questionId: string, value: AnswerValue) => void;
   onClear: () => void;
-  onValidate: (questions: SurveyDetailResponse["sections"][number]["questions"]) => boolean;
+  onValidate: (questions: SurveyDetailResponse["sections"][number]["questions"]) => Promise<boolean>;
   onSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
   questionErrors: Record<string, string>;
   submitError: string | null;
@@ -59,8 +59,12 @@ export function SurveyResponseForm({
     setSectionIndex(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const nextSection = () => {
-    if (isPreview || !activeSection || onValidate(activeSection.questions)) move(activeIndex + 1);
+  const [validating, setValidating] = useState(false);
+  const nextSection = async () => {
+    if (validating) return;
+    setValidating(true);
+    try { if (!activeSection || await onValidate(activeSection.questions)) move(activeIndex + 1); }
+    finally { setValidating(false); }
   };
 
   return (
@@ -154,8 +158,8 @@ export function SurveyResponseForm({
         <div className="survey-response-actions flex flex-wrap items-center gap-3">
           {activeIndex > 0 && <Button type="button" variant="outline" onClick={() => move(activeIndex - 1)}>{lang === "ko" ? "이전" : "Back"}</Button>}
           {activeIndex < visibleSections.length - 1
-            ? <Button type="button" variant="outline" onClick={nextSection}>{lang === "ko" ? "다음" : "Next"}</Button>
-            : <Button type="submit" disabled={submitting || isPreview}>{submitting ? (lang === "ko" ? "제출 중..." : "Submitting...") : isEditingExistingResponse ? (lang === "ko" ? "저장" : "Save") : (lang === "ko" ? "제출" : "Submit")}</Button>}
+            ? <Button type="button" variant="outline" disabled={validating} onClick={() => void nextSection()}>{lang === "ko" ? "다음" : "Next"}</Button>
+            : <Button loading={submitting} className="px-4" type="submit" disabled={submitting || isPreview}>{isEditingExistingResponse ? (lang === "ko" ? "저장" : "Save") : (lang === "ko" ? "제출" : "Submit")}</Button>}
           <Button className="ml-auto text-brand-primary" type="button" variant="ghost" onClick={() => { onClear(); move(0); }}>{lang === "ko" ? "양식 지우기" : "Clear form"}</Button>
         </div>
       </form>

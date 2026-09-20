@@ -172,7 +172,7 @@ export function NoticeBoard() {
               ? lang === "ko"
                 ? "익명"
                 : "Anonymous"
-              : item.author.name,
+              : (lang === "en" ? item.author.nameEn || item.author.name : item.author.name),
             title: lang === "ko" ? item.titleKo : item.titleEn || item.titleKo,
             date: formatDate(item.postedAt),
             isImportant: item.isPinned,

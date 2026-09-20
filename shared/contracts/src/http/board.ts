@@ -74,6 +74,7 @@ export type ArticleStatus = "DRAFT" | "PUBLISHED" | "HIDDEN" | "DELETED";
 export type VisibilityScope = "PUBLIC" | "MEMBERS" | "STAFF_ONLY";
 
 export interface ArticleAuthorSummary {
+  nameEn?: string | null;
   /** Present only for non-anonymous authors/comments. */
   userId?: string;
   name: string;

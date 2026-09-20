@@ -1,3 +1,4 @@
+import { PromotionStatus } from "@/components/ui/promotion-period";
 import { BackToListLink } from "@/components/ui/back-to-list-link";
 import type {
   ArticleDetailResponse,
@@ -104,6 +105,7 @@ export function BoardDetailArticleCard({
       <header>
         <h1 className="break-words text-[1.18rem] font-semibold leading-snug tracking-tight text-app-text-strong [overflow-wrap:anywhere] md:text-[1.45rem]">
           {title}
+          {category === "promotions" && <span className="ml-3"><PromotionStatus start={article.eventStartDate} end={article.eventEndDate} lang={lang} /></span>}
         </h1>
         <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal text-slate-400">
@@ -112,7 +114,7 @@ export function BoardDetailArticleCard({
                 ? lang === "ko"
                   ? "익명"
                   : "Anonymous"
-                : article.author.name}
+                : (lang === "en" ? article.author.nameEn || article.author.name : article.author.name)}
             </span>
             <span className="text-slate-300">·</span>
             <span>{formatDate(article.postedAt)}</span>
@@ -153,27 +155,26 @@ export function BoardDetailArticleCard({
                             {lang === "ko" ? "수정" : "Edit"}
                           </AdminActionMenuLink>
                         </DropdownMenu.Item>
-                        <DropdownMenu.Item asChild>
-                          <AdminActionMenuItem icon={<Trash2 />} tone="danger" onClick={onDeleteArticle}>
-                            {lang === "ko" ? "삭제" : "Delete"}
-                          </AdminActionMenuItem>
-                        </DropdownMenu.Item>
                       </>
                     ) : null}
                     {canModerate ? (
-                      <>
-                        <DropdownMenu.Item asChild>
-                          <AdminActionMenuItem
-                            icon={article.status === "HIDDEN" ? <Eye /> : <EyeOff />}
-                            tone="danger"
-                            onClick={article.status === "HIDDEN" ? onRestoreArticle : onHideArticle}
-                          >
-                            {article.status === "HIDDEN"
-                              ? lang === "ko" ? "게시글 숨김 해제" : "Unhide post"
-                              : lang === "ko" ? "게시글 숨기기" : "Hide post"}
-                          </AdminActionMenuItem>
-                        </DropdownMenu.Item>
-                      </>
+                      <DropdownMenu.Item asChild>
+                        <AdminActionMenuItem
+                          icon={article.status === "HIDDEN" ? <Eye /> : <EyeOff />}
+                          onClick={article.status === "HIDDEN" ? onRestoreArticle : onHideArticle}
+                        >
+                          {article.status === "HIDDEN"
+                            ? lang === "ko" ? "숨김 해제" : "Unhide"
+                            : lang === "ko" ? "숨기기" : "Hide"}
+                        </AdminActionMenuItem>
+                      </DropdownMenu.Item>
+                    ) : null}
+                    {canEdit ? (
+                      <DropdownMenu.Item asChild>
+                        <AdminActionMenuItem icon={<Trash2 />} tone="danger" onClick={onDeleteArticle}>
+                          {lang === "ko" ? "삭제" : "Delete"}
+                        </AdminActionMenuItem>
+                      </DropdownMenu.Item>
                     ) : null}
                   </AdminActionMenuPanel>
                 </DropdownMenu.Content>

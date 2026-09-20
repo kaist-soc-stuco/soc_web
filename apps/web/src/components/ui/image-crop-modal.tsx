@@ -180,8 +180,8 @@ export function ImageCropModal({
       footer={(
         <>
           <Button type="button" variant="outline" onClick={onCancel} disabled={processing}>취소</Button>
-          <Button type="button" onClick={() => void handleCrop()} disabled={processing || !naturalSize.width}>
-            {processing ? "적용 중" : "적용"}
+          <Button loading={processing} type="button" onClick={() => void handleCrop()} disabled={processing || !naturalSize.width}>
+            {"적용"}
           </Button>
         </>
       )}

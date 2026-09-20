@@ -1,3 +1,4 @@
+import { Permissions } from "@soc/contracts";
 import {
   BadRequestException,
   Inject,
@@ -7,7 +8,7 @@ import {
   Optional,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { and, eq, gte, ilike, inArray, isNotNull, lte, or } from "drizzle-orm";
+import { and, eq, gte, ilike, inArray, isNotNull, lte, or, sql } from "drizzle-orm";
 import type {
   CalendarEventCreateRequest,
   CalendarEventCategory,
@@ -75,12 +76,13 @@ export class CalendarService {
     from: Date,
     to: Date,
     query?: string,
+    viewer?: { id: string; permission: number },
   ): Promise<PublicCalendarEventsResponse> {
     const [surveyEvents, articleEvents, manualEvents, voteEvents] = await Promise.all([
       this.listSurveyCalendarEvents(from, to, query),
       this.listArticleCalendarEvents(from, to, query),
       this.listManualCalendarEvents(from, to, query),
-      this.listVoteCalendarEvents(from, to, query),
+      this.listVoteCalendarEvents(from, to, query, viewer),
     ]);
 
     return {
@@ -93,12 +95,13 @@ export class CalendarService {
   async searchPublicCalendarEvents(
     query: string | undefined,
     limit: number,
+    viewer?: { id: string; permission: number },
   ): Promise<PublicCalendarEventsResponse> {
     const [surveyEvents, articleEvents, manualEvents, voteEvents] = await Promise.all([
       this.listSurveyCalendarEvents(undefined, undefined, query),
       this.listArticleCalendarEvents(undefined, undefined, query),
       this.listManualCalendarEvents(undefined, undefined, query),
-      this.listVoteCalendarEvents(undefined, undefined, query),
+      this.listVoteCalendarEvents(undefined, undefined, query, viewer),
     ]);
     const normalizedLimit = Math.min(Math.max(limit, 1), 100);
 
@@ -704,9 +707,11 @@ export class CalendarService {
     return match?.[1] ?? "";
   }
 
-  private async listVoteCalendarEvents(from?: Date, to?: Date, query?: string): Promise<PublicCalendarEventItem[]> {
+  private async listVoteCalendarEvents(from?: Date, to?: Date, query?: string, viewer?: { id: string; permission: number }): Promise<PublicCalendarEventItem[]> {
+    if (!viewer) return [];
     const rows = await this.db.select({ id: votes.voteId, titleKo: votes.titleKo, titleEn: votes.titleEn, startAt: votes.startsAt, endAt: votes.endsAt }).from(votes).where(and(
       inArray(votes.status, ["PUBLISHED", "CLOSED", "TALLIED"]),
+      Permissions.has(viewer.permission, Permissions.MANAGE_VOTE) ? undefined : sql`exists (select 1 from vote_voter eligible_voter where eligible_voter.vote_id = ${votes.voteId} and eligible_voter.user_id = ${viewer.id} and eligible_voter.status = 'ELIGIBLE')`,
       from ? gte(votes.endsAt, from) : undefined,
       to ? lte(votes.startsAt, to) : undefined,
       query?.trim() ? or(ilike(votes.titleKo, `%${query.trim()}%`), ilike(votes.titleEn, `%${query.trim()}%`)) : undefined,

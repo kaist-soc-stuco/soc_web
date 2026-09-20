@@ -1,3 +1,4 @@
+import { PromotionStatus } from "@/components/ui/promotion-period";
 import type { ReactNode } from "react";
 import type { ArticleListItem } from "@soc/contracts";
 import { isoToDate, isoToMs, nowMs } from "@soc/shared";
@@ -209,7 +210,7 @@ export function BoardArticleTable({
       ? lang === "ko"
         ? "익명"
         : "Anonymous"
-      : post.author.name;
+      : (lang === "en" ? post.author.nameEn || post.author.name : post.author.name);
   const tableGridClass = `board-table-grid ${category ? "" : "board-table-grid--all"}`;
   const renderArticleRow = (post: ArticleListItem, pinned = false) => {
     const isNew =
@@ -239,6 +240,7 @@ export function BoardArticleTable({
             <span className="line-clamp-2 min-w-0 md:truncate">
               {lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}
             </span>
+            {postCategory === "promotions" && <PromotionStatus start={post.eventStartDate} end={post.eventEndDate} lang={lang} />}
             {post.commentCount > 0 ? (
               <span
                 aria-label={

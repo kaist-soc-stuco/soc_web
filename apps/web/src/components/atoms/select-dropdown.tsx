@@ -64,6 +64,8 @@ export function SelectDropdown({
   const instanceId = useId();
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const isOpen = open ?? internalIsOpen;
+  const [menuMounted, setMenuMounted] = useState(isOpen);
+  const closeAnimationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onOpenChangeRef = useRef(onOpenChange);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -86,6 +88,32 @@ export function SelectDropdown({
   }, [onOpenChange]);
 
   useEffect(() => {
+    if (isOpen) {
+      if (closeAnimationTimerRef.current) {
+        clearTimeout(closeAnimationTimerRef.current);
+        closeAnimationTimerRef.current = null;
+      }
+      setMenuMounted(true);
+      return;
+    }
+    if (!menuMounted) return;
+    closeAnimationTimerRef.current = setTimeout(() => {
+      closeAnimationTimerRef.current = null;
+      setMenuMounted(false);
+    }, 150);
+    return () => {
+      if (closeAnimationTimerRef.current) {
+        clearTimeout(closeAnimationTimerRef.current);
+        closeAnimationTimerRef.current = null;
+      }
+    };
+  }, [isOpen, menuMounted]);
+
+  useEffect(() => () => {
+    if (closeAnimationTimerRef.current) clearTimeout(closeAnimationTimerRef.current);
+  }, []);
+
+  useEffect(() => {
     const closeWhenAnotherOpens = (openedInstanceId: string) => {
       if (openedInstanceId === instanceId) return;
       setInternalIsOpen(false);
@@ -98,8 +126,12 @@ export function SelectDropdown({
   }, [instanceId]);
 
   useLayoutEffect(() => {
-    if (!isOpen || typeof window === "undefined") {
+    if (typeof window === "undefined") {
       setMenuStyle({ visibility: "hidden", width: "max-content" });
+      return;
+    }
+    if (!isOpen) {
+      if (!menuMounted) setMenuStyle({ visibility: "hidden", width: "max-content" });
       return;
     }
 
@@ -187,7 +219,7 @@ export function SelectDropdown({
       window.removeEventListener("resize", updateMenuPosition);
       window.removeEventListener("scroll", updateMenuPosition, true);
     };
-  }, [isOpen, optionLabelsKey]);
+  }, [isOpen, menuMounted, optionLabelsKey]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -267,13 +299,19 @@ export function SelectDropdown({
         />
       </Button>
 
-      {isOpen && !disabled
+      {menuMounted && !disabled
         ? createPortal(
             <div
               ref={menuRef}
               id={menuId}
               role="listbox"
-              style={menuStyle}
+              style={{
+                ...menuStyle,
+                opacity: isOpen ? 1 : 0,
+                pointerEvents: isOpen ? "auto" : "none",
+                transform: isOpen ? "scale(1)" : "scale(0.98)",
+                transition: "opacity 150ms ease, transform 150ms ease",
+              }}
               className={`ui-select-dropdown-menu fixed z-[100] max-h-60 overflow-x-hidden overflow-y-auto rounded-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white p-1 shadow-[0_2px_8px_rgb(15_23_42_/_0.08)] ${disableMenuScroll ? "!max-h-none !overflow-visible" : ""} ${menuClassName || ""}`}
             >
               {options.length === 0 ? (

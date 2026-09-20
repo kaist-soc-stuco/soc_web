@@ -1,3 +1,4 @@
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useToast } from "@/components/ui/toast";
 import { createApiClient } from "@soc/api-client";
 import type { AuditLogEventKind, AuditLogRecord } from "@soc/contracts";
@@ -12,7 +13,6 @@ import { AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard } from "
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/data-state";
-import { UiInput } from "@/components/ui/form-control";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -234,11 +234,7 @@ export function AuditLogPage() {
             <div className="flex flex-col gap-3 border-b border-slate-100 p-4 xl:flex-row xl:items-end xl:justify-between">
               <div className="flex flex-wrap items-end gap-2">
                 <AdminSelectDropdown ariaLabel="로그 도메인" value={targetType} options={domainOptions} onChange={(value) => updatePageFilter(setTargetType, value)} className="w-36 shrink-0" buttonClassName="h-[var(--ui-control-height)]" />
-                <div aria-label="기간" className="flex w-full items-center gap-2 sm:w-[19rem]">
-                  <UiInput aria-label="시작일" type="date" value={dateFrom} onChange={(event) => updatePageFilter(setDateFrom, event.currentTarget.value)} className="min-w-0 flex-1 text-sm font-normal" />
-                  <span className="text-sm text-slate-400">~</span>
-                  <UiInput aria-label="종료일" type="date" value={dateTo} onChange={(event) => updatePageFilter(setDateTo, event.currentTarget.value)} className="min-w-0 flex-1 text-sm font-normal" />
-                </div>
+                <DateRangePicker label="기간 선택" disableFuture align="start" value={{ from: dateFrom, to: dateTo }} onChange={({ from, to }) => { updatePageFilter(setDateFrom, from); updatePageFilter(setDateTo, to); }} />
               </div>
               <PageSearchField
                 ariaLabel="운영 로그 검색"

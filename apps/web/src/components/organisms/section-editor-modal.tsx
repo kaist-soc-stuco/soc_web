@@ -1,3 +1,4 @@
+import { useDebouncedEditorSave } from "@/hooks/use-debounced-editor-save";
 import { useEffect, useRef, useState } from "react";
 
 import { BuilderTextField as RichTextInput } from "@/components/ui/builder-field";
@@ -53,6 +54,7 @@ export function SectionInlineEditor({ value, onDraftChange, titlePlaceholder, pl
     if (savingRef.current === pending) savingRef.current = null;
     return succeeded && JSON.stringify(latestForm.current) !== savedRef.current ? save() : succeeded;
   };
+  useDebouncedEditorSave(form, save, !onDraftChange && !isOngoing);
   saveRef.current = async () => { await save(); };
   if (commitRef) commitRef.current = save;
   useEffect(() => () => { if (commitRef) commitRef.current = null; }, [commitRef]);
@@ -74,7 +76,7 @@ export function SectionInlineEditor({ value, onDraftChange, titlePlaceholder, pl
           placeholder={placeholders?.[field] ?? (language === "ko" ? kind === "title" ? isSurveyHeader ? titlePlaceholder ?? "제목 없는 설문지" : "섹션 제목(선택사항)" : isSurveyHeader ? "설문지 설명" : "설명(선택사항)" : kind === "title" ? isSurveyHeader ? "Untitled form" : "Section title (optional)" : "Description (optional)")}
           value={form[field]} onChange={value => setForm(current => ({...current, [field]: value}))}
           ariaLabel={`${language === "ko" ? "국문" : "영문"} 섹션 ${kind === "title" ? "제목" : "설명"}`} disabled={isOngoing}
-          inputClassName={`!bg-transparent !px-0 !h-auto !py-0 !min-h-6 !font-normal ${isSurveyHeader && kind === "title" ? "!text-3xl !leading-tight !min-h-9" : "!text-base !leading-6"}`} /></div>;
+          inputClassName={`!bg-transparent !px-0 !h-auto !pt-2 !pb-3 !min-h-6 !font-normal ${isSurveyHeader && kind === "title" ? "!text-3xl !leading-tight !min-h-9" : "!text-base !leading-6"}`} /></div>;
       }))}
     </div>
     {error ? <p role="alert" className="mt-3 text-sm text-red-600">{error}</p> : null}

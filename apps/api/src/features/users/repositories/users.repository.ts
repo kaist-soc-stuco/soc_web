@@ -580,23 +580,18 @@ export class UsersRepository {
       notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]),
     ];
     if (feeFilter) conditions.push(feeFilter);
-    const query = filters?.query?.trim();
-    if (query) {
-      const queryFilter = or(
-        ilike(users.nameKo, `%${query}%`),
-        ilike(users.nameEn, `%${query}%`),
-        ilike(users.stdNo, `%${query}%`),
-        ilike(users.email, `%${query}%`),
-      );
-      if (queryFilter) conditions.push(queryFilter);
-    }
-    const studentNumber = filters?.studentNumber?.trim();
-    if (studentNumber === "2024_OR_EARLIER") {
-      conditions.push(lt(users.stdNo, "20250000"));
-    } else if (studentNumber) {
-      conditions.push(ilike(users.stdNo, `%${studentNumber}%`));
-    }
-    if (filters?.primaryMajor?.trim()) conditions.push(ilike(users.primaryMajor, `%${filters.primaryMajor.trim()}%`));
+    const filterValues = (value?: string) => [...new Set((value ?? "").split(",").map(part => part.trim()).filter(Boolean))];
+    const queries = filterValues(filters?.query);
+    if (queries.length) conditions.push(or(...queries.map(query => or(
+      ilike(users.nameKo, `%${query}%`), ilike(users.nameEn, `%${query}%`),
+      ilike(users.stdNo, `%${query}%`), ilike(users.email, `%${query}%`),
+    )))!);
+    const studentNumbers = filterValues(filters?.studentNumber);
+    if (studentNumbers.length) conditions.push(or(...studentNumbers.map(value =>
+      value === "2024_OR_EARLIER" ? lt(users.stdNo, "20250000") : ilike(users.stdNo, `${value}%`),
+    ))!);
+    const majors = filterValues(filters?.primaryMajor);
+    if (majors.length) conditions.push(or(...majors.map(value => ilike(users.primaryMajor, `%${value}%`)))!);
 
     const rows = await this.db
       .select({
@@ -1521,15 +1516,14 @@ export class UsersRepository {
     const conditions: SQL[] = [];
     if (start) conditions.push(gte(studentFeePayments.paidAt, start));
     if (end) conditions.push(lt(studentFeePayments.paidAt, end));
-    if (options.referenceSemester) conditions.push(eq(studentFeePayments.effectiveStartSemester, options.referenceSemester));
+    // Receipt dates and benefit semesters are independent reporting dimensions.
 
     const targetCondition = and(
       eq(users.isActive, true),
       notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]),
     );
-    const selectedPaymentCondition = conditions.length > 0
-      ? and(targetCondition, ...conditions)
-      : targetCondition;
+    const receiptTargetCondition = notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]);
+    const selectedPaymentCondition = and(receiptTargetCondition, ...conditions);
 
     const [paymentRows, allPaymentRows, userRows, statusRows] = await Promise.all([
       this.db
@@ -1597,6 +1591,16 @@ export class UsersRepository {
       return day;
     };
 
+    const halfGroups = new Map<string, { paidAmount: number; paymentCount: number; users: Set<string> }>();
+    for (const payment of allPaymentRows) {
+      const day = koreanDate(payment.paidAt);
+      const period = `${day.slice(0, 4)}-${Number(day.slice(5, 7)) <= 6 ? "H1" : "H2"}`;
+      const group = halfGroups.get(period) ?? { paidAmount: 0, paymentCount: 0, users: new Set<string>() };
+      group.paidAmount += Number(payment.amount); group.paymentCount += 1; group.users.add(payment.userId);
+      halfGroups.set(period, group);
+    }
+    const paymentHalfBreakdown = [...halfGroups].sort(([a], [b]) => a.localeCompare(b)).map(([period, group]) => ({ period, paidAmount: group.paidAmount, paymentCount: group.paymentCount, paidStudents: group.users.size }));
+
     const grouped = new Map<string, { paidAmount: number; paymentCount: number; userIds: Set<string> }>();
     paymentRows.forEach((payment) => {
       const period = periodKey(payment.paidAt);
@@ -1656,9 +1660,8 @@ export class UsersRepository {
       );
       const hasLegacyPaid = legacy?.status === "PAID" && legacyActive;
       const hasLegacyPartial = legacy?.status === "PARTIAL" && legacyActive && (legacy.paidAmount ?? 0) > 0;
-      const totalPaidForUser = payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
       if (covered || hasLegacyPaid) paidUserIds.add(user.userId);
-      else if (totalPaidForUser > 0 || hasLegacyPartial) partialUserIds.add(user.userId);
+      else if (hasLegacyPartial) partialUserIds.add(user.userId);
     }
     const paidStudents = paidUserIds.size;
     const partialStudents = partialUserIds.size;
@@ -1683,6 +1686,7 @@ export class UsersRepository {
         outstandingAmount,
       },
       trend,
+      paymentHalfBreakdown,
       majorBreakdown: categoryDefinitions.map(({ category, label, field }) => {
         const eligibleIds = new Set(userRows.filter((user) => Boolean(user[field])).map((user) => user.userId));
         const categoryPayments = paymentRows.filter((payment) => eligibleIds.has(payment.userId));

@@ -14,7 +14,6 @@ import type {
   BulkEmailPreviewResponse,
   CurrentUserResponse,
   BulkEmailRecord,
-  BulkEmailTemplate,
   SendBulkEmailRequest,
 } from "@soc/contracts";
 import {
@@ -29,12 +28,9 @@ import {
   CalendarClock,
   ChevronDown,
   ChevronRight,
-  FileText,
   History,
   Plus,
-  Rocket,
-  Save,
-  Trash2,
+  Send,
   Users,
   X,
 } from "lucide-react";
@@ -67,17 +63,6 @@ const RECIPIENT_TYPES: ReadonlyArray<{
 type RecipientFilters = NonNullable<SendBulkEmailRequest["filters"]>;
 type RecipientFilterKey = keyof RecipientFilters;
 type DeliveryMode = "now" | "scheduled";
-
-function firstEmailBodyLine(value: string) {
-  const text = value
-    .replace(/<br\s*\/?\s*>/gi, "\n")
-    .replace(/<\/(?:p|div|li|h[1-6])>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .trim();
-  return text.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? "";
-}
 
 type StoredEmailDraft = {
   content: string;
@@ -167,12 +152,6 @@ function BulkEmailPageContent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
 
-  const [templates, setTemplates] = useState<BulkEmailTemplate[]>([]);
-  const [templatesLoading, setTemplatesLoading] = useState(true);
-  const [selectedTemplateId, setSelectedTemplateId] = useState("");
-  const [templateModalOpen, setTemplateModalOpen] = useState(false);
-  const [templateSaving, setTemplateSaving] = useState(false);
-
   const [initialLocalDraft, setInitialLocalDraft] = useState<StoredEmailDraft | null>(null);
   const [draftIdentityKey, setDraftIdentityKey] = useState<string | null | undefined>(undefined);
   const [loadedDraftIdentityKey, setLoadedDraftIdentityKey] = useState<string | null>(null);
@@ -203,7 +182,6 @@ function BulkEmailPageContent() {
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("now");
   const [scheduledAt, setScheduledAt] = useState("");
   const [sending, setSending] = useState(false);
-  const [testSending, setTestSending] = useState(false);
 
   const [history, setHistory] = useState<BulkEmailRecord[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -225,7 +203,6 @@ function BulkEmailPageContent() {
     setDraftRestored(false);
     setDraftSavedAt(null);
     setDraftNoticeVisible(false);
-    setSelectedTemplateId("");
     setRecipientType("UNPAID_STUDENTS");
     setFilters({});
     setSubject("");
@@ -253,9 +230,9 @@ function BulkEmailPageContent() {
       if (normalized) entries.push({ key, label, tokenLabel: tokenLabel ?? normalized, value: normalized });
     };
 
-    add("studentNumber", "학번", formatStudentNumberFilter(filters.studentNumber));
-    add("primaryMajor", "주전공", filters.primaryMajor, `${filters.primaryMajor ?? ""} 주전공`);
-    add("query", "검색", filters.query, `검색: ${filters.query ?? ""}`);
+    for (const value of filters.studentNumber?.split(",").filter(Boolean) ?? []) add("studentNumber", "학번", value, formatStudentNumberFilter(value));
+    for (const value of filters.primaryMajor?.split(",").filter(Boolean) ?? []) add("primaryMajor", "주전공", value, `${value} 주전공`);
+    for (const value of filters.query?.split(",").filter(Boolean) ?? []) add("query", "검색", value, `검색: ${value}`);
     return entries;
   }, [filters]);
   const selectedRecipientLabel =
@@ -268,21 +245,8 @@ function BulkEmailPageContent() {
   const previewContent = renderEmailTemplate(content, previewVariables);
   const previewSubject = renderEmailTemplate(subject, previewVariables);
 
-  const applyTemplateToForm = (template: BulkEmailTemplate) => {
-    setSelectedTemplateId(template.id);
-    setRecipientType(template.recipientType);
-    setSubject(template.subject);
-    setContent(template.content);
-    setContentType(template.contentType);
-    setFilters(template.filters ?? {});
-    setScheduledAt("");
-    setAttachments([]);
-    setOperationError(null);
-  };
-
   const applyLocalDraftToForm = (draft: StoredEmailDraft) => {
     skipNextDraftSaveRef.current = true;
-    setSelectedTemplateId("");
     setRecipientType(draft.recipientType);
     setSubject(draft.subject);
     setContent(draft.content);
@@ -298,37 +262,10 @@ function BulkEmailPageContent() {
 
   useEffect(() => {
     if (sessionLoading || draftIdentityKey !== emailDraftStorageKey) return;
-    let mounted = true;
     if (initialLocalDraft) applyLocalDraftToForm(initialLocalDraft);
-
-    const loadInitialData = async () => {
-      try {
-        const templateResponse = await apiClient.getBulkEmailTemplates();
-        if (!mounted) return;
-
-        setTemplates(templateResponse.items);
-        const defaultTemplate =
-          templateResponse.items.find((template) => template.id === "f26-unpaid-reminder") ??
-          templateResponse.items[0];
-        if (!initialLocalDraft && defaultTemplate) {
-          skipNextDraftSaveRef.current = true;
-          applyTemplateToForm(defaultTemplate);
-        }
-      } catch {
-        if (!mounted) return;
-        setOperationError("템플릿을 불러오지 못했습니다.");
-      }
-      if (mounted) {
-        setTemplatesLoading(false);
-        setDraftReady(true);
-        setLoadedDraftIdentityKey(emailDraftStorageKey);
-      }
-    };
-    void loadInitialData();
-    return () => {
-      mounted = false;
-    };
-  }, [apiClient, draftIdentityKey, emailDraftStorageKey, initialLocalDraft, sessionLoading]);
+    setDraftReady(true);
+    setLoadedDraftIdentityKey(emailDraftStorageKey);
+  }, [draftIdentityKey, emailDraftStorageKey, initialLocalDraft, sessionLoading]);
 
   useEffect(() => {
     let active = true;
@@ -456,7 +393,6 @@ function BulkEmailPageContent() {
 
   const handleStartNew = () => {
     clearStoredDraft();
-    setSelectedTemplateId("");
     setRecipientType("ALL");
     setFilters({});
     setSubject("");
@@ -473,7 +409,7 @@ function BulkEmailPageContent() {
     if (option.kind === "recipientType") {
       setRecipientType(option.value);
     } else {
-      setFilters((previous) => ({ ...previous, [option.key]: option.value }));
+      setFilters((previous) => ({ ...previous, [option.key]: [...new Set([...(previous[option.key]?.split(",") ?? []), option.value])].join(",") }));
     }
     setRecipientMenuOpen(false);
     setOperationError(null);
@@ -505,73 +441,6 @@ function BulkEmailPageContent() {
       setOperationError("메일 발송에 실패했습니다.");
     } finally {
       setSending(false);
-    }
-  };
-
-  const handleTestSend = async () => {
-    if (!validateMessage()) return;
-    try {
-      setTestSending(true);
-      setOperationError(null);
-      const response = await apiClient.sendBulkEmailTest(
-        buildRequest({ includeSchedule: false }),
-      );
-      setStatusNotice(`내 계정(${response.recipientEmail})으로 테스트 메일을 보냈습니다.`);
-    } catch {
-      setOperationError("테스트 메일 발송에 실패했습니다.");
-    } finally {
-      setTestSending(false);
-    }
-  };
-
-  const handleSaveTemplate = async () => {
-    const templateName = subject.trim();
-    const templateDescription = firstEmailBodyLine(content);
-    if (!templateName || !templateDescription) {
-      setOperationError("메일 제목과 본문 첫 줄을 입력해 주세요.");
-      return;
-    }
-    try {
-      setTemplateSaving(true);
-      setOperationError(null);
-      const templateInput = {
-        name: templateName,
-        description: templateDescription,
-        subject: templateName,
-        content,
-        contentType,
-        recipientType,
-        filters: normalizeFilters(filters),
-      };
-      const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
-      const saved = selectedTemplate?.createdBy
-        ? await apiClient.updateBulkEmailTemplate(selectedTemplate.id, templateInput)
-        : await apiClient.createBulkEmailTemplate(templateInput);
-      setSelectedTemplateId(saved.id);
-      setTemplates((previous) => [
-        ...previous.filter((template) => template.id !== saved.id),
-        saved,
-      ]);
-      setStatusNotice("템플릿을 저장했습니다.");
-    } catch {
-      setOperationError("템플릿 저장에 실패했습니다.");
-    } finally {
-      setTemplateSaving(false);
-    }
-  };
-
-  const handleDeleteTemplate = async (templateId: string) => {
-    const template = templates.find((item) => item.id === templateId);
-    if (!template?.createdBy) return;
-    try {
-      setTemplateSaving(true);
-      await apiClient.deleteBulkEmailTemplate(templateId);
-      setTemplates((previous) => previous.filter((item) => item.id !== templateId));
-      if (selectedTemplateId === templateId) setSelectedTemplateId("");
-    } catch {
-      setOperationError("템플릿 삭제에 실패했습니다.");
-    } finally {
-      setTemplateSaving(false);
     }
   };
 
@@ -675,7 +544,7 @@ function BulkEmailPageContent() {
   };
 
   const dismissReview = () => {
-    if (sending || testSending) return;
+    if (sending) return;
     setReviewOpen(false);
     setReviewPreview(null);
   };
@@ -709,19 +578,8 @@ function BulkEmailPageContent() {
               <History aria-hidden="true" />
               발송 이력
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setTemplateModalOpen(true);
-              }}
-            >
-              <FileText aria-hidden="true" />
-              템플릿
-            </Button>
-            <Button form="bulk-email-compose" type="submit" size="sm" disabled={sending || templatesLoading}>
-              <Rocket aria-hidden="true" />
+            <Button form="bulk-email-compose" type="submit" size="sm" disabled={sending}>
+              <Send aria-hidden="true" />
               검토 및 발송
             </Button>
           </div>
@@ -755,9 +613,9 @@ function BulkEmailPageContent() {
                   <RecipientToken label={selectedRecipientLabel} onRemove={() => setRecipientType("ALL")} />
                   {activeFilterEntries.map((entry) => (
                     <RecipientToken
-                      key={entry.key}
+                      key={`${entry.key}-${entry.value}`}
                       label={entry.tokenLabel}
-                      onRemove={() => setFilters((previous) => ({ ...previous, [entry.key]: undefined }))}
+                      onRemove={() => setFilters((previous) => ({ ...previous, [entry.key]: previous[entry.key]?.split(",").filter((value) => value !== entry.value).join(",") || undefined }))}
                     />
                   ))}
                   <DropdownMenu.Root modal={false} open={recipientMenuOpen} onOpenChange={setRecipientMenuOpen}>
@@ -914,62 +772,6 @@ function BulkEmailPageContent() {
       </main>
 
       <Modal
-        open={templateModalOpen}
-        onClose={() => setTemplateModalOpen(false)}
-        title="템플릿"
-        headerActions={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-[var(--ui-control-height)] !font-medium"
-            onClick={() => void handleSaveTemplate()}
-            disabled={templateSaving}
-          >
-            <Save aria-hidden="true" />
-            {templateSaving ? "저장 중…" : "저장"}
-          </Button>
-        }
-        className="max-w-2xl"
-        mobileFullscreen
-        bodyClassName="space-y-5 px-4 py-5 sm:px-5"
-      >
-        <div className="space-y-5">
-
-          <section>
-            {templatesLoading ? (
-              <p className="py-6 text-center text-sm font-normal text-slate-500">불러오는 중…</p>
-            ) : templates.length === 0 ? (
-              <p className="py-6 text-center text-sm font-normal text-slate-500">저장된 양식이 없습니다.</p>
-            ) : (
-              <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-                {templates.map((template) => (
-                  <div key={template.id} className="group flex items-center gap-3 px-3 py-3 transition-colors hover:bg-slate-50">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        applyTemplateToForm(template);
-                        setTemplateModalOpen(false);
-                      }}
-                      className="min-w-0 flex-1 text-left outline-none"
-                    >
-                      <p className="truncate text-sm font-medium text-slate-800">{template.name}</p>
-                      {template.description ? <p className="mt-0.5 truncate text-xs font-normal text-slate-500">{template.description}</p> : null}
-                    </button>
-                    {template.createdBy ? (
-                      <Button type="button" variant="ghost" size="icon" aria-label={`${template.name} 삭제`} data-tooltip="템플릿 삭제" onClick={() => void handleDeleteTemplate(template.id)} disabled={templateSaving} className="min-h-11 min-w-11 text-slate-400 hover:bg-rose-50 hover:text-rose-600 sm:size-8 sm:min-h-0 sm:min-w-0">
-                        <Trash2 aria-hidden="true" />
-                      </Button>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
-      </Modal>
-
-      <Modal
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         title="발송 이력"
@@ -1014,11 +816,8 @@ function BulkEmailPageContent() {
         bodyClassName="space-y-5 px-4 py-5 sm:px-5"
         footer={
           <div className="email-review-footer flex w-full flex-wrap items-center gap-2">
-            <Button type="button" variant="ghost" onClick={() => void handleTestSend()} disabled={sending || testSending} className="mr-auto">
-              {testSending ? "테스트 발송 중…" : "내 계정으로 테스트 발송"}
-            </Button>
-            <Button type="button" variant="outline" onClick={dismissReview} disabled={sending || testSending}>취소</Button>
-            <Button type="button" onClick={() => void handleConfirmSend()} disabled={sending || !reviewPreview}>{sending ? "발송 중…" : "보내기"}</Button>
+            <Button type="button" variant="outline" onClick={dismissReview} disabled={sending}>취소</Button>
+            <Button loading={sending} type="button" onClick={() => void handleConfirmSend()} disabled={sending || !reviewPreview} className="min-w-20">보내기</Button>
           </div>
         }
       >

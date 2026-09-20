@@ -574,16 +574,13 @@ export function RoadmapGraph({
         if (!source || !target) return [];
         const highlighted =
           relation.source === activeCourseCode || relation.target === activeCourseCode;
+        if (!highlighted) return [];
 
         const sourceNode = layout.nodes.find((node) => node.id === source)!;
         const targetNode = layout.nodes.find((node) => node.id === target)!;
-        // Keep the overview quiet. Dependency arrows are useful only while a
-        // course is being inspected; rendering every relation at rest makes
-        // the canvas look like a bundle of stray grey wires.
-        if (!activeCourseCode || !highlighted) return [];
         const route = routeConnection({ id: source, ...sourceNode.position }, { id: target, ...targetNode.position }, layout.nodes.filter(node => node.type === "course").map(node => ({ id: node.id, ...node.position })));
         if (!route) return [];
-        const color = relation.target === activeCourseCode ? "#d97706" : "#0284c7";
+        const color = !highlighted ? "#64748b" : relation.target === activeCourseCode ? "#d97706" : "#0284c7";
         return [
           {
             id: `${relation.source}-${relation.target}`,
@@ -603,7 +600,7 @@ export function RoadmapGraph({
               color: color,
             },
             style: {
-              opacity: highlighted ? 0.85 : 0.25,
+              opacity: highlighted ? 0.95 : activeCourseCode ? 0.15 : 0.5,
               pointerEvents: "none",
               stroke: color,
               strokeWidth: highlighted ? 1.5 : 1,

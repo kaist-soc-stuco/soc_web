@@ -1,6 +1,6 @@
 import type { CurrentUserResponse, MyScrapItem } from "@soc/contracts";
 import { isoToMs, nowMs } from "@soc/shared";
-import { Bookmark, Clock3, User, type LucideIcon } from "lucide-react";
+import { Clock3, User, type LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { EmptyState } from "@/components/ui/data-state";
@@ -371,17 +371,16 @@ export function MyPageActivityPanel({
               <Link
                 key={item.articleId}
                 to={item.boardCode === "_EVENT" ? `/events/${item.articleId}` : `/board/${item.boardCode}/${item.articleId}`}
-                className="group flex min-h-11 items-start gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50 sm:items-center"
+                className="group flex min-h-0 items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-slate-50 sm:items-center"
               >
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[length:var(--ui-text-caption-size)] font-semibold tracking-tight text-slate-700">
-                  <Bookmark className="h-3 w-3" aria-hidden="true" />
+                <span className="inline-flex shrink-0 items-center rounded-md bg-slate-100 px-2.5 py-1 text-[length:var(--ui-text-caption-size)] font-semibold leading-4 tracking-tight text-slate-700">
                   {isEvent ? (lang === "ko" ? "행사" : "Event") : item.boardNameKo}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block break-words text-sm font-normal text-slate-800 group-hover:text-kaist-darkgreen">
+                  <span className="block break-words text-sm font-normal leading-5 text-slate-800 group-hover:text-kaist-darkgreen">
                     {item.titleKo}
                   </span>
-                  <span className="mt-1 block break-words text-[length:var(--ui-text-caption-size)] font-normal text-slate-400">
+                  <span className="mt-0.5 block break-words text-[length:var(--ui-text-caption-size)] font-normal leading-4 text-slate-400">
                     {item.boardNameKo} · {formatRelative(item.scrapUpdatedAt, lang)}
                   </span>
                 </span>

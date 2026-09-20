@@ -36,6 +36,7 @@ const ALLOWED_TAGS = new Set([
 
 const SAFE_STYLE_VALUE = {
   color: /^(?:#[0-9a-f]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\))$/i,
+  "background-color": /^(?:#[0-9a-f]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\))$/i,
   "font-size": /^(?:14|16|18|22)px$/,
 };
 

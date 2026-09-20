@@ -143,7 +143,8 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
   };
 
   const isEvent = category === "_EVENT";
-  const eventFields = isEvent ? (
+  const isEventLike = isEvent || category === "promotions";
+  const eventFields = isEventLike ? (
     <BoardWriteEventFields
       eventDescriptionKo={eventDescriptionKo}
       eventDescriptionEn={eventDescriptionEn}
@@ -192,14 +193,14 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
       surveys={surveys}
       isAnonymous={isAnonymous}
       boardCode={category}
-      isEvent={isEvent}
+      isEvent={isEventLike}
       isPinned={isPinned}
       homeVisible={homeVisible}
       isSecret={isSecret}
       allowSecret={allowSecret}
       onAnonymousChange={setIsAnonymous}
       onPinnedChange={setIsPinned}
-      onHomeVisibleChange={setHomeVisible}
+      onHomeVisibleChange={isEvent ? setHomeVisible : undefined}
       onSecretChange={setIsSecret}
       anonymousLabel={lang === "ko" ? "익명으로 작성" : "Write Anonymously"}
       pinnedLabel={
@@ -211,7 +212,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
             ? "게시글 상단 고정"
             : "Pin to Top"
       }
-      stacked={isEvent}
+      stacked={isEventLike}
     />
   );
   const editorCard = (includeSettings: boolean) => (
@@ -295,7 +296,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
               onSaveDraft={handleSaveDraft}
               onSubmit={handleSubmit}
               submitLabel={lang === "ko" ? "수정" : "Save"}
-              submittingLabel={lang === "ko" ? "저장 중..." : "Saving..."}
+
             />
           </div>
         }
@@ -333,7 +334,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
                 onChange={(event) => void handleUploadFiles(event.target.files)}
               />
 
-              {isEvent ? (
+              {isEventLike ? (
                 <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
                   {editorCard(false)}
                   <DataViewCard className="min-w-0">

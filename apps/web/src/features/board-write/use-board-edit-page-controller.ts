@@ -128,10 +128,11 @@ export function useBoardEditPageController(forcedCategory?: string) {
         setIsKoreanOnly(
           !res.titleEn?.trim() ||
             !res.contentEn?.trim() ||
-            (category === "_EVENT" && !res.eventDescriptionEn?.trim()),
+            ((category === "_EVENT" || category === "promotions") &&
+              !res.eventDescriptionEn?.trim()),
         );
         setIsEventAlwaysOpen(
-          category === "_EVENT" &&
+          (category === "_EVENT" || category === "promotions") &&
             !res.eventStartDate &&
             !res.eventEndDate &&
             Boolean(res.eventDescriptionKo),
@@ -227,19 +228,25 @@ export function useBoardEditPageController(forcedCategory?: string) {
       sortOrder: index,
     })),
     eventStartDate:
-      category === "_EVENT" && eventStartDate
+      (category === "_EVENT" || category === "promotions") && eventStartDate
         ? eventDateInputToIso(eventStartDate, isAllDay)
         : null,
     eventEndDate:
-      category === "_EVENT" && eventEndDate
+      (category === "_EVENT" || category === "promotions") && eventEndDate
         ? eventDateInputToIso(eventEndDate, isAllDay, true)
         : null,
     eventLocation:
-      category === "_EVENT" ? eventLocation.trim() || null : null,
+      (category === "_EVENT" || category === "promotions")
+        ? eventLocation.trim() || null
+        : null,
     eventDescriptionKo:
-      category === "_EVENT" ? eventDescriptionKo || null : null,
+      (category === "_EVENT" || category === "promotions")
+        ? eventDescriptionKo || null
+        : null,
     eventDescriptionEn:
-      category === "_EVENT" ? eventDescriptionEn || null : null,
+      (category === "_EVENT" || category === "promotions")
+        ? eventDescriptionEn || null
+        : null,
     linkedSurveyId: selectedSurveyId || null,
   });
 
@@ -347,7 +354,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     try {
       const uploaded = await Promise.all(
         Array.from(files).map(async (file) => {
-          const asset = await apiClient.uploadAsset(file);
+          const asset = await apiClient.uploadAsset(file, { transport: "server" });
           return {
             assetId: asset.assetId,
             mimeType: asset.mimeType,
@@ -390,7 +397,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
 
     setUploading(true);
     try {
-      const asset = await apiClient.uploadAsset(file);
+      const asset = await apiClient.uploadAsset(file, { transport: "server" });
       setAssets((current) => [
         ...current,
         {
@@ -432,7 +439,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
 
     setUploading(true);
     try {
-      const asset = await apiClient.uploadAsset(file);
+      const asset = await apiClient.uploadAsset(file, { transport: "server" });
       const thumbnail = {
         assetId: asset.assetId,
         mimeType: asset.mimeType,
@@ -484,7 +491,12 @@ export function useBoardEditPageController(forcedCategory?: string) {
       return;
     }
 
-    if (category === "_EVENT") {
+    if (category === "promotions" && eventStartDate && eventEndDate && eventEndDate.slice(0, 10) < eventStartDate.slice(0, 10)) {
+      toast({ type: "error", message: lang === "ko" ? "게시 종료 날짜는 시작 날짜 이후여야 합니다." : "The end date must be on or after the start date." });
+      return;
+    }
+
+    if (category === "_EVENT" || category === "promotions") {
       if (
         !eventDescriptionKo.trim() ||
         (!isKoreanOnly && !eventDescriptionEn.trim()) ||
@@ -520,23 +532,27 @@ export function useBoardEditPageController(forcedCategory?: string) {
           sortOrder: index,
         })),
         eventStartDate:
-          category === "_EVENT"
+          (category === "_EVENT" || category === "promotions")
             ? isEventAlwaysOpen
               ? null
               : eventDateInputToIso(eventStartDate, isAllDay)
             : undefined,
         eventEndDate:
-          category === "_EVENT"
+          (category === "_EVENT" || category === "promotions")
             ? isEventAlwaysOpen
               ? null
               : eventDateInputToIso(eventEndDate, isAllDay, true)
             : undefined,
         eventLocation:
-          category === "_EVENT" ? eventLocation.trim() || undefined : undefined,
+          (category === "_EVENT" || category === "promotions")
+            ? eventLocation.trim() || undefined
+            : undefined,
         eventDescriptionKo:
-          category === "_EVENT" ? eventDescriptionKo.trim() : undefined,
+          (category === "_EVENT" || category === "promotions")
+            ? eventDescriptionKo.trim()
+            : undefined,
         eventDescriptionEn:
-          category === "_EVENT"
+          (category === "_EVENT" || category === "promotions")
             ? isKoreanOnly
               ? null
               : eventDescriptionEn.trim()

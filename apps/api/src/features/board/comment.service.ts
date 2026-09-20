@@ -222,6 +222,7 @@ export class CommentService {
           commentId: created.commentId,
           articleId,
           boardCode: code,
+          content: payload.content,
           isReply: Boolean(payload.parentCommentId),
           isOfficial: isOfficialReply,
         },
@@ -294,7 +295,9 @@ export class CommentService {
       targetId: commentId,
       targetType: "comment",
       payload: {
+        before: { content: comment.content },
         after: {
+          content: payload.content,
           commentId,
           articleId,
           boardCode: code,
@@ -351,7 +354,7 @@ export class CommentService {
       actorUserId: user.id,
       targetId: commentId,
       targetType: "comment",
-      payload: { deleted: { commentId, articleId, boardCode: code } },
+      payload: { deleted: { commentId, articleId, boardCode: code, content: comment.content } },
     });
     return result;
   }
@@ -387,7 +390,7 @@ export class CommentService {
     await this.auditLogService.record({
       action: "comment.hide",
       actorUserId: user.id,
-      payload: { articleId, boardCode: code, reason: input.reason },
+      payload: { articleId, boardCode: code, reason: input.reason, content: comment.content },
       targetId: commentId,
       targetType: "comment",
     });
@@ -416,7 +419,7 @@ export class CommentService {
     await this.auditLogService.record({
       action: "comment.restore",
       actorUserId: user.id,
-      payload: { articleId, boardCode: code },
+      payload: { articleId, boardCode: code, content: comment.content },
       targetId: commentId,
       targetType: "comment",
     });
