@@ -173,6 +173,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
         )
       }
       onThumbnailSelect={handleUploadThumbnail}
+      showCardDetails={isEvent}
       thumbnail={assets.find((asset) => asset.usageType === "THUMBNAIL")}
       uploading={uploading}
       onAllDayChange={(checked) => {

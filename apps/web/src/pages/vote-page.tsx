@@ -59,17 +59,6 @@ export function VotePage() {
     }).catch(() => setError(t.loadFailed));
   }, [client, id, reloadKey, t.loadFailed]);
 
-  useEffect(() => {
-    let active = true;
-    const refresh = () => {
-      if (document.hidden) return;
-      void client.getVote(id).then((data) => { if (active) setVote(data); }).catch(() => undefined);
-    };
-    const timer = window.setInterval(refresh, 30_000);
-    document.addEventListener("visibilitychange", refresh);
-    return () => { active = false; window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
-  }, [client, id]);
-
   const selectionError = (item: VoteDetailResponse["items"][number]) => {
     const count = answers[item.id]?.length ?? 0;
     if (!count) return lang === "ko" ? "필수 입력란입니다." : "This question is required.";

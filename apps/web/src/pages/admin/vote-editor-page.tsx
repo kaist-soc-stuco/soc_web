@@ -20,7 +20,7 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from "@dnd-kit/utilities";
 import { Copy, Undo2, Redo2, Link2, Eye, MoreVertical, Download, Upload, GripVertical, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode, type SetStateAction } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useBlocker, useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { meetsVoteQuorum, htmlDatetimeLocalToIso, isoToHtmlDatetimeLocal, isoToMs, isoToTimeObj, msToIso, nowIso, nowMs } from "@soc/shared";
 
@@ -240,7 +240,7 @@ export function VoteEditorPage() {
       const created = await client.createVote(body);
       voteIdRef.current = created.id; ownCreatedId.current = created.id;
       savedPayload.current = JSON.stringify(body); setVote(created);
-      navigate(`/admin/votes/${created.id}`, {replace:true});
+      if (!leavingRef.current) navigate(`/admin/votes/${created.id}`, {replace:true});
       return created.id;
     })().finally(() => { creation.current = null; });
     return creation.current;
@@ -260,6 +260,20 @@ export function VoteEditorPage() {
     try { await task; } finally { if (saveQueue.current === task) saveQueue.current = null; }
   };
   const saveLatest = useRef(save); saveLatest.current = save;
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (!dirty || currentLocation.pathname === nextLocation.pathname || nextLocation.pathname === `/admin/votes/${voteIdRef.current}`) return false;
+    try { return JSON.stringify(payload()) !== savedPayload.current; }
+    catch { return true; }
+  });
+  const leavingRef = useRef(false);
+  useEffect(() => {
+    if (blocker.state !== "blocked" || leavingRef.current) return;
+    leavingRef.current = true;
+    void saveLatest.current().then(() => blocker.proceed()).catch(() => {
+      blocker.reset();
+      toast({ type: "error", message: "변경 사항을 저장하지 못해 이동을 멈췄습니다. 입력값과 연결을 확인해 주세요." });
+    }).finally(() => { leavingRef.current = false; });
+  }, [blocker, toast]);
   const saveErrorShown = useRef(false);
   useEffect(() => {
     if (!dirty || (vote && vote.status !== "DRAFT")) return;

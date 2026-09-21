@@ -9,7 +9,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
-import { createApiClient } from "@soc/api-client";
+import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type {
   BulkEmailPreviewResponse,
   CurrentUserResponse,
@@ -65,6 +65,7 @@ type RecipientFilterKey = keyof RecipientFilters;
 type DeliveryMode = "now" | "scheduled";
 
 type StoredEmailDraft = {
+  attachments?: AttachmentView[];
   content: string;
   contentType: SendBulkEmailRequest["contentType"];
   filters: RecipientFilters;
@@ -253,7 +254,7 @@ function BulkEmailPageContent() {
     setContentType(draft.contentType);
     setFilters(draft.filters ?? {});
     setScheduledAt("");
-    setAttachments([]);
+    setAttachments(draft.attachments ?? []);
     setOperationError(null);
     setDraftRestored(true);
     setDraftSavedAt(draft.savedAt);
@@ -316,6 +317,7 @@ function BulkEmailPageContent() {
     const timer = window.setTimeout(() => {
       const savedAt = msToIso(nowMs());
       const draft: StoredEmailDraft = {
+        attachments,
         content,
         contentType,
         filters: normalizeFilters(filters),
@@ -334,7 +336,7 @@ function BulkEmailPageContent() {
     }, 500);
 
     return () => window.clearTimeout(timer);
-  }, [content, contentType, draftReady, draftRestored, emailDraftStorageKey, filters, recipientType, subject]);
+  }, [attachments, content, contentType, draftReady, draftRestored, emailDraftStorageKey, filters, recipientType, subject]);
 
   const buildRequest = (options?: {
     includeSchedule?: boolean;
@@ -372,8 +374,10 @@ function BulkEmailPageContent() {
       setSending(true);
       setReviewPreview(await apiClient.previewBulkEmailRecipients(buildRequest()));
       setReviewOpen(true);
-    } catch {
-      setOperationError("발송 전 수신자를 확인하지 못했습니다.");
+    } catch (error) {
+      const missingId = error instanceof ApiClientHttpError ? error.code?.split("bulk_email_attachment_unavailable:")[1] : null;
+      const missing = attachments.find(file => file.assetId === missingId);
+      setOperationError(missing ? `첨부파일 “${missing.filename}”을 사용할 수 없습니다. 제거한 뒤 다시 첨부해 주세요.` : "발송 전 수신자와 첨부파일을 확인하지 못했습니다.");
     } finally {
       setSending(false);
     }
@@ -907,6 +911,7 @@ function readStoredEmailDraft(storageKey: string | null): StoredEmailDraft | nul
       recipientType: draft.recipientType,
       filters: normalizeFilters(draft.filters as RecipientFilters),
       savedAt: draft.savedAt,
+      attachments: Array.isArray(draft.attachments) ? draft.attachments.filter((file): file is AttachmentView => Boolean(file && typeof file.assetId === "string" && /^\d+$/.test(file.assetId) && typeof file.filename === "string" && typeof file.mimeType === "string" && typeof file.sizeBytes === "number")).slice(0, 10) : [],
     };
   } catch {
     return null;

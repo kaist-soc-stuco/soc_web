@@ -250,7 +250,11 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
 
   async previewRecipients(
     dto: SendBulkEmailRequest,
+    senderId?: string,
   ): Promise<BulkEmailPreviewResponse> {
+    if (senderId) for (const assetId of dto.attachmentAssetIds ?? []) {
+      if (!await this.assetService.hasOwnedAsset(assetId, senderId)) throw new BadRequestException(`bulk_email_attachment_unavailable:${assetId}`);
+    }
     const recipients = await this.usersService.listEmailRecipients(dto.recipientType, dto.filters);
     return { recipientCount: recipients.length, sample: recipients.slice(0, 10) };
   }

@@ -635,13 +635,16 @@ export const createAdminApi = ({
   getStudentFeeSpreadsheet: async (): Promise<{
     spreadsheetId: string;
     spreadsheetUrl: string;
-  }> => {
+  } | null> => {
     return requestJson(
       `${usersBaseUrl}/fee-status/spreadsheet`,
       { method: "GET" },
       { retryOnUnauthorized: true },
     );
   },
+
+  connectStudentFeeSpreadsheet: async (): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> =>
+    requestJson(`${usersBaseUrl}/fee-status/spreadsheet/connect`, { method: "POST" }, { retryOnUnauthorized: true }),
 
   previewStudentFeeImport: async (body: BulkUpdateStudentFeeStatusRequest): Promise<StudentFeeImportPreview> => {
     return requestJson<StudentFeeImportPreview>(`${usersBaseUrl}/fee-status/preview`, {
@@ -677,9 +680,9 @@ export const createAdminApi = ({
     );
   },
 
-  getStudentFeeDetail: async (userId: string): Promise<StudentFeeDetailResponse> => {
+  getStudentFeeDetail: async (userId: string, referenceSemester?: string): Promise<StudentFeeDetailResponse> => {
     return requestJson<StudentFeeDetailResponse>(
-      `${usersBaseUrl}/fee-status/detail/${encodeURIComponent(userId)}`,
+      `${usersBaseUrl}/fee-status/detail/${encodeURIComponent(userId)}${referenceSemester ? `?referenceSemester=${encodeURIComponent(referenceSemester)}` : ""}`,
       { method: "GET" },
       { retryOnUnauthorized: true },
     );

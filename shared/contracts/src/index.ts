@@ -19,3 +19,4 @@ export * from "./errors/app-error.js";
 export * from "./permissions-registry.js";
 export * from "./operational-surveys.js";
 export * from "./schemas.js";
+export * from "./survey-structure.js";

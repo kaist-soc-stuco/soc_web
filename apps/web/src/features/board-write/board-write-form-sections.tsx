@@ -282,6 +282,7 @@ interface EventFieldsProps {
   onEventAlwaysOpenChange: (checked: boolean) => void;
   onThumbnailRemove: () => void;
   onThumbnailSelect: (file: File) => void | Promise<void>;
+  showCardDetails: boolean;
   thumbnail?: AttachedAsset;
   uploading: boolean;
 }
@@ -305,6 +306,7 @@ export function BoardWriteEventFields({
   onEventStartDateChange,
   onThumbnailRemove,
   onThumbnailSelect,
+  showCardDetails,
   thumbnail,
   uploading,
 }: EventFieldsProps) {
@@ -397,98 +399,107 @@ export function BoardWriteEventFields({
           {!isAllDay ? <UiInput type="time" aria-label={lang === "ko" ? "종료 시간 (한국 시간)" : "End time (Seoul)"} disabled={isEventAlwaysOpen || !eventEndInputValue} value={eventEndInputValue.slice(11, 16)} onChange={(event) => onEventEndDateChange(`${eventEndInputValue.slice(0, 10)}T${event.target.value}`)} className="mt-2 w-full min-w-0" /> : null}
         </UiFormField>
       </div>
-      <UiFormField
-        label={
-          lang === "ko"
-            ? "대표 썸네일 (16:9 권장)"
-            : "Representative thumbnail (16:9 recommended)"
-        }
-      >
-        <ImageUploadField
-          alt={lang === "ko" ? "대표 썸네일 미리보기" : "Representative thumbnail preview"}
-          compact
-          disabled={uploading}
-          fileName={thumbnail?.originalFilename}
-          imageUrl={thumbnail ? resolveAssetUrl(thumbnail.storageKey) : undefined}
-          onRemove={onThumbnailRemove}
-          onSelect={onThumbnailSelect}
-          removeLabel={lang === "ko" ? "제거" : "Remove"}
-          selectLabel={
-            lang === "ko"
-              ? thumbnail
-                ? "이미지 변경"
-                : "썸네일 선택"
-              : thumbnail
-                ? "Change image"
-                : "Choose thumbnail"
-          }
-        />
-      </UiFormField>
-      <UiFormField label={lang === "ko" ? "행사 장소" : "Event location"} htmlFor="event-location" className="min-w-0">
-        <UiInput
-          id="event-location"
-          type="text"
-          maxLength={255}
-          aria-label={lang === "ko" ? "행사 장소" : "Event location"}
-          placeholder={lang === "ko" ? "행사 장소를 입력하세요" : "Enter event location"}
-          className="w-full"
-          value={eventLocation}
-          onChange={(event) => onEventLocationChange(event.target.value)}
-        />
-      </UiFormField>
-      <div className="grid gap-1.5">
-        <div className="flex items-center justify-between gap-3">
-          <label
-            htmlFor="event-description"
-            className="min-w-0 text-xs font-normal leading-4 text-[#344054]"
-          >
-            {lang === "ko" ? "카드 요약 설명 (피드 노출용)" : "Card summary (shown in feeds)"}
-          </label>
-          <div
-            aria-label={lang === "ko" ? "설명 언어" : "Description language"}
-            className="inline-flex shrink-0 rounded-md border border-slate-200 bg-slate-50 p-0.5"
-            role="tablist"
-          >
-            {(["ko", "en"] as const).map((language) => {
-              const isActive = activeDescriptionLanguage === language;
-              const isDisabled = language === "en" && isKoreanOnly;
-              return (
-                <button
-                  key={language}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  aria-disabled={isDisabled}
-                  disabled={isDisabled}
-                  onClick={() => setDescriptionLanguage(language)}
-                  className={`select-none rounded px-2 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold uppercase leading-4 transition-colors ${
-                    isActive
-                      ? "bg-white text-brand-primary shadow-sm"
-                      : "text-slate-400 hover:text-slate-700"
-                  } disabled:cursor-not-allowed disabled:opacity-45`}
-                >
-                  {language.toUpperCase()}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <UiInput
-          id="event-description"
-          type="text"
-          aria-label={lang === "ko" ? "카드 요약 설명" : "Card summary"}
-          placeholder="설명을 입력하세요"
-          className="w-full"
-          value={activeDescriptionLanguage === "ko" ? eventDescriptionKo : eventDescriptionEn}
-          onChange={(event) => {
-            if (activeDescriptionLanguage === "ko") {
-              onEventDescriptionKoChange(event.target.value);
-            } else {
-              onEventDescriptionEnChange(event.target.value);
+      {showCardDetails ? (
+        <>
+          <UiFormField
+            label={
+              lang === "ko"
+                ? "대표 썸네일 (16:9 권장)"
+                : "Representative thumbnail (16:9 recommended)"
             }
-          }}
-        />
-      </div>
+          >
+            <ImageUploadField
+              alt={lang === "ko" ? "대표 썸네일 미리보기" : "Representative thumbnail preview"}
+              compact
+              disabled={uploading}
+              fileName={thumbnail?.originalFilename}
+              imageUrl={thumbnail ? resolveAssetUrl(thumbnail.storageKey) : undefined}
+              onRemove={onThumbnailRemove}
+              onSelect={onThumbnailSelect}
+              previewErrorText={
+                lang === "ko"
+                  ? "이미지를 불러오지 못했습니다. 다시 선택해 주세요."
+                  : "Could not load the image. Please choose it again."
+              }
+              removeLabel={lang === "ko" ? "제거" : "Remove"}
+              selectLabel={
+                lang === "ko"
+                  ? thumbnail
+                    ? "이미지 변경"
+                    : "썸네일 선택"
+                  : thumbnail
+                    ? "Change image"
+                    : "Choose thumbnail"
+              }
+            />
+          </UiFormField>
+          <UiFormField label={lang === "ko" ? "행사 장소" : "Event location"} htmlFor="event-location" className="min-w-0">
+            <UiInput
+              id="event-location"
+              type="text"
+              maxLength={255}
+              aria-label={lang === "ko" ? "행사 장소" : "Event location"}
+              placeholder={lang === "ko" ? "행사 장소를 입력하세요" : "Enter event location"}
+              className="w-full"
+              value={eventLocation}
+              onChange={(event) => onEventLocationChange(event.target.value)}
+            />
+          </UiFormField>
+          <div className="grid gap-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <label
+                htmlFor="event-description"
+                className="min-w-0 text-xs font-normal leading-4 text-[#344054]"
+              >
+                {lang === "ko" ? "카드 요약 설명 (피드 노출용)" : "Card summary (shown in feeds)"}
+              </label>
+              <div
+                aria-label={lang === "ko" ? "설명 언어" : "Description language"}
+                className="inline-flex shrink-0 rounded-md border border-slate-200 bg-slate-50 p-0.5"
+                role="tablist"
+              >
+                {(["ko", "en"] as const).map((language) => {
+                  const isActive = activeDescriptionLanguage === language;
+                  const isDisabled = language === "en" && isKoreanOnly;
+                  return (
+                    <button
+                      key={language}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      aria-disabled={isDisabled}
+                      disabled={isDisabled}
+                      onClick={() => setDescriptionLanguage(language)}
+                      className={`select-none rounded px-2 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold uppercase leading-4 transition-colors ${
+                        isActive
+                          ? "bg-white text-brand-primary shadow-sm"
+                          : "text-slate-400 hover:text-slate-700"
+                      } disabled:cursor-not-allowed disabled:opacity-45`}
+                    >
+                      {language.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <UiInput
+              id="event-description"
+              type="text"
+              aria-label={lang === "ko" ? "카드 요약 설명" : "Card summary"}
+              placeholder="설명을 입력하세요"
+              className="w-full"
+              value={activeDescriptionLanguage === "ko" ? eventDescriptionKo : eventDescriptionEn}
+              onChange={(event) => {
+                if (activeDescriptionLanguage === "ko") {
+                  onEventDescriptionKoChange(event.target.value);
+                } else {
+                  onEventDescriptionEnChange(event.target.value);
+                }
+              }}
+            />
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

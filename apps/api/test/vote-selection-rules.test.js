@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const {test} = require("node:test");
 const {VotesService} = require("../dist/apps/api/src/features/votes/votes.service.js");
 const {VotesRepository} = require("../dist/apps/api/src/features/votes/votes.repository.js");
-const {VoteItemInputSchema} = require("@soc/contracts");
+const {Permissions, VoteItemInputSchema} = require("@soc/contracts");
 
 test("custom selection feedback survives request validation and the response contract", async () => {
   const item = VoteItemInputSchema.parse({
@@ -14,11 +14,30 @@ test("custom selection feedback survives request validation and the response con
   const now = new Date();
   const service = new VotesService({
     findVote: async () => ({status: "PUBLISHED", startsAt: now, endsAt: now, createdAt: now, updatedAt: now}),
+    findVoter: async () => ({status: "ELIGIBLE", hasVoted: false}),
     findDefinition: async () => [{...item, itemId: "item", options: []}],
     counts: async () => ({eligibleCount: 0, votedCount: 0}),
   }, {});
-  assert.equal((await service.detail("vote")).items[0].selectionErrorMessage, item.selectionErrorMessage);
+  assert.equal((await service.detail("vote", {id: "eligible", permission: 0})).items[0].selectionErrorMessage, item.selectionErrorMessage);
   assert.equal(VoteItemInputSchema.safeParse({...item, selectionErrorMessage: "x".repeat(501)}).success, false);
+});
+
+test("vote detail is limited to eligible voters while managers retain access", async () => {
+  const now = new Date();
+  let resultsPublishedAt = null;
+  const service = new VotesService({
+    findVote: async () => ({status: "PUBLISHED", startsAt: now, endsAt: now, createdAt: now, updatedAt: now, resultsPublishedAt}),
+    findVoter: async (_voteId, userId) => userId === "eligible" ? {status: "ELIGIBLE", hasVoted: false} : null,
+    findDefinition: async () => [],
+    counts: async () => ({eligibleCount: 1, votedCount: 0}),
+  }, {});
+
+  await assert.rejects(service.detail("vote"), /vote_not_found/);
+  await assert.rejects(service.detail("vote", {id: "other", permission: 0}), /vote_not_found/);
+  assert.equal((await service.detail("vote", {id: "eligible", permission: 0})).eligibility, "ELIGIBLE");
+  assert.equal((await service.detail("vote", {id: "manager", permission: Permissions.MANAGE_VOTE})).isManager, true);
+  resultsPublishedAt = now;
+  assert.equal((await service.detail("vote")).eligibility, "LOGIN_REQUIRED");
 });
 
 function serviceFor(rule, limit = 2) {

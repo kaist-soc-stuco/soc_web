@@ -136,7 +136,7 @@ export function Calendar() {
                     {formatScheduleRange(item)}
                   </time>
                   <div className="min-w-0 flex-1">
-                    <h3 className="line-clamp-2">{title}</h3>
+                    <h3 className="truncate">{title}</h3>
                   </div>
                   {showDdayBadge ? <span className="home-editorial-dday home-schedule-dday shrink-0">{ddayLabel}</span> : null}
                 </Link>

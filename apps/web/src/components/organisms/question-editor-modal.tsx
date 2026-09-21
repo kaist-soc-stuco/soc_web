@@ -548,6 +548,7 @@ export function QuestionInlineEditor({
       ),
   }));
   const form = value ?? localForm;
+  const savedFormRef = useRef(isNewQuestion ? null : JSON.stringify(localForm));
   const setForm = (update: QuestionFormState | ((previous: QuestionFormState) => QuestionFormState)) => {
     if (isOngoing) return;
     if (onDraftChange) onDraftChange(typeof update === "function" ? update(form) : update);
@@ -891,6 +892,8 @@ export function QuestionInlineEditor({
   };
 
   const handleSave = async (): Promise<boolean> => {
+    const snapshot = JSON.stringify(form);
+    if (snapshot === savedFormRef.current) return true;
     const usedOptionValues = new Set<string>();
     const normalizedOptions = (needsOptions && form.options.length === 0 ? [{ value: "option_1", labelKo: "", labelEn: "" }] : form.options).map((option, index) => {
       let value = option.value.trim() || `option_${index + 1}`;
@@ -967,6 +970,7 @@ export function QuestionInlineEditor({
     savingRef.current = true;
     try {
       await onSave(normalizedForm);
+      savedFormRef.current = snapshot;
       return true;
     } catch {
       return false;
@@ -1528,9 +1532,12 @@ export function TitleDescriptionInlineEditor({
 }: TitleDescriptionInlineEditorProps) {
   const { toast } = useToast();
   const [form, setForm] = useState(initial);
+  const savedFormRef = useRef(JSON.stringify(initial));
   const [saving, setSaving] = useState(false);
 
   const handleSave = async (): Promise<boolean> => {
+    const snapshot = JSON.stringify(form);
+    if (snapshot === savedFormRef.current) return true;
     if (saving) return false;
     setSaving(true);
     try {
@@ -1547,6 +1554,7 @@ export function TitleDescriptionInlineEditor({
         isRequired: false,
         config: null,
       });
+      savedFormRef.current = snapshot;
       return true;
     } catch {
       toast({ type: "error", message: "제목 및 설명을 저장하지 못했습니다." });

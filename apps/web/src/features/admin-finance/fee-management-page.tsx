@@ -155,6 +155,7 @@ export function FeeManagementPage() {
   const [importMatches, setImportMatches] = useState<StudentFeeImportPreview | null>(null);
   const [importPreview, setImportPreview] = useState<BulkUpdateStudentFeeStatusRequest["updates"] | null>(null);
   const [spreadsheetInfoOpen, setSpreadsheetInfoOpen] = useState(false);
+  const [connectingSheet, setConnectingSheet] = useState(false);
   const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
   const [openFilterDropdown, setOpenFilterDropdown] = useState<"semester" | null>(null);
   const [spreadsheetInputKey, setSpreadsheetInputKey] = useState(0);
@@ -180,7 +181,10 @@ export function FeeManagementPage() {
     return { from: stamp(start), to: stamp(today) };
   });
   const statsRequest = useRef(0);
-  const [stats, setStats] = useState<StudentFeeStatsResponse | null>(null);
+  const statsKey = JSON.stringify([statsSemester, statsRange]);
+  const [statsResult, setStatsResult] = useState<{ key: string; data: StudentFeeStatsResponse } | null>(null);
+  const stats = statsResult?.key === statsKey ? statsResult.data : null;
+  const [statsError, setStatsError] = useState<string | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
   useEffect(() => {
@@ -199,17 +203,12 @@ export function FeeManagementPage() {
   const semesterOptions = useMemo(buildSemesterOptions, []);
   const detailSummary = useMemo(() => {
     if (!detail) return null;
-    const referenceOrdinal = semesterOrdinal(referenceSemester);
-    const hasCoveredPayment = referenceOrdinal !== null && detail.history.some((payment) => {
-      const startOrdinal = semesterOrdinal(payment.effectiveStartSemester);
-      return startOrdinal !== null && referenceOrdinal >= startOrdinal && referenceOrdinal < startOrdinal + payment.coverageSemesters;
-    });
     const paidAmount = detail.history.length > 0
       ? detail.history.reduce((sum, payment) => sum + payment.amount, 0)
       : detail.status.paidAmount;
     const latestNote = detail.history.find((payment) => payment.note)?.note ?? detail.status.note;
     return {
-      status: hasCoveredPayment ? "PAID" as const : detail.history.length > 0 ? "PARTIAL" as const : detail.status.status,
+      status: detail.status.status,
       paidAmount,
       latestNote,
       latestPaidAt: detail.history[0]?.paidAt ?? detail.status.paidAt,
@@ -271,7 +270,7 @@ export function FeeManagementPage() {
     }
     void apiClient
       .getStudentFeeSpreadsheet()
-      .then((spreadsheet) => setSpreadsheetUrl(spreadsheet.spreadsheetUrl))
+      .then((spreadsheet) => setSpreadsheetUrl(spreadsheet?.spreadsheetUrl ?? null))
       .catch(() => setSpreadsheetUrl(null));
   }, [apiClient, session?.permission, sessionLoading]);
 
@@ -279,6 +278,8 @@ export function FeeManagementPage() {
     if (sessionLoading || !Permissions.has(session?.permission ?? 0, Permissions.MANAGE_FINANCE)) return;
     const request = ++statsRequest.current;
     setStatsLoading(true);
+    setStatsError(null);
+    setStatsResult(null);
     try {
       const response = await apiClient.getStudentFeeStats({
         bucket: "day",
@@ -287,14 +288,13 @@ export function FeeManagementPage() {
         referenceSemester: statsSemester,
       });
       if (request !== statsRequest.current) return;
-      setStats(response);
-      setError(null);
+      setStatsResult({ key: statsKey, data: response });
     } catch (err) {
-      if (request === statsRequest.current) setError("납부 통계를 불러오지 못했습니다.");
+      if (request === statsRequest.current) setStatsError("납부 통계를 불러오지 못했습니다. 다시 시도해 주세요.");
     } finally {
       if (request === statsRequest.current) setStatsLoading(false);
     }
-  }, [apiClient, session?.permission, sessionLoading, statsSemester, statsRange]);
+  }, [apiClient, session?.permission, sessionLoading, statsSemester, statsRange, statsKey]);
 
   useEffect(() => {
     void loadStats();
@@ -488,7 +488,7 @@ export function FeeManagementPage() {
     setOperationError(null);
     setDetailLoading(true);
     try {
-      const response = await apiClient.getStudentFeeDetail(student.userId);
+      const response = await apiClient.getStudentFeeDetail(student.userId, referenceSemester);
       setDetail(response);
     } catch (err) {
       toast({ type: "error", message: "납부 상세를 불러오지 못했습니다." });
@@ -541,7 +541,7 @@ export function FeeManagementPage() {
       setDetailPaymentFormOpen(false);
       setSuccessMessage(`${detail.user.nameKo}의 납부 내역을 원장에 추가했습니다.`);
       await loadData();
-      const refreshed = await apiClient.getStudentFeeDetail(detail.user.userId);
+      const refreshed = await apiClient.getStudentFeeDetail(detail.user.userId, referenceSemester);
       setDetail(refreshed);
     } catch (err) {
       toast({ type: "error", message: "납부 내역 추가에 실패했습니다." });
@@ -561,13 +561,21 @@ export function FeeManagementPage() {
               <Button
                 type="button"
                 variant="outline"
-                disabled={!spreadsheetUrl}
+                loading={connectingSheet}
                 onClick={() => {
-                  if (spreadsheetUrl) window.open(spreadsheetUrl, "_blank", "noopener,noreferrer");
+                  if (spreadsheetUrl) { window.open(spreadsheetUrl, "_blank", "noopener,noreferrer"); return; }
+                  const tab = window.open("about:blank", "_blank");
+                  if (tab) tab.opener = null;
+                  setConnectingSheet(true);
+                  void apiClient.connectStudentFeeSpreadsheet().then(sheet => {
+                    setSpreadsheetUrl(sheet.spreadsheetUrl);
+                    if (tab) tab.location.href = sheet.spreadsheetUrl;
+                  }).catch(() => { tab?.close(); toast({ type: "error", message: "Google Sheets에 연결하지 못했습니다. 연결 설정을 확인해 주세요." }); })
+                    .finally(() => setConnectingSheet(false));
                 }}
               >
                 <Sheet className="size-4" aria-hidden="true" />
-                Google Sheets에서 보기 ↗
+                {spreadsheetUrl ? "Google Sheets에서 보기 ↗" : "Google Sheets에 연결"}
               </Button>
             )}
           />
@@ -590,7 +598,7 @@ export function FeeManagementPage() {
           {error ? <div className="rounded-lg border border-rose-200 bg-white px-4 py-3 text-sm font-normal text-rose-700">{error}</div> : null}
 
           {activeSection === "settings" ? <section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex flex-wrap items-end gap-3"><AdminFormField label="표준 과비 (원)"><UiInput type="number" min={1} value={policyAmount} onChange={event => setPolicyAmount(event.currentTarget.value)} /></AdminFormField><Button disabled={saving || !policyReady} onClick={() => void saveFeePolicy()}>저장</Button></div></section> : activeSection === "stats" ? (
-            <FeeStatisticsPanel
+            <FeeStatisticsPanel error={statsError} onRetry={() => void loadStats()}
               range={statsRange}
               onRangeChange={setStatsRange}
               semester={statsSemester}
@@ -726,7 +734,7 @@ export function FeeManagementPage() {
               <section className="space-y-3">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900">현재 요약</h3>
-                  <p className="mt-1 text-xs text-slate-500">납부 이력의 합산 결과입니다.</p>
+                  <p className="mt-1 text-xs text-slate-500">{formatSemesterLabel(referenceSemester)} 기준 납부 상태입니다.</p>
                 </div>
                 <dl className="grid gap-3 rounded-lg border border-slate-200 px-4 py-3 text-sm sm:grid-cols-2">
                   <div>

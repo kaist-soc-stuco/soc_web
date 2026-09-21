@@ -1,7 +1,7 @@
 import { createApiClient } from '@soc/api-client';
 import { nowMs } from '@soc/shared';
 import { lazy, Suspense, useEffect, useMemo, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
+import { createBrowserRouter, createRoutesFromElements, RouterProvider, Outlet, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { AdminLayout } from '@/components/organisms/admin-layout';
 import { AuthGuard } from '@/components/guards/auth-guard';
 import { useCurrentSession } from '@/hooks/use-current-session';
@@ -130,6 +130,48 @@ function LegacyEventsSurveysRedirect() {
   return <Navigate to={`${destination}${query}`} replace />;
 }
 
+function ScrollToTopOnRouteChange() {
+  const location = useLocation();
+  const previousLocationRef = useRef<{
+    pathname: string;
+    search: string;
+    hash: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const previousLocation = previousLocationRef.current;
+    const pathChanged =
+      !previousLocation ||
+      previousLocation.pathname !== location.pathname ||
+      previousLocation.search !== location.search;
+    const hashWasCleared =
+      previousLocation?.pathname === location.pathname &&
+      previousLocation.search === location.search &&
+      Boolean(previousLocation.hash) &&
+      !location.hash;
+
+    if (!location.hash && (pathChanged || hashWasCleared)) {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }
+
+    previousLocationRef.current = {
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+    };
+  }, [location.hash, location.pathname, location.search]);
+
+  useEffect(() => {
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
+  }, []);
+
+  return null;
+}
+
 /**
  * Keep an authenticated session alive while the user is actively using the site.
  * Refresh rotation is server-side sliding expiry; this client trigger makes route
@@ -198,15 +240,26 @@ function PreventImageGhostDrag() {
   return null;
 }
 
-export function App() {
+function AppLayout() {
   return (
-    <BrowserRouter>
+    <>
+      <ScrollToTopOnRouteChange />
       <PreventImageGhostDrag />
       <SessionKeepAlive />
       <ChannelTalkProvider>
         <PublicOperationalContent />
         <Suspense fallback={null}>
-          <Routes>
+          <Outlet />
+
+        </Suspense>
+      </ChannelTalkProvider>
+    </>
+  );
+}
+
+const router = createBrowserRouter(createRoutesFromElements(
+  <Route element={<AppLayout />}>
+
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/life/roadmap" element={<RoadmapPage />} />
@@ -287,9 +340,10 @@ export function App() {
             <Route path="emails" element={<BulkEmailPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </Suspense>
-      </ChannelTalkProvider>
-    </BrowserRouter>
-  );
+
+  </Route>
+));
+
+export function App() {
+  return <RouterProvider router={router} />;
 }

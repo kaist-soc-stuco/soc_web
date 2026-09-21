@@ -57,6 +57,13 @@
       "when": 1789924642938,
       "tag": "0007_whole_silver_samurai",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790000000000,
+      "tag": "0008_repair_vote_item_image",
+      "breakpoints": true
     }
   ]
 }

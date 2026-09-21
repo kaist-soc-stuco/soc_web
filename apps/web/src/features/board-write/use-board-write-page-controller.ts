@@ -367,7 +367,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setIsEventAlwaysOpen(
       !draft.eventStartDate &&
         !draft.eventEndDate &&
-        Boolean(draft.eventDescriptionKo),
+        (selectedCategory === "promotions" || Boolean(draft.eventDescriptionKo)),
     );
     const draftIsAllDay = isAllDayDateRange(
       draft.eventStartDate,
@@ -572,7 +572,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
         setIsKoreanOnly(draft.isKoreanOnly);
         setIsEventAlwaysOpen(
           !draft.eventStartDate && !draft.eventEndDate &&
-            Boolean(draft.eventDescriptionKo),
+            (selectedCategory === "promotions" || Boolean(draft.eventDescriptionKo)),
         );
         const draftIsAllDay = isAllDayDateRange(
           draft.eventStartDate,
@@ -850,16 +850,21 @@ export function useBoardWritePageController(forcedCategory?: string) {
 
     if (selectedCategory === "_EVENT" || selectedCategory === "promotions") {
       if (
-        !eventDescriptionKo.trim() ||
-        (!isKoreanOnly && !eventDescriptionEn.trim()) ||
+        (selectedCategory === "_EVENT" &&
+          (!eventDescriptionKo.trim() ||
+            (!isKoreanOnly && !eventDescriptionEn.trim()))) ||
         (!isEventAlwaysOpen && (!eventStartDate || !eventEndDate))
       ) {
         toast({
           type: "error",
           message:
-            lang === "ko"
-              ? "행사 일정 또는 상시 여부, 그리고 간단한 설명은 필수입니다."
-              : "Event schedule or always-open status, plus card description, is required.",
+            selectedCategory === "promotions"
+              ? lang === "ko"
+                ? "게시 기간 또는 상시 진행 여부를 설정해 주세요."
+                : "Set a publication period or mark the post as always open."
+              : lang === "ko"
+                ? "행사 일정 또는 상시 여부, 그리고 간단한 설명은 필수입니다."
+                : "Event schedule or always-open status, plus card description, is required.",
         });
         return;
       }

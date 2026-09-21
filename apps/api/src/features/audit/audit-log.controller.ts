@@ -115,12 +115,12 @@ export class AuditLogController {
 
 function normalizeDateStart(value?: string): string | undefined {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? isoToDate(`${value}T00:00:00.000Z`).toISOString()
+    ? isoToDate(`${value}T00:00:00.000+09:00`).toISOString()
     : undefined;
 }
 
 function normalizeDateEnd(value?: string): string | undefined {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? isoToDate(`${value}T23:59:59.999Z`).toISOString()
+    ? isoToDate(`${value}T23:59:59.999+09:00`).toISOString()
     : undefined;
 }

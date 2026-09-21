@@ -46,7 +46,13 @@ export class GoogleFeeSheetsService implements OnModuleInit {
     );
   }
 
-  async getReference(audit?: AuditMetadata) {
+  async getReference() {
+    return this.sheets.getSpreadsheetReference(SPREADSHEET_PURPOSE);
+  }
+
+  async connect(audit?: AuditMetadata) {
+    const existing = await this.getReference();
+    if (existing) return existing;
     const spreadsheet = await this.sheets.getOrCreateSpreadsheet({
       title: "KAIST SOC 과비 납부",
       sheetTitle: SHEET_TITLE,

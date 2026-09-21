@@ -9,6 +9,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import {
   isSurveyDisplayBlock,
+  surveyStructureSnapshot, surveyStructuresEqual, type SurveyStructure, type SurveyHistoryHeader,
   type ArticleListItem,
   type SurveyDetailResponse,
   type CreateSurveyRequest,
@@ -923,6 +924,43 @@ export function SurveyEditorPage() {
   } | null>(null);
 
   const [sections, setSections] = useState<SurveyEditorSection[]>([]);
+  type HistoryEntry = { kind: "settings"; before: SurveySettingsFormValues; after: SurveySettingsFormValues }
+    | { kind: "structure"; before: SurveyStructure; after: SurveyStructure; header?: { before: SurveyHistoryHeader; after: SurveyHistoryHeader } };
+  const history = useRef<{ past: HistoryEntry[]; future: HistoryEntry[] }>({ past: [], future: [] });
+  const [, setHistoryVersion] = useState(0);
+  const historyApplying = useRef(false);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const historyLock = useRef(false);
+  const structureRequests = useRef(0);
+  const structureWaiters = useRef<Array<() => void>>([]);
+  const committedSections = useRef<SurveyStructure>([]);
+  const pickHistoryHeader = (values: SurveySettingsFormValues): SurveyHistoryHeader => ({ titleKo: values.titleKo, titleEn: values.titleEn ?? "", descriptionKo: values.descriptionKo ?? "", descriptionEn: values.descriptionEn ?? "" });
+  const historyChanged = () => setHistoryVersion(value => value + 1);
+  const recordHistory = (entry: HistoryEntry) => {
+    if (historyApplying.current) return;
+    history.current.past = [...history.current.past.slice(-49), structuredClone(entry)];
+    history.current.future = []; historyChanged();
+  };
+  const resetSections = (next: SurveyEditorSection[]) => {
+    committedSections.current = surveyStructureSnapshot(next);
+    history.current = { past: [], future: [] }; historyChanged(); setSections(next);
+  };
+  const commitSections = (next: SurveyEditorSection[], header?: { before: SurveyHistoryHeader; after: SurveyHistoryHeader }) => {
+    const snapshot = surveyStructureSnapshot(next);
+    if (!surveyStructuresEqual(committedSections.current, snapshot)) recordHistory({ kind: "structure", before: committedSections.current, after: snapshot, header });
+    committedSections.current = snapshot; setSections(next);
+  };
+  function withStructureEdit<Args extends unknown[], Result>(action: (...args: Args) => Promise<Result>) {
+    return async (...args: Args): Promise<Result> => {
+      structureRequests.current += 1;
+      try { return await action(...args); }
+      finally {
+        structureRequests.current -= 1;
+        if (!structureRequests.current) structureWaiters.current.splice(0).forEach(resolve => resolve());
+      }
+    };
+  }
+
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get("tab") === "responses" ? "responses" : searchParams.get("tab") === "delivery" ? "delivery" : "content";
   const [collapsedSectionIds, setCollapsedSectionIds] = useState<Set<string>>(
@@ -1049,7 +1087,7 @@ export function SurveyEditorPage() {
             connectedArticleId: detail.connectedPostId ?? "",
           });
           suppressAutoSave.current = false;
-          setSections(detail.sections);
+          resetSections(detail.sections);
           setActiveEditorSectionId(
             [...detail.sections].sort(compareSurveySectionOrder)[0]?.id ?? null,
           );
@@ -1172,7 +1210,7 @@ export function SurveyEditorPage() {
         setLoadedSurveyId(created.id);
         setSpreadsheetUrl(detail.spreadsheetUrl ?? null);
         setLoadedLifecycleStatus(detail.lifecycleStatus);
-        setSections(detail.sections.length ? detail.sections : [{ ...section, questions: [] }]);
+        resetSections(detail.sections.length ? detail.sections : [{ ...section, questions: [] }]);
         setActiveEditorSectionId(
           [...(detail.sections.length ? detail.sections : [{ ...section, questions: [] }])]
             .sort(compareSurveySectionOrder)[0]?.id ?? null,
@@ -1246,15 +1284,13 @@ export function SurveyEditorPage() {
 
   const suppressAutoSave = useRef(false);
   const flushAutoSave = useRef<() => Promise<unknown>>(async () => undefined);
-  const [settingsPast, setSettingsPast] = useState<SurveySettingsFormValues[]>([]);
-  const [settingsFuture, setSettingsFuture] = useState<SurveySettingsFormValues[]>([]);
-  const historyApplying = useRef(false);
+
   const autoSaveError = useRef<unknown>(null);
   const autoSaveQueue = useRef<Promise<unknown>>(Promise.resolve());
   useEffect(() => {
     if (!loadedSurveyId) return;
     suppressAutoSave.current = false;
-    setSettingsPast([]); setSettingsFuture([]);
+    history.current = { past: [], future: [] }; historyChanged();
     let previous = structuredClone(form.getValues());
     let timer: ReturnType<typeof setTimeout> | undefined;
     let pending: SurveySettingsFormValues | null = null;
@@ -1263,38 +1299,73 @@ export function SurveyEditorPage() {
       const values = pending; pending = null;
       autoSaveQueue.current = autoSaveQueue.current.catch(() => undefined).then(async () => {
         setSaveState("saving");
-        try { await client.updateSurvey(loadedSurveyId, buildSurveyBody(values, { allowPlaceholder: true })); autoSaveError.current = null; setSaveState("saved"); }
+        try { const { isPublished: _publication, ...body } = buildSurveyBody(values, { allowPlaceholder: true }); await client.updateSurvey(loadedSurveyId, body); autoSaveError.current = null; setSaveState("saved"); }
         catch (error) { autoSaveError.current = error; setSaveState("error"); setError(getErrorMessage(error, "자동 저장에 실패했습니다. 연결을 확인하고 다시 수정해 주세요.")); }
       });
     };
     flushAutoSave.current = async () => { clearTimeout(timer); flush(); await autoSaveQueue.current; if (autoSaveError.current) throw autoSaveError.current; };
     const subscription = form.watch(() => {
-      if (suppressAutoSave.current) return;
       const next = structuredClone(form.getValues());
+      if (suppressAutoSave.current) { previous = next; return; }
       if (JSON.stringify(previous) === JSON.stringify(next)) return;
-      if (!historyApplying.current) { const snapshot = previous; setSettingsPast(items => [...items.slice(-49), snapshot]); setSettingsFuture([]); }
+      if (!historyApplying.current) recordHistory({ kind: "settings", before: previous, after: next });
       previous = next; pending = next; setSaveState("saving");
       clearTimeout(timer); timer = setTimeout(flush, 800);
     });
     return () => { subscription.unsubscribe(); clearTimeout(timer); flush(); };
   }, [loadedSurveyId, form]);
-  const restoreSettings = (direction: "undo" | "redo") => {
-    const source = direction === "undo" ? settingsPast : settingsFuture;
-    const value = source.at(-1); if (!value) return;
-    const current = structuredClone(form.getValues());
-    if (direction === "undo") { setSettingsPast(source.slice(0, -1)); setSettingsFuture(items => [...items, current]); }
-    else { setSettingsFuture(source.slice(0, -1)); setSettingsPast(items => [...items, current]); }
-    historyApplying.current = true; form.reset(value); historyApplying.current = false;
+  const restoreHistory = async (direction: "undo" | "redo") => {
+    if (historyLock.current || saving || !loadedSurveyId) return;
+    historyLock.current = true; setHistoryBusy(true);
+    try {
+      if (structureRequests.current) await new Promise<void>(resolve => structureWaiters.current.push(resolve));
+      if (sectionCommitRef.current && !(await sectionCommitRef.current())) return;
+      if (!(await commitEditingQuestion())) return;
+      await flushAutoSave.current();
+      const source = direction === "undo" ? history.current.past : history.current.future;
+      const entry = source.at(-1); if (!entry) return;
+      historyApplying.current = true;
+      if (entry.kind === "structure") {
+        const restored = await client.restoreSurveyStructure(loadedSurveyId, {
+          expected: committedSections.current, sections: direction === "undo" ? entry.before : entry.after,
+          header: entry.header ? { expected: pickHistoryHeader(form.getValues()), value: direction === "undo" ? entry.header.before : entry.header.after } : undefined,
+        });
+        committedSections.current = surveyStructureSnapshot(restored); setSections(restored);
+        if (entry.header) {
+          suppressAutoSave.current = true;
+          form.reset({ ...form.getValues(), ...(direction === "undo" ? entry.header.before : entry.header.after) });
+          suppressAutoSave.current = false;
+        }
+        setEditingQuestion(null); setEditingSection(null);
+        setActiveEditorSectionId(restored[0]?.id ?? null); latestCreatedQuestionRef.current = null;
+      } else {
+        const values = direction === "undo" ? entry.before : entry.after;
+        const current = form.getValues();
+        const { isPublished: _publication, ...body } = buildSurveyBody(values, { allowPlaceholder: true });
+        await client.updateSurvey(loadedSurveyId, body);
+        suppressAutoSave.current = true;
+        form.reset({ ...values, isPublished: current.isPublished });
+        suppressAutoSave.current = false;
+      }
+      setEditingQuestion(null); setEditingSection(null);
+      source.pop(); (direction === "undo" ? history.current.future : history.current.past).push(entry); historyChanged();
+    } catch (err) {
+      const code = err instanceof ApiClientHttpError ? err.code : undefined;
+      toast({ type: "error", message: code === "survey_history_question_has_answers"
+        ? "이미 응답이 있는 질문은 실행 취소로 삭제할 수 없습니다."
+        : code === "survey_history_conflict" ? "다른 편집 내용이 반영되어 실행 취소할 수 없습니다. 새로고침 후 확인해 주세요."
+        : "변경을 되돌리지 못했습니다. 입력 내용과 연결을 확인한 뒤 다시 시도해 주세요." });
+    } finally { historyApplying.current = false; historyLock.current = false; setHistoryBusy(false); }
   };
   useEffect(() => {
     const handle = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
       const key = event.key.toLowerCase();
       if (key !== "z" && key !== "y") return;
-      if ((event.target as HTMLElement)?.closest("input,textarea,[contenteditable=true]")) return;
-      event.preventDefault(); restoreSettings(key === "y" || event.shiftKey ? "redo" : "undo");
+      if ((event.target as HTMLElement)?.closest("[role=dialog]")) return;
+      event.preventDefault(); event.stopImmediatePropagation(); void restoreHistory(key === "y" || event.shiftKey ? "redo" : "undo");
     };
-    window.addEventListener("keydown", handle); return () => window.removeEventListener("keydown", handle);
+    window.addEventListener("keydown", handle, true); return () => window.removeEventListener("keydown", handle, true);
   });
 
   const [responseCount, setResponseCount] = useState(0);
@@ -1390,7 +1461,7 @@ export function SurveyEditorPage() {
     setLoadedSurveyId(null);
     setSpreadsheetUrl(null);
     setLoadedLifecycleStatus(null);
-    setSections([]);
+    resetSections([]);
     setActiveEditorSectionId(null);
     setCollapsedSectionIds(new Set());
     setSectionMenuOpenId(null);
@@ -1403,7 +1474,7 @@ export function SurveyEditorPage() {
     navigate("/admin/surveys/new", { state: { skipDraftRestore: true } });
   };
 
-  const handleAddSection = async (afterSectionId: string) => {
+  const handleAddSection = withStructureEdit(async (afterSectionId: string) => {
     if (!loadedSurveyId || addingSection) return;
     const sourceIndex = orderedSections.findIndex((section) => section.id === afterSectionId);
     const source = sourceIndex >= 0 ? orderedSections[sourceIndex] : null;
@@ -1438,7 +1509,7 @@ export function SurveyEditorPage() {
       }
 
       const updated = await client.getSurveyDetail(loadedSurveyId);
-      setSections(updated.sections);
+      commitSections(updated.sections);
       setActiveEditorSectionId(created.id);
       setEditingQuestion(null);
       setEditingSection({sectionId:created.id,initial:{titleKo:created.titleKo ?? "",titleEn:created.titleEn ?? "",descriptionKo:created.descriptionKo ?? "",descriptionEn:created.descriptionEn ?? ""},initialFocus:null});
@@ -1454,16 +1525,16 @@ export function SurveyEditorPage() {
     } finally {
       setAddingSection(false);
     }
-  };
+  });
 
-  const handleDeleteSection = async (sectionId: string) => {
+  const handleDeleteSection = withStructureEdit(async (sectionId: string) => {
     if (!loadedSurveyId) return;
     const section = sections.find((item) => item.id === sectionId);
     const confirmed = await requestConfirm({
       confirmLabel: "삭제",
       title: "섹션 삭제",
       description: <>정말 <strong className="font-semibold text-slate-900">“{plainText(section?.titleKo) || "이 섹션"}”</strong> 섹션을 삭제하시겠습니까?</>,
-      warning: "(삭제된 섹션과 포함된 문항은 영구히 복구할 수 없습니다.)",
+      warning: "이 편집 화면에서 실행 취소로 복구할 수 있습니다.",
       tone: "danger",
     });
     if (!confirmed) return;
@@ -1472,7 +1543,7 @@ export function SurveyEditorPage() {
     try {
       await client.deleteSection(loadedSurveyId, sectionId);
       const updated = await client.getSurveyDetail(loadedSurveyId);
-      setSections(updated.sections);
+      commitSections(updated.sections);
       setCollapsedSectionIds((previous) => {
         const next = new Set(previous);
         next.delete(sectionId);
@@ -1483,9 +1554,9 @@ export function SurveyEditorPage() {
       console.error(err);
       setError(getSurveyErrorMessage(err, "섹션 삭제 실패"));
     }
-  };
+  });
 
-  const handleDuplicateSection = async (sectionId: string) => {
+  const handleDuplicateSection = withStructureEdit(async (sectionId: string) => {
     if (!loadedSurveyId || !(await commitEditingQuestion())) return;
     const sourceIndex = orderedSections.findIndex((section) => section.id === sectionId);
     const source = sourceIndex >= 0 ? orderedSections[sourceIndex] : null;
@@ -1539,7 +1610,7 @@ export function SurveyEditorPage() {
       }
 
       const updated = await client.getSurveyDetail(loadedSurveyId);
-      setSections(updated.sections);
+      commitSections(updated.sections);
       setCollapsedSectionIds((previous) => {
         const next = new Set(previous);
         next.delete(created.id);
@@ -1550,7 +1621,7 @@ export function SurveyEditorPage() {
       console.error(err);
       setError(getSurveyErrorMessage(err, "섹션 복제 실패"));
     }
-  };
+  });
 
   const isValidSectionOrder = (candidateSections: SurveyEditorSection[]) =>
     candidateSections.every((section, index) => {
@@ -1603,7 +1674,7 @@ export function SurveyEditorPage() {
     setError(null);
   };
 
-  const handleSaveSectionReorder = async () => {
+  const handleSaveSectionReorder = withStructureEdit(async () => {
     if (!loadedSurveyId || sectionReorderSaving) return;
     if (!(await commitEditingQuestion())) return;
     if (!isValidSectionOrder(sectionReorderDraft)) {
@@ -1633,7 +1704,7 @@ export function SurveyEditorPage() {
         items: nextSections.map((section) => ({ id: section.id, sortOrder: section.sortOrder })),
       });
       const updated = await client.getSurveyDetail(loadedSurveyId);
-      setSections(updated.sections);
+      commitSections(updated.sections);
       setSectionReorderOpen(false);
       setSectionReorderDraft([]);
     } catch (err: unknown) {
@@ -1643,7 +1714,7 @@ export function SurveyEditorPage() {
     } finally {
       setSectionReorderSaving(false);
     }
-  };
+  });
 
   const closeSectionReorder = () => {
     if (sectionReorderSaving) return;
@@ -1652,7 +1723,7 @@ export function SurveyEditorPage() {
     setError(null);
   };
 
-  const handleSectionNavigationChange = async (sectionId: string, target: string) => {
+  const handleSectionNavigationChange = withStructureEdit(async (sectionId: string, target: string) => {
     if (!loadedSurveyId) return;
     const previousSections = sections;
     setSections((current) => current.map((section) =>
@@ -1665,12 +1736,13 @@ export function SurveyEditorPage() {
       await client.updateSection(loadedSurveyId, sectionId, {
         nextSectionId: target || null,
       });
+      commitSections((await client.getSurveyDetail(loadedSurveyId)).sections);
     } catch (err: unknown) {
       console.error(err);
       setSections(previousSections);
       setError(getSurveyErrorMessage(err, "섹션 이동 설정 실패"));
     }
-  };
+  });
 
   const openEditSection = async (section: SurveySectionRecord, initialFocus: keyof SectionFormState | null = null) => {
     if (editingSection?.sectionId === section.id) return;
@@ -1696,7 +1768,7 @@ export function SurveyEditorPage() {
     });
   };
 
-  const handleDuplicateNewQuestion = async (
+  const handleDuplicateNewQuestion = withStructureEdit(async (
     sectionId: string,
     draft: QuestionFormState,
   ) => {
@@ -1727,7 +1799,7 @@ export function SurveyEditorPage() {
       });
       rememberCreatedQuestion(sectionId, duplicated.id);
       const updated = await client.getSurveyDetail(loadedSurveyId);
-      setSections(updated.sections);
+      commitSections(updated.sections);
       setEditingQuestion({
         sectionId,
         questionId: duplicated.id,
@@ -1738,10 +1810,11 @@ export function SurveyEditorPage() {
       console.error(err);
       toast({ type: "error", message: getSurveyErrorMessage(err, "문항 복제 실패") });
     }
-  };
+  });
 
-  const handleSaveSection = async (sectionForm: SectionFormState) => {
+  const handleSaveSection = withStructureEdit(async (sectionForm: SectionFormState) => {
     if (!loadedSurveyId || !editingSection) return;
+    const headerBefore = pickHistoryHeader(form.getValues());
     const sectionId = editingSection.sectionId;
     const isSurveyHeader = orderedSections[0]?.id === sectionId;
     const titleKo = plainText(sectionForm.titleKo).trim() ? sectionForm.titleKo : isSurveyHeader ? "제목 없는 설문지" : "";
@@ -1760,14 +1833,16 @@ export function SurveyEditorPage() {
         descriptionEn,
       });
       if (isSurveyHeader) {
+        historyApplying.current = true;
         const options = { shouldDirty: true, shouldValidate: true } as const;
         form.setValue("titleKo", titleKo, options);
         form.setValue("titleEn", titleEn ?? "", options);
         form.setValue("descriptionKo", descriptionKo ?? "", options);
         form.setValue("descriptionEn", descriptionEn ?? "", options);
+        historyApplying.current = false;
       }
       const updated = await client.getSurveyDetail(loadedSurveyId);
-      setSections(updated.sections);
+      commitSections(updated.sections, isSurveyHeader ? { before: headerBefore, after: pickHistoryHeader(form.getValues()) } : undefined);
       setSaveState("saved");
 
     } catch (err: unknown) {
@@ -1776,7 +1851,7 @@ export function SurveyEditorPage() {
       setError(getErrorMessage(err, "섹션 저장 실패"));
       throw err;
     }
-  };
+  });
 
   const commitEditingQuestion = async () => {
     if (!editingQuestion || !questionCommitRef.current) return true;
@@ -1839,7 +1914,7 @@ export function SurveyEditorPage() {
       : -1;
     return targetIndex >= 0 ? targetIndex + 1 : questions.length;
   };
-  const runFloatingAction = async (action: () => Promise<void>) => {
+  const runFloatingAction = withStructureEdit(async (action: () => Promise<void>) => {
     if (floatingActionRef.current) return;
     floatingActionRef.current = true; setFloatingBusy(true);
     try {
@@ -1848,7 +1923,7 @@ export function SurveyEditorPage() {
       await action();
     } catch (error) { toast({ type: "error", message: getSurveyErrorMessage(error, "편집 도구를 실행하지 못했습니다.") }); }
     finally { floatingActionRef.current = false; setFloatingBusy(false); }
-  };
+  });
   const handleFloatingAddQuestion = () => void runFloatingAction(async () => {
     const sectionId = getFloatingTargetSectionId();
     if (!sectionId || !loadedSurveyId) return;
@@ -1861,7 +1936,7 @@ export function SurveyEditorPage() {
     rememberCreatedQuestion(sectionId, created.id);
     questions.splice(insertAt, 0, created);
     const reordered = await client.reorderSurveyQuestions(loadedSurveyId, sectionId, {items:questions.map((item,sortOrder)=>({id:item.id,sortOrder}))});
-    setSections(updated.sections.map(item => item.id === sectionId ? {...item,questions:reordered} : item));
+    commitSections(updated.sections.map(item => item.id === sectionId ? {...item,questions:reordered} : item));
     setEditingSection(null); setActiveEditorSectionId(sectionId);
     setCollapsedSectionIds(previous=>{const next=new Set(previous);next.delete(sectionId);return next;});
     setEditingQuestion({sectionId,questionId:created.id,initial:questionToFormState(created)});
@@ -1896,7 +1971,7 @@ export function SurveyEditorPage() {
     const reordered = await client.reorderSurveyQuestions(loadedSurveyId, sectionId, {
       items: questions.map((item, sortOrder) => ({ id: item.id, sortOrder })),
     });
-    setSections(updated.sections.map((item) =>
+    commitSections(updated.sections.map((item) =>
       item.id === sectionId ? { ...item, questions: reordered } : item,
     ));
     setEditingSection(null);
@@ -1915,7 +1990,7 @@ export function SurveyEditorPage() {
       document.getElementById(`survey-question-${created.id}`)?.scrollIntoView({ block: "nearest" }),
     );
   });
-  const handleSaveQuestion = async (qForm: QuestionFormState) => {
+  const handleSaveQuestion = withStructureEdit(async (qForm: QuestionFormState) => {
     if (!loadedSurveyId || !editingQuestion) return;
     setError(null);
     setSaveState("saving");
@@ -1975,7 +2050,7 @@ export function SurveyEditorPage() {
         rememberCreatedQuestion(sectionId, createdQuestion.id);
       }
       const updated = await client.getSurveyDetail(loadedSurveyId);
-      setSections(updated.sections);
+      commitSections(updated.sections);
       setSaveState("saved");
       setEditingQuestion((current) => {
         if (current !== editingSnapshot) return current;
@@ -1992,9 +2067,9 @@ export function SurveyEditorPage() {
       toast({ type: "error", message: getSurveyErrorMessage(err, "문항 저장 실패") });
       throw err;
     }
-  };
+  });
 
-  const handleDuplicateQuestion = async (sectionId: string, question: SurveyQuestionRecord) => {
+  const handleDuplicateQuestion = withStructureEdit(async (sectionId: string, question: SurveyQuestionRecord) => {
     if (!loadedSurveyId) return;
     setError(null);
 
@@ -2039,7 +2114,7 @@ export function SurveyEditorPage() {
       const orderedQuestions = [...reordered].sort(
         (left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id),
       );
-      setSections(updated.sections.map((section) =>
+      commitSections(updated.sections.map((section) =>
         section.id === sectionId ? { ...section, questions: orderedQuestions } : section,
       ));
       setEditingQuestion({
@@ -2052,64 +2127,9 @@ export function SurveyEditorPage() {
       console.error(err);
       setError(getErrorMessage(err, "문항 복제 실패"));
     }
-  };
+  });
 
-  const handleUndoDeleteQuestion = async ({
-    sectionId,
-    question,
-  }: {
-    sectionId: string;
-    question: SurveyQuestionRecord;
-  }) => {
-    if (!loadedSurveyId) return;
-    setError(null);
-    try {
-      const restored = await client.createQuestion(loadedSurveyId, sectionId, {
-        titleKo: question.titleKo,
-        titleEn: question.titleEn ?? undefined,
-        descriptionKo: question.descriptionKo ?? "",
-        descriptionEn: question.descriptionEn ?? "",
-        questionType: question.questionType,
-        options: question.options?.map((option) => ({ ...option })) ?? undefined,
-        config: question.config
-          ? {
-              ...question.config,
-              rows: question.config.rows?.map((option) => ({ ...option })),
-              columns: question.config.columns?.map((option) => ({ ...option })),
-              goToSectionByValue: question.config.goToSectionByValue
-                ? { ...question.config.goToSectionByValue }
-                : undefined,
-            }
-          : undefined,
-        answerRegex: question.answerRegex ?? undefined,
-        isRequired: question.isRequired,
-        sortOrder: question.sortOrder,
-      });
-      rememberCreatedQuestion(sectionId, restored.id);
-      const updated = await client.getSurveyDetail(loadedSurveyId);
-      const restoredSection = updated.sections.find((section) => section.id === sectionId);
-      if (!restoredSection) throw new Error("복구할 섹션을 찾을 수 없습니다.");
-
-      const questions = [...restoredSection.questions].filter((item) => item.id !== restored.id);
-      const insertIndex = Math.min(Math.max(question.sortOrder, 0), questions.length);
-      questions.splice(insertIndex, 0, restored);
-      const reordered = await client.reorderSurveyQuestions(loadedSurveyId, sectionId, {
-        items: questions.map((item, sortOrder) => ({ id: item.id, sortOrder })),
-      });
-      const orderedQuestions = [...reordered].sort(
-        (left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id),
-      );
-      setSections(updated.sections.map((section) =>
-        section.id === sectionId ? { ...section, questions: orderedQuestions } : section,
-      ));
-      toast({ type: "success", message: "항목을 복구했습니다." });
-    } catch (err: unknown) {
-      console.error(err);
-      setError(getErrorMessage(err, "항목을 복구하지 못했습니다."));
-    }
-  };
-
-  const handleDeleteQuestion = async (sectionId: string, questionId: string) => {
+  const handleDeleteQuestion = withStructureEdit(async (sectionId: string, questionId: string) => {
     if (!loadedSurveyId) return;
     const question = sections
       .find((section) => section.id === sectionId)
@@ -2120,24 +2140,21 @@ export function SurveyEditorPage() {
     try {
       await client.deleteQuestion(loadedSurveyId, sectionId, questionId);
       const updated = await client.getSurveyDetail(loadedSurveyId);
-      setSections(updated.sections);
+      commitSections(updated.sections);
       setEditingQuestion((current) => current?.questionId === questionId ? null : current);
       toast({
         type: "success",
         message: "항목이 삭제되었습니다.",
         duration: 7000,
-        action: {
-          label: "실행취소",
-          onClick: () => void handleUndoDeleteQuestion({ sectionId, question }),
-        },
+
       });
     } catch (err: unknown) {
       console.error(err);
       setError(getErrorMessage(err, "문항 삭제 실패"));
     }
-  };
+  });
 
-  const persistQuestionOrder = async (
+  const persistQuestionOrder = withStructureEdit(async (
     sectionId: string,
     questions: SurveyQuestionRecord[],
     backup: SurveyQuestionRecord[],
@@ -2148,6 +2165,7 @@ export function SurveyEditorPage() {
       await client.reorderSurveyQuestions(loadedSurveyId, sectionId, {
         items: questions.map((question, sortOrder) => ({ id: question.id, sortOrder })),
       });
+      commitSections((await client.getSurveyDetail(loadedSurveyId)).sections);
     } catch (err: unknown) {
       console.error(err);
       setError(getErrorMessage(err, "순서 변경 실패"));
@@ -2157,7 +2175,7 @@ export function SurveyEditorPage() {
         ),
       );
     }
-  };
+  });
 
   const handleQuestionDragStart = ({ active }: DragStartEvent) => {
     setActiveQuestionId(String(active.id));
@@ -2266,7 +2284,7 @@ export function SurveyEditorPage() {
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
       <AdminPageShell>
         {ConfirmDialog}
-        <main className="admin-page__main admin-survey-editor mx-auto flex w-full max-w-[76rem] flex-col gap-5 px-4 pb-6 pt-0 sm:px-5 md:gap-6 md:px-8 md:pb-7 xl:px-10">
+        <main inert={historyBusy || undefined} className="admin-page__main admin-survey-editor mx-auto flex w-full max-w-[76rem] flex-col gap-5 px-4 pb-6 pt-0 sm:px-5 md:gap-6 md:px-8 md:pb-7 xl:px-10">
 
           <div data-survey-editor-header className="sticky top-0 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-1 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
           <AdminPageHeader
@@ -2276,8 +2294,8 @@ export function SurveyEditorPage() {
             title={plainText(form.watch("titleKo")) || (isEdit ? "설문조사 편집" : "새 설문조사")}
             actions={
               <div className="survey-editor-header-actions flex items-center gap-1">
-                <IconButton data-tooltip="실행 취소" aria-label="실행 취소" disabled={saving} onClick={event => { if (event.detail === 0) restoreSettings("undo"); }} onMouseDown={event => { event.preventDefault(); if (document.activeElement?.getAttribute("contenteditable") === "true") document.execCommand("undo"); else restoreSettings("undo"); }}><Undo2 className="size-4" /></IconButton>
-                <IconButton data-tooltip="다시 실행" aria-label="다시 실행" disabled={saving} onClick={event => { if (event.detail === 0) restoreSettings("redo"); }} onMouseDown={event => { event.preventDefault(); if (document.activeElement?.getAttribute("contenteditable") === "true") document.execCommand("redo"); else restoreSettings("redo"); }}><Redo2 className="size-4" /></IconButton>
+                <IconButton data-tooltip="실행 취소" aria-label="실행 취소" disabled={saving || historyBusy || (!history.current.past.length && !editingQuestion && !editingSection)} onMouseDown={event => event.preventDefault()} onClick={() => void restoreHistory("undo")}><Undo2 className="size-4" /></IconButton>
+                <IconButton data-tooltip="다시 실행" aria-label="다시 실행" disabled={saving || historyBusy || !history.current.future.length} onMouseDown={event => event.preventDefault()} onClick={() => void restoreHistory("redo")}><Redo2 className="size-4" /></IconButton>
                 {loadedSurveyId ? <>
                   <IconButton data-tooltip="응답자 링크 복사" aria-label="응답자 링크 복사" className="border-0 text-slate-600" onClick={() => void navigator.clipboard.writeText(`${window.location.origin}/survey/${loadedSurveyId}`).then(() => toast({ type: "success", message: "설문 링크를 복사했습니다." })).catch(() => toast({ type: "error", message: "링크를 복사하지 못했습니다." }))}><Link2 className="size-5" /></IconButton>
                   <IconButton data-tooltip="미리보기" aria-label="미리보기" className="border-0 text-slate-600" onClick={() => window.open(`/survey/${loadedSurveyId}?preview=1`, "_blank", "noopener,noreferrer")}><Eye className="size-5" /></IconButton>
@@ -2641,7 +2659,7 @@ export function SurveyEditorPage() {
                           type="button"
                           data-tooltip="질문 추가"
                           aria-label="질문 추가"
-                          disabled={!orderedSections.length || floatingBusy || addingSection}
+                          disabled={historyBusy || !orderedSections.length || floatingBusy || addingSection}
                           onClick={handleFloatingAddQuestion}
                         >
                           <Plus aria-hidden="true" className="size-5" />
@@ -2650,7 +2668,7 @@ export function SurveyEditorPage() {
                           type="button"
                           data-tooltip="새 섹션"
                           aria-label="새 섹션"
-                          disabled={!orderedSections.length || floatingBusy || addingSection}
+                          disabled={historyBusy || !orderedSections.length || floatingBusy || addingSection}
                           onClick={handleFloatingAddSection}
                         >
                           <PanelTop aria-hidden="true" className="size-5" />
@@ -2659,7 +2677,7 @@ export function SurveyEditorPage() {
                           type="button"
                           data-tooltip="제목 및 설명 추가"
                           aria-label="제목 및 설명 추가"
-                          disabled={!orderedSections.length || floatingBusy || addingSection}
+                          disabled={historyBusy || !orderedSections.length || floatingBusy || addingSection}
                           onClick={handleFloatingAddTitleAndDescription}
                         >
                           <AlignLeft aria-hidden="true" className="size-5" />

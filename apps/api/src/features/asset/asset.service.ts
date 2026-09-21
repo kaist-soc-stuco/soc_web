@@ -487,6 +487,10 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
    * attachments are uploaded before they are attached to any article, so the
    * ownership check is the authorization boundary for this workflow.
    */
+  async hasOwnedAsset(assetId: string, userId: string): Promise<boolean> {
+    return Boolean(await this.assetRepository.findOwnedAssetDetails(assetId, userId));
+  }
+
   async getOwnedFile(
     assetId: string,
     userId: string,

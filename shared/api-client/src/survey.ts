@@ -1,4 +1,5 @@
 import type {
+  RestoreSurveyStructureRequest,
   CreateQuestionRequest,
   CreateSectionRequest,
   CreateSurveyRequest,
@@ -108,6 +109,11 @@ export const createSurveyApi = ({
       { retryOnUnauthorized: true },
     );
   },
+
+  restoreSurveyStructure: (surveyId: string, body: RestoreSurveyStructureRequest) =>
+    requestJson<SurveyDetailResponse["sections"]>(`${surveyBaseUrl}/${surveyId}/structure`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }, { retryOnUnauthorized: true }),
 
   deleteSurvey: async (surveyId: string): Promise<void> => {
     await requestVoid(

@@ -58,6 +58,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
   sessionRef.current = session;
   const requestedSurveyIdRef = useRef<string | undefined>(undefined);
   const loadedSurveyIdRef = useRef<string | null>(null);
+  const loadedSessionRef = useRef<string | null>(null);
 
   const [survey, setSurvey] = useState<SurveyDetailResponse | null>(null);
   const previewRequested = new URLSearchParams(window.location.search).get("preview") === "1";
@@ -117,7 +118,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
       setQuestionErrors({});
     }
 
-    if (loadedSurveyIdRef.current === surveyId && loadAttempt === 0) return;
+    if (loadedSurveyIdRef.current === surveyId && loadedSessionRef.current === sessionIdentity && loadAttempt === 0) return;
 
     setLoadError(null);
     setSubmitted(false);
@@ -130,6 +131,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
         if (!active) return;
 
         loadedSurveyIdRef.current = surveyId;
+        loadedSessionRef.current = sessionIdentity;
         if (loadAttempt > 0) setLoadAttempt(0);
         setSurvey(data);
         setResponseSubmittedAt(data.currentResponse?.submittedAt ?? null);
@@ -158,7 +160,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
         // A background auth refresh can briefly return an empty session. Keep
         // the already loaded survey usable instead of replacing it with a
         // transient error screen; explicit retries still surface failures.
-        if (loadedSurveyIdRef.current === surveyId && loadAttempt === 0) return;
+        if (loadedSurveyIdRef.current === surveyId && loadedSessionRef.current === sessionIdentity && loadAttempt === 0) return;
         setLoadError(
           "survey_load_failed",
         );

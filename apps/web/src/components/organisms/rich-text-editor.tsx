@@ -109,26 +109,31 @@ function normalizeFontSize(value: unknown) {
 }
 
 const TEXT_COLOR_PALETTE = [
-  { value: "#111827", label: "검정" },
-  { value: "#b42318", label: "빨강" },
-  { value: "#c2410c", label: "주황" },
-  { value: "#a16207", label: "노랑" },
-  { value: "#15803d", label: "초록" },
-  { value: "#0e7490", label: "청록" },
-  { value: "#1d4ed8", label: "파랑" },
-  { value: "#7e22ce", label: "보라" },
+  { value: "#111827", labelKo: "검정", labelEn: "Black" },
+  { value: "#b42318", labelKo: "빨강", labelEn: "Red" },
+  { value: "#c2410c", labelKo: "주황", labelEn: "Orange" },
+  { value: "#a16207", labelKo: "노랑", labelEn: "Yellow" },
+  { value: "#15803d", labelKo: "초록", labelEn: "Green" },
+  { value: "#0e7490", labelKo: "청록", labelEn: "Teal" },
+  { value: "#1d4ed8", labelKo: "파랑", labelEn: "Blue" },
+  { value: "#7e22ce", labelKo: "보라", labelEn: "Purple" },
 ] as const;
 
 const BACKGROUND_COLOR_PALETTE = [
-  { value: "#f3f4f6", label: "회색" },
-  { value: "#fee2e2", label: "연한 빨강" },
-  { value: "#ffedd5", label: "연한 주황" },
-  { value: "#fef3c7", label: "연한 노랑" },
-  { value: "#dcfce7", label: "연한 초록" },
-  { value: "#cffafe", label: "연한 청록" },
-  { value: "#dbeafe", label: "연한 파랑" },
-  { value: "#f3e8ff", label: "연한 보라" },
+  { value: "#f3f4f6", labelKo: "회색", labelEn: "Gray" },
+  { value: "#fee2e2", labelKo: "연한 빨강", labelEn: "Light red" },
+  { value: "#ffedd5", labelKo: "연한 주황", labelEn: "Light orange" },
+  { value: "#fef3c7", labelKo: "연한 노랑", labelEn: "Light yellow" },
+  { value: "#dcfce7", labelKo: "연한 초록", labelEn: "Light green" },
+  { value: "#cffafe", labelKo: "연한 청록", labelEn: "Light teal" },
+  { value: "#dbeafe", labelKo: "연한 파랑", labelEn: "Light blue" },
+  { value: "#f3e8ff", labelKo: "연한 보라", labelEn: "Light purple" },
 ] as const;
+
+function isDefaultTextColor(value: string) {
+  const normalized = value.toLowerCase().replace(/\s+/g, "");
+  return normalized === "black" || normalized === "#000" || normalized === "#000000" || normalized === "#111827" || normalized === "rgb(0,0,0)" || normalized === "rgba(0,0,0,1)" || normalized === "rgb(17,24,39)" || normalized === "rgba(17,24,39,1)";
+}
 
 function ToolbarDivider() {
   return <span className="mx-1 h-5 w-px bg-slate-200" aria-hidden="true" />;
@@ -367,6 +372,8 @@ function useTiptapEditor({
   placeholder: string;
   spellCheck: boolean;
 }) {
+  const latestEditorContentRef = useRef(content);
+  const localChangePendingRef = useRef(false);
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -397,7 +404,11 @@ function useTiptapEditor({
     editable: !disabled,
     onUpdate: ({ editor: updatedEditor }) => {
       const html = getSafeEditorHTML(updatedEditor);
-      if (html !== null) onChange(html);
+      if (html !== null) {
+        latestEditorContentRef.current = html;
+        localChangePendingRef.current = true;
+        onChange(html);
+      }
     },
     editorProps: {
       attributes: {
@@ -430,8 +441,37 @@ function useTiptapEditor({
 
   useEffect(() => {
     if (!editor || editor.isDestroyed || !editor.schema) return;
-    if (!editor.isFocused) editor.commands.setContent(content, { emitUpdate: false });
+    if (content === latestEditorContentRef.current) {
+      localChangePendingRef.current = false;
+      return;
+    }
+    // React can render once with the previous prop while a keystroke update is
+    // still being flushed. Do not replace the live document with that stale
+    // value, especially when the browser tab becomes hidden and the editor
+    // loses focus.
+    if (editor.isFocused || localChangePendingRef.current) return;
+    editor.commands.setContent(content, { emitUpdate: false });
+    latestEditorContentRef.current = content;
+    localChangePendingRef.current = false;
   }, [content, editor]);
+
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    const syncBeforeLeaving = () => {
+      if (document.visibilityState !== "hidden") return;
+      const html = getSafeEditorHTML(editor);
+      if (html === null || html === latestEditorContentRef.current) return;
+      latestEditorContentRef.current = html;
+      localChangePendingRef.current = true;
+      onChange(html);
+    };
+    document.addEventListener("visibilitychange", syncBeforeLeaving);
+    window.addEventListener("pagehide", syncBeforeLeaving);
+    return () => {
+      document.removeEventListener("visibilitychange", syncBeforeLeaving);
+      window.removeEventListener("pagehide", syncBeforeLeaving);
+    };
+  }, [editor, onChange]);
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
@@ -485,14 +525,16 @@ function ColorPopover({
   colors,
   clearLabel,
   currentValue,
+  lang,
   label,
   onApply,
   onClear,
   onClose,
 }: {
-  colors: ReadonlyArray<{ value: string; label: string }>;
+  colors: ReadonlyArray<{ value: string; labelKo: string; labelEn: string }>;
   clearLabel: string;
   currentValue: string;
+  lang: string;
   label: string;
   onApply: (value: string) => void;
   onClear: () => void;
@@ -530,6 +572,7 @@ function ColorPopover({
           variant="ghost"
           size="sm"
           aria-label={clearLabel}
+          onMouseDown={(event) => event.preventDefault()}
           onClick={() => {
             onClear();
             onClose();
@@ -541,14 +584,15 @@ function ColorPopover({
           {clearLabel}
         </Button>
       </div>
-      <div className="grid grid-cols-8 gap-2" role="listbox" aria-label={`${label} 팔레트`}>
+      <div className="grid grid-cols-8 gap-2" role="listbox" aria-label={`${label} ${lang === "ko" ? "팔레트" : "palette"}`}>
         {colors.map((color) => (
           <button
             key={color.value}
             type="button"
             role="option"
-            aria-label={color.label}
+            aria-label={lang === "ko" ? color.labelKo : color.labelEn}
             aria-selected={currentValue.toLowerCase() === color.value}
+            onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               onApply(color.value);
               onClose();
@@ -690,6 +734,7 @@ function RichTextToolbar({
   const [linkDialog, setLinkDialog] = useState<{text:string;url:string} | null>(null);
   const [linkPreview, setLinkPreview] = useState<EditorLinkPreview | null>(null);
   const linkSelection = useRef({from:0,to:0});
+  const colorSelection = useRef<{ from: number; to: number } | null>(null);
   useEffect(() => {
     const capture = () => {
       if (editor.isActive("link")) editor.commands.extendMarkRange("link");
@@ -722,6 +767,7 @@ function RichTextToolbar({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const currentTextColor = editor.getAttributes("textStyle").color ?? "";
   const currentBackgroundColor = editor.getAttributes("textStyle").backgroundColor ?? "";
+  const effectiveTextColor = isDefaultTextColor(currentTextColor) ? "" : currentTextColor;
   const sizeValue = normalizeFontSize(editor.getAttributes("textStyle").fontSize);
   const editorIsFocused = editor.isFocused;
   const variableMenuOptions = variableOptions?.length
@@ -732,6 +778,22 @@ function RichTextToolbar({
 
   const setLink = () => {
     promptForLink(editor, lang);
+  };
+
+  const rememberColorSelection = () => {
+    if (editor.isDestroyed) return;
+    colorSelection.current = {
+      from: editor.state.selection.from,
+      to: editor.state.selection.to,
+    };
+  };
+
+  const runWithColorSelection = (run: (chain: ReturnType<Editor["chain"]>) => void) => {
+    const chain = editor.chain();
+    if (colorSelection.current) chain.setTextSelection(colorSelection.current);
+    chain.focus();
+    run(chain);
+    chain.run();
   };
 
   const handleImageSelection = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -826,10 +888,11 @@ function RichTextToolbar({
           <div className="relative">
             <ToolbarButton
               label={lang === "ko" ? "글자 색상" : "Text color"}
-              active={editorIsFocused && (Boolean(currentTextColor) || colorPopover === "text")}
+              active={editorIsFocused && (Boolean(effectiveTextColor) || colorPopover === "text")}
               expanded={colorPopover === "text"}
               hasPopup="dialog"
               onClick={() => {
+                rememberColorSelection();
                 setColorPopover((open) => (open === "text" ? null : "text"));
               }}
             >
@@ -839,10 +902,14 @@ function RichTextToolbar({
               <ColorPopover
                 colors={TEXT_COLOR_PALETTE}
                 clearLabel={lang === "ko" ? "색상 제거" : "Clear color"}
-                currentValue={currentTextColor}
+                currentValue={effectiveTextColor}
+                lang={lang}
                 label={lang === "ko" ? "글자 색상" : "Text color"}
-                onApply={(value) => editor.chain().focus().setColor(value).run()}
-                onClear={() => editor.chain().focus().unsetColor().run()}
+                onApply={(value) => runWithColorSelection((chain) => {
+                  if (isDefaultTextColor(value)) chain.unsetColor();
+                  else chain.setColor(value);
+                })}
+                onClear={() => runWithColorSelection((chain) => chain.unsetColor())}
                 onClose={() => setColorPopover(null)}
               />
             ) : null}
@@ -854,6 +921,7 @@ function RichTextToolbar({
               expanded={colorPopover === "background"}
               hasPopup="dialog"
               onClick={() => {
+                rememberColorSelection();
                 setColorPopover((open) => (open === "background" ? null : "background"));
               }}
             >
@@ -864,9 +932,10 @@ function RichTextToolbar({
                 colors={BACKGROUND_COLOR_PALETTE}
                 clearLabel={lang === "ko" ? "색상 제거" : "Clear color"}
                 currentValue={currentBackgroundColor}
+                lang={lang}
                 label={lang === "ko" ? "배경 색상" : "Background color"}
-                onApply={(value) => editor.chain().focus().setBackgroundColor(value).run()}
-                onClear={() => editor.chain().focus().unsetBackgroundColor().run()}
+                onApply={(value) => runWithColorSelection((chain) => chain.setBackgroundColor(value))}
+                onClear={() => runWithColorSelection((chain) => chain.unsetBackgroundColor())}
                 onClose={() => setColorPopover(null)}
               />
             ) : null}

@@ -17,6 +17,8 @@ import { SurveySectionsService } from "./survey-sections.service";
 import { SurveyQuestionsService } from "./survey-questions.service";
 import { SurveyResponsesService } from "./survey-responses.service";
 import { SurveyMutationPolicy } from "./survey-mutation-policy";
+import { SurveyHistoryService } from "./survey-history.service";
+import { SurveyHistoryController } from "./survey-history.controller";
 import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
 
 import { SurveysController } from "./surveys.controller";
@@ -27,12 +29,14 @@ import { SurveyResponsesController } from "./survey-responses.controller";
 @Module({
   imports: [EmailDeliveryModule, PostgresModule, AuthModule, UsersModule, AssetModule, AuditLogModule],
   controllers: [
+    SurveyHistoryController,
     SurveysController,
     SurveySectionsController,
     SurveyQuestionsController,
     SurveyResponsesController,
   ],
   providers: [
+    SurveyHistoryService,
     // Survey repositories
     SurveysRepository,
     SurveySectionsRepository,

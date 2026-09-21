@@ -8,7 +8,6 @@ import { ArrowUpRight } from "lucide-react";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { formatNumericDateRange } from "@/lib/date-display";
 import { Button } from "@/components/ui/button";
-import { stripRichText } from "@/components/ui/rich-text-content";
 import { useLanguage } from "@/hooks/use-language";
 
 const HOME_NOTICE_LIMIT = 6;
@@ -56,27 +55,22 @@ export function NoticeBoard() {
         <ul className="home-editorial-list">
           {notices.map((notice) => {
             const title = lang === "ko" ? notice.titleKo : notice.titleEn || notice.titleKo;
-            const content = lang === "ko" ? notice.snippetKo : notice.snippetEn || notice.snippetKo;
-            const plainText = stripRichText((content ?? "").replace(/<\/(?:p|div|li|h[1-6])>|<br\s*\/?>/gi, "$& "));
-            const snippet = plainText.length > 180 ? `${plainText.slice(0, 180).trimEnd()}…` : plainText;
             const isNew = isoToMs(notice.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
             return (
               <li key={notice.articleId}>
                 <Link to={`/board/notice/${notice.articleId}`} className="home-notice-entry">
-                  <div className="flex min-w-0 items-start gap-2">
-                    <h3 className="line-clamp-2">{title}</h3>
-                    {isNew ? (
-                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-rose-500">
-                        <span className="sr-only">{lang === "ko" ? "새 글" : "New post"}</span>
-                      </span>
-                    ) : null}
-                  </div>
-                  {snippet ? <p className="home-notice-excerpt line-clamp-2">{snippet}</p> : null}
-                  <div className="home-notice-entry-meta">
-                    <time dateTime={notice.postedAt}>{formatNumericDateRange(notice.postedAt, notice.postedAt)}</time>
-                    {notice.commentCount > 0 ? (
-                      <span>{lang === "ko" ? `댓글 ${notice.commentCount}` : `${notice.commentCount} comments`}</span>
-                    ) : null}
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <h3 className="truncate">{title}</h3>
+                      {isNew ? (
+                        <span className="size-1.5 shrink-0 rounded-full bg-rose-500">
+                          <span className="sr-only">{lang === "ko" ? "새 글" : "New post"}</span>
+                        </span>
+                      ) : null}
+                    </div>
+                    <time className="home-notice-entry-time shrink-0" dateTime={notice.postedAt}>
+                      {formatNumericDateRange(notice.postedAt, notice.postedAt)}
+                    </time>
                   </div>
                 </Link>
               </li>

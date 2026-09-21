@@ -75,6 +75,11 @@ export class GoogleSheetsClient {
 
   constructor(private readonly config: ConfigService) {}
 
+  async getSpreadsheetReference(purpose: string, key?: string): Promise<GoogleSpreadsheetReference | null> {
+    const spreadsheetId = await this.findSpreadsheetId(purpose, key);
+    return spreadsheetId ? { spreadsheetId, spreadsheetUrl: DEFAULT_SPREADSHEET_URL(spreadsheetId) } : null;
+  }
+
   async getOrCreateSpreadsheet(options: {
     configuredSpreadsheetId?: string | null;
     duplicateTitle?: string;

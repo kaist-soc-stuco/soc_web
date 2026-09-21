@@ -165,13 +165,13 @@ export function ArticleTemplateControl({
         }}
       >
         <FileText aria-hidden="true" />
-        템플릿
+        {lang === "ko" ? "템플릿" : "Templates"}
       </Button>
 
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="템플릿"
+        title={lang === "ko" ? "템플릿" : "Templates"}
         headerActions={
           <Button
             type="button"
@@ -181,7 +181,7 @@ export function ArticleTemplateControl({
             onClick={saveTemplate}
           >
             <Save aria-hidden="true" />
-            저장
+            {lang === "ko" ? "저장" : "Save"}
           </Button>
         }
         className="max-w-2xl"
@@ -196,7 +196,7 @@ export function ArticleTemplateControl({
           <section>
             {currentTemplates.length === 0 ? (
               <p className="py-6 text-center text-sm font-normal text-slate-500">
-                저장된 양식이 없습니다.
+                {lang === "ko" ? "저장된 양식이 없습니다." : "No saved templates."}
               </p>
             ) : (
               <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
@@ -227,8 +227,8 @@ export function ArticleTemplateControl({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      aria-label={`${template.name} 삭제`}
-                      data-tooltip="템플릿 삭제"
+                      aria-label={`${template.name} ${lang === "ko" ? "삭제" : "Delete"}`}
+                      data-tooltip={lang === "ko" ? "템플릿 삭제" : "Delete template"}
                       onClick={() => deleteTemplate(template.id)}
                       className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                     >

@@ -339,13 +339,14 @@ export class UsersController {
   @Get("fee-status/spreadsheet")
   @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
-  async getStudentFeeSpreadsheet(
-    @Req() req: AuthenticatedRequest,
-  ): Promise<{
-    spreadsheetId: string;
-    spreadsheetUrl: string;
-  }> {
-    return this.googleFeeSheetsService.getReference(auditMetadataFromRequest(req));
+  async getStudentFeeSpreadsheet() {
+    return this.googleFeeSheetsService.getReference();
+  }
+
+  @Post("fee-status/spreadsheet/connect")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  async connectStudentFeeSpreadsheet(@Req() req: AuthenticatedRequest) {
+    return this.googleFeeSheetsService.connect(auditMetadataFromRequest(req));
   }
 
   @Get("fee-status/export.xlsx")
@@ -457,8 +458,8 @@ export class UsersController {
   @Get("fee-status/detail/:userId")
   @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
-  async getStudentFeeDetail(@Param("userId") userId: string) {
-    const detail = await this.usersService.getStudentFeeDetail(userId);
+  async getStudentFeeDetail(@Param("userId") userId: string, @Query("referenceSemester") referenceSemester?: string) {
+    const detail = await this.usersService.getStudentFeeDetail(userId, referenceSemester);
     if (!detail) return { user: null, status: null, history: [] };
     return detail;
   }

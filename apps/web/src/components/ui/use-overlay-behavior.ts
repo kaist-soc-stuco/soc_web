@@ -11,6 +11,13 @@ const FOCUSABLE_SELECTOR = [
 ].join(",");
 
 const overlayStack: HTMLElement[] = [];
+const overlayBranches = new Map<HTMLElement, { owner: HTMLElement; close: () => void }>();
+
+/** Portalled menus belong to their trigger's overlay, not the page behind it. */
+export function registerOverlayBranch(root: HTMLElement, owner: HTMLElement, close: () => void) {
+  overlayBranches.set(root, { owner, close });
+  return () => { overlayBranches.delete(root); };
+}
 let bodyScrollLockCount = 0;
 let previousBodyOverflow: string | null = null;
 let previousDocumentOverflow: string | null = null;
@@ -98,12 +105,15 @@ export function useOverlayBehavior({
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
+        const branch = Array.from(overlayBranches.values()).reverse().find(item => surface.contains(item.owner));
+        if (branch) { branch.close(); return; }
         onCloseRef.current();
       }
     };
 
     const handleFocusIn = (event: FocusEvent) => {
       if (overlayStack.at(-1) !== surface || surface.contains(event.target as Node)) return;
+      if (Array.from(overlayBranches).some(([root, branch]) => surface.contains(branch.owner) && root.contains(event.target as Node))) return;
       focusSurface(surface);
     };
 
@@ -139,6 +149,7 @@ export function useOverlayBehavior({
     }
 
     const activeElement = document.activeElement;
+    if (Array.from(overlayBranches).some(([root, branch]) => surface.contains(branch.owner) && root.contains(activeElement))) return;
     const first = focusable[0];
     const last = focusable.at(-1);
     if (event.shiftKey && (activeElement === first || !surface.contains(activeElement))) {

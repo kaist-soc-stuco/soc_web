@@ -4,6 +4,7 @@ import type { ComponentType, CSSProperties } from "react";
 import { ChevronDown, Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { registerOverlayBranch } from "@/components/ui/use-overlay-behavior";
 import { useLanguage } from "@/hooks/use-language";
 
 export interface DropdownOption {
@@ -82,6 +83,22 @@ export function SelectDropdown({
     if (open === false || open === true) setInternalIsOpen(open);
     onOpenChange?.(open);
   };
+  const closeAndFocus = () => {
+    setInternalIsOpen(false);
+    onOpenChangeRef.current?.(false);
+    containerRef.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+  };
+
+  useLayoutEffect(() => {
+    if (!isOpen || !menuMounted || !menuRef.current || !containerRef.current) return;
+    const menu = menuRef.current;
+    const unregister = registerOverlayBranch(menu, containerRef.current, closeAndFocus);
+    if (menuStyle.visibility !== "visible") return unregister;
+    const frame = requestAnimationFrame(() => {
+      (menu.querySelector<HTMLButtonElement>('[aria-selected="true"]') ?? menu.querySelector<HTMLButtonElement>('[role="option"]'))?.focus({ preventScroll: true });
+    });
+    return () => { cancelAnimationFrame(frame); unregister(); };
+  }, [isOpen, menuMounted, menuStyle.visibility]);
 
   useEffect(() => {
     onOpenChangeRef.current = onOpenChange;
@@ -254,7 +271,7 @@ export function SelectDropdown({
 
   const selectedOption = options.find((o) => o.value === value);
   const SelectedIcon = selectedOption?.icon;
-  const menuId = id ? `${id}-menu` : undefined;
+  const menuId = `${id ?? instanceId}-menu`;
 
   return (
     <div ref={containerRef} className={`relative ${className || ""}`}>
@@ -267,8 +284,8 @@ export function SelectDropdown({
         onClick={() => !disabled && setOpen(!isOpen)}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
-            setOpen(false);
-          } else if (event.key === "ArrowDown") {
+            if (isOpen) { event.preventDefault(); event.stopPropagation(); closeAndFocus(); }
+          } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
             setOpen(true);
           }
@@ -305,6 +322,20 @@ export function SelectDropdown({
               ref={menuRef}
               id={menuId}
               role="listbox"
+              aria-label={ariaLabel ?? placeholder ?? (lang === "ko" ? "선택 항목" : "Options")}
+              aria-hidden={!isOpen}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeAndFocus(); return; }
+                if (event.key === "Tab") { closeAndFocus(); return; }
+                const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []);
+                const index = items.indexOf(document.activeElement as HTMLButtonElement);
+                let next = -1;
+                if (event.key === "ArrowDown") next = (index + 1) % items.length;
+                if (event.key === "ArrowUp") next = (index - 1 + items.length) % items.length;
+                if (event.key === "Home") next = 0;
+                if (event.key === "End") next = items.length - 1;
+                if (next >= 0) { event.preventDefault(); event.stopPropagation(); items[next]?.focus(); }
+              }}
               style={{
                 ...menuStyle,
                 opacity: isOpen ? 1 : 0,
@@ -333,9 +364,10 @@ export function SelectDropdown({
                         size="sm"
                         role="option"
                         aria-selected={option.value === value}
+                        tabIndex={-1}
                         onClick={() => {
                           onChange(option.value);
-                          setOpen(false);
+                          closeAndFocus();
                         }}
                         className={`interaction-menu-item h-[var(--ui-menu-row-height)] w-full min-w-0 justify-between overflow-hidden rounded-md px-2.5 py-0 text-left text-[length:var(--ui-text-body-size)] ${
                           option.value === value

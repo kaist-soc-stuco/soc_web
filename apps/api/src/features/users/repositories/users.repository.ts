@@ -910,7 +910,18 @@ export class UsersRepository {
     };
   }
 
-  async getStudentFeeDetail(userId: string): Promise<StudentFeeDetailResponse | null> {
+  private feeStatusAt(
+    legacy: { status: string | null; paidAt: Date | null; paidAmount: number | null; coverageSemesters: number | null },
+    payments: { effectiveStartSemester: string; coverageSemesters: number }[],
+    reference: string,
+  ): FeeStatus {
+    const covered = payments.some(payment => this.isSemesterCovered(payment.effectiveStartSemester, payment.coverageSemesters, reference));
+    const legacyActive = legacy.paidAt === null || this.isSemesterCovered(this.semesterFromDate(legacy.paidAt), legacy.coverageSemesters ?? 6, reference);
+    if (covered || (legacy.status === "PAID" && legacyActive)) return "PAID";
+    return legacy.status === "PARTIAL" && (legacy.paidAmount ?? 0) > 0 && legacyActive ? "PARTIAL" : "UNPAID";
+  }
+
+  async getStudentFeeDetail(userId: string, referenceSemester?: string): Promise<StudentFeeDetailResponse | null> {
     const [user, statusRecord, history] = await Promise.all([
       this.db
         .select({
@@ -944,7 +955,8 @@ export class UsersRepository {
         email: user[0].email,
         primaryMajor: user[0].primaryMajor,
       },
-      status,
+      status: { ...status, status: this.feeStatusAt({ ...status, paidAt: status.paidAt ? isoToDate(status.paidAt) : null }, history,
+        referenceSemester && /^\d{4}-[12]$/.test(referenceSemester) ? referenceSemester : this.currentReferenceSemester()) },
       history: history.map((row) => this.mapFeePaymentRow(row)),
     };
   }
@@ -1404,32 +1416,15 @@ export class UsersRepository {
 
     const mapped = rows.map((row) => {
       const payments = paymentsByUser.get(row.userId) ?? [];
-      const coveredPayment = payments.find((payment) =>
-        this.isSemesterCovered(
-          payment.effectiveStartSemester,
-          payment.coverageSemesters,
-          normalizedReference,
-        ),
-      );
+      const resolvedStatus = this.feeStatusAt(row, payments, normalizedReference);
+      const eligible = resolvedStatus === "PAID";
       const legacyStartSemester = this.semesterFromDate(row.paidAt);
-      const legacyCovered =
-        row.status === "PAID" &&
-        (row.paidAt === null ||
-          this.isSemesterCovered(
-            legacyStartSemester,
-            row.coverageSemesters ?? 6,
-            normalizedReference,
-          ));
-      const eligible = Boolean(coveredPayment || legacyCovered);
       const latestPayment = payments[0];
       const totalPaidAmount = payments.length
         ? payments.reduce((sum, payment) => sum + payment.amount, 0)
         : row.paidAmount ?? 0;
-      const legacyPartial = row.status === "PARTIAL" && (row.paidAmount ?? 0) > 0 &&
-        (row.paidAt === null || this.isSemesterCovered(legacyStartSemester, row.coverageSemesters ?? 6, normalizedReference));
-
       return {
-        status: eligible ? ("PAID" as const) : legacyPartial ? ("PARTIAL" as const) : ("UNPAID" as const),
+        status: resolvedStatus,
         eligible,
         userId: row.userId,
         nameKo: row.nameKo,

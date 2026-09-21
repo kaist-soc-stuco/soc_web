@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useLayoutEffect } from "react";
 import type { StudentFeeStatsResponse } from "@soc/contracts";
 import { AdminCard } from "@/components/ui/admin-page";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
+import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { buildFeeTrend } from "./fee-trend";
 
@@ -13,21 +14,35 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
   return <div className="min-w-0 px-5 py-4"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-2xl font-medium tabular-nums text-slate-900">{value}</p>{detail ? <p className="mt-1 text-xs text-slate-500">{detail}</p> : null}</div>;
 }
 
-export function FeeStatisticsPanel({ semester, semesterOptions, loading, onSemesterChange, stats, range, onRangeChange }: {
+export function FeeStatisticsPanel({ semester, semesterOptions, loading, onSemesterChange, stats, range, onRangeChange, error, onRetry }: {
+  error?: string | null; onRetry?: () => void;
   semester: string; semesterOptions: readonly FeeSemesterOption[]; loading: boolean;
   onSemesterChange: (value: string) => void; stats: StudentFeeStatsResponse | null;
   range: DateRange; onRangeChange: (range: DateRange) => void;
 }) {
   const [mode, setMode] = useState<"period" | "cumulative">("period");
+  const chartRef = useRef<SVGSVGElement>(null);
+  const [chartWidth, setChartWidth] = useState(920);
+  useLayoutEffect(() => {
+    const element = chartRef.current;
+    if (!element) return;
+    const measure = () => setChartWidth(Math.max(240, element.getBoundingClientRect().width));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [Boolean(stats?.totals.paymentCount)]);
+  const plotWidth = chartWidth - 110;
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
   const chart = useMemo(() => buildFeeTrend(stats?.trend ?? [], range.from, range.to || today), [stats, range.from, range.to, today]);
   const totals = stats?.totals;
   const receiptStudents = stats?.trend.at(-1)?.cumulativeStudents ?? 0;
   const max = Math.max(1, ...chart.points.map(point => mode === "period" ? point.amount : point.cumulative));
   const ceiling = Math.ceil(max / Math.pow(10, Math.floor(Math.log10(max)))) * Math.pow(10, Math.floor(Math.log10(max)));
-  const x = (index: number) => 92 + (index + .5) * 790 / Math.max(chart.points.length, 1);
+  const x = (index: number) => 92 + (index + .5) * plotWidth / Math.max(chart.points.length, 1);
   const y = (value: number) => 182 - value / ceiling * 154;
   return <div className="space-y-5" aria-busy={loading}>
+    {error ? <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600"><span>{error}</span><Button variant="outline" onClick={onRetry}>다시 시도</Button></div> : null}
     <AdminCard className="overflow-visible">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div><h2 className="text-base font-medium text-slate-900">학기별 납부 현황</h2><p className="mt-1 text-xs text-slate-500">선택 학기에 납부 혜택이 적용되는 회원 기준입니다.</p></div>
@@ -53,12 +68,12 @@ export function FeeStatisticsPanel({ semester, semesterOptions, loading, onSemes
       <div className="border-t border-slate-100 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-sm font-medium">수납 추이 <span className="ml-1 text-xs font-normal text-slate-500">{chart.unit} 단위</span></h3><SegmentedControl ariaLabel="수납 추이 표시" value={mode} onChange={setMode} options={[{value:"period",label:"기간별 금액"},{value:"cumulative",label:"누적 금액"}]} /></div>
         {!stats ? <div className="h-52" /> : !totals?.paymentCount ? <p className="flex h-52 items-center justify-center text-sm text-slate-500">선택한 기간에 수납 내역이 없습니다.</p> : <>
-          <svg viewBox="0 0 920 222" className={`mt-3 h-56 w-full ${loading ? "opacity-60" : ""}`} role="img" aria-label={`${mode === "period" ? "기간별" : "누적"} 수납 금액 추이`}>
-            {[0,.5,1].map(ratio => <g key={ratio}><line x1="92" x2="895" y1={y(ceiling*ratio)} y2={y(ceiling*ratio)} stroke="#e2e8f0" /><text x="82" y={y(ceiling*ratio)+4} textAnchor="end" fontSize="12" fill="#64748b">{money(ceiling*ratio)}</text></g>)}
+          <svg ref={chartRef} viewBox={`0 0 ${chartWidth} 222`} className={`mt-3 h-56 w-full ${loading ? "opacity-60" : ""}`} role="img" aria-label={`${mode === "period" ? "기간별" : "누적"} 수납 금액 추이`}>
+            {[0,.5,1].map(ratio => <g key={ratio}><line x1="92" x2={chartWidth-15} y1={y(ceiling*ratio)} y2={y(ceiling*ratio)} stroke="#e2e8f0" /><text x="82" y={y(ceiling*ratio)+4} textAnchor="end" fontSize="12" fill="#64748b">{money(ceiling*ratio)}</text></g>)}
             {mode === "cumulative" ? <polyline fill="none" stroke="#047857" strokeWidth="2" points={chart.points.map((point,i)=>`${x(i)},${y(point.cumulative)}`).join(" ")} /> : null}
             {chart.points.map((point,i) => <g key={point.start}>
-              {mode === "period" ? <rect x={x(i)-Math.min(14,300/chart.points.length)} y={y(point.amount)} width={Math.min(28,600/chart.points.length)} height={182-y(point.amount)} rx="2" fill="#76b49c"><title>{point.label}: {money(point.amount)} · {point.count}건</title></rect> : <circle cx={x(i)} cy={y(point.cumulative)} r="2.5" fill="#047857"><title>{point.label}: 누적 {money(point.cumulative)}</title></circle>}
-              {i % Math.max(1,Math.ceil(chart.points.length/6)) === 0 || i === chart.points.length-1 ? <text x={x(i)} y="207" textAnchor="middle" fontSize="11" fill="#64748b">{point.label}</text> : null}
+              {mode === "period" ? <rect x={x(i)-Math.min(14,plotWidth*.35/chart.points.length)} y={y(point.amount)} width={Math.min(28,plotWidth*.7/chart.points.length)} height={182-y(point.amount)} rx="2" fill="#76b49c"><title>{point.label}: {money(point.amount)} · {point.count}건</title></rect> : <circle cx={x(i)} cy={y(point.cumulative)} r="2.5" fill="#047857"><title>{point.label}: 누적 {money(point.cumulative)}</title></circle>}
+              {i % Math.max(1,Math.ceil(chart.points.length/(chartWidth < 480 ? 3 : 6))) === 0 || i === chart.points.length-1 ? <text x={x(i)} y="207" textAnchor="middle" fontSize="11" fill="#64748b">{point.label}</text> : null}
             </g>)}
           </svg>
           <p className="text-xs text-slate-500">{mode === "cumulative" ? "선택한 기간의 시작일부터 누적한 금액입니다." : "수납이 없는 구간은 0원으로 표시합니다."}</p>

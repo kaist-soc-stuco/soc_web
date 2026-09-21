@@ -15,6 +15,7 @@ interface ImageUploadFieldProps {
   imageUrl?: string;
   onRemove: () => void;
   onSelect: (file: File) => void | Promise<void>;
+  previewErrorText?: string;
   removeLabel: string;
   selectLabel: string;
 }
@@ -30,6 +31,7 @@ export function ImageUploadField({
   imageUrl,
   onRemove,
   onSelect,
+  previewErrorText = "이미지를 불러오지 못했습니다. 다시 선택해 주세요.",
   removeLabel,
   selectLabel,
 }: ImageUploadFieldProps) {
@@ -157,7 +159,7 @@ export function ImageUploadField({
               {selectLabel}
             </button>
             {previewFailed ? (
-              <p className="mt-1 text-xs font-normal text-rose-600">이미지를 불러오지 못했습니다. 다시 선택해 주세요.</p>
+              <p className="mt-1 text-xs font-normal text-rose-600">{previewErrorText}</p>
             ) : emptyText ? (
               <p className="mt-1 text-xs font-normal text-[#344054]">
                 {emptyText}

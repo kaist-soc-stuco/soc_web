@@ -381,8 +381,8 @@ export class UsersService {
     return this.usersRepository.ensureStudentFeeStatus(userId);
   }
 
-  async getStudentFeeDetail(userId: string): Promise<StudentFeeDetailResponse | null> {
-    return this.usersRepository.getStudentFeeDetail(userId);
+  async getStudentFeeDetail(userId: string, referenceSemester?: string): Promise<StudentFeeDetailResponse | null> {
+    return this.usersRepository.getStudentFeeDetail(userId, referenceSemester);
   }
 
   async processStudentFeePayments(

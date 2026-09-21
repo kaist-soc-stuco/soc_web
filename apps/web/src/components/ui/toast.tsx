@@ -63,7 +63,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div
         aria-live="polite"
         aria-relevant="additions removals"
-        className="pointer-events-none fixed inset-x-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[100] flex flex-col items-center gap-2 sm:inset-x-auto sm:right-6 sm:bottom-20 sm:items-end"
+        className="pointer-events-none fixed inset-x-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[100] flex flex-col items-center gap-2 sm:inset-x-auto sm:right-6 sm:bottom-[5.5rem] sm:items-end"
       >
         {toasts.map((item) => (
           <ToastCard key={item.id} item={item} onDismiss={dismiss} />

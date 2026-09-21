@@ -267,6 +267,7 @@ function SiteContentPageContent() {
 
 
   const selectBlock = async (block: ContentBlockRecord) => {
+    if (imageUploading || saving) return;
     if (block.contentBlockId === selectedId) return;
     if (isDirty) {
       const discard = await confirm({ title: "저장하지 않은 변경 사항을 버릴까요?", confirmLabel: "변경 사항 버리기", tone: "danger" });
@@ -277,6 +278,7 @@ function SiteContentPageContent() {
   };
 
   const changeCategory = async (nextCategory: ContentCategory) => {
+    if (imageUploading || saving) return;
     if (nextCategory === category) return;
     if (isDirty) {
       const discard = await confirm({ title: "저장하지 않은 변경 사항을 버릴까요?", confirmLabel: "변경 사항 버리기", tone: "danger" });
@@ -361,7 +363,7 @@ function SiteContentPageContent() {
         value={category}
         onChange={(value) => void changeCategory(value as ContentCategory)}
         className="clean-segmented-control w-fit max-w-full overflow-x-auto"
-        options={Object.entries(categoryMeta).map(([value, meta]) => ({ value, label: meta.label }))}
+        options={Object.entries(categoryMeta).map(([value, meta]) => ({ value, label: meta.label, disabled: imageUploading || saving }))}
       />
 
       <div className={cn("grid gap-4", !categoryMeta[category].singleton && "xl:grid-cols-[280px_minmax(0,1fr)]")}>
@@ -406,7 +408,7 @@ function SiteContentPageContent() {
       </div>
     </AdminPageMain>
 
-    <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={categoryMeta[category].createLabel} mobileFullscreen className="max-w-xl" bodyClassName="space-y-4 px-4 py-5 sm:px-5" footer={<><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>취소</Button><Button loading={saving} type="button" onClick={() => void createBlock()} disabled={saving || imageUploading || !createDraft.titleKo.trim() || (isImageOnlyType(createDraft.type) && !createDraft.imageUrl.trim())}>{"등록"}</Button></>}>
+    <Modal open={createOpen} onClose={() => { if (!imageUploading && !saving) setCreateOpen(false); }} title={categoryMeta[category].createLabel} mobileFullscreen className="max-w-xl" bodyClassName="space-y-4 px-4 py-5 sm:px-5" footer={<><Button type="button" variant="outline" disabled={imageUploading || saving} onClick={() => setCreateOpen(false)}>취소</Button><Button loading={saving} type="button" onClick={() => void createBlock()} disabled={saving || imageUploading || !createDraft.titleKo.trim() || (isImageOnlyType(createDraft.type) && !createDraft.imageUrl.trim())}>{"등록"}</Button></>}>
       <div className="grid gap-4">
         {!isImageOnlyType(createDraft.type) ? <AdminFormField label="한국어 제목"><UiInput value={createDraft.titleKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleKo: value })); }} placeholder="공개 화면에 표시할 제목" /></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) ? <AdminFormField label="영문 제목"><UiInput value={createDraft.titleEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleEn: value })); }} /></AdminFormField> : null}

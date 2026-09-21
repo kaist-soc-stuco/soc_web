@@ -116,10 +116,10 @@ export class VotesService {
 
   async detail(id: string, caller?: Caller): Promise<VoteDetailResponse> {
     const vote = await this.repo.findVote(id);
-    if (!vote || (vote.status === "DRAFT" && !this.isManager(caller))) {
+    const isManager = this.isManager(caller);
+    if (!vote || (vote.status === "DRAFT" && !isManager)) {
       throw new NotFoundException("vote_not_found");
     }
-    const [items, counts] = await Promise.all([this.repo.findDefinition(id), this.repo.counts(id)]);
     let eligibility: VoteDetailResponse["eligibility"] = "LOGIN_REQUIRED";
     if (caller) {
       const voter = await this.repo.findVoter(id, caller.id);
@@ -129,11 +129,16 @@ export class VotesService {
           ? "ALREADY_VOTED"
           : "ELIGIBLE";
     }
+    const resultsArePublished = Boolean(vote.resultsPublishedAt);
+    if (!isManager && !resultsArePublished && (eligibility === "LOGIN_REQUIRED" || eligibility === "NOT_ELIGIBLE")) {
+      throw new NotFoundException("vote_not_found");
+    }
+    const [items, counts] = await Promise.all([this.repo.findDefinition(id), this.repo.counts(id)]);
     return {
       ...this.mapVote(vote, counts),
       items: this.mapItems(items),
       eligibility,
-      isManager: this.isManager(caller),
+      isManager,
     };
   }
 

@@ -146,8 +146,9 @@ export class BulkEmailController {
   @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async previewRecipients(
+    @Req() req: AuthedRequest,
     @Body(new ZodValidationPipe(SendBulkEmailSchema)) body: SendBulkEmailRequest,
   ): Promise<BulkEmailPreviewResponse> {
-    return this.bulkEmailService.previewRecipients(body);
+    return this.bulkEmailService.previewRecipients(body, req.user.id);
   }
 }

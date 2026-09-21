@@ -74,7 +74,6 @@ test("creates and formats an executive contact sheet through the shared Sheets c
     "활동 연도",
     "이메일",
     "전화번호",
-    "연락처 ID",
     "활동 이력",
   ]);
   assert.deepEqual(syncCall.definition.rows, [[
@@ -85,10 +84,9 @@ test("creates and formats an executive contact sheet through the shared Sheets c
     2026,
     "hong@example.com",
     "010-0000-0000",
-    "contact-fixture-1",
     "2025 / 기획부 / 부원\n2026 / 회장단 / 회장",
   ]]);
-  assert.deepEqual(syncCall.definition.columnWidths, [120, 100, 140, 140, 100, 230, 140, 280, 360]);
+  assert.deepEqual(syncCall.definition.columnWidths, [120, 100, 140, 140, 100, 230, 140, 360]);
   assert.equal(syncCall.definition.protectionDescription, "KAIST SOC · 집행부원 연락망 (읽기 전용)");
 });
 

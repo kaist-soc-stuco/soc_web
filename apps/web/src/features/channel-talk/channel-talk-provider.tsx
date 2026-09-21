@@ -11,7 +11,7 @@ import {
   shutdownChannelTalk,
 } from "./channel-talk";
 
-function updateChannelTalkLauncherLayer(offsetBottom: boolean) {
+function updateChannelTalkLauncherLayer(offsetBottom: boolean, hideLauncher: boolean) {
   if (typeof document === "undefined") return;
 
   const shadowHost = document.querySelector<HTMLElement>("#ch-plugin-entry > div");
@@ -19,6 +19,7 @@ function updateChannelTalkLauncherLayer(offsetBottom: boolean) {
   if (!shadowRoot) return;
 
   const hidden =
+    hideLauncher ||
     document.body.classList.contains("site-mobile-menu-open") ||
     document.body.classList.contains("ui-modal-open");
   let layerStyle = shadowRoot.querySelector<HTMLStyleElement>(
@@ -59,11 +60,13 @@ function updateChannelTalkLauncherLayer(offsetBottom: boolean) {
 export function ChannelTalkProvider({ children }: PropsWithChildren) {
   const location = useLocation();
   const isAdminRoute = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
-  const shouldOffsetChannelTalk =
-    location.pathname.endsWith("/write") ||
-    location.pathname.endsWith("/edit") ||
+  const hideChannelTalk =
     location.pathname.startsWith("/survey/") ||
     location.pathname.startsWith("/votes/");
+  const shouldOffsetChannelTalk =
+    !hideChannelTalk &&
+    (location.pathname.endsWith("/write") ||
+      location.pathname.endsWith("/edit"));
   const hasBootedRef = useRef(false);
   const previousIdentityRef = useRef<string | null>(null);
   const { data: session, isPending: isSessionPending } = useCurrentSession();
@@ -96,7 +99,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (typeof document === "undefined") return;
 
-    const update = () => updateChannelTalkLauncherLayer(shouldOffsetChannelTalk);
+    const update = () => updateChannelTalkLauncherLayer(shouldOffsetChannelTalk, hideChannelTalk);
     const observer = new MutationObserver(update);
     observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
     const intervalId = window.setInterval(update, 250);
@@ -108,7 +111,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
       window.clearInterval(intervalId);
       window.removeEventListener("resize", update);
     };
-  }, [shouldOffsetChannelTalk]);
+  }, [hideChannelTalk, shouldOffsetChannelTalk]);
 
   useEffect(() => {
     if (isSessionPending) return;
@@ -127,7 +130,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
   }, [channelTalkIdentity, isSessionPending]);
 
   useEffect(() => {
-    if (isAdminRoute) {
+    if (isAdminRoute || hideChannelTalk) {
       if (hasBootedRef.current) {
         shutdownChannelTalk();
         hasBootedRef.current = false;
@@ -173,7 +176,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, [data, isAdminRoute]);
+  }, [data, hideChannelTalk, isAdminRoute]);
 
   // The SDK owns the launcher and messenger UI. Keeping this provider renderless
   // avoids a second, competing affordance in the page layout.
