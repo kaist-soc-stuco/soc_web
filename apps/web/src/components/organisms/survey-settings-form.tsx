@@ -39,6 +39,7 @@ export interface SurveySettingsFormValues {
   allowMultipleResponses?: boolean;
   allowResponseEdit?: boolean;
   isPublished?: boolean;
+  showOnList?: boolean;
   showOnCalendar?: boolean;
   isAlwaysOpen?: boolean;
   isAllDay?: boolean;
@@ -590,6 +591,11 @@ export function SurveySettingsForm({
               <div>
                 <h3 id="survey-display-settings" className="text-sm font-semibold text-[#172033]">노출 및 연결</h3>
               </div>
+              <SettingCheckbox
+                checked={watch("showOnList") !== false}
+                label="설문 목록에 노출"
+                onChange={(checked) => setValue("showOnList", checked, { shouldDirty: true })}
+              />
               <SettingCheckbox
                 checked={showOnCalendar}
                 label="캘린더에 표시"

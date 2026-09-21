@@ -102,9 +102,8 @@ export class VotesService {
     return rows.map(({ vote, eligibleCount, votedCount }) => this.mapVote(vote, { eligibleCount, votedCount }));
   }
 
-  async listPublic(user?: { id: string; permission: number }): Promise<VoteRecord[]> {
-    if (!user) return [];
-    const rows = await this.repo.list(true, Permissions.has(user.permission, Permissions.MANAGE_VOTE) ? undefined : user.id);
+  async listPublic(): Promise<VoteRecord[]> {
+    const rows = await this.repo.list(true);
     return rows.map(({ vote, eligibleCount, votedCount }) => this.mapVote(vote, { eligibleCount, votedCount }));
   }
 
@@ -128,10 +127,6 @@ export class VotesService {
         : voter.hasVoted
           ? "ALREADY_VOTED"
           : "ELIGIBLE";
-    }
-    const resultsArePublished = Boolean(vote.resultsPublishedAt);
-    if (!isManager && !resultsArePublished && (eligibility === "LOGIN_REQUIRED" || eligibility === "NOT_ELIGIBLE")) {
-      throw new NotFoundException("vote_not_found");
     }
     const [items, counts] = await Promise.all([this.repo.findDefinition(id), this.repo.counts(id)]);
     return {

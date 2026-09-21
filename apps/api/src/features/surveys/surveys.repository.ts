@@ -1,6 +1,5 @@
-import { OPERATIONAL_SURVEY_IDS } from "@soc/contracts";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, ne, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { isoToDate, msToIso, nowDate } from "@soc/shared";
 
 import {
@@ -52,6 +51,7 @@ export class SurveysRepository {
       previousVersionId: row.previousVersionId,
       versionNumber: row.versionNumber,
       derivedVersionCount: 0,
+      showOnList: row.showOnList,
       showOnCalendar: row.showOnCalendar,
       maxResponses: row.maxResponseCount,
       isAlwaysOpen: row.isAlwaysOpen,
@@ -139,6 +139,7 @@ export class SurveysRepository {
         lifecycleStatus: dto.isPublished ? "PUBLISHED" : "DRAFT",
         previousVersionId: lineage?.previousVersionId ?? null,
         versionNumber: lineage?.versionNumber ?? 1,
+        showOnList: dto.showOnList ?? true,
         showOnCalendar: dto.showOnCalendar ?? false,
         resultVisibility: dto.resultVisibility ?? "PRIVATE",
         maxResponseCount: dto.maxResponseCount ?? null,
@@ -189,6 +190,7 @@ export class SurveysRepository {
       set.isPublished = dto.isPublished;
       set.lifecycleStatus = dto.isPublished ? "PUBLISHED" : "DRAFT";
     }
+    if (dto.showOnList !== undefined) set.showOnList = dto.showOnList;
     if (dto.showOnCalendar !== undefined) set.showOnCalendar = dto.showOnCalendar;
     if (dto.resultVisibility !== undefined) set.resultVisibility = dto.resultVisibility;
     if (dto.maxResponseCount !== undefined) set.maxResponseCount = dto.maxResponseCount;
@@ -325,7 +327,7 @@ export class SurveysRepository {
     const query = input.query?.trim();
     const whereClause = and(
       eq(surveys.lifecycleStatus, "PUBLISHED"),
-      ne(surveys.surveyId, OPERATIONAL_SURVEY_IDS.corporatePartnership),
+      eq(surveys.showOnList, true),
       query
         ? or(
             ilike(surveys.titleKo, `%${query}%`),

@@ -38,7 +38,7 @@ import {
   votes,
 } from "../../infrastructure/postgres/postgres.schema";
 import { CalendarSyncService } from "./calendar-sync.service";
-import { addSeoulDays, formatSeoulDate } from "./calendar.utils";
+import { addSeoulDays, formatSeoulDate, isPublicHolidayTitle } from "./calendar.utils";
 import { AuditLogService } from "../audit/audit-log.service";
 import type { AuditMetadata } from "../audit/audit-context";
 import { fetchBoundedText, readResponseTextWithLimit } from "../../shared/http/bounded-fetch";
@@ -936,7 +936,7 @@ export class CalendarService {
   ): CalendarEventCategory {
     if (this.isCalendarCategory(row.categoryOverride)) return row.categoryOverride;
     if (row.sourceType === "MANUAL") return "EVENT";
-    return this.isKoreanHolidayRange(row.startAt, row.endAt, holidayDates)
+    return isPublicHolidayTitle(row.titleKo) || this.isKoreanHolidayRange(row.startAt, row.endAt, holidayDates)
       ? "HOLIDAY"
       : "ACADEMIC";
   }

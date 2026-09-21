@@ -24,6 +24,7 @@
     "src/lib/survey-display.ts",
     "src/lib/date-range-filter.ts",
     "src/lib/survey-results-display.ts",
-    "src/features/admin-finance/fee-trend.ts"
+    "src/features/admin-finance/fee-trend.ts",
+    "src/features/events-surveys/events-surveys-calendar-utils.ts"
   ]
 }

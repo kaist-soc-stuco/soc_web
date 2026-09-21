@@ -438,6 +438,7 @@ const SurveyFieldsSchema = z.object({
   allowResponseEdit: z.boolean().optional(),
   isKoreanOnly: z.boolean().optional(),
   isPublished: z.boolean().optional(),
+  showOnList: z.boolean().optional(),
   showOnCalendar: z.boolean().optional(),
   isAlwaysOpen: z.boolean().optional(),
   resultVisibility: SurveyResultVisibilitySchema.default("PRIVATE"),

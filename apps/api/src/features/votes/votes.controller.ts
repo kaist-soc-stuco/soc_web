@@ -28,7 +28,7 @@ export class VotesController {
 
   @Get("public")
   @UseGuards(OptionalAuthGuard)
-  listPublic(@Req() req: OptionalAuthedRequest) { return this.service.listPublic(req.user); }
+  listPublic() { return this.service.listPublic(); }
 
   @Get("admin")
   @RequirePermissions(Permissions.MANAGE_VOTE)

@@ -20,6 +20,7 @@ import { GoogleCalendarApiError, GoogleCalendarClient, GoogleCalendarConflictErr
 import { KaistAcademicCalendarSource } from "./kaist-academic-calendar.source";
 import {
   addSeoulDays,
+  isPublicHolidayTitle,
   formatSeoulDate,
   SEOUL_TIME_ZONE,
   seoulYear,
@@ -172,7 +173,7 @@ export class CalendarSyncService {
             sourceHash: item.sourceHash,
             isReadOnly: true,
             isActive: true,
-            isHiddenByAdmin: true,
+            isHiddenByAdmin: !isPublicHolidayTitle(item.titleKo),
             createdByUserId: null,
           });
         insertedCount += 1;

@@ -22,22 +22,27 @@ test("custom selection feedback survives request validation and the response con
   assert.equal(VoteItemInputSchema.safeParse({...item, selectionErrorMessage: "x".repeat(501)}).success, false);
 });
 
-test("vote detail is limited to eligible voters while managers retain access", async () => {
+test("published vote detail is public while eligibility and draft access remain separate", async () => {
   const now = new Date();
   let resultsPublishedAt = null;
+  let status = "PUBLISHED";
   const service = new VotesService({
-    findVote: async () => ({status: "PUBLISHED", startsAt: now, endsAt: now, createdAt: now, updatedAt: now, resultsPublishedAt}),
+    findVote: async () => ({status, startsAt: now, endsAt: now, createdAt: now, updatedAt: now, resultsPublishedAt}),
     findVoter: async (_voteId, userId) => userId === "eligible" ? {status: "ELIGIBLE", hasVoted: false} : null,
     findDefinition: async () => [],
     counts: async () => ({eligibleCount: 1, votedCount: 0}),
   }, {});
 
-  await assert.rejects(service.detail("vote"), /vote_not_found/);
-  await assert.rejects(service.detail("vote", {id: "other", permission: 0}), /vote_not_found/);
+  assert.equal((await service.detail("vote")).eligibility, "LOGIN_REQUIRED");
+  assert.equal((await service.detail("vote", {id: "other", permission: 0})).eligibility, "NOT_ELIGIBLE");
   assert.equal((await service.detail("vote", {id: "eligible", permission: 0})).eligibility, "ELIGIBLE");
   assert.equal((await service.detail("vote", {id: "manager", permission: Permissions.MANAGE_VOTE})).isManager, true);
   resultsPublishedAt = now;
   assert.equal((await service.detail("vote")).eligibility, "LOGIN_REQUIRED");
+  status = "DRAFT";
+  await assert.rejects(service.detail("vote"), /vote_not_found/);
+  await assert.rejects(service.detail("vote", {id: "other", permission: 0}), /vote_not_found/);
+  assert.equal((await service.detail("vote", {id: "manager", permission: Permissions.MANAGE_VOTE})).isManager, true);
 });
 
 function serviceFor(rule, limit = 2) {
@@ -69,3 +74,25 @@ test("close checks quorum while holding the same transaction lock as submissions
     assert.equal(updated,allowed);
   }
 });
+
+
+test("public listing requests published votes without a voter restriction", async () => {
+  const now = new Date();
+  const repo = { list: async (...args) => {
+    assert.deepEqual(args, [true]);
+    return [{ vote: { voteId: "public-vote", status: "PUBLISHED", startsAt: now, endsAt: now, createdAt: now, updatedAt: now }, eligibleCount: 1, votedCount: 0 }];
+  } };
+  const result = await new VotesService(repo, {}).listPublic();
+  assert.equal(result[0].id, "public-vote");
+});
+
+for (const voter of [null, {status: "EXCLUDED", hasVoted: false}]) {
+  test(`public detail does not grant ballot submission to ${voter ? "excluded" : "unlisted"} users`, async () => {
+    const service = new VotesService({
+      findVote: async () => ({status: "PUBLISHED", startsAt: new Date(Date.now()-60000), endsAt: new Date(Date.now()+60000)}),
+      findVoter: async () => voter,
+      submitBallot: async () => assert.fail("An ineligible ballot must never be recorded"),
+    }, {});
+    await assert.rejects(service.submit("vote", "other", {answers: []}), /vote_not_eligible/);
+  });
+}

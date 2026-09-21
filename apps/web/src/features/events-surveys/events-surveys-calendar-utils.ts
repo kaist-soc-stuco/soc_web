@@ -48,7 +48,8 @@ export function buildCalendarGrid(year: number, month: number): CalendarCell[] {
     });
   }
 
-  const remainingCells = 42 - grid.length;
+  const cellCount = Math.max(35, Math.ceil(grid.length / 7) * 7);
+  const remainingCells = cellCount - grid.length;
   for (let i = 1; i <= remainingCells; i++) {
     grid.push({
       day: i,
@@ -68,7 +69,7 @@ export function getCalendarEventStyles(
 ) {
   if (category === "HOLIDAY") {
     return {
-      bg: "bg-rose-100 text-rose-700 hover:bg-rose-200",
+      bg: "bg-rose-100 text-black hover:bg-rose-200",
       hoverBg: "bg-rose-200",
       bullet: "bg-rose-400",
       label: lang === "ko" ? "공휴일" : "Public holiday",
@@ -76,7 +77,7 @@ export function getCalendarEventStyles(
   }
   if (sourceType === "KAIST_ACADEMIC") {
     return {
-      bg: "bg-slate-200 text-slate-600 hover:bg-slate-300",
+      bg: "bg-slate-200 text-black hover:bg-slate-300",
       hoverBg: "bg-slate-300",
       bullet: "bg-slate-500",
       label: lang === "ko" ? "학사일정" : "Academic schedule",
@@ -85,17 +86,21 @@ export function getCalendarEventStyles(
 
   if (sourceType === "MANUAL") {
     return {
-      bg: "bg-brand-primary/15 text-brand-primary hover:bg-brand-primary/25",
+      bg: "bg-brand-primary/15 text-black hover:bg-brand-primary/25",
       hoverBg: "bg-brand-primary/25",
       bullet: "bg-brand-primary",
       label: lang === "ko" ? "학생회 일정" : "Council Schedule",
     };
   }
 
+  if (sourceType === "VOTE") {
+    return { bg: "bg-sky-100 text-black hover:bg-sky-200", hoverBg: "bg-sky-200", bullet: "bg-sky-500", label: lang === "ko" ? "투표" : "Vote" };
+  }
+
   switch (kind) {
     case "EVENT":
       return {
-        bg: "bg-brand-primary/15 text-brand-primary hover:bg-brand-primary/25",
+        bg: "bg-brand-primary/15 text-black hover:bg-brand-primary/25",
         hoverBg: "bg-brand-primary/25",
         bullet: "bg-brand-primary",
         label: lang === "ko" ? "행사" : "Event",
@@ -103,7 +108,7 @@ export function getCalendarEventStyles(
     case "SURVEY":
     default:
       return {
-        bg: "bg-sky-100 text-sky-700 hover:bg-sky-200",
+        bg: "bg-sky-100 text-black hover:bg-sky-200",
         hoverBg: "bg-sky-200",
         bullet: "bg-sky-500",
         label: lang === "ko" ? "설문" : "Survey",
@@ -122,6 +127,35 @@ export function getCompactKindLabel(
   if (sourceType === "MANUAL") {
     return lang === "ko" ? "일정" : "Calendar";
   }
+  if (sourceType === "VOTE") return lang === "ko" ? "투표" : "Vote";
   if (kind === "EVENT") return lang === "ko" ? "행사" : "Event";
   return lang === "ko" ? "설문" : "Survey";
+}
+
+export function getEventLabelSegment(
+  range: { start: Date; end: Date },
+  cellIndex: number,
+  calendarGrid: CalendarCell[],
+) {
+  const rangeStartIndex = calendarGrid.findIndex(
+    (gridCell) => isSameDay(gridCell.date, range.start),
+  );
+  const rangeEndIndex = calendarGrid.findIndex(
+    (gridCell) => isSameDay(gridCell.date, range.end),
+  );
+  const visibleRangeStartIndex = rangeStartIndex < 0 ? 0 : rangeStartIndex;
+  const visibleRangeEndIndex =
+    rangeEndIndex < 0 ? calendarGrid.length - 1 : rangeEndIndex;
+  const weekStartIndex = Math.floor(cellIndex / 7) * 7;
+  const weekEndIndex = Math.min(weekStartIndex + 6, calendarGrid.length - 1);
+  let segmentStartIndex = Math.max(weekStartIndex, visibleRangeStartIndex);
+  let segmentEndIndex = Math.min(weekEndIndex, visibleRangeEndIndex);
+  // Split labels at week and month boundaries so dimming matches each bar segment.
+  while (segmentStartIndex < cellIndex && calendarGrid[segmentStartIndex].isCurrentMonth !== calendarGrid[cellIndex].isCurrentMonth) segmentStartIndex += 1;
+  while (segmentEndIndex > cellIndex && calendarGrid[segmentEndIndex].isCurrentMonth !== calendarGrid[cellIndex].isCurrentMonth) segmentEndIndex -= 1;
+
+  return {
+    dayCount: Math.max(1, segmentEndIndex - segmentStartIndex + 1),
+    offsetDays: Math.max(0, cellIndex - segmentStartIndex),
+  };
 }

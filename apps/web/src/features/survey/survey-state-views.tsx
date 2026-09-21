@@ -64,9 +64,11 @@ export function BeforeOpenView({
 export function ClosedView({
   embedded = false,
   lang,
+  subject = "survey",
 }: {
   embedded?: boolean;
   lang: string;
+  subject?: "survey" | "vote";
 }) {
   return (
     <div
@@ -80,12 +82,12 @@ export function ClosedView({
         <Lock className="w-8 h-8" />
       </div>
       <h2 className="text-2xl font-bold text-kaist-black mb-3">
-        {lang === "ko" ? "마감된 설문입니다" : "Survey is Closed"}
+        {lang === "ko" ? subject === "vote" ? "마감된 투표입니다" : "마감된 설문입니다" : subject === "vote" ? "Vote is Closed" : "Survey is Closed"}
       </h2>
       <p className="text-sm text-kaist-grey/80 leading-relaxed">
         {lang === "ko"
-          ? "이 설문의 응답 기간이 만료되어 더 이상 응답을 제출할 수 없습니다."
-          : "The response period for this survey has ended, and submissions are no longer accepted."}
+          ? subject === "vote" ? "이 투표는 마감되어 더 이상 참여할 수 없습니다." : "이 설문의 응답 기간이 만료되어 더 이상 응답을 제출할 수 없습니다."
+          : subject === "vote" ? "This vote has ended and no longer accepts ballots." : "The response period for this survey has ended, and submissions are no longer accepted."}
       </p>
     </div>
   );

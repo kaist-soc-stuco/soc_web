@@ -31,11 +31,8 @@ export class VotesRepository {
     return this.db.transaction(callback);
   }
 
-  async list(publicOnly = false, eligibleUserId?: string) {
-    const condition = and(
-      publicOnly ? sql`${votes.status} <> 'DRAFT'` : undefined,
-      eligibleUserId ? sql`exists (select 1 from vote_voter eligible_voter where eligible_voter.vote_id = ${votes.voteId} and eligible_voter.user_id = ${eligibleUserId} and eligible_voter.status = 'ELIGIBLE')` : undefined,
-    );
+  async list(publicOnly = false) {
+    const condition = publicOnly ? sql`${votes.status} <> 'DRAFT'` : undefined;
     return this.db
       .select({
         vote: votes,

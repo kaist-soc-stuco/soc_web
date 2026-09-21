@@ -13,6 +13,7 @@ import {
 } from "@/lib/events-surveys";
 import {
   getCalendarEventStyles,
+  getEventLabelSegment,
   isSameDay,
   toDateKey,
   type CalendarCell,
@@ -21,7 +22,6 @@ import {
 const MAX_VISIBLE_EVENTS = 4;
 const CALENDAR_WEEK_HEIGHT = 144;
 const CALENDAR_WEEK_OVERFLOW_HEIGHT = 164;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface EventRange {
   end: Date;
@@ -126,44 +126,11 @@ function isEventLabelDay(
   cell: CalendarCell,
   calendarGrid: CalendarCell[],
 ) {
-  const visibleStart = Math.max(
-    dayStamp(range.start),
-    dayStamp(calendarGrid[0].date),
-  );
-  const visibleEnd = Math.min(
-    dayStamp(range.end),
-    dayStamp(calendarGrid[calendarGrid.length - 1].date),
-  );
-  const centerDay =
-    visibleStart + Math.floor((visibleEnd - visibleStart) / DAY_MS / 2) * DAY_MS;
-
-  return dayStamp(cell.date) === centerDay;
+  const cellIndex = calendarGrid.indexOf(cell);
+  const segment = getEventLabelSegment(range, cellIndex, calendarGrid);
+  return segment.offsetDays === Math.floor((segment.dayCount - 1) / 2);
 }
 
-function getEventLabelSegment(
-  range: EventRange,
-  cellIndex: number,
-  calendarGrid: CalendarCell[],
-) {
-  const rangeStartIndex = calendarGrid.findIndex(
-    (gridCell) => dayStamp(gridCell.date) === dayStamp(range.start),
-  );
-  const rangeEndIndex = calendarGrid.findIndex(
-    (gridCell) => dayStamp(gridCell.date) === dayStamp(range.end),
-  );
-  const visibleRangeStartIndex = rangeStartIndex < 0 ? 0 : rangeStartIndex;
-  const visibleRangeEndIndex =
-    rangeEndIndex < 0 ? calendarGrid.length - 1 : rangeEndIndex;
-  const weekStartIndex = Math.floor(cellIndex / 7) * 7;
-  const weekEndIndex = Math.min(weekStartIndex + 6, calendarGrid.length - 1);
-  const segmentStartIndex = Math.max(weekStartIndex, visibleRangeStartIndex);
-  const segmentEndIndex = Math.min(weekEndIndex, visibleRangeEndIndex);
-
-  return {
-    dayCount: Math.max(1, segmentEndIndex - segmentStartIndex + 1),
-    offsetDays: Math.max(0, cellIndex - segmentStartIndex),
-  };
-}
 
 function getDateTextClass(
   cell: CalendarCell,
@@ -418,7 +385,7 @@ export function EventsSurveysCalendarGrid({
                       >
                         <span
                           aria-label={`${titleText}, ${formatCalendarEventRange(event, lang)}`}
-                          className={`group relative ${labelSegment ? "z-30" : "z-10"} flex h-5 min-h-5 items-center overflow-visible rounded-md px-2 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold leading-4 transition-[background-color,box-shadow] focus:outline-none focus-visible:outline-none ${segmentWidthClass} ${
+                          className={`group relative ${labelSegment ? "z-30" : "z-10"} flex h-5 min-h-5 items-center overflow-visible rounded-md px-2 py-0.5 text-[length:var(--ui-text-micro-size)] font-medium leading-4 transition-[background-color,box-shadow] ${cell.isCurrentMonth ? "" : "opacity-40"} focus:outline-none focus-visible:outline-none ${segmentWidthClass} ${
                             isStart ? "rounded-l-md" : "rounded-l-none"
                           } ${isEnd ? "rounded-r-md" : "rounded-r-none"} ${
                             eventStyle.bg

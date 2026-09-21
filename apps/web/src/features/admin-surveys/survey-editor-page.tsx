@@ -1,3 +1,4 @@
+import { useDebouncedEditorSave } from "@/hooks/use-debounced-editor-save";
 import { SurveyBuilderToolbar } from "./survey-builder-toolbar";
 import { EditorBackButton } from "@/components/ui/editor-back-button";
 import { stripRichText } from "@/components/ui/rich-text-content";
@@ -5,7 +6,7 @@ import { restrictListDrag } from "@/lib/drag-bounds";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import {
   isSurveyDisplayBlock,
@@ -141,6 +142,7 @@ const SurveySettingsSchema = z.object({
   allowMultipleResponses: z.boolean().optional(),
   allowResponseEdit: z.boolean().optional(),
   isPublished: z.boolean().optional(),
+  showOnList: z.boolean().optional(),
   showOnCalendar: z.boolean().optional(),
   isAlwaysOpen: z.boolean().optional(),
   isAllDay: z.boolean().optional(),
@@ -861,13 +863,9 @@ function QuestionDragOverlayRow({
 }
 
 export function SurveyEditorPage() {
-  const location = useLocation();
   const navigate = useNavigate();
   const { id: surveyId } = useParams<{ id: string }>();
   const isEdit = Boolean(surveyId);
-  const skipDraftRestore = Boolean(
-    (location.state as { skipDraftRestore?: boolean } | null)?.skipDraftRestore,
-  );
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
   const { toast } = useToast();
@@ -875,7 +873,7 @@ export function SurveyEditorPage() {
   const form = useForm<SurveySettingsFormValues>({
     resolver: zodResolver(SurveySettingsSchema),
     defaultValues: {
-      titleKo: "제목 없는 설문지",
+      titleKo: "",
       titleEn: "",
       descriptionKo: DEFAULT_SURVEY_DESCRIPTION_KO,
       descriptionEn: DEFAULT_SURVEY_DESCRIPTION_EN,
@@ -890,9 +888,10 @@ export function SurveyEditorPage() {
       allowMultipleResponses: false,
       allowResponseEdit: false,
       isPublished: false,
-  showOnCalendar: false,
-  isAlwaysOpen: false,
-  isAllDay: false,
+      showOnList: true,
+      showOnCalendar: false,
+      isAlwaysOpen: false,
+      isAllDay: false,
       maxResponseCount: "",
       openAt: "",
       closeAt: "",
@@ -1020,7 +1019,10 @@ export function SurveyEditorPage() {
   const sectionCommitRef = useRef<(() => Promise<boolean>) | null>(null);
   const questionCommitRef = useRef<(() => boolean | Promise<boolean>) | null>(null);
   const creatingDraftRef = useRef<Promise<string> | null>(null);
-  const initialDraftLoadAttemptedRef = useRef(false);
+  const [firstQuestion, setFirstQuestion] = useState<QuestionFormState>(emptyQuestion);
+  const createdDraftNavigationRef = useRef<string | null>(null);
+  const firstQuestionRef = useRef(firstQuestion);
+  firstQuestionRef.current = firstQuestion;
   const sessionAuthenticated = Boolean(session?.authenticated);
   const sessionPermission = session?.permission ?? 0;
 
@@ -1040,6 +1042,10 @@ export function SurveyEditorPage() {
       }
 
       if (isEdit && surveyId) {
+        if (createdDraftNavigationRef.current === surveyId) {
+          createdDraftNavigationRef.current = null;
+          return;
+        }
         setLoadError(null);
         setSurveyLoading(true);
         try {
@@ -1069,6 +1075,7 @@ export function SurveyEditorPage() {
             allowMultipleResponses: detail.allowMultipleResponses ?? false,
             allowResponseEdit: detail.allowResponseEdit ?? false,
             isPublished: detail.isPublished ?? false,
+            showOnList: detail.showOnList ?? true,
             showOnCalendar: detail.showOnCalendar ?? false,
             isAlwaysOpen: detail.isAlwaysOpen ?? false,
             isAllDay: allDay,
@@ -1160,6 +1167,7 @@ export function SurveyEditorPage() {
       allowResponseEdit: values.allowMultipleResponses ? false : values.allowResponseEdit,
       isKoreanOnly: values.isKoreanOnly,
       isPublished: options?.publish ?? values.isPublished,
+      showOnList: values.showOnList ?? true,
       showOnCalendar: values.showOnCalendar,
       isAlwaysOpen: values.isAlwaysOpen || (allowPlaceholder && !values.openAt),
       resultVisibility: values.resultVisibility,
@@ -1206,7 +1214,56 @@ export function SurveyEditorPage() {
             ? undefined
             : draftValues.descriptionEn?.trim() || undefined,
         });
-        const detail = await client.getSurveyDetail(created.id);
+        let createdQuestionId: string | null = null;
+        let detail: SurveyDetailResponse;
+        // Keep edits made during creation; switch to the persisted editor only once caught up.
+        for (;;) {
+          const question = firstQuestionRef.current;
+          const values = form.getValues();
+          const signature = JSON.stringify({ question, values });
+          const questionBody = {
+            titleKo: question.titleKo.trim() || "질문",
+            titleEn: question.titleEn.trim() || undefined,
+            descriptionKo: question.descriptionKo,
+            descriptionEn: question.descriptionEn,
+            questionType: question.questionType,
+            options: question.options,
+            config: question.config ?? {},
+            answerRegex: question.answerValidationEnabled ? question.answerRegex : "",
+            isRequired: question.isRequired,
+            sortOrder: 0,
+          };
+          if (createdQuestionId) await client.updateQuestion(created.id, section.id, createdQuestionId, questionBody);
+          else createdQuestionId = (await client.createQuestion(created.id, section.id, questionBody)).id;
+          await client.updateSurvey(created.id, buildSurveyBody(values, { allowPlaceholder: true, publish: false }));
+          detail = await client.getSurveyDetail(created.id);
+          if (signature === JSON.stringify({ question: firstQuestionRef.current, values: form.getValues() })) break;
+        }
+        const focusedInput = document.activeElement;
+        const focusLabel = focusedInput?.getAttribute("aria-label");
+        const headerField = focusedInput?.closest("[data-section-field]")?.getAttribute("data-section-field") as keyof SectionFormState | undefined;
+        if (headerField) {
+          const values = form.getValues();
+          setEditingSection({ sectionId: section.id, initialFocus: headerField, initial: {
+            titleKo: values.titleKo, titleEn: values.titleEn ?? "",
+            descriptionKo: values.descriptionKo ?? "", descriptionEn: values.descriptionEn ?? "",
+          } });
+        } else if (focusLabel && createdQuestionId) {
+          setEditingQuestion({ sectionId: section.id, questionId: createdQuestionId, initial: firstQuestionRef.current });
+        }
+        if (focusLabel) requestAnimationFrame(() => {
+          const input = Array.from(document.querySelectorAll<HTMLElement>('[contenteditable="true"][aria-label]'))
+            .find(element => element.getAttribute("aria-label") === focusLabel);
+          if (!input) return;
+          input.focus();
+          const range = document.createRange();
+          range.selectNodeContents(input); range.collapse(false);
+          const selection = window.getSelection();
+          selection?.removeAllRanges(); selection?.addRange(range);
+        });
+        createdDraftNavigationRef.current = created.id;
+        form.setValue("isAlwaysOpen", detail.isAlwaysOpen);
+        if (!plainText(form.getValues("titleKo"))) form.setValue("titleKo", detail.titleKo);
         setLoadedSurveyId(created.id);
         setSpreadsheetUrl(detail.spreadsheetUrl ?? null);
         setLoadedLifecycleStatus(detail.lifecycleStatus);
@@ -1233,19 +1290,18 @@ export function SurveyEditorPage() {
     return creatingDraftRef.current;
   };
 
-  useEffect(() => {
-    if (sessionLoading || !session?.authenticated) return;
-    if ((session.permission ?? 0) & Permissions.MANAGE_SURVEY) {
-      if (isEdit) {
-        // Allow the restore check to run again when the user chooses "새로 쓰기".
-        initialDraftLoadAttemptedRef.current = false;
-        return;
-      }
-      if (initialDraftLoadAttemptedRef.current) return;
-      initialDraftLoadAttemptedRef.current = true;
-      void ensureDraft().catch(() => { initialDraftLoadAttemptedRef.current = false; });
-    }
-  }, [isEdit, navigate, session, sessionLoading, skipDraftRestore]);
+  const initialDraftTitle = form.watch("titleKo");
+  const initialDraftTitleEn = form.watch("titleEn");
+  useDebouncedEditorSave(
+    { titleKo: initialDraftTitle, titleEn: initialDraftTitleEn, firstQuestion },
+    async () => {
+      if (!plainText(form.getValues("titleKo")) && !plainText(form.getValues("titleEn")) &&
+          !plainText(firstQuestionRef.current.titleKo) && !plainText(firstQuestionRef.current.titleEn)) return true;
+      await ensureDraft();
+      return true;
+    },
+    !isEdit && !loadedSurveyId && !sessionLoading && Boolean(sessionAuthenticated && (sessionPermission & Permissions.MANAGE_SURVEY)),
+  );
 
   const handleSaveSettings = async (
     values: SurveySettingsFormValues,
@@ -1412,13 +1468,6 @@ export function SurveyEditorPage() {
   };
 
   const handleTabChange = async (nextTab: "content" | "delivery" | "responses") => {
-    if (nextTab === "content" && !loadedSurveyId) {
-      try {
-        await ensureDraft();
-      } catch {
-        return;
-      }
-    }
     setSearchParams((current) => { const next = new URLSearchParams(current); next.set("tab", nextTab); return next; });
   };
 
@@ -1469,8 +1518,8 @@ export function SurveyEditorPage() {
     setSectionReorderDraft([]);
     setError(null);
     setSaveState("idle");
-    form.reset({ titleKo: "제목 없는 설문지", titleEn: "", descriptionKo: "", descriptionEn: "", descriptionImageUrlKo: null, descriptionImageUrlEn: null, resultVisibility: "PRIVATE", feePayersOnly: false, eligibleSocAffiliations: [], academicEligibility: "ANY", allowAnonymous: false, isKoreanOnly: false, allowMultipleResponses: false, allowResponseEdit: false, isPublished: false, showOnCalendar: false, isAlwaysOpen: false, isAllDay: false, maxResponseCount: "", openAt: "", closeAt: "", connectedArticleId: "" });
-    initialDraftLoadAttemptedRef.current = false;
+    form.reset({ titleKo: "", titleEn: "", descriptionKo: "", descriptionEn: "", descriptionImageUrlKo: null, descriptionImageUrlEn: null, resultVisibility: "PRIVATE", feePayersOnly: false, eligibleSocAffiliations: [], academicEligibility: "ANY", allowAnonymous: false, isKoreanOnly: false, allowMultipleResponses: false, allowResponseEdit: false, isPublished: false, showOnList: true, showOnCalendar: false, isAlwaysOpen: false, isAllDay: false, maxResponseCount: "", openAt: "", closeAt: "", connectedArticleId: "" });
+    setFirstQuestion(emptyQuestion());
     navigate("/admin/surveys/new", { state: { skipDraftRestore: true } });
   };
 
@@ -2380,8 +2429,24 @@ export function SurveyEditorPage() {
            {(
              <div hidden={Boolean(loadError) || tab !== "content"} className="space-y-6">
                {!loadedSurveyId ? (
-                <div className="rounded-xl border border-slate-200 bg-white px-6 py-12 text-center text-sm font-medium text-slate-400">
-                  설문 문항을 준비 중입니다.
+                <div className="survey-editor-canvas space-y-6">
+                  <div className="survey-section-surface is-header is-selected p-6">
+                    <SectionInlineEditor
+                      initial={{ titleKo: "", titleEn: "", descriptionKo: "", descriptionEn: "" }}
+                      value={{ titleKo: initialDraftTitle ?? "", titleEn: initialDraftTitleEn ?? "", descriptionKo: form.watch("descriptionKo") ?? "", descriptionEn: form.watch("descriptionEn") ?? "" }}
+                      onDraftChange={(draft) => {
+                        for (const field of ["titleKo", "titleEn", "descriptionKo", "descriptionEn"] as const) {
+                          form.setValue(field, draft[field], { shouldDirty: true });
+                        }
+                      }}
+                      isSurveyHeader isKoreanOnly={isKoreanOnly}
+                      onSave={() => undefined} onCancel={() => undefined}
+                    />
+                  </div>
+                  <QuestionInlineEditor initial={firstQuestion} value={firstQuestion}
+                    onDraftChange={setFirstQuestion} isKoreanOnly={isKoreanOnly}
+                    onSave={() => undefined} onCancel={() => undefined}
+                  />
                 </div>
               ) : (
                 <>

@@ -578,6 +578,7 @@ export class SurveysService {
           openAt: original.opensAt ?? undefined,
           closeAt: original.closesAt ?? undefined,
           isAlwaysOpen: original.isAlwaysOpen,
+          showOnList: original.showOnList,
         },
         tx,
         {

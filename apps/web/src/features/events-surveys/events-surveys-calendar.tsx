@@ -88,11 +88,15 @@ export function EventsSurveysCalendar({
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-sky-500" aria-hidden="true" />
-                {lang === "ko" ? "설문" : "Surveys"}
+                {lang === "ko" ? "설문·투표" : "Surveys & votes"}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-slate-400" aria-hidden="true" />
                 {lang === "ko" ? "학사일정" : "Academic schedule"}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-rose-400" aria-hidden="true" />
+                {lang === "ko" ? "공휴일" : "Public holidays"}
               </span>
             </div>
             <div className="flex min-w-0 flex-wrap items-center justify-center gap-1.5 sm:gap-2">

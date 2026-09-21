@@ -53,6 +53,7 @@ export const surveys = pgTable("survey", {
     { onDelete: "restrict" },
   ),
   versionNumber: integer("version_number").notNull().default(1),
+  showOnList: boolean("show_on_list").notNull().default(true),
   showOnCalendar: boolean("show_on_calendar").notNull().default(false),
   resultVisibility: varchar("result_visibility", { length: 20 })
     .notNull()

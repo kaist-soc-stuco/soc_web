@@ -1,3 +1,4 @@
+import { ClosedView } from "@/features/survey/survey-state-views";
 import { ResponsePageMain, ResponseHeaderCard } from "@/features/survey/response-layout";
 import { SurveyParticipationNotice } from "@/features/survey/survey-participation-notice";
 import { SurveyQuestionCard } from "@/features/survey/survey-question-card";
@@ -39,14 +40,14 @@ export function VotePage() {
     submitted: "투표가 제출되었습니다.",
     verify: "접수 확인", verified: "정상 접수 확인됨",
     results: "투표 결과", ballots: "표", notStarted: "아직 투표가 시작되지 않았습니다.", ended: "투표가 종료되었습니다. 결과는 공개 후 확인할 수 있습니다.",
-    loginHelp: "투표 자격 확인을 위해 로그인해 주세요.", login: "로그인", ineligible: "확정된 선거인명부에 포함되지 않아 참여할 수 없습니다.",
+    loginHelp: "투표 자격 확인을 위해 로그인해 주세요.", login: "로그인", ineligible: "이 투표의 참여 대상이 아닙니다.",
     voted: "이미 투표를 제출했습니다.", submit: "투표 제출", required: "모든 안건에 기표해 주세요.",
     confirmTitle: "투표를 제출할까요?", confirmDescription: "제출한 뒤에는 선택을 확인하거나 수정할 수 없습니다.", confirmLabel: "제출", loadFailed: "투표를 불러오지 못했습니다.", retry: "다시 시도",
   } : {
     submitted: "Your ballot was submitted.",
     verify: "Verify receipt", verified: "Receipt verified",
     results: "Results", ballots: "ballots", notStarted: "Voting has not started yet.", ended: "Voting has ended. Results will appear after publication.",
-    loginHelp: "Sign in to verify your eligibility.", login: "Sign in", ineligible: "You are not included in the primary-major voter roll fixed at publication.",
+    loginHelp: "Sign in to verify your eligibility.", login: "Sign in", ineligible: "You are not eligible to participate in this vote.",
     voted: "You have already submitted a ballot.", submit: "Submit ballot", required: "Please vote on every agenda item.",
     confirmTitle: "Submit this ballot?", confirmDescription: "You cannot review or change your selections after submission.", confirmLabel: "Submit", loadFailed: "Failed to load this vote.", retry: "Try again",
   };
@@ -69,7 +70,7 @@ export function VotePage() {
     return undefined;
   };
   const submit = async () => {
-    if (isPreview) return;
+    if (isPreview || submitting || !vote || vote.eligibility !== "ELIGIBLE" || vote.status !== "PUBLISHED" || nowMs() < isoToMs(vote.startsAt) || nowMs() >= isoToMs(vote.endsAt)) return;
     if (!vote || vote.items.some(item => selectionError(item))) {
       setValidationAttempted(true);
       const missing = vote?.items.find(item => selectionError(item));
@@ -103,6 +104,12 @@ export function VotePage() {
 
   const now = nowMs();
   const isOpen = vote.status === "PUBLISHED" && now >= isoToMs(vote.startsAt) && now < isoToMs(vote.endsAt);
+
+  if (!isPreview && !vote.resultsPublishedAt && (vote.status === "CLOSED" || vote.status === "TALLIED" || now >= isoToMs(vote.endsAt))) {
+    return <PageShell><ResponsePageMain><ClosedView lang={lang} subject="vote" /></ResponsePageMain></PageShell>;
+  }
+
+  const canParticipate = isOpen && vote.eligibility === "ELIGIBLE";
 
   return (
     <PageShell>
@@ -142,7 +149,9 @@ export function VotePage() {
                 </div>
               ))}
             </section>
-          ) : !isPreview && !isOpen ? (
+          ) : (
+            <>
+            {!isPreview && !isOpen ? (
             <div className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-14 text-center text-sm font-normal text-[#344054]">
               {now < isoToMs(vote.startsAt) ? t.notStarted : t.ended}
             </div>
@@ -152,7 +161,7 @@ export function VotePage() {
             <SurveyParticipationNotice eligibility={{ status: "NOT_ELIGIBLE", reasons: [] }} lang={lang} subject="vote" description={t.ineligible} />
           ) : !isPreview && vote.eligibility === "ALREADY_VOTED" ? (
             <div className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-14 text-center text-sm font-normal text-[#344054]">{t.voted}</div>
-          ) : (
+          ) : null}
             <section className="space-y-5">
               {vote.items.map(item => <SurveyQuestionCard key={item.id} id={`vote-card-${item.id}`} lang={lang}
                 question={{ id: item.id, titleKo: item.titleKo, titleEn: item.titleEn, descriptionKo: item.descriptionKo, descriptionEn: item.descriptionEn, isRequired: true,
@@ -160,13 +169,14 @@ export function VotePage() {
                   options: item.options.map(option => ({ value: option.id, labelKo: option.labelKo, labelEn: option.labelEn ?? undefined, imageUrlKo: option.imageUrl, imageUrlEn: option.imageUrl })) }}
                 value={item.type === "MULTIPLE_CHOICE" ? answers[item.id] ?? [] : answers[item.id]?.[0] ?? ""}
                 onChange={value => setAnswers(current => ({ ...current, [item.id]: Array.isArray(value) ? value.slice(0, item.selectionRule === "min" ? item.options.length : item.maxSelections) : typeof value === "string" ? [value] : [] }))}
-                disabled={submitting}
+                disabled={submitting || (!isPreview && !canParticipate)}
                 maxSelections={item.type === "MULTIPLE_CHOICE" && item.selectionRule !== "min" ? item.maxSelections : undefined}
                 hint={item.type === "MULTIPLE_CHOICE" ? lang === "ko" ? `${item.selectionRule === "min" ? "최소" : item.selectionRule === "exact" ? "정확히" : "최대"} ${item.maxSelections}개 선택` : `Select ${item.selectionRule === "min" ? "at least" : item.selectionRule === "exact" ? "exactly" : "up to"} ${item.maxSelections}` : undefined}
                 error={validationAttempted ? selectionError(item) ?? null : null} />)}
               {error ? <p role="alert" aria-live="assertive" className="text-sm font-normal text-rose-600">{error}</p> : null}
-              <div className="survey-response-actions flex justify-end px-0 py-3 md:py-0"><Button loading={submitting} className="min-h-11" onClick={() => void submit()} disabled={submitting || isPreview}>{t.submit}</Button></div>
+              <div className="survey-response-actions flex justify-end px-0 py-3 md:py-0"><Button loading={submitting} className="min-h-11" onClick={() => void submit()} disabled={submitting || isPreview || !canParticipate}>{t.submit}</Button></div>
             </section>
+            </>
           )}
           </div>
       </ResponsePageMain>

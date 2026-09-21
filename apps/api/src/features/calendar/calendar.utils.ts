@@ -53,3 +53,8 @@ export function formatSeoulDateTime(date: Date): string {
 export function seoulYear(date = nowDate()): number {
   return msToTimeObj(date.valueOf(), SEOUL_TIME_ZONE).year;
 }
+
+/** Academic feed titles that explicitly name a public holiday (not academic breaks). */
+export function isPublicHolidayTitle(title: string): boolean {
+  return /^(?:(?:대체|임시)\s*공휴일|신정|설날(?:\s*연휴)?|추석(?:\s*연휴)?|삼일절|3[·.]1절|어린이날|부처님\s*오신\s*날|석가탄신일|현충일|광복절|개천절|한글날|성탄절|크리스마스|기독탄신일)(?:\s*\([^)]*\))?$/.test(title.trim());
+}

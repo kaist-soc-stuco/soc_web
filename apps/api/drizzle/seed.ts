@@ -2630,6 +2630,7 @@ async function seedOperationalSurveys() {
         isKoreanOnly: false,
         isPublished: true,
         lifecycleStatus: "PUBLISHED",
+        showOnList: seed.surveyId !== OPERATIONAL_SURVEY_IDS.corporatePartnership,
         showOnCalendar: false,
         resultVisibility: "PRIVATE",
         isAlwaysOpen: true,

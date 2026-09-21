@@ -161,3 +161,14 @@ test("manual Calendar publication, failure retry, and stale-worker fence on Post
     await admin.end();
   }
 });
+
+
+test("academic public holidays are visible by default without matching academic breaks", () => {
+  const { isPublicHolidayTitle } = require("../dist/apps/api/src/features/calendar/calendar.utils.js");
+  for (const title of ["추석 연휴", "설날 연휴", "부처님 오신날 (대체공휴일)", "개천절 (대체공휴일)", "한글날"]) {
+    assert.equal(isPublicHolidayTitle(title), true, title);
+  }
+  for (const title of ["추석 행사 신청", "여름방학", "수강신청", "설날 맞이 행사"]) {
+    assert.equal(isPublicHolidayTitle(title), false, title);
+  }
+});

@@ -31,6 +31,7 @@ export interface SurveyRecord {
   previousVersionId: string | null;
   versionNumber: number;
   derivedVersionCount: number;
+  showOnList: boolean;
   showOnCalendar: boolean;
   maxResponses: number | null;
   isAlwaysOpen: boolean;
