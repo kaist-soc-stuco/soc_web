@@ -4,7 +4,7 @@ import { ApiClientHttpError } from "@soc/api-client";
 import {
   clearStoredAuthState,
   readStoredAuthState,
-} from "@/lib/auth-storage";
+} from "./auth-storage";
 
 /**
  * 현재 로그인 세션을 표현하는 프런트 공용 타입/헬퍼입니다.
@@ -31,7 +31,7 @@ export const getTemporarySessionId = (): string | undefined => {
 };
 
 /**
- * 세션 조회 실패 시에도 화면이 깨지지 않도록 기본 세션으로 복구합니다.
+ * 인증 실패만 비로그인 상태로 변환합니다. 통신 오류는 쿼리 캐시가 기존 세션을 유지하도록 전달합니다.
  */
 export const getAuthSessionSummary = async (
   apiClient: SessionApiClient,
@@ -60,8 +60,9 @@ export const getAuthSessionSummary = async (
       (error.status === 401 || error.status === 403)
     ) {
       clearStoredAuthState();
+      return createEmptyAuthSession();
     }
 
-    return createEmptyAuthSession();
+    throw error;
   }
 };

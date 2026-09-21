@@ -1,9 +1,11 @@
+import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
+import { overlapsDateRange } from "@/lib/date-range-filter";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
-import { OPERATIONAL_SURVEY_IDS, type SurveyRecord } from "@soc/contracts";
+import { type SurveyRecord } from "@soc/contracts";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { isoToDate, nowMs } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api";
@@ -112,6 +114,7 @@ export function SurveyListPage() {
   const [duplicating, setDuplicating] = useState<string | null>(null);
 
   // Filter States
+  const [dateRange, setDateRange] = useState<DateRange>({ from: "", to: "" });
   const [surveyGroup, setSurveyGroup] = useState<"general" | "operational">("general");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<SurveyStatusFilter>("all");
@@ -266,7 +269,7 @@ export function SurveyListPage() {
 
   // Perform Dynamic Client-Side Filtering & Sorting
   const filteredSurveys = useMemo(() => {
-    return filterAndSortSurveys(surveys.filter((survey) => survey.id !== OPERATIONAL_SURVEY_IDS.corporatePartnership).filter((survey) => Object.values(OPERATIONAL_SURVEY_IDS).some((id) => id === survey.id) === (surveyGroup === "operational")), {
+    return filterAndSortSurveys(surveys.filter(survey => survey.isAlwaysOpen === (surveyGroup === "operational")).filter(survey => overlapsDateRange(survey.isAlwaysOpen ? null : survey.opensAt, survey.isAlwaysOpen ? null : survey.closesAt, dateRange)), {
       periodFilter: "all",
       searchQuery,
       sortBy,
@@ -274,6 +277,7 @@ export function SurveyListPage() {
       statusFilter,
     });
   }, [
+    dateRange,
     surveyGroup,
     surveys,
     searchQuery,
@@ -337,6 +341,7 @@ export function SurveyListPage() {
                 }}
                 className="w-28 shrink-0"
               />
+              <DateRangePicker presetType="future" align="start" value={dateRange} onChange={range => { setDateRange(range); setCurrentPage(1); }} />
               <PageSearchField
                 ariaLabel="설문 검색"
                 className="ml-auto w-full sm:w-72"

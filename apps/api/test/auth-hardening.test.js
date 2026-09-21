@@ -417,3 +417,16 @@ test("development mode with HTTPS KAIST SSO also uses a cross-site transaction c
     else process.env.SSO_REDIRECT_URI = previousRedirectUri;
   }
 });
+
+
+test("existing SSO login records recent access with refreshed profile", async () => {
+  const { UsersService } = require("../dist/apps/api/src/features/users/users.service.js");
+  let saved;
+  const service = new UsersService({ async updateProfile(id, changes) { saved = { id, ...changes }; } }, {});
+  const before = Date.now();
+  await service.updateProfileFromSso("existing-user", { primaryMajor: "전산학부" });
+  assert.equal(saved.id, "existing-user");
+  assert.equal(saved.primaryMajor, "전산학부");
+  assert.ok(saved.lastLoginAt instanceof Date);
+  assert.ok(saved.lastLoginAt.getTime() >= before && saved.lastLoginAt.getTime() <= Date.now());
+});

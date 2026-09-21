@@ -29,7 +29,7 @@ function numeric(value: number, operator: string | undefined, threshold?: number
     default: return value >= threshold!;
   }
 }
-export async function getResponseError(question: SurveyQuestionRecord, value: AnswerValue | undefined, lang: string): Promise<string | null> {
+export async function getResponseError(question: Pick<SurveyQuestionRecord, "questionType" | "isRequired" | "config"> & Partial<Pick<SurveyQuestionRecord, "answerRegex">>, value: AnswerValue | undefined, lang: string): Promise<string | null> {
   if (isSurveyDisplayBlock(question.questionType)) return null;
   if (!isAnswerFilled(question.questionType, value)) return question.isRequired ? (lang === "ko" ? "필수 질문입니다." : "This question is required.") : null;
   const config = question.config;

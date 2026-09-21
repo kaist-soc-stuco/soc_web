@@ -14,7 +14,7 @@ import {
   AdminTableHeader,
 } from "@/components/ui/admin-data-table";
 import { AdminLoadingState, AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
-import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -39,6 +39,7 @@ export function ContentModerationPage() {
 function ContentModerationPageContent() {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { toast } = useToast();
+  const [boardNames, setBoardNames] = useState<Record<string, string>>({});
   const [items, setItems] = useState<HiddenArticleItem[]>([]);
   const [comments, setComments] = useState<HiddenCommentItem[]>([]);
   const [view, setView] = useState<"articles" | "comments">("articles");
@@ -52,6 +53,7 @@ function ContentModerationPageContent() {
     setLoading(true);
     try {
       const boards = await apiClient.getBoards();
+      setBoardNames(Object.fromEntries(boards.items.map(board => [board.code, board.nameKo])));
       const [responses, hiddenComments] = await Promise.all([
         Promise.all(boards.items.map((board) => apiClient.getHiddenArticles(board.code))),
         apiClient.getHiddenComments(),
@@ -68,8 +70,8 @@ function ContentModerationPageContent() {
   useEffect(() => { void load(); }, []);
 
   const normalizedQuery = query.trim().toLocaleLowerCase();
-  const filtered = items.filter((item) => !normalizedQuery || [item.titleKo, item.authorName, item.hiddenReason, item.boardCode].some((value) => value.toLocaleLowerCase().includes(normalizedQuery)));
-  const filteredComments = comments.filter((item) => !normalizedQuery || [item.content, item.articleTitleKo, item.authorName, item.hiddenReason, item.boardCode].some((value) => value.toLocaleLowerCase().includes(normalizedQuery)));
+  const filtered = items.filter((item) => !normalizedQuery || [item.titleKo, item.authorName, item.hiddenReason, boardNames[item.boardCode] ?? ""].some((value) => value.toLocaleLowerCase().includes(normalizedQuery)));
+  const filteredComments = comments.filter((item) => !normalizedQuery || [item.content, item.articleTitleKo, item.authorName, item.hiddenReason, boardNames[item.boardCode] ?? ""].some((value) => value.toLocaleLowerCase().includes(normalizedQuery)));
   const activeItems = view === "articles" ? filtered : filteredComments;
   const totalPages = Math.max(1, Math.ceil(activeItems.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -134,6 +136,7 @@ function ContentModerationPageContent() {
           )}
           pagination={activeItems.length > 0 ? (
             <Pagination
+              className="m-0 w-full"
               currentPage={safePage}
               totalPages={totalPages}
               onPageChange={setPage}
@@ -145,19 +148,19 @@ function ContentModerationPageContent() {
           {loading && items.length === 0 && comments.length === 0 ? <AdminLoadingState /> : view === "articles" ? (
             <AdminDataTable minWidth={920} mobileMode="cards">
               <colgroup><col style={{ width: 120 }} /><col /><col style={{ width: 140 }} /><col style={{ width: 300 }} /><col style={{ width: 170 }} /><col style={{ width: 92 }} /></colgroup>
-              <AdminTableHeader><tr><AdminTableHead>게시판</AdminTableHead><AdminTableHead>제목</AdminTableHead><AdminTableHead>작성자</AdminTableHead><AdminTableHead>숨김 사유</AdminTableHead><AdminTableHead>처리 일시</AdminTableHead><AdminTableHead>작업</AdminTableHead></tr></AdminTableHeader>
+              <AdminTableHeader><tr><AdminTableHead>게시판</AdminTableHead><AdminTableHead>제목</AdminTableHead><AdminTableHead>작성자</AdminTableHead><AdminTableHead>숨김 사유</AdminTableHead><AdminTableHead>처리 일시</AdminTableHead><AdminTableHead className="text-center">작업</AdminTableHead></tr></AdminTableHeader>
               <AdminTableBody>
                 {pageItems.length === 0 ? <AdminTableEmpty colSpan={6}>숨긴 게시글이 없습니다.</AdminTableEmpty> : pageItems.map((article) => (
                   <tr key={`${article.boardCode}:${article.articleId}`}>
-                    <AdminTableCell>{article.boardCode}</AdminTableCell>
+                    <AdminTableCell>{boardNames[article.boardCode] ?? "게시판"}</AdminTableCell>
                     <AdminTableCell data-mobile-label="제목" truncate><span className="font-medium text-app-text-strong">{article.titleKo}</span></AdminTableCell>
                     <AdminTableCell data-mobile-label="작성자" truncate>{article.authorName}</AdminTableCell>
                     <AdminTableCell data-mobile-label="숨김 사유"><span className="line-clamp-2 font-normal">{article.hiddenReason}</span></AdminTableCell>
                     <AdminTableCell data-mobile-label="처리 일시">{formatDate(article.hiddenAt)}</AdminTableCell>
                     <AdminTableCell data-mobile-label="작업" className="text-center align-middle">
-                      <Button type="button" variant="ghost" size="sm" className="text-rose-600 hover:text-rose-700" disabled={restoringId === article.articleId} onClick={() => void restore(article)}>
-                        <RotateCcw className="size-3.5" aria-hidden="true" /> 복구
-                      </Button>
+                      <IconButton aria-label="복구" data-tooltip="복구" size="sm" disabled={restoringId === article.articleId} onClick={() => void restore(article)}>
+                        <RotateCcw className="size-3.5" aria-hidden="true" />
+                      </IconButton>
                     </AdminTableCell>
                   </tr>
                 ))}
@@ -166,19 +169,19 @@ function ContentModerationPageContent() {
           ) : (
             <AdminDataTable minWidth={920} mobileMode="cards">
               <colgroup><col style={{ width: 120 }} /><col style={{ width: 260 }} /><col /><col style={{ width: 140 }} /><col style={{ width: 220 }} /><col style={{ width: 92 }} /></colgroup>
-              <AdminTableHeader><tr><AdminTableHead>게시판</AdminTableHead><AdminTableHead>게시글</AdminTableHead><AdminTableHead>댓글 내용</AdminTableHead><AdminTableHead>작성자</AdminTableHead><AdminTableHead>숨김 사유</AdminTableHead><AdminTableHead>작업</AdminTableHead></tr></AdminTableHeader>
+              <AdminTableHeader><tr><AdminTableHead>게시판</AdminTableHead><AdminTableHead>게시글</AdminTableHead><AdminTableHead>댓글 내용</AdminTableHead><AdminTableHead>작성자</AdminTableHead><AdminTableHead>숨김 사유</AdminTableHead><AdminTableHead className="text-center">작업</AdminTableHead></tr></AdminTableHeader>
               <AdminTableBody>
                 {pageComments.length === 0 ? <AdminTableEmpty colSpan={6}>숨긴 댓글이 없습니다.</AdminTableEmpty> : pageComments.map((comment) => (
                   <tr key={comment.commentId}>
-                    <AdminTableCell>{comment.boardCode}</AdminTableCell>
+                    <AdminTableCell>{boardNames[comment.boardCode] ?? "게시판"}</AdminTableCell>
                     <AdminTableCell data-mobile-label="게시글" truncate>{comment.articleTitleKo}</AdminTableCell>
                     <AdminTableCell data-mobile-label="댓글 내용"><span className="line-clamp-2 font-normal text-app-text-strong">{comment.content}</span></AdminTableCell>
                     <AdminTableCell data-mobile-label="작성자" truncate>{comment.authorName}</AdminTableCell>
                     <AdminTableCell data-mobile-label="숨김 사유"><span className="line-clamp-2 font-normal">{comment.hiddenReason}</span></AdminTableCell>
                     <AdminTableCell data-mobile-label="작업" className="text-center align-middle">
-                      <Button type="button" variant="ghost" size="sm" className="text-rose-600 hover:text-rose-700" disabled={restoringId === `comment:${comment.commentId}`} onClick={() => void restoreComment(comment)}>
-                        <RotateCcw className="size-3.5" aria-hidden="true" /> 복구
-                      </Button>
+                      <IconButton aria-label="복구" data-tooltip="복구" size="sm" disabled={restoringId === `comment:${comment.commentId}`} onClick={() => void restoreComment(comment)}>
+                        <RotateCcw className="size-3.5" aria-hidden="true" />
+                      </IconButton>
                     </AdminTableCell>
                   </tr>
                 ))}

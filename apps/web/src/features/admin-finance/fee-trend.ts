@@ -1,7 +1,8 @@
+import { isoToDate, msToDate } from "@soc/shared";
 type ReceiptDay = { period: string; paidAmount: number; paymentCount: number };
 export type FeeTrendPoint = { start: string; end: string; label: string; amount: number; count: number; cumulative: number };
 const dayMs = 86_400_000;
-const date = (value: string) => new Date(`${value}T00:00:00Z`);
+const date = (value: string) => isoToDate(`${value}T00:00:00Z`);
 const stamp = (value: Date) => value.toISOString().slice(0, 10);
 
 /** Date-only arithmetic uses UTC; incoming dates already represent Korean receipt days. */
@@ -14,12 +15,12 @@ export function buildFeeTrend(rows: ReceiptDay[], from: string, to: string): { u
   const points: FeeTrendPoint[] = [];
   const amounts = new Map(rows.map(row => [row.period, row]));
   let cumulative = 0;
-  for (let cursor = new Date(start); cursor <= end;) {
-    const bucketStart = new Date(cursor);
-    const next = new Date(cursor);
+  for (let cursor = msToDate(start.getTime()); cursor <= end;) {
+    const bucketStart = msToDate(cursor.getTime());
+    const next = msToDate(cursor.getTime());
     if (unit === "월") next.setUTCMonth(next.getUTCMonth() + 1, 1);
     else next.setUTCDate(next.getUTCDate() + (unit === "주" ? 7 : 1));
-    const bucketEnd = new Date(Math.min(next.getTime() - dayMs, end.getTime()));
+    const bucketEnd = msToDate(Math.min(next.getTime() - dayMs, end.getTime()));
     let amount = 0, count = 0;
     while (cursor <= bucketEnd) {
       const row = amounts.get(stamp(cursor));

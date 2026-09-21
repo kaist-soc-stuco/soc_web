@@ -16,7 +16,7 @@ import { useCurrentSession } from "@/hooks/use-current-session";
 import type { AnswerValue, FileAnswer } from "./survey-answer-utils";
 import { UiInput, UiTextarea } from "@/components/ui/form-control";
 
-export type ResponseQuestion = Pick<SurveyQuestionRecord, "id" | "questionType" | "options" | "config" | "titleKo" | "titleEn" | "descriptionKo" | "descriptionEn" | "isRequired">;
+export type ResponseQuestion = Pick<SurveyQuestionRecord, "id" | "questionType" | "options" | "config" | "titleKo" | "titleEn" | "descriptionKo" | "descriptionEn" | "isRequired"> & Partial<Pick<SurveyQuestionRecord, "answerRegex">>;
 
 interface QuestionInputProps {
   maxSelections?: number;

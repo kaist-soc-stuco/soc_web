@@ -1,3 +1,4 @@
+import { nowDate } from "@soc/shared";
 import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
 import { and, eq, inArray } from "drizzle-orm";
 import { surveyStructureSnapshot, surveyStructuresEqual, type RestoreSurveyStructureRequest } from "@soc/contracts";
@@ -53,16 +54,16 @@ export class SurveyHistoryService {
           throw new ConflictException("survey_history_conflict");
         }
         await assertSurveyAssetReferences(this.assets, actorUserId, input.header.value, tx, surveyId);
-        await tx.update(surveys).set({ ...input.header.value, descriptionKo: sanitizeSurveyRichText(input.header.value.descriptionKo), descriptionEn: sanitizeSurveyRichText(input.header.value.descriptionEn), updatedAt: new Date() }).where(eq(surveys.surveyId, surveyId));
+        await tx.update(surveys).set({ ...input.header.value, descriptionKo: sanitizeSurveyRichText(input.header.value.descriptionKo), descriptionEn: sanitizeSurveyRichText(input.header.value.descriptionEn), updatedAt: nowDate() }).where(eq(surveys.surveyId, surveyId));
       }
       for (const section of target) {
         const { questions: _questions, ...fields } = section;
-        const values = { ...fields, surveyId, descriptionKo: sanitizeSurveyRichText(fields.descriptionKo), descriptionEn: sanitizeSurveyRichText(fields.descriptionEn), updatedAt: new Date() };
+        const values = { ...fields, surveyId, descriptionKo: sanitizeSurveyRichText(fields.descriptionKo), descriptionEn: sanitizeSurveyRichText(fields.descriptionEn), updatedAt: nowDate() };
         if (currentSections.has(section.id)) await tx.update(surveySections).set(values).where(and(eq(surveySections.id, section.id), eq(surveySections.surveyId, surveyId)));
         else await tx.insert(surveySections).values(values);
       }
       for (const section of target) for (const question of section.questions) {
-        const values = { ...question, sectionId: section.id, descriptionKo: sanitizeSurveyRichText(question.descriptionKo), descriptionEn: sanitizeSurveyRichText(question.descriptionEn), updatedAt: new Date() };
+        const values = { ...question, sectionId: section.id, descriptionKo: sanitizeSurveyRichText(question.descriptionKo), descriptionEn: sanitizeSurveyRichText(question.descriptionEn), updatedAt: nowDate() };
         if (currentQuestions.has(question.id)) await tx.update(surveyQuestions).set(values).where(eq(surveyQuestions.id, question.id));
         else await tx.insert(surveyQuestions).values(values);
       }

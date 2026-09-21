@@ -1,3 +1,5 @@
+import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
+import { overlapsDateRange } from "@/lib/date-range-filter";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { createApiClient } from "@soc/api-client";
 import type { VoteRecord } from "@soc/contracts";
@@ -24,11 +26,13 @@ export function VoteListPage() {
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const [votes, setVotes] = useState<VoteRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<DateRange>({ from: "", to: "" });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   useEffect(() => { void client.listAdminVotes().then(setVotes).finally(() => setLoading(false)); }, [client]);
-  const totalPages = Math.max(1, Math.ceil(votes.length / pageSize));
-  const visible = votes.slice((page - 1) * pageSize, page * pageSize);
+  const filteredVotes = votes.filter(vote => overlapsDateRange(vote.startsAt, vote.endsAt, dateRange));
+  const totalPages = Math.max(1, Math.ceil(filteredVotes.length / pageSize));
+  const visible = filteredVotes.slice((page - 1) * pageSize, page * pageSize);
   const rangeStart = visible.length > 0 ? (page - 1) * pageSize + 1 : 0;
   const rangeEnd = visible.length > 0 ? rangeStart + visible.length - 1 : 0;
 
@@ -37,7 +41,7 @@ export function VoteListPage() {
       <AdminPageShell>
         <AdminPageMain>
           <AdminPageHeader title="투표 관리" actions={<Button asChild><Link to="/admin/votes/new"><Plus />새 투표</Link></Button>} />
-          <AdminTableCard pagination={(
+          <AdminTableCard toolbar={<div className="py-4"><DateRangePicker presetType="future" align="start" value={dateRange} onChange={range => { setDateRange(range); setPage(1); }} /></div>} pagination={(
             <Pagination
               className="m-0 w-full"
               currentPage={page}
@@ -51,7 +55,7 @@ export function VoteListPage() {
                   }}
                 />
               )}
-              range={<span className="text-sm font-normal text-[#344054]">총 {votes.length}건 중 {rangeStart}-{rangeEnd}</span>}
+              range={<span className="text-sm font-normal text-[#344054]">총 {filteredVotes.length}건 중 {rangeStart}-{rangeEnd}</span>}
               totalPages={totalPages}
             />
           )}>

@@ -274,6 +274,7 @@ export class UsersService {
   ): Promise<void> {
     await this.usersRepository.updateProfile(userId, {
       ...input,
+      lastLoginAt: nowDate(),
     });
   }
 

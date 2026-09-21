@@ -528,6 +528,7 @@
   }
 
   .ui-pagination__controls {
+    margin-left: auto;
     max-width: 100%;
     justify-content: flex-end;
     gap: 4px;

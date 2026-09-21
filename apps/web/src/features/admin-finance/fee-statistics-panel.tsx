@@ -1,3 +1,4 @@
+import { nowDate } from "@soc/shared";
 import { useMemo, useState, useRef, useLayoutEffect } from "react";
 import type { StudentFeeStatsResponse } from "@soc/contracts";
 import { AdminCard } from "@/components/ui/admin-page";
@@ -33,7 +34,7 @@ export function FeeStatisticsPanel({ semester, semesterOptions, loading, onSemes
     return () => observer.disconnect();
   }, [Boolean(stats?.totals.paymentCount)]);
   const plotWidth = chartWidth - 110;
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+  const today = nowDate().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
   const chart = useMemo(() => buildFeeTrend(stats?.trend ?? [], range.from, range.to || today), [stats, range.from, range.to, today]);
   const totals = stats?.totals;
   const receiptStudents = stats?.trend.at(-1)?.cumulativeStudents ?? 0;

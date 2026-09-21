@@ -80,7 +80,7 @@ export function AuthGuard({
     redirectTo,
   ]);
 
-  if (isLoading || isFetching) {
+  if (isLoading) {
     return <>{fallback}</>;
   }
 

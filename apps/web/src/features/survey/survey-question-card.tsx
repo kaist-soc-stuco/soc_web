@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { getResponseError } from "./survey-response-validation";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { getLocalizedText, isAnswerFilled, type AnswerValue } from "./survey-answer-utils";
@@ -9,7 +10,14 @@ export function SurveyQuestionCard({ question, value, onChange, lang, error: que
   error?: string | null; disabled?: boolean; maxSelections?: number; hint?: string; id?: string;
 }) {
   const [touched, setTouched] = useState(false);
-  const error = questionError || (touched && !disabled && question.isRequired && !isAnswerFilled(question.questionType, value)
+  const [blurError, setBlurError] = useState<string | null>(null);
+  const validationVersion = useRef(0);
+  useEffect(() => {
+    validationVersion.current++;
+    setBlurError(null);
+    return () => { validationVersion.current++; };
+  }, [value, question, lang, disabled]);
+  const error = questionError || (!disabled && blurError) || (touched && !disabled && question.isRequired && !isAnswerFilled(question.questionType, value)
     ? lang === "ko" ? "필수 질문입니다." : "This question is required."
     : null);
   const questionImage = lang === "ko" ? question.config?.imageUrlKo : question.config?.imageUrlEn || question.config?.imageUrlKo;
@@ -18,7 +26,15 @@ export function SurveyQuestionCard({ question, value, onChange, lang, error: que
       id={id ?? `survey-question-${question.id}`}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)
-          && !(event.relatedTarget instanceof Element && event.relatedTarget.closest('[role="listbox"]'))) setTouched(true);
+          && !(event.relatedTarget instanceof Element && event.relatedTarget.closest('[role="listbox"]'))) {
+          setTouched(true);
+          if (!disabled) {
+            const version = ++validationVersion.current;
+            void getResponseError(question, value, lang).then(message => {
+              if (version === validationVersion.current) setBlurError(message);
+            });
+          }
+        }
       }}
       className={`group scroll-mt-24 rounded-lg border bg-white px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.035)] transition-[border-color,box-shadow] ${
         error

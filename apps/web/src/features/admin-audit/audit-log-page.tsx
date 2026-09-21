@@ -234,16 +234,16 @@ export function AuditLogPage() {
             <div className="flex flex-col gap-3 border-b border-slate-100 p-4 xl:flex-row xl:items-end xl:justify-between">
               <div className="flex flex-wrap items-end gap-2">
                 <AdminSelectDropdown ariaLabel="로그 도메인" value={targetType} options={domainOptions} onChange={(value) => updatePageFilter(setTargetType, value)} className="w-36 shrink-0" buttonClassName="h-[var(--ui-control-height)]" />
-                <DateRangePicker label="기간 선택" disableFuture align="start" value={{ from: dateFrom, to: dateTo }} onChange={({ from, to }) => { updatePageFilter(setDateFrom, from); updatePageFilter(setDateTo, to); }} />
               </div>
               <PageSearchField
                 ariaLabel="운영 로그 검색"
-                className="order-first ml-auto w-full xl:order-last xl:w-[25rem]"
+                className="ml-auto w-full xl:w-[25rem]"
                 onChange={(value) => updatePageFilter(setQuery, value)}
                 onClear={() => updatePageFilter(setQuery, "")}
                 placeholder="담당자, 대상, 액션 검색"
                 value={query}
               />
+              <div className="self-end"><DateRangePicker label="기간 선택" disableFuture align="end" value={{ from: dateFrom, to: dateTo }} onChange={({ from, to }) => { updatePageFilter(setDateFrom, from); updatePageFilter(setDateTo, to); }} /></div>
             </div>
 
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">

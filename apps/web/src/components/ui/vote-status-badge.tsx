@@ -17,7 +17,7 @@ export function VoteStatusBadge({ status, startsAt, endsAt }: { status: string; 
           ? { label: labels.ended, tone: "neutral" as const }
           : { label: labels.open, tone: "success" as const }
       : status === "CLOSED"
-        ? { label: labels.closed, tone: "warning" as const }
+        ? { label: labels.closed, tone: "neutral" as const }
         : { label: labels.tallied, tone: "info" as const };
   return <Badge tone={config.tone}>{config.label}</Badge>;
 }

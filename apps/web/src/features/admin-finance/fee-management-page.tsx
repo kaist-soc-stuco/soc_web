@@ -14,7 +14,7 @@ import type {
   StudentFeeListResponse,
   StudentFeeStatsResponse,
 } from "@soc/contracts";
-import { isoToDate, nowIso } from "@soc/shared";
+import { isoToDate, msToDate, nowDate, nowIso } from "@soc/shared";
 import { ChevronDown, CreditCard, FileUp, Plus, Sheet } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
@@ -175,8 +175,8 @@ export function FeeManagementPage() {
   const [activeSection, setActiveSection] = useState<"ledger" | "stats" | "settings">("ledger");
   const [statsSemester, setStatsSemester] = useState(referenceSemester);
   const [statsRange, setStatsRange] = useState<DateRange>(() => {
-    const today = new Date();
-    const start = new Date(today); start.setDate(start.getDate() - 29);
+    const today = nowDate();
+    const start = msToDate(today.getTime()); start.setDate(start.getDate() - 29);
     const stamp = (date: Date) => date.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
     return { from: stamp(start), to: stamp(today) };
   });
@@ -284,7 +284,7 @@ export function FeeManagementPage() {
       const response = await apiClient.getStudentFeeStats({
         bucket: "day",
         dateFrom: statsRange.from || undefined,
-        dateTo: statsRange.to || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }),
+        dateTo: statsRange.to || nowDate().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }),
         referenceSemester: statsSemester,
       });
       if (request !== statsRequest.current) return;
@@ -881,7 +881,7 @@ function parseFeeSpreadsheet(input: ArrayBuffer): { updates: BulkUpdateStudentFe
 }
 
 function formatPaymentHalf(iso: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "numeric" }).formatToParts(new Date(iso));
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "numeric" }).formatToParts(isoToDate(iso));
   const year = parts.find(part => part.type === "year")?.value;
   const month = Number(parts.find(part => part.type === "month")?.value);
   return `${year}년 ${month <= 6 ? "상반기" : "하반기"} 납부`;

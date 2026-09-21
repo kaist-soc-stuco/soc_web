@@ -299,8 +299,10 @@ export function PermissionPage() {
     setMemberEditorOpen(true);
   };
 
+  const membersChanged = selectedMemberIds.length !== members.length || members.some(member => !selectedMemberIds.includes(member.userId));
+
   const saveMembers = async () => {
-    if (!selectedRole) return;
+    if (!selectedRole || !membersChanged || candidateSaving) return;
     setCandidateSaving(true);
     setError(null);
     try {
@@ -431,7 +433,7 @@ export function PermissionPage() {
           <div className="grid gap-4"><AdminFormField label="역할 이름"><UiInput autoFocus value={createDraft.nameKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, nameKo: value })); }} placeholder="예: 콘텐츠 관리자" /></AdminFormField></div>
         </Modal>
 
-        <Modal open={memberEditorOpen} onClose={() => setMemberEditorOpen(false)} title={selectedRole ? `${selectedRole.nameKo} 구성원 편집` : "구성원 편집"} className="h-[680px] max-h-[calc(100dvh-3rem)] max-w-4xl" bodyClassName="!overflow-hidden flex min-h-0 flex-1 flex-col" footer={<><Button type="button" variant="outline" onClick={() => setMemberEditorOpen(false)}>취소</Button><Button loading={candidateSaving} type="button" onClick={() => void saveMembers()} disabled={candidateSaving}>{"적용"}</Button></>}>
+        <Modal open={memberEditorOpen} onClose={() => setMemberEditorOpen(false)} title={selectedRole ? `${selectedRole.nameKo} 구성원 편집` : "구성원 편집"} className="h-[680px] max-h-[calc(100dvh-3rem)] max-w-4xl" bodyClassName="!overflow-hidden flex min-h-0 flex-1 flex-col" footer={<><Button type="button" variant="outline" onClick={() => setMemberEditorOpen(false)}>취소</Button><Button loading={candidateSaving} type="button" onClick={() => void saveMembers()} disabled={candidateSaving || !membersChanged}>{"적용"}</Button></>}>
           <div className="flex min-h-0 flex-1 flex-col gap-4">
             <div className="grid shrink-0 gap-2">
               <AdminSearchField aria-label="구성원 검색" value={candidateQuery} onValueChange={setCandidateQuery} placeholder="이름, 학번, 이메일, 소속 검색" />
