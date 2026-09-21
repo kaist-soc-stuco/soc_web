@@ -411,19 +411,21 @@ function CalendarManagementContent() {
           toolbar={(
             <div className="py-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <SegmentedControl<SourceFilter>
-                  ariaLabel="일정 출처"
-                  value={sourceFilter}
-                  onChange={(value) => { setSourceFilter(value); setPage(1); }}
-                  options={[
-                    { value: "all", label: "전체" },
-                    { value: "ARTICLE", label: "행사 게시글" },
-                    { value: "MANUAL", label: "학생회 일정" },
-                    { value: "KAIST_ACADEMIC", label: "KAIST 학사일정" },
-                  ]}
-                />
-                <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto">
+                <div className="flex flex-wrap items-center gap-2">
+                  <SegmentedControl<SourceFilter>
+                    ariaLabel="일정 출처"
+                    value={sourceFilter}
+                    onChange={(value) => { setSourceFilter(value); setPage(1); }}
+                    options={[
+                      { value: "all", label: "전체" },
+                      { value: "ARTICLE", label: "행사 게시글" },
+                      { value: "MANUAL", label: "학생회 일정" },
+                      { value: "KAIST_ACADEMIC", label: "KAIST 학사일정" },
+                    ]}
+                  />
                   <DateRangePicker presetType="future" align="start" value={{ from: dateFrom, to: dateTo }} onChange={({ from, to }) => { setDateFrom(from); setDateTo(to); setPage(1); }} />
+                </div>
+                <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto">
                   <AdminSelectDropdown
                     ariaLabel="일정 분류"
                     value={categoryFilter}
