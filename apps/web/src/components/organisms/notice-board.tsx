@@ -1,295 +1,93 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import { isoToMs, nowMs } from "@soc/shared";
-import { ChevronRight } from "lucide-react";
-import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { formatNumericDate } from "@/lib/date-display";
-import { Button } from "@/components/ui/button";
-import { SectionHeader } from "@/components/ui/section-header";
-import { SegmentedControl } from "@/components/ui/segmented-control";
-import { EmptyState } from "@/components/ui/data-state";
-import { useLanguage } from "@/hooks/use-language";
+import { ArrowUpRight } from "lucide-react";
 
-interface NoticeItemProps {
-  id: string;
-  category: string;
-  categoryLabel: string;
-  lang: string;
-  author: string;
-  title: string;
-  date: string;
-  commentCount?: number;
-  isImportant?: boolean;
-  isNew?: boolean;
-  showGroupDivider?: boolean;
-  showCategoryBadge?: boolean;
-}
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { formatNumericDateRange } from "@/lib/date-display";
+import { Button } from "@/components/ui/button";
+import { stripRichText } from "@/components/ui/rich-text-content";
+import { useLanguage } from "@/hooks/use-language";
 
 const HOME_NOTICE_LIMIT = 6;
 
-function NoticeItem({
-  id,
-  category,
-  categoryLabel,
-  lang,
-  author,
-  title,
-  date,
-  commentCount,
-  isImportant,
-  isNew,
-  showGroupDivider,
-  showCategoryBadge,
-}: NoticeItemProps) {
-  return (
-    <Link
-      to={`/board/${category}/${id}`}
-      className={`flex min-h-[2.5rem] items-center overflow-hidden border-b border-slate-100 px-3 transition-colors ${
-        isImportant
-          ? "bg-brand-primary-light/35 hover:bg-brand-primary/10"
-          : "hover:bg-slate-50/80"
-      } ${showGroupDivider ? "border-t border-brand-primary-border/50" : ""}`}
-    >
-      <div className="flex w-full min-w-0 items-center justify-between gap-4 py-0.5">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          {showCategoryBadge ? (
-            <span className="inline-flex shrink-0 items-center rounded-md border-0 bg-slate-100 px-2 py-0.5 text-[length:var(--ui-text-caption-size)] font-semibold tracking-tight text-slate-700">
-              {categoryLabel}
-            </span>
-          ) : null}
-          <div
-            className={`home-board-title flex min-w-0 items-center gap-1.5 truncate text-slate-700 hover:text-brand-primary ${
-              isImportant ? "is-important" : ""
-            }`}
-          >
-            <span className="min-w-0 truncate">{title}</span>
-            {commentCount && commentCount > 0 ? (
-              <span
-                aria-label={
-                  lang === "ko"
-                    ? `댓글 ${commentCount}개`
-                    : `${commentCount} comments`
-                }
-                className="shrink-0 self-end text-xs font-normal leading-4 text-[#1769AA]"
-              >
-                [{commentCount}]
-              </span>
-            ) : null}
-            {isNew ? (
-              <span
-                className="h-[5px] w-[5px] shrink-0 rounded-full bg-rose-500"
-              >
-                <span className="sr-only">{lang === "ko" ? "새 글" : "New post"}</span>
-              </span>
-            ) : null}
-          </div>
-        </div>
-        <div className="home-notice-meta grid w-[10.5rem] min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-1.5 text-right">
-          <span className="home-meta-text min-w-0 truncate text-slate-400">
-            {author}
-          </span>
-          <span aria-hidden="true" className="home-meta-text text-center text-slate-300">
-            ·
-          </span>
-          <time className="home-meta-text shrink-0 tabular-nums text-slate-400">
-            {date}
-          </time>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function formatDate(dateIso: string) {
-  return formatNumericDate(dateIso);
-}
-
 export function NoticeBoard() {
   const { lang } = useLanguage();
-  const [activeTab, setActiveTab] = useState(0);
-  const [notices, setNotices] = useState<Record<string, NoticeItemProps[]>>({});
-  const [noticeErrors, setNoticeErrors] = useState<Record<string, boolean>>({});
-  const [lastLoadedNotices, setLastLoadedNotices] = useState<NoticeItemProps[]>([]);
-
-  const tabs = [
-    { code: "notice", labelKo: "공지", labelEn: "Notice" },
-    { code: "hoc", labelKo: "HoC", labelEn: "HoC" },
-    { code: "promotions", labelKo: "홍보글", labelEn: "Promotional Posts" },
-    { code: "labs", labelKo: "연구실", labelEn: "Research Labs" },
-  ];
-
-  const apiClient = useMemo(
-    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
-    [],
-  );
-  const activeCategory = tabs[activeTab].code;
-  const activeNoticeKey = `${activeCategory}:${lang}`;
-  const getCategoryLabel = (code: string) => {
-    const tab = tabs.find((item) => item.code === code);
-    if (!tab) return code;
-    return lang === "ko" ? tab.labelKo : tab.labelEn;
-  };
-
-  const currentNotices = notices[activeNoticeKey] || [];
-  const hasCurrentNoticeData = Object.prototype.hasOwnProperty.call(
-    notices,
-    activeNoticeKey,
-  );
-
-  const displayNotices = useMemo(() => {
-    const pinned = currentNotices.filter((notice) => notice.isImportant).slice(0, 3);
-    const regular = currentNotices.filter((notice) => !notice.isImportant);
-    return [...pinned, ...regular];
-  }, [currentNotices]);
-  const visibleNotices = displayNotices.slice(0, HOME_NOTICE_LIMIT);
-  const renderedNotices = hasCurrentNoticeData
-    ? visibleNotices
-    : lastLoadedNotices.slice(0, HOME_NOTICE_LIMIT);
-  useEffect(() => {
-    let active = true;
-    const fetchNotices = async () => {
-      try {
-        const res = await apiClient.getArticles(activeCategory, { limit: 20 });
-        // Filter out items with blank/empty titles
-        const items = res.items
-          .filter(
-            (item) => item.boardCode !== "_EVENT" && item.boardCode !== "faq",
-          )
-          .filter((item) => item.titleKo && item.titleKo.trim() !== "")
-          .sort((a, b) => {
-            if (a.isPinned !== b.isPinned) {
-              return Number(b.isPinned) - Number(a.isPinned);
-            }
-            return isoToMs(b.postedAt) - isoToMs(a.postedAt);
-          })
-          .map((item) => ({
-            id: item.articleId,
-            category: activeCategory,
-            categoryLabel: getCategoryLabel(activeCategory),
-            lang,
-            author: item.isAnonymous
-              ? lang === "ko"
-                ? "익명"
-                : "Anonymous"
-              : (lang === "en" ? item.author.nameEn || item.author.name : item.author.name),
-            title: lang === "ko" ? item.titleKo : item.titleEn || item.titleKo,
-            date: formatDate(item.postedAt),
-            isImportant: item.isPinned,
-            isNew: (() => {
-              if (activeCategory !== "notice") {
-                return false;
-              }
-              return isoToMs(item.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
-            })(),
-            commentCount: item.commentCount,
-        }));
-        if (active) {
-          setNotices((prev) => ({ ...prev, [activeNoticeKey]: items }));
-          setNoticeErrors((prev) => ({ ...prev, [activeNoticeKey]: false }));
-          setLastLoadedNotices(items);
-        }
-      } catch (err) {
-        console.error(err);
-        if (active) {
-          setNoticeErrors((prev) => ({ ...prev, [activeNoticeKey]: true }));
-        }
-      }
-    };
-
-    if (!notices[activeNoticeKey]) {
-      void fetchNotices();
-    }
-  }, [
-    activeCategory,
-    activeNoticeKey,
-    lang,
-    notices,
-    apiClient,
-  ]);
-
-  const hasNoticeError = noticeErrors[activeNoticeKey] === true;
-  const isLoadingNotices = !hasCurrentNoticeData && !hasNoticeError;
-
-  const retryNotice = () => {
-    setNoticeErrors((prev) => ({ ...prev, [activeNoticeKey]: false }));
-    setNotices((prev) => {
-      const next = { ...prev };
-      delete next[activeNoticeKey];
-      return next;
-    });
-  };
+  const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+  const noticesQuery = useQuery({
+    queryKey: ["articles", "home-notices"],
+    queryFn: () => apiClient.getArticles("notice", { limit: 20 }),
+    staleTime: 60 * 1000,
+  });
+  const notices = useMemo(() => {
+    const items = (noticesQuery.data?.items ?? [])
+      .filter((item) => item.titleKo.trim())
+      .sort((a, b) => isoToMs(b.postedAt) - isoToMs(a.postedAt));
+    return [
+      ...items.filter((item) => item.isPinned).slice(0, 3),
+      ...items.filter((item) => !item.isPinned),
+    ].slice(0, HOME_NOTICE_LIMIT);
+  }, [noticesQuery.data]);
 
   return (
-    <section className="home-bento-card flex min-h-[18rem] min-w-0 flex-col overflow-hidden">
-      <div className="mx-auto flex min-h-[18rem] w-full flex-col">
-        <SectionHeader
-          navigation={
-            <SegmentedControl
-              ariaLabel={lang === "ko" ? "게시판 카테고리" : "Board categories"}
-              className="home-board-tabs clean-segmented-control max-w-full"
-              itemClassName="!text-xs"
-              options={tabs.map((tab) => ({
-                label: lang === "ko" ? tab.labelKo : tab.labelEn,
-                value: tab.code,
-              }))}
-              value={activeCategory}
-              onChange={(value) => {
-                const nextIndex = tabs.findIndex((tab) => tab.code === value);
-                if (nextIndex >= 0) setActiveTab(nextIndex);
-              }}
-            />
-          }
-          action={
-            <Link
-              to={`/board/${activeCategory}`}
-              className="home-more-link shrink-0"
-            >
-              <span>{lang === "ko" ? "더보기" : "More"}</span>
-              <ChevronRight className="h-3 w-3" />
-            </Link>
-          }
-        />
-
-        {/* Notice List */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-1 pb-1 pt-1">
-          {hasNoticeError ? (
-            <div className="home-data-error flex-1" role="alert">
-              <p>{lang === "ko" ? "게시글을 불러오지 못했습니다." : "We couldn't load posts."}</p>
-              <Button type="button" variant="outline" size="lg" onClick={retryNotice}>
-                {lang === "ko" ? "다시 시도" : "Try again"}
-              </Button>
-            </div>
-          ) : isLoadingNotices ? null : renderedNotices.length > 0 ? (
-            <div
-              className="grid min-h-0 flex-none content-start"
-              style={{
-                gridTemplateRows: `repeat(${renderedNotices.length}, 2.5rem)`,
-              }}
-            >
-              {renderedNotices.map((notice, index) => (
-                <NoticeItem
-                  key={notice.id}
-                  {...notice}
-                  lang={lang}
-                  showCategoryBadge={false}
-                  showGroupDivider={
-                    index > 0 &&
-                    !notice.isImportant &&
-                    Boolean(visibleNotices[index - 1]?.isImportant)
-                  }
-                />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              className="min-h-0 flex-1 rounded-none border-0 bg-transparent p-4"
-              message={lang === "ko" ? "등록된 게시글이 없습니다." : "No posts available."}
-              minHeightClassName="min-h-0"
-            />
-          )}
+    <section className="home-notices min-w-0" aria-labelledby="home-notices-title">
+      <header className="home-section-heading">
+        <h2 id="home-notices-title">
+          <Link to="/board/notice" className="home-heading-link">
+            {lang === "ko" ? "공지사항" : "Notices"}
+            <ArrowUpRight aria-hidden="true" />
+          </Link>
+        </h2>
+      </header>
+      {noticesQuery.isPending ? (
+        <p className="home-editorial-placeholder" role="status">
+          {lang === "ko" ? "공지사항을 불러오는 중입니다." : "Loading notices…"}
+        </p>
+      ) : noticesQuery.isError ? (
+        <div className="home-data-error" role="alert">
+          <p>{lang === "ko" ? "게시글을 불러오지 못했습니다." : "We couldn't load posts."}</p>
+          <Button type="button" variant="outline" size="lg" onClick={() => void noticesQuery.refetch()}>
+            {lang === "ko" ? "다시 시도" : "Try again"}
+          </Button>
         </div>
-      </div>
+      ) : notices.length > 0 ? (
+        <ul className="home-editorial-list">
+          {notices.map((notice) => {
+            const title = lang === "ko" ? notice.titleKo : notice.titleEn || notice.titleKo;
+            const content = lang === "ko" ? notice.snippetKo : notice.snippetEn || notice.snippetKo;
+            const plainText = stripRichText((content ?? "").replace(/<\/(?:p|div|li|h[1-6])>|<br\s*\/?>/gi, "$& "));
+            const snippet = plainText.length > 180 ? `${plainText.slice(0, 180).trimEnd()}…` : plainText;
+            const isNew = isoToMs(notice.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
+            return (
+              <li key={notice.articleId}>
+                <Link to={`/board/notice/${notice.articleId}`} className="home-notice-entry">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <h3 className="line-clamp-2">{title}</h3>
+                    {isNew ? (
+                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-rose-500">
+                        <span className="sr-only">{lang === "ko" ? "새 글" : "New post"}</span>
+                      </span>
+                    ) : null}
+                  </div>
+                  {snippet ? <p className="home-notice-excerpt line-clamp-2">{snippet}</p> : null}
+                  <div className="home-notice-entry-meta">
+                    <time dateTime={notice.postedAt}>{formatNumericDateRange(notice.postedAt, notice.postedAt)}</time>
+                    {notice.commentCount > 0 ? (
+                      <span>{lang === "ko" ? `댓글 ${notice.commentCount}` : `${notice.commentCount} comments`}</span>
+                    ) : null}
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="home-editorial-placeholder">
+          {lang === "ko" ? "등록된 공지사항이 없습니다." : "No notices available."}
+        </p>
+      )}
     </section>
   );
 }

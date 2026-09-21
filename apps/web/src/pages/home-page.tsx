@@ -4,11 +4,8 @@ import { EventCarousel } from '@/components/organisms/event-carousel';
 import { NoticeBoard } from '@/components/organisms/notice-board';
 import { Calendar } from '@/components/organisms/calendar';
 import { Footer } from '@/components/organisms/footer';
-import { useLanguage } from '@/hooks/use-language';
 
 export function HomePage() {
-  const { lang } = useLanguage();
-
   return (
     <div className="home-page-shell flex min-h-screen flex-col overflow-x-clip bg-white">
       <Header variant="home" />
@@ -19,12 +16,9 @@ export function HomePage() {
           <EventCarousel />
         </div>
 
-        <section className="home-updates-section" aria-labelledby="home-updates-title">
+        <div className="home-updates-section">
           <div className="home-public-content">
-            <div className="home-section-heading">
-              <h2 id="home-updates-title">{lang === 'ko' ? '소식과 일정' : 'News and schedule'}</h2>
-            </div>
-            <div className="grid min-w-0 items-start gap-6 lg:grid-cols-2">
+            <div className="home-updates-grid">
               <div className="min-w-0">
                 <NoticeBoard />
               </div>
@@ -33,7 +27,7 @@ export function HomePage() {
               </div>
             </div>
           </div>
-        </section>
+        </div>
       </main>
 
       <Footer />

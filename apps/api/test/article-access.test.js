@@ -23,6 +23,38 @@ const contentManager = {
   user: { id: "staff-1", permission: Permissions.MODERATE_CONTENT },
 };
 
+test("notice list previews include readable content and mask secret content", async () => {
+  const { ArticleService } = require("../dist/apps/api/src/features/board/article.service.js");
+  const { ArticleController } = require("../dist/apps/api/src/features/board/article.controller.js");
+  const items = [false, true].map((isSecret, index) => ({
+    articleId: String(index + 1),
+    titleKo: "공지사항",
+    isSecret,
+    isAnonymous: false,
+    authorUserId: "author-1",
+    author: { userId: "author-1", name: "작성자" },
+    snippetKo: "본문 미리보기",
+    snippetEn: "Content preview",
+  }));
+  const service = new ArticleService(
+    { findByCode: async () => ({ boardId: 1, isActive: true, allowGuestRead: true }) },
+    {
+      listByBoardId: async (_boardId, _page, _limit, scopes, _query, _viewerId, includePreview) => {
+        assert.deepEqual(scopes, ["PUBLIC"]);
+        assert.equal(includePreview, true);
+        return { items, total: items.length };
+      },
+    },
+  );
+  const controller = new ArticleController(service, { getOptionalCurrentUser: async () => anonymous });
+  const result = await controller.getArticles("notice", 1, 20);
+  assert.equal(result.items[0].snippetKo, "본문 미리보기");
+  assert.equal(result.items[0].snippetEn, "Content preview");
+  assert.equal(result.items[1].titleKo, "비밀글입니다.");
+  assert.equal(result.items[1].snippetKo, undefined);
+  assert.equal(result.items[1].snippetEn, undefined);
+});
+
 test("anonymous users can read only public articles", () => {
   assert.deepEqual(getReadableArticleScopes(anonymous), ["PUBLIC"]);
   assert.equal(canReadStaffArticles(anonymous), false);

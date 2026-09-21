@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
-import { ChevronRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { formatNumericDate } from "@/lib/date-display";
@@ -103,15 +103,14 @@ export function Calendar() {
   }, [eventsQuery.data?.items, range.from]);
 
   return (
-    <section className="home-bento-card flex min-h-[18rem] min-w-0 flex-col overflow-hidden">
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-slate-100 px-4">
-        <h3 className="text-sm font-semibold tracking-[-0.01em] text-[#172033]">
-          {lang === "ko" ? "다가오는 일정" : "Upcoming schedule"}
-        </h3>
-        <Link to="/calendar" className="home-more-link shrink-0">
-          <span>{lang === "ko" ? "더보기" : "More"}</span>
-          <ChevronRight aria-hidden="true" className="h-3 w-3" />
-        </Link>
+    <section className="home-schedule-section min-w-0" aria-labelledby="home-schedule-title">
+      <header className="home-section-heading">
+        <h2 id="home-schedule-title">
+          <Link to="/calendar" className="home-heading-link">
+            {lang === "ko" ? "다가오는 일정" : "Upcoming schedule"}
+            <ArrowUpRight aria-hidden="true" />
+          </Link>
+        </h2>
       </header>
 
       {eventsQuery.isPending ? null : eventsQuery.isError ? (
@@ -122,10 +121,7 @@ export function Calendar() {
           </Button>
         </div>
       ) : schedules.length > 0 ? (
-        <ul
-          className="grid min-h-0 flex-none content-start divide-y divide-slate-100"
-          style={{ gridTemplateRows: `repeat(${schedules.length}, 2.5rem)` }}
-        >
+        <ul className="home-editorial-list">
           {schedules.map((item) => {
             const title = lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
             const ddayLabel = getScheduleDdayLabel(item);
@@ -134,13 +130,13 @@ export function Calendar() {
               <li key={item.id} className="min-w-0 overflow-hidden">
                 <Link
                   to={`/calendar?selected=${toIsoDate(item.startAt)}`}
-                  className="home-schedule-row flex h-full min-h-[2.5rem] min-w-0 items-center gap-4 overflow-hidden px-4 py-1.5 hover:bg-slate-50/80"
+                  className="home-schedule-entry"
                 >
-                  <time className="w-[6.75rem] shrink-0 whitespace-nowrap text-[0.8125rem] font-normal tabular-nums text-[#667085]">
+                  <time dateTime={toIsoDate(item.startAt)}>
                     {formatScheduleRange(item)}
                   </time>
                   <div className="min-w-0 flex-1">
-                    <p className="block min-w-0 truncate text-sm font-normal text-[#172033]">{title}</p>
+                    <h3 className="line-clamp-2">{title}</h3>
                   </div>
                   {showDdayBadge ? <span className="home-editorial-dday home-schedule-dday shrink-0">{ddayLabel}</span> : null}
                 </Link>

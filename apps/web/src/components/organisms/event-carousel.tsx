@@ -1,6 +1,6 @@
 import { createApiClient } from "@soc/api-client";
 import { isoToMs, localDate, msToDate, nowMs } from "@soc/shared";
-import { ArrowRight, ChevronLeft, ChevronRight, Clock, MapPin } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, Clock, MapPin } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -528,13 +528,12 @@ export function EventCarousel() {
     return (
       <section className="home-events-section" aria-labelledby="home-events-title">
         <div className="home-section-heading home-section-heading-row">
-          <div>
-            <h2 id="home-events-title">{lang === "ko" ? "행사" : "Events"}</h2>
-          </div>
-          <Link to="/events" className="home-section-link">
-            {lang === "ko" ? "행사 전체 보기" : "View all events"}
-            <ArrowRight aria-hidden="true" className="size-4" />
-          </Link>
+          <h2 id="home-events-title">
+            <Link to="/events" className="home-heading-link">
+              {lang === "ko" ? "행사" : "Events"}
+              <ArrowUpRight aria-hidden="true" />
+            </Link>
+          </h2>
         </div>
         <div className="home-data-error" role="alert">
           <p>{lang === "ko" ? "행사를 불러오지 못했습니다." : "We couldn't load events."}</p>
@@ -558,13 +557,12 @@ export function EventCarousel() {
       aria-labelledby="home-events-title"
     >
       <div className="home-section-heading home-section-heading-row">
-        <div>
-          <h2 id="home-events-title">{lang === "ko" ? "행사" : "Events"}</h2>
-        </div>
-        <Link to="/events" className="home-section-link">
-          {lang === "ko" ? "행사 전체 보기" : "View all events"}
-          <ArrowRight aria-hidden="true" className="size-4" />
-        </Link>
+        <h2 id="home-events-title">
+          <Link to="/events" className="home-heading-link">
+            {lang === "ko" ? "행사" : "Events"}
+            <ArrowUpRight aria-hidden="true" />
+          </Link>
+        </h2>
       </div>
 
       {localizedEvents.length === 0 ? (
