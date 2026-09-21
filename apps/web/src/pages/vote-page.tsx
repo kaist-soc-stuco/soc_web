@@ -105,9 +105,8 @@ export function VotePage() {
   const now = nowMs();
   const isOpen = vote.status === "PUBLISHED" && now >= isoToMs(vote.startsAt) && now < isoToMs(vote.endsAt);
 
-  if (!isPreview && !vote.resultsPublishedAt && (vote.status === "CLOSED" || vote.status === "TALLIED" || now >= isoToMs(vote.endsAt))) {
-    return <PageShell><ResponsePageMain><ClosedView lang={lang} subject="vote" /></ResponsePageMain></PageShell>;
-  }
+  const showClosedNotice = !isPreview && !vote.resultsPublishedAt &&
+    (vote.status === "CLOSED" || vote.status === "TALLIED" || now >= isoToMs(vote.endsAt));
 
   const canParticipate = isOpen && vote.eligibility === "ELIGIBLE";
 
@@ -122,7 +121,9 @@ export function VotePage() {
           </ResponseHeaderCard>
 
           <div className="min-w-0">
-          {!isPreview && receipt ? (
+          {showClosedNotice ? (
+            <ClosedView lang={lang} subject="vote" />
+          ) : !isPreview && receipt ? (
             <section className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/50 p-8 text-center">
               <Check className="mx-auto size-8 text-emerald-700" />
               <h2 className="mt-3 text-xl font-semibold text-[#172033]">{t.submitted}</h2>
