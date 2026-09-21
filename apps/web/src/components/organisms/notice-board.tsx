@@ -58,7 +58,10 @@ export function NoticeBoard() {
             const isNew = isoToMs(notice.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
             return (
               <li key={notice.articleId}>
-                <Link to={`/board/notice/${notice.articleId}`} className="home-notice-entry">
+                <Link
+                  to={`/board/notice/${notice.articleId}`}
+                  className={`home-notice-entry${notice.isPinned ? " home-notice-entry-pinned" : ""}`}
+                >
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex min-w-0 flex-1 items-center gap-2">
                       <h3 className="truncate">{title}</h3>

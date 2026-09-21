@@ -1379,6 +1379,14 @@
     background: #f8faf9;
   }
 
+  .home-notice-entry-pinned {
+    background: #f0fdf4;
+  }
+
+  .home-notice-entry-pinned:hover {
+    background: #ecfdf5;
+  }
+
   .home-notice-entry:hover h3,
   .home-schedule-entry:hover h3 {
     color: var(--kaist-darkgreen-main);

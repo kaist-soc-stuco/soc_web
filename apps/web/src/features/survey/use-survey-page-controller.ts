@@ -135,6 +135,12 @@ export function useSurveyPageController(surveyId: string | undefined) {
         if (loadAttempt > 0) setLoadAttempt(0);
         setSurvey(data);
         setResponseSubmittedAt(data.currentResponse?.submittedAt ?? null);
+        const hasCurrentResponse = Boolean(
+          data.currentResponse &&
+            !data.isPreview &&
+            data.isPublished &&
+            !previewRequested,
+        );
         const answerByQuestionId = new Map(
           (data.isPreview || !data.isPublished || previewRequested ? undefined : data.currentResponse)?.answers.map((answer) => [
             answer.questionId,
@@ -150,9 +156,30 @@ export function useSurveyPageController(surveyId: string | undefined) {
             );
           }
         }
-        const savedAnswers = data.isPreview || !data.isPublished || new URLSearchParams(window.location.search).get("preview") === "1" ? null : readSurveyResponseDraft(storageKey);
+        const savedAnswers =
+          data.isPreview ||
+          !data.isPublished ||
+          previewRequested ||
+          hasCurrentResponse
+            ? null
+            : readSurveyResponseDraft(storageKey);
+
+        if (hasCurrentResponse) {
+          try {
+            window.localStorage.removeItem(storageKey);
+          } catch {
+            // Stale draft cleanup is best effort.
+          }
+        }
+
         setAnswers(savedAnswers ? { ...init, ...savedAnswers } : init);
-        setDraftRestored(Boolean(savedAnswers && Object.keys(savedAnswers).length > 0));
+        setDraftRestored(
+          Boolean(
+            !hasCurrentResponse &&
+              savedAnswers &&
+              Object.keys(savedAnswers).length > 0,
+          ),
+        );
         setHydratedDraftKey(storageKey);
       })
       .catch(() => {
