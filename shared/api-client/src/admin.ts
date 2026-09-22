@@ -498,6 +498,7 @@ export const createAdminApi = ({
   },
 
   downloadContactsXlsx: async (
+    reason: string,
     options?: Omit<ContactListOptions, "page" | "pageSize">,
   ): Promise<Blob> => {
     const params = new URLSearchParams();
@@ -510,7 +511,7 @@ export const createAdminApi = ({
     const query = params.toString();
     return requestBlob(
       `${contactsBaseUrl}/manage/export.xlsx${query ? `?${query}` : ""}`,
-      { method: "GET" },
+      { headers: { "X-Download-Reason": reason }, method: "GET" },
       { retryOnUnauthorized: true },
     );
   },
@@ -555,7 +556,7 @@ export const createAdminApi = ({
     );
   },
 
-  downloadAuditLogsXlsx: async (options?: {
+  downloadAuditLogsXlsx: async (reason: string, options?: {
     action?: string;
     q?: string;
     sortBy?: "createdAt" | "actor" | "action";
@@ -575,7 +576,7 @@ export const createAdminApi = ({
     const query = params.toString();
     return requestBlob(
       `${auditLogsBaseUrl}/export.xlsx${query ? `?${query}` : ""}`,
-      { method: "GET" },
+      { headers: { "X-Download-Reason": reason }, method: "GET" },
       { retryOnUnauthorized: true },
     );
   },
@@ -594,7 +595,7 @@ export const createAdminApi = ({
     );
   },
 
-  downloadStudentFeeXlsx: async (options?: StudentFeeListOptions): Promise<Blob> => {
+  downloadStudentFeeXlsx: async (reason: string, options?: StudentFeeListOptions): Promise<Blob> => {
     const params = new URLSearchParams();
     if (options?.status) params.set("status", options.status);
     if (options?.sortBy) params.set("sortBy", options.sortBy);
@@ -607,7 +608,24 @@ export const createAdminApi = ({
     const query = params.toString();
     return requestBlob(
       `${usersBaseUrl}/fee-status/export.xlsx${query ? `?${query}` : ""}`,
-      { method: "GET" },
+      { headers: { "X-Download-Reason": reason }, method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  recordPersonalDataDownload: async (input: {
+    count?: number;
+    kind: "survey_responses" | "vote_results" | "vote_roster";
+    reason: string;
+    targetId?: string;
+  }): Promise<{ success: true }> => {
+    return requestJson<{ success: true }>(
+      `${auditLogsBaseUrl}/personal-data-download`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
       { retryOnUnauthorized: true },
     );
   },

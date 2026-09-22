@@ -1,11 +1,12 @@
-import { Controller, Get, Header, Query, Req, StreamableFile } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Header, Headers, Post, Query, Req, StreamableFile } from "@nestjs/common";
 import type { Request } from "express";
 import * as XLSX from "xlsx";
 import { Permissions } from "@soc/contracts";
 import { isoToDate } from "@soc/shared";
 
-import { RequirePermissions } from "../auth/guards";
+import { RequireAnyPermissions, RequirePermissions } from "../auth/guards";
 import { auditMetadataFromRequest } from "./audit-context";
+import { requireDownloadReason } from "./download-reason";
 import { AuditLogService } from "./audit-log.service";
 
 interface AuthenticatedRequest extends Request {
@@ -13,11 +14,11 @@ interface AuthenticatedRequest extends Request {
 }
 
 @Controller("audit-logs")
-  @RequirePermissions(Permissions.VIEW_AUDIT_LOG)
 export class AuditLogController {
   constructor(private readonly auditLogService: AuditLogService) {}
 
   @Get()
+  @RequirePermissions(Permissions.VIEW_AUDIT_LOG)
   @Header("Cache-Control", "private, no-store")
   async listAuditLogs(
     @Query("action") action?: string,
@@ -47,6 +48,7 @@ export class AuditLogController {
   }
 
   @Get("export.xlsx")
+  @RequirePermissions(Permissions.VIEW_AUDIT_LOG)
   @Header("Cache-Control", "private, no-store")
   @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   @Header("Content-Disposition", 'attachment; filename="audit-logs.xlsx"')
@@ -59,7 +61,9 @@ export class AuditLogController {
     @Query("targetType") targetType?: string,
     @Query("dateFrom") dateFrom?: string,
     @Query("dateTo") dateTo?: string,
+    @Headers("x-download-reason") downloadReason?: string,
   ): Promise<StreamableFile> {
+    const reason = requireDownloadReason(downloadReason);
     const items = await this.auditLogService.export({
       action,
       query,
@@ -106,10 +110,48 @@ export class AuditLogController {
         targetType: targetType ?? null,
         dateFrom: normalizeDateStart(dateFrom) ?? null,
         dateTo: normalizeDateEnd(dateTo) ?? null,
+        reason,
       },
       targetType: "audit_log",
     });
     return new StreamableFile(buffer);
+  }
+
+  @Post("personal-data-download")
+  @RequireAnyPermissions(Permissions.MANAGE_SURVEY, Permissions.MANAGE_VOTE)
+  async recordPersonalDataDownload(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: {
+      count?: number;
+      kind?: string;
+      reason?: string;
+      targetId?: string;
+    },
+  ): Promise<{ success: true }> {
+    const definitions = {
+      survey_responses: { targetType: "survey_response" },
+      vote_results: { targetType: "vote" },
+      vote_roster: { targetType: "vote" },
+    } as const;
+    const kind = body?.kind as keyof typeof definitions;
+    const definition = definitions[kind];
+    if (!definition) throw new BadRequestException("download_kind_invalid");
+
+    const reason = requireDownloadReason(body.reason);
+    const audit = auditMetadataFromRequest(request);
+    await this.auditLogService.record({
+      action: "privacy.download",
+      actorUserId: audit.actorUserId ?? null,
+      ipAddress: audit.ipAddress ?? null,
+      payload: {
+        count: Number.isInteger(body.count) && body.count! >= 0 ? body.count : null,
+        kind,
+        reason,
+      },
+      targetId: body.targetId ?? null,
+      targetType: definition.targetType,
+    });
+    return { success: true };
   }
 }
 

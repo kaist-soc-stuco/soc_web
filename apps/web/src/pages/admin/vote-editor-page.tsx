@@ -33,6 +33,7 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Permissions } from "@/lib/permissions";
+import { promptDownloadReason } from "@/lib/download-reason";
 
 type DraftItem = CreateVoteRequest["items"][number];
 type Draft = Omit<CreateVoteRequest, "startsAt" | "endsAt"> & { startsAt: string; endsAt: string };
@@ -375,13 +376,19 @@ export function VoteEditorPage() {
   const [rosterPage, setRosterPage] = useState(1);
   const [rosterPageSize, setRosterPageSize] = useState(20);
   const [addingVoter, setAddingVoter] = useState(false);
-  const exportRoster = () => {
+  const exportRoster = async () => {
+    const reason = promptDownloadReason();
+    if (!reason || !id) return;
+    await client.recordPersonalDataDownload({ count: effectiveVoters.length, kind: "vote_roster", reason, targetId: id });
     const sheet = XLSX.utils.json_to_sheet(effectiveVoters.map(voter => ({ 학번: voter.studentNumber, 이름: voter.nameKo, 참여: voter.hasVoted ? "참여" : "미참여", 상태: voter.status, "투표 일시": formatVotedTime(voter.votedAt) })));
     const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, sheet, "선거인명부"); XLSX.writeFile(workbook, "선거인명부.xlsx");
   };
   const exportResults = async () => {
     if (!id) return;
+    const reason = promptDownloadReason();
+    if (!reason) return;
     try { const results = await client.getVoteResults(id); const workbook = XLSX.utils.book_new(); const rows = results.items.flatMap(item => item.options.map(option => ({ 안건: stripRichText(item.titleKo), 선택지: option.labelKo, 득표: option.count, 비율: option.percentage })));
+      await client.recordPersonalDataDownload({ count: rows.length, kind: "vote_results", reason, targetId: id });
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), "개표 결과"); XLSX.writeFile(workbook, "투표 결과.xlsx");
     } catch { toast({ type: "error", message: "결과를 내려받지 못했습니다." }); }
   };
@@ -507,7 +514,7 @@ export function VoteEditorPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5">
             <UiInput className="w-full max-w-xs md:ml-auto" placeholder="학번 또는 이름 검색" value={voterQuery} onChange={e=>{setVoterQuery(e.target.value);setRosterPage(1);}} />
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={exportRoster}><Download />내보내기</Button>
+              <Button variant="outline" onClick={() => void exportRoster()}><Download />내보내기</Button>
               {rosterEditable ? <>
                 <Button variant="outline" onClick={() => setUploadDialogOpen(true)}><Upload className="size-4" />엑셀 업로드</Button>
                 <Button variant="outline" onClick={()=>setAddingVoter(true)}><UserPlus />수동 추가</Button>

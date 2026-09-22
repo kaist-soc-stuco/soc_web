@@ -19,6 +19,7 @@ import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { downloadBlob } from "@/lib/download-blob";
+import { promptDownloadReason } from "@/lib/download-reason";
 import { Permissions } from "@/lib/permissions";
 
 type SortBy = "createdAt" | "actor" | "action";
@@ -205,9 +206,11 @@ export function AuditLogPage() {
   };
 
   const handleExport = async () => {
+    const reason = promptDownloadReason();
+    if (!reason) return;
     setOperationError(null);
     try {
-      const blob = await client.downloadAuditLogsXlsx({
+      const blob = await client.downloadAuditLogsXlsx(reason, {
         q: query,
         sortBy,
         sortDirection,

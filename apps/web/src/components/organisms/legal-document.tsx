@@ -359,8 +359,8 @@ const privacySections: readonly LegalSection[] = [
         kind: "optional",
         label: t("선택 항목", "Optional items"),
         value: t(
-          "성별(SSO에서 제공되고 이용자가 동의한 경우에만 처리).",
-          "Gender (processed only when provided by SSO and consented to by the User).",
+          "성별, 학적 상태, 신분코드(SSO에서 제공되고 이용자가 동의한 경우에만 처리).",
+          "Gender, academic status, and member code (processed only when provided by SSO and consented to by the User).",
         ),
       },
       {
@@ -491,6 +491,14 @@ const privacySections: readonly LegalSection[] = [
       ),
     ],
     groups: [
+      {
+        label: t("SPARCS", "SPARCS"),
+        value: t("운영 서버·데이터베이스 저장 공간 제공과 호스팅 인프라 관리.", "Provision of operating server and database storage and management of hosting infrastructure."),
+      },
+      {
+        label: t("Google Sheets(선택 기능)", "Google Sheets (optional)"),
+        value: t("관리자가 연동한 경우 설문 응답, 집행위원 연락처 또는 학생회비 원장을 Google 스프레드시트에 저장·동기화.", "When connected by an administrator, survey responses, executive contact details, or student-fee ledgers are stored and synchronized in Google spreadsheets."),
+      },
       {
         label: t("KAIST SSO", "KAIST SSO"),
         value: t("로그인 인증과 계정 연계를 위한 사용자 정보 교환. SSO 제공자의 별도 개인정보 안내가 함께 적용될 수 있음.", "User-information exchange for login authentication and account linking. The SSO provider’s separate privacy notice may also apply."),

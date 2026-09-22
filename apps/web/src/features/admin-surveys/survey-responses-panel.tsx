@@ -18,6 +18,7 @@ import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { formatSurveyAnswer } from "@/lib/survey-answer-display";
+import { promptDownloadReason } from "@/lib/download-reason";
 import { SurveyQuestionSummary } from "./survey-analytics-dashboard";
 
 const positiveInteger = (value: string | null) => Math.max(1, Math.min(1_000_000, Number.parseInt(value ?? "1", 10) || 1));
@@ -101,6 +102,8 @@ export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sh
 
 
   const exportCsv = async () => {
+    const reason = promptDownloadReason();
+    if (!reason) return;
     setExporting(true);
     try {
       const rows: string[][] = [["응답 일시", ...questions.map(q=>stripRichText(q.titleKo))]];
@@ -111,6 +114,12 @@ export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sh
         if (page * 100 >= batch.total || !batch.items.length) break;
         page++;
       }
+      await client.recordPersonalDataDownload({
+        count: Math.max(0, rows.length - 1),
+        kind: "survey_responses",
+        reason,
+        targetId: surveyId,
+      });
       const cell = (value: string) => '"' + (/^[=+@\-\t\r]/.test(value) ? "'" : "") + value.replaceAll('"','""') + '"';
       const url=URL.createObjectURL(new Blob(["\uFEFF"+rows.map(row=>row.map(cell).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"}));
       const link=document.createElement("a"); link.href=url;link.download="설문 응답.csv";link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);

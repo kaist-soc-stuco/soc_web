@@ -136,6 +136,7 @@ export class ContactsService {
   async exportManaged(
     input: ContactListOptions = {},
     audit?: AuditMetadata,
+    downloadReason?: string,
   ): Promise<ContactRecord[]> {
     const response = await this.findManaged(
       { ...input, page: 1, pageSize: 500 },
@@ -147,6 +148,7 @@ export class ContactsService {
       ipAddress: audit?.ipAddress ?? null,
       payload: {
         count: response.items.length,
+        reason: downloadReason ?? null,
         filters: {
           q: input.q ?? null,
           department: input.department ?? null,

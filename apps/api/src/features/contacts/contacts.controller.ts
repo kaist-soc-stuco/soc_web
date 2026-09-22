@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Query, Req, StreamableFile } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, Headers, Param, Patch, Post, Query, Req, StreamableFile } from "@nestjs/common";
 import type { Request } from "express";
 import * as XLSX from "xlsx";
 import {
@@ -12,6 +12,7 @@ import {
 import { Permissions } from "@soc/contracts";
 import { RequirePermissions } from "../auth/guards";
 import { auditMetadataFromRequest } from "../audit/audit-context";
+import { requireDownloadReason } from "../audit/download-reason";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { ContactsService } from "./contacts.service";
 import type {
@@ -66,10 +67,13 @@ export class ContactsController {
     @Query("cohort") cohort?: string,
     @Query("department") department?: string,
     @Query("privacyConsented") privacyConsented?: string,
+    @Headers("x-download-reason") downloadReason?: string,
   ): Promise<StreamableFile> {
+    const reason = requireDownloadReason(downloadReason);
     const items = await this.contactsService.exportManaged(
       parseContactListOptions({ query, cohort, department, privacyConsented }),
       auditMetadataFromRequest(request),
+      reason,
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
       ["이름", "학번", "부서", "직책", "활동 연도", "이메일", "전화번호", "개인정보동의", "표시순서"],
