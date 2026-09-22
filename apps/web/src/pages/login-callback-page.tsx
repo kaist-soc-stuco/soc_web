@@ -280,24 +280,24 @@ export function LoginCallbackPage() {
             </div>
           }
         >
-          <div className="space-y-3 text-sm font-medium leading-6 text-slate-600">
-            <p>
-              {lang === "ko"
-                ? "SSO 로그인으로 받은 이름, 이메일, 학번 정보를 서비스 이용에 사용합니다."
-                : "We use your name, email address, and student number received through SSO to provide this service."}
-            </p>
-            <p>
-              {lang === "ko"
-                ? (
-                  <>
-                    동의하면 포털 회원 정보를 유지하여 다음 로그인에도 이용합니다.
-                    <br />
-                    임시 이용을 선택하면 회원 정보를 저장하지 않고 이번 세션에서만 이용하며, 세션 종료 시 임시 정보를 즉시 파기합니다.
-                  </>
-                )
-                : "With consent, your portal account information is retained for future visits. Temporary access does not save an account; temporary information is discarded when the session ends."}
-            </p>
-          </div>
+          <dl className="space-y-3 text-sm font-medium leading-6 text-slate-600">
+            <div>
+              <dt className="font-semibold text-slate-800">{lang === "ko" ? "수집·이용 목적" : "Purpose"}</dt>
+              <dd>{lang === "ko" ? "KAIST 구성원 확인, 회원 계정 생성, 홈페이지 서비스 제공·운영 및 보안" : "KAIST identity verification, account creation, service operation, and security"}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-800">{lang === "ko" ? "수집 항목" : "Information collected"}</dt>
+              <dd>{lang === "ko" ? "KAIST UID, 성명(한글·영문), 학번, 이메일, 소속, 주전공, 성별, 학적 상태·신분코드, 동의·로그인·접속기록" : "KAIST UID, Korean and English names, student number, email, department, primary major, gender, academic status and member code, consent, login, and access records"}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-800">{lang === "ko" ? "보유·이용 기간" : "Retention period"}</dt>
+              <dd>{lang === "ko" ? "회원 탈퇴 또는 처리 목적 달성 시까지. 법령과 내부 보존 기준에 따른 기록은 정해진 기간 동안 별도 보관" : "Until account withdrawal or the processing purpose is achieved. Records required by law or internal retention rules are kept separately for the applicable period."}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-800">{lang === "ko" ? "동의 거부권 및 불이익" : "Right to refuse and consequences"}</dt>
+              <dd>{lang === "ko" ? "동의를 거부할 수 있습니다. 거부하면 회원 정보를 저장하지 않는 임시 세션만 제공되며 마이페이지 등 계정 저장이 필요한 기능은 이용할 수 없습니다. 임시 정보는 세션 종료 시 파기합니다." : "You may refuse consent. If you refuse, only a temporary session without a stored account is provided, and account-based features such as My Page are unavailable. Temporary information is deleted when the session ends."}</dd>
+            </div>
+          </dl>
 
 
         </Modal>

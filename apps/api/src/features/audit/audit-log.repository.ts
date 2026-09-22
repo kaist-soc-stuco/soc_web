@@ -64,6 +64,7 @@ const ACTION_DEFINITIONS: Record<string, { label: string; kind: AuditLogEventKin
   "asset.upload.complete": { label: "첨부 파일 업로드 완료", kind: "EXECUTE" },
   "asset.upload.prepare": { label: "첨부 파일 업로드 준비", kind: "EXECUTE" },
   "audit.export": { label: "운영 로그 내보내기", kind: "EXECUTE" },
+  "privacy.download": { label: "개인정보 다운로드", kind: "EXECUTE" },
   "auth.login.consent": { label: "로그인 개인정보 동의", kind: "EXECUTE" },
   "auth.login.success": { label: "로그인 성공", kind: "EXECUTE" },
   "auth.logout": { label: "로그아웃", kind: "EXECUTE" },

@@ -448,6 +448,7 @@ export class UsersService {
     referenceSemester?: string,
     userIds?: string[],
     audit?: AuditMetadata,
+    downloadReason?: string,
   ): Promise<StudentFeeListResponse["students"]> {
     const pageSize = 1_000;
     const first = await this.listStudentsByFeeStatus(
@@ -486,6 +487,7 @@ export class UsersService {
         ipAddress: audit.ipAddress ?? null,
         payload: {
           count: items.length,
+          reason: downloadReason ?? null,
           filters: {
             majorCategory: majorCategory ?? null,
             paymentYear: paymentYear ?? null,

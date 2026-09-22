@@ -1,5 +1,5 @@
 import { StudentFeePolicySchema, type StudentFeePolicy } from "@soc/contracts";
-import { Body, Controller, Get, Header, Param, Post, Put, Query, Req, StreamableFile, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Header, Headers, Param, Post, Put, Query, Req, StreamableFile, UseGuards } from "@nestjs/common";
 import { Request } from "express";
 import * as XLSX from "xlsx";
 import {
@@ -13,6 +13,7 @@ import { Permissions } from "@soc/contracts";
 
 import { AuthGuard, RequirePermissions } from "../auth/guards";
 import { auditMetadataFromRequest } from "../audit/audit-context";
+import { requireDownloadReason } from "../audit/download-reason";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { resolveFeeReferenceSemester } from "./fee-semester";
 import { UsersService } from "./users.service";
@@ -364,7 +365,9 @@ export class UsersController {
     @Query("referenceSemester") referenceSemester?: string,
     @Query("majorCategory") majorCategory?: string,
     @Query("userIds") userIds?: string,
+    @Headers("x-download-reason") downloadReason?: string,
   ) {
+    const reason = requireDownloadReason(downloadReason);
     const feeStatus: FeeStatus | undefined =
       status === "PAID" || status === "PARTIAL" || status === "UNPAID" ? status : undefined;
     const feeSortBy =
@@ -386,6 +389,7 @@ export class UsersController {
       resolvedReferenceSemester,
       userIds?.split(",").filter(Boolean),
       auditMetadataFromRequest(req),
+      reason,
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
       ["학번", "이름", "이메일", "소속", "주전공", "상태", "납부 적용 학기 수", "납부 적용 시작 학기", "총 수납액", "기준 납부액", "납부 유형", "결제 수단", "납부 일자", "비고", "사용자 ID"],
