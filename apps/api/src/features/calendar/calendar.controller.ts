@@ -94,6 +94,14 @@ export class CalendarController {
     return this.calendarService.listManagedEvents();
   }
 
+  @Get("feed.ics")
+  @Header("Content-Type", "text/calendar; charset=utf-8")
+  @Header("Content-Disposition", "inline; filename=\"soc-calendar.ics\"")
+  @Header("Cache-Control", "public, max-age=300")
+  async exportPublicIcs(): Promise<string> {
+    return this.calendarService.exportPublicIcs();
+  }
+
   @Patch("admin/events/:id/presentation")
   @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async updateEventPresentation(

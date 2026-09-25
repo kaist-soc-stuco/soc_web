@@ -163,20 +163,22 @@ export function VotePage() {
           ) : !isPreview && vote.eligibility === "ALREADY_VOTED" ? (
             <div className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-14 text-center text-sm font-normal text-[#344054]">{t.voted}</div>
           ) : null}
-            <section className="space-y-5">
-              {vote.items.map(item => <SurveyQuestionCard key={item.id} id={`vote-card-${item.id}`} lang={lang}
-                question={{ id: item.id, titleKo: item.titleKo, titleEn: item.titleEn, descriptionKo: item.descriptionKo, descriptionEn: item.descriptionEn, isRequired: true,
-                  questionType: item.type === "MULTIPLE_CHOICE" ? "multiple_choice" : "single_choice", config: item.imageUrl ? { imageUrlKo: item.imageUrl, imageUrlEn: item.imageUrl } : null,
-                  options: item.options.map(option => ({ value: option.id, labelKo: option.labelKo, labelEn: option.labelEn ?? undefined, imageUrlKo: option.imageUrl, imageUrlEn: option.imageUrl })) }}
-                value={item.type === "MULTIPLE_CHOICE" ? answers[item.id] ?? [] : answers[item.id]?.[0] ?? ""}
-                onChange={value => setAnswers(current => ({ ...current, [item.id]: Array.isArray(value) ? value.slice(0, item.selectionRule === "min" ? item.options.length : item.maxSelections) : typeof value === "string" ? [value] : [] }))}
-                disabled={submitting || (!isPreview && !canParticipate)}
-                maxSelections={item.type === "MULTIPLE_CHOICE" && item.selectionRule !== "min" ? item.maxSelections : undefined}
-                hint={item.type === "MULTIPLE_CHOICE" ? lang === "ko" ? `${item.selectionRule === "min" ? "최소" : item.selectionRule === "exact" ? "정확히" : "최대"} ${item.maxSelections}개 선택` : `Select ${item.selectionRule === "min" ? "at least" : item.selectionRule === "exact" ? "exactly" : "up to"} ${item.maxSelections}` : undefined}
-                error={validationAttempted ? selectionError(item) ?? null : null} />)}
-              {error ? <p role="alert" aria-live="assertive" className="text-sm font-normal text-rose-600">{error}</p> : null}
-              <div className="survey-response-actions flex justify-end px-0 py-3 md:py-0"><Button loading={submitting} className="min-h-11" onClick={() => void submit()} disabled={submitting || isPreview || !canParticipate}>{t.submit}</Button></div>
-            </section>
+            {isPreview || canParticipate ? (
+              <section className="space-y-5">
+                {vote.items.map(item => <SurveyQuestionCard key={item.id} id={`vote-card-${item.id}`} lang={lang}
+                  question={{ id: item.id, titleKo: item.titleKo, titleEn: item.titleEn, descriptionKo: item.descriptionKo, descriptionEn: item.descriptionEn, isRequired: true,
+                    questionType: item.type === "MULTIPLE_CHOICE" ? "multiple_choice" : "single_choice", config: item.imageUrl ? { imageUrlKo: item.imageUrl, imageUrlEn: item.imageUrl } : null,
+                    options: item.options.map(option => ({ value: option.id, labelKo: option.labelKo, labelEn: option.labelEn ?? undefined, imageUrlKo: option.imageUrl, imageUrlEn: option.imageUrl })) }}
+                  value={item.type === "MULTIPLE_CHOICE" ? answers[item.id] ?? [] : answers[item.id]?.[0] ?? ""}
+                  onChange={value => setAnswers(current => ({ ...current, [item.id]: Array.isArray(value) ? value.slice(0, item.selectionRule === "min" ? item.options.length : item.maxSelections) : typeof value === "string" ? [value] : [] }))}
+                  disabled={submitting}
+                  maxSelections={item.type === "MULTIPLE_CHOICE" && item.selectionRule !== "min" ? item.maxSelections : undefined}
+                  hint={item.type === "MULTIPLE_CHOICE" ? lang === "ko" ? `${item.selectionRule === "min" ? "최소" : item.selectionRule === "exact" ? "정확히" : "최대"} ${item.maxSelections}개 선택` : `Select ${item.selectionRule === "min" ? "at least" : item.selectionRule === "exact" ? "exactly" : "up to"} ${item.maxSelections}` : undefined}
+                  error={validationAttempted ? selectionError(item) ?? null : null} />)}
+                {error ? <p role="alert" aria-live="assertive" className="text-sm font-normal text-rose-600">{error}</p> : null}
+                <div className="survey-response-actions flex justify-end px-0 py-3 md:py-0"><Button loading={submitting} className="min-h-11" onClick={() => void submit()} disabled={submitting || isPreview || !canParticipate}>{t.submit}</Button></div>
+              </section>
+            ) : null}
             </>
           )}
           </div>

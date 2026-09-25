@@ -414,6 +414,7 @@ export function useEventsSurveysPageController({
     (holidaysQuery.isError && !holidaysQuery.data);
 
   return {
+    calendarFeedUrl: apiClient.getPublicCalendarIcsUrl(),
     calendarEvents,
     currentDate,
     dateFrom,

@@ -2,6 +2,7 @@ import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "@/hooks/use-language";
 import { Header } from "@/components/organisms/header";
 import { EventsSurveysCalendar } from "@/features/events-surveys/events-surveys-calendar";
+import { CalendarSubscriptionButton } from "@/features/events-surveys/calendar-subscription-button";
 import { EventsSurveysFilterBar } from "@/features/events-surveys/events-surveys-filter-bar";
 import { EventsSurveysGrid } from "@/features/events-surveys/events-surveys-grid";
 import { useEventsSurveysPageController } from "@/features/events-surveys/use-events-surveys-page-controller";
@@ -58,6 +59,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
   const currentTab = view ?? (searchParams.get("tab") as EventsSurveysView | null) ?? "event";
   const selectedParam = searchParams.get("selected");
   const {
+    calendarFeedUrl,
     calendarEvents,
     calendarQuery,
     currentPage,
@@ -117,7 +119,9 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
       <PageMain>
         <PageHeader
           actions={
-            currentTab === "survey" &&
+            currentTab === "calendar" ? (
+              <CalendarSubscriptionButton feedUrl={calendarFeedUrl} lang={lang} />
+            ) : currentTab === "survey" &&
             Permissions.has(session?.permission ?? 0, Permissions.MANAGE_SURVEY) ? (
               <Button asChild>
                 <Link to="/admin/surveys/new">{lang === "ko" ? "등록" : "Create"}</Link>

@@ -138,6 +138,63 @@ export class CalendarService {
     };
   }
 
+  async exportPublicIcs(): Promise<string> {
+    const [surveyEvents, articleEvents, manualEvents] = await Promise.all([
+      this.listSurveyCalendarEvents(undefined, undefined),
+      this.listArticleCalendarEvents(undefined, undefined),
+      this.listManualCalendarEvents(undefined, undefined),
+    ]);
+    const items = [...surveyEvents, ...articleEvents, ...manualEvents].sort(
+      (left, right) =>
+        left.date.localeCompare(right.date) ||
+        left.titleKo.localeCompare(right.titleKo, "ko"),
+    );
+
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//KAIST SOC//Public Calendar//KO",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "X-WR-CALNAME:KAIST SOC 일정",
+      "X-WR-TIMEZONE:Asia/Seoul",
+    ];
+
+    for (const item of items) {
+      const start = isoToDate(item.startAt ?? item.date);
+      if (Number.isNaN(start.valueOf())) continue;
+
+      const parsedEnd = item.endAt ? isoToDate(item.endAt) : null;
+      const end = parsedEnd && !Number.isNaN(parsedEnd.valueOf()) && parsedEnd.valueOf() > start.valueOf()
+        ? parsedEnd
+        : msToDate(start.valueOf() + 60 * 60 * 1000);
+      const isAllDay = Boolean(item.isAllDay) || item.sourceType === "KAIST_ACADEMIC";
+      const uid = `soc-${item.sourceType.toLowerCase()}-${item.id}@soc.kaist.ac.kr`;
+
+      lines.push(
+        "BEGIN:VEVENT",
+        `UID:${escapeIcsText(uid)}`,
+        `DTSTAMP:${formatIcsDate(nowDate())}`,
+        ...(isAllDay
+          ? [
+              `DTSTART;VALUE=DATE:${formatIcsDateOnly(start)}`,
+              `DTEND;VALUE=DATE:${formatIcsDateOnly(addSeoulDays(end, 1))}`,
+            ]
+          : [
+              `DTSTART:${formatIcsDate(start)}`,
+              `DTEND:${formatIcsDate(end)}`,
+            ]),
+        `SUMMARY:${escapeIcsText(item.titleKo)}`,
+        ...(item.location ? [`LOCATION:${escapeIcsText(item.location)}`] : []),
+        ...(item.category ? [`CATEGORIES:${escapeIcsText(item.category)}`] : []),
+        "END:VEVENT",
+      );
+    }
+
+    lines.push("END:VCALENDAR");
+    return `${lines.join("\r\n")}\r\n`;
+  }
+
   /**
    * 행사 게시글은 `article`에 일정 정보가 저장되고 `calendar_event`에는
    * 미러링되지 않습니다. 관리 화면에서는 두 저장소를 한 목록으로 보여주되,

@@ -18,6 +18,8 @@ export const createCalendarApi = ({
   calendarBaseUrl,
   requestJson,
 }: ApiClientContext) => ({
+  getPublicCalendarIcsUrl: (): string => `${calendarBaseUrl}/feed.ics`,
+
   getPublicCalendarEvents: async (params: {
     from: string;
     to: string;
