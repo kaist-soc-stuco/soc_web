@@ -118,7 +118,7 @@ export function SurveyQuestionInput({
           <UiTextarea
             {...inputAccessibility}
             rows={1}
-            className={`${controlClass} min-h-11 leading-normal resize-none`}
+            className={`${controlClass} block min-h-11 py-2.5 leading-6 resize-none`}
             value={value as string}
             onChange={(e) => onChange(e.target.value)}
             aria-invalid={Boolean(error)}

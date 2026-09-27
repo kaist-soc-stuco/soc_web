@@ -254,7 +254,7 @@ export function DateRangePicker({
                 const weekday = date.getDay();
                 const dayColor = weekday === 0 ? "text-rose-600" : "text-slate-700";
                 return <span key={day} className="relative flex h-9 items-center justify-center">
-                  {inRange && draft.from !== draft.to ? <span aria-hidden="true" className={`pointer-events-none absolute top-1/2 h-8 -translate-y-1/2 bg-emerald-50 ${day === draft.from ? "left-1/2 right-0" : day === draft.to ? "left-0 right-1/2" : "inset-x-0"}`} /> : null}
+                  {inRange && draft.from !== draft.to ? <span aria-hidden="true" className={`pointer-events-none absolute top-1/2 h-8 -translate-y-1/2 bg-emerald-50 ${day === draft.from ? "left-1/2 right-0" : day === draft.to ? "left-0 right-1/2" : "inset-x-0"} ${!endpoint && (weekday === 0 || index === 0) ? "rounded-l-full" : ""} ${!endpoint && (weekday === 6 || index === count - 1) ? "rounded-r-full" : ""}`} /> : null}
                   <button
                     type="button"
                     disabled={disableFuture && day > todayStamp}
@@ -265,7 +265,7 @@ export function DateRangePicker({
                       setActivePreset(null);
                       choose(day);
                     }}
-                    className={`relative z-10 flex size-8 items-center justify-center text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-brand-primary disabled:cursor-not-allowed disabled:!bg-transparent disabled:!text-slate-300 ${endpoint ? "rounded-md bg-brand-primary text-white" : inRange ? "text-emerald-900 hover:bg-emerald-100" : `rounded-md ${dayColor} hover:bg-slate-100`}`}
+                    className={`relative z-10 flex size-8 items-center justify-center rounded-full text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:!bg-transparent disabled:!text-slate-300 ${day === todayStamp && !endpoint ? "ring-1 ring-inset ring-emerald-600" : ""} ${endpoint ? "bg-brand-primary text-white" : inRange ? "text-emerald-900 hover:bg-emerald-100" : `${dayColor} hover:bg-slate-100`}`}
                   >{index + 1}</button>
                 </span>;
               })}

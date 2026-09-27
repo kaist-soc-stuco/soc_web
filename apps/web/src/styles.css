@@ -4302,6 +4302,27 @@ html { scrollbar-gutter: stable; }
 .rich-input-toolbar-space[data-open="false"] .rich-input-toolbar { visibility:hidden; pointer-events:none; }
 .section-inline-editor { padding:16px 24px; padding-right:96px; }
 .section-inline-editor.survey-section-header { padding:24px 24px 28px; padding-right:96px; }
+.admin-survey-editor {
+  --ui-builder-text-size: 0.9375rem;
+  --ui-builder-title-size: 1.25rem;
+}
+.admin-survey-editor .section-inline-editor > .grid { row-gap: 0.5rem; }
+.admin-survey-editor .section-inline-editor .rich-text-input {
+  padding-block: 0.5rem !important;
+  font-size: 1rem !important;
+  line-height: 1.5rem !important;
+}
+.admin-survey-editor .section-inline-editor [data-section-field^="description"] .rich-text-input {
+  font-size: 0.875rem !important;
+}
+.admin-survey-editor .survey-section-header [data-section-field^="title"] .rich-text-input {
+  font-size: 1.5rem !important;
+  line-height: 1.875rem !important;
+}
+.admin-survey-editor .question-inline-editor .rich-text-input { padding-block: 0.5rem; min-height: 2.5rem; }
+.admin-survey-editor .question-option-row input,
+.admin-survey-editor .question-inline-editor input[aria-label*="라벨"],
+.admin-survey-editor .question-inline-editor input[aria-label="선택지 추가"] { font-size: var(--ui-builder-text-size); }
 .survey-section-surface { border:1px solid #e2e8f0; border-radius:0 8px 8px 8px; background:white; box-shadow:0 1px 2px rgb(0 0 0 / .05); }
 @media (prefers-reduced-motion:reduce) { .rich-input-toolbar-space { transition:none; } }
 

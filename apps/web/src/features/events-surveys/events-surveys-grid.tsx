@@ -288,7 +288,7 @@ export function EventsSurveysGrid({
                 </div>
               ) : null}
               {canEngage ? (
-                <div className="absolute right-3 top-3 z-20 rounded-lg border border-white/40 bg-white/75 p-0.5 shadow-sm backdrop-blur-md transition-colors hover:border-white/70 hover:bg-slate-100/90">
+                <div className="absolute right-3 top-3 z-20 rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm transition-colors hover:bg-slate-100">
                   <ArticleEngagementActions
                     allowLike={false}
                     compact

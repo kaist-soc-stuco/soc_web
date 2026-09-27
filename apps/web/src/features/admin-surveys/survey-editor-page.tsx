@@ -457,7 +457,7 @@ function QuestionOptionPreview({
   const isMultiple = questionType === "multiple_choice";
 
   return (
-    <div className="mt-3 grid max-w-2xl gap-2 text-base text-slate-700">
+    <div className="mt-3 grid max-w-2xl gap-2 text-[length:var(--ui-builder-text-size)] text-slate-700">
       {fallbackOptions.slice(0, 8).map((option, index) => (
         <div key={`${option.value}-${index}`} className="flex min-w-0 items-center gap-2">
           {isDropdown ? (
@@ -500,7 +500,7 @@ function GridQuestionPreview({
   const isMultiple = questionType === "grid_multiple";
 
   return (
-    <div className="mt-3 w-full max-w-4xl overflow-x-auto text-base text-slate-700">
+    <div className="mt-3 w-full max-w-4xl overflow-x-auto text-[length:var(--ui-builder-text-size)] text-slate-700">
       <div
         className="grid min-w-[28rem] items-center gap-y-3"
         style={{
@@ -2480,11 +2480,9 @@ export function SurveyEditorPage() {
                            ? "flex min-w-0 cursor-text items-start justify-between gap-4 px-6 pb-7 pt-6 pr-24"
                            : "flex min-w-0 cursor-text items-start justify-between gap-4 px-6 py-4 pr-24";
                          const sectionTitleClass = isSurveyHeader
-                           ? "break-words text-3xl font-normal leading-tight text-slate-900"
+                           ? "break-words text-2xl font-normal leading-tight text-slate-900"
                            : "break-words text-base font-normal leading-6 text-slate-900";
-                         const sectionDescriptionClass = isSurveyHeader
-                           ? "mt-3 max-w-3xl text-base font-normal leading-6 text-slate-600"
-                           : "mt-1 max-w-3xl text-base font-normal leading-6 text-slate-600";
+                         const sectionDescriptionClass = "mt-2 max-w-3xl text-sm font-normal leading-6 text-slate-600";
 
                          return (
                            <section
@@ -2512,14 +2510,14 @@ export function SurveyEditorPage() {
                                  <div className="min-w-0">
                                    <h3 data-focus-field="titleKo" className={`${sectionTitleClass} ${(!plainText(displayTitleKo) || displayTitleKo === "섹션 제목(선택사항)") ? "!text-slate-400" : ""}`}>
                                      {plainText(displayTitleKo) || (isSurveyHeader ? "제목 없는 설문지" : "섹션 제목(선택사항)")}
-                                     {plainText(displayTitleEn) ? (
-                                       <span data-focus-field="titleEn" className="ml-1 text-inherit font-normal">
-                                          / {plainText(displayTitleEn)}
+                                     {!isKoreanOnly ? (
+                                       <span data-focus-field="titleEn" className={`ml-1 text-inherit font-normal ${!plainText(displayTitleEn) ? "text-slate-400" : ""}`}>
+                                          / {plainText(displayTitleEn) || (isSurveyHeader ? "Untitled form" : "Section title (optional)")}
                                        </span>
                                      ) : null}
                                    </h3>
                                  {true ? (
-                                     <p data-section-description className={`${sectionDescriptionClass} mt-4 ${!plainText(isSurveyHeader ? surveyDescriptionKo : section.descriptionKo) ? "!text-slate-400" : ""}`}>
+                                     <p data-section-description className={`${sectionDescriptionClass} ${!plainText(isSurveyHeader ? surveyDescriptionKo : section.descriptionKo) ? "!text-slate-400" : ""}`}>
                                        {isSurveyHeader ? plainText(surveyDescriptionKo) || "설문지 설명" : plainText(section.descriptionKo) || "설명(선택사항)"}
                                        {!isKoreanOnly ? <span data-focus-field="descriptionEn" className={`ml-1 ${plainText(isSurveyHeader ? surveyDescriptionEn : section.descriptionEn) ? "text-slate-600" : "text-slate-400"}`}> / {plainText(isSurveyHeader ? surveyDescriptionEn : section.descriptionEn) || (isSurveyHeader ? "Survey description" : "Description (optional)")}</span> : null}
                                      </p>
