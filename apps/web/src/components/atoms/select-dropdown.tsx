@@ -22,6 +22,8 @@ export interface SelectDropdownProps {
   placeholder?: string;
   className?: string;
   ariaLabel?: string;
+  ariaLabelledBy?: string;
+  ariaDescribedBy?: string;
   buttonClassName?: string;
   disabled?: boolean;
   autoFocus?: boolean;
@@ -50,6 +52,8 @@ export function SelectDropdown({
   placeholder,
   className,
   ariaLabel,
+  ariaLabelledBy,
+  ariaDescribedBy,
   buttonClassName,
   disabled = false,
   autoFocus = false,
@@ -292,6 +296,8 @@ export function SelectDropdown({
         }}
         aria-expanded={isOpen}
         aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        aria-describedby={ariaDescribedBy}
           aria-haspopup="listbox"
           aria-controls={isOpen ? menuId : undefined}
           aria-invalid={ariaInvalid ? "true" : undefined}

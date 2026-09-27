@@ -47,7 +47,7 @@ export function NoticeBoard() {
       ) : noticesQuery.isError ? (
         <div className="home-data-error" role="alert">
           <p>{lang === "ko" ? "게시글을 불러오지 못했습니다." : "We couldn't load posts."}</p>
-          <Button type="button" variant="outline" size="lg" onClick={() => void noticesQuery.refetch()}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => void noticesQuery.refetch()}>
             {lang === "ko" ? "다시 시도" : "Try again"}
           </Button>
         </div>

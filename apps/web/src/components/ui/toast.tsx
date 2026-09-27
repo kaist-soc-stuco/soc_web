@@ -89,6 +89,11 @@ function ToastCard({
   onDismiss: (id: string) => void;
 }) {
   const [isLeaving, setIsLeaving] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const remaining = useRef(item.duration ?? 4500);
+  const leaving = useRef(false);
+  const exitTimer = useRef<number | undefined>(undefined);
   const toastType = item.type ?? "info";
   const Icon =
     toastType === "success"
@@ -108,22 +113,33 @@ function ToastCard({
           : "text-sky-300";
 
   const requestDismiss = useCallback(() => {
-    if (isLeaving) return;
+    if (leaving.current) return;
+    leaving.current = true;
     setIsLeaving(true);
-    window.setTimeout(() => onDismiss(item.id), 160);
-  }, [isLeaving, item.id, onDismiss]);
+    exitTimer.current = window.setTimeout(() => onDismiss(item.id), 160);
+  }, [item.id, onDismiss]);
+
+  useEffect(() => () => window.clearTimeout(exitTimer.current), []);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(
-      requestDismiss,
-      item.duration ?? 4500,
-    );
-    return () => window.clearTimeout(timeoutId);
-  }, [item.duration, requestDismiss]);
+    if (hovered || focused || isLeaving) return;
+    const started = performance.now();
+    const timeoutId = window.setTimeout(requestDismiss, remaining.current);
+    return () => {
+      window.clearTimeout(timeoutId);
+      remaining.current = Math.max(0, remaining.current - (performance.now() - started));
+    };
+  }, [hovered, focused, isLeaving, requestDismiss]);
 
   return (
     <div
       role="status"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocusCapture={() => setFocused(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      }}
       className={`pointer-events-auto inline-flex max-w-full items-center gap-3 rounded-lg border border-slate-800/10 bg-slate-900 px-3.5 py-2.5 text-[length:var(--ui-text-body-sm-size)] font-medium leading-5 text-white shadow-[0_10px_28px_rgba(15,23,42,0.18)] ${isLeaving ? "toast-exit" : "toast-enter"}`}
     >
       <Icon aria-hidden="true" className={`size-4 shrink-0 ${iconClassName}`} />

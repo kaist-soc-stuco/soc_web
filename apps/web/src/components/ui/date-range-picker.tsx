@@ -145,7 +145,7 @@ export function DateRangePicker({
     ? `${value.from ? format(value.from) : "…"} ~ ${value.to ? format(value.to).slice(value.from.slice(0, 4) === value.to.slice(0, 4) ? 5 : 0) : "…"}`
     : ko ? "전체 기간" : "All dates";
   const rangeSummary = draft.from
-    ? `${format(draft.from)} – ${draft.to ? format(draft.to) : ko ? "종료일 선택" : "Select end date"}`
+    ? `${format(draft.from)} – ${draft.to ? format(draft.to).slice(draft.from.slice(0, 4) === draft.to.slice(0, 4) ? 5 : 0) : ko ? "종료일 선택" : "Select end date"}`
     : ko ? "전체 기간" : "All dates";
 
   const choose = (day: string) => {
@@ -252,10 +252,9 @@ export function DateRangePicker({
                 const endpoint = day === draft.from || day === draft.to;
                 const inRange = Boolean(draft.from && draft.to && day >= draft.from && day <= draft.to);
                 const weekday = date.getDay();
-                const rangeStart = inRange && (day === draft.from || weekday === 0 || index === 0);
-                const rangeEnd = inRange && (day === draft.to || weekday === 6 || index === count - 1);
                 const dayColor = weekday === 0 ? "text-rose-600" : "text-slate-700";
-                return <span key={day} className={`flex h-9 items-center justify-center transition-[background-color,opacity] duration-150 ${inRange ? `bg-emerald-50 ${rangeStart ? "rounded-l-md" : ""} ${rangeEnd ? "rounded-r-md" : ""}` : ""}`}>
+                return <span key={day} className="relative flex h-9 items-center justify-center">
+                  {inRange && draft.from !== draft.to ? <span aria-hidden="true" className={`pointer-events-none absolute top-1/2 h-8 -translate-y-1/2 bg-emerald-50 ${day === draft.from ? "left-1/2 right-0" : day === draft.to ? "left-0 right-1/2" : "inset-x-0"}`} /> : null}
                   <button
                     type="button"
                     disabled={disableFuture && day > todayStamp}
@@ -276,12 +275,12 @@ export function DateRangePicker({
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
         <div className="flex min-w-0 items-center gap-3">
-          <Button type="button" variant="ghost" onClick={() => { onChange({ from: "", to: "" }); setActivePreset(null); close(); }}>{ko ? "초기화" : "Reset"}</Button>
-          <p className="min-w-0 truncate text-xs text-slate-500" aria-live="polite">{rangeSummary}</p>
+          <Button type="button" variant="ghost" size="sm" onClick={() => { setDraft({ from: "", to: "" }); setActivePreset(null); }}>{ko ? "초기화" : "Reset"}</Button>
+          <p className="min-w-0 text-sm text-slate-600" aria-live="polite">{rangeSummary}</p>
         </div>
-        <div className="flex shrink-0 gap-2">
-          <Button type="button" variant="outline" onClick={close}>{ko ? "취소" : "Cancel"}</Button>
-          <Button type="button" disabled={Boolean(draft.from && !draft.to) || (disableFuture && (draft.from > todayStamp || draft.to > todayStamp))} onClick={() => { onChange(draft); close(); }}>{ko ? "적용" : "Apply"}</Button>
+        <div className="ml-auto flex shrink-0 gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={close}>{ko ? "취소" : "Cancel"}</Button>
+          <Button type="button" size="sm" disabled={Boolean(draft.from && !draft.to) || (disableFuture && (draft.from > todayStamp || draft.to > todayStamp))} onClick={() => { onChange(draft); close(); }}>{ko ? "적용" : "Apply"}</Button>
         </div>
       </div>
     </div>, document.body)}

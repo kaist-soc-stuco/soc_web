@@ -346,9 +346,9 @@ export function VoteEditorPage() {
       try { setVoters(await client.listVoteVoters(voteId)); setRosterPage(1); }
       catch { toast({type:"error",message:"추가는 완료했지만 명부를 새로 불러오지 못했습니다. 새로고침해 주세요."}); }
     } catch (error) {
-      setCandidateError(error instanceof ApiClientHttpError && error.code === "vote_voter_not_found_or_ineligible"
+      toast({ type: "error", message: error instanceof ApiClientHttpError && error.code === "vote_voter_not_found_or_ineligible"
         ? "추가할 수 없는 회원이 포함되어 있습니다. 활성 상태인 전산학부 주전공 회원인지 확인해 주세요."
-        : "선거인을 추가하지 못했습니다. 다시 시도해 주세요.");
+        : "선거인을 추가하지 못했습니다. 다시 시도해 주세요." });
     } finally {
       candidateAddLock.current = false; setAddingCandidates(false);
       if (added) closeCandidateModal();

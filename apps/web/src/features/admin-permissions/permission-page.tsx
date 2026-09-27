@@ -11,6 +11,7 @@ import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableEmpty, AdminT
 import { AdminCard, AdminCardHeader, AdminFormField, AdminLoadingState, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSearchField, AdminSectionTitle } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
+import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UiInput } from "@/components/ui/form-control";
@@ -78,6 +79,7 @@ const displayError = (error: unknown, fallback: string) => {
 export function PermissionPage() {
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const [roles, setRoles] = useState<RoleGroupRecord[]>([]);
@@ -196,11 +198,11 @@ export function PermissionPage() {
       await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
     } catch (saveError) {
       setFailedDraft(draft);
-      setError(displayError(saveError, "역할 변경 사항을 저장하지 못했습니다."));
+      toast({ type: "error", message: displayError(saveError, "역할 변경 사항을 저장하지 못했습니다.") });
     } finally {
       setSaving(false);
     }
-  }, [canEditRole, client, draft, isDirty, queryClient, saving, selectedRole]);
+  }, [canEditRole, client, draft, isDirty, queryClient, saving, selectedRole, toast]);
 
   useEffect(() => {
     if (!selectedRole || !canEditRole || !isDirty || saving || failedDraft === draft) return;
@@ -219,7 +221,7 @@ export function PermissionPage() {
       setCreateOpen(false);
       setSelection(created.roleGroupId);
     } catch (createError) {
-      setError(displayError(createError, "역할을 만들지 못했습니다."));
+      toast({ type: "error", message: displayError(createError, "역할을 만들지 못했습니다.") });
     } finally {
       setSaving(false);
     }
@@ -242,7 +244,7 @@ export function PermissionPage() {
       setRoles(remaining);
       if (remaining[0]) setSelection(remaining[0].roleGroupId);
     } catch (deleteError) {
-      setError(displayError(deleteError, "역할을 삭제하지 못했습니다."));
+      toast({ type: "error", message: displayError(deleteError, "역할을 삭제하지 못했습니다.") });
     } finally {
       setSaving(false);
     }
@@ -312,7 +314,7 @@ export function PermissionPage() {
       setMemberEditorOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
     } catch (memberError) {
-      setError(displayError(memberError, "구성원 변경 사항을 저장하지 못했습니다."));
+      toast({ type: "error", message: displayError(memberError, "구성원 변경 사항을 저장하지 못했습니다.") });
     } finally {
       setCandidateSaving(false);
     }
@@ -329,7 +331,7 @@ export function PermissionPage() {
       setRoles((current) => current.map((role) => role.roleGroupId === selectedRole.roleGroupId ? { ...role, userCount: updatedMembers.length } : role));
       await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
     } catch (memberError) {
-      setError(displayError(memberError, "구성원을 제외하지 못했습니다."));
+      toast({ type: "error", message: displayError(memberError, "구성원을 제외하지 못했습니다.") });
     } finally {
       setCandidateSaving(false);
     }
@@ -341,7 +343,8 @@ export function PermissionPage() {
         {ConfirmDialog}
         <AdminPageMain>
           <AdminPageHeader title="권한 관리" actions={<Button type="button" onClick={() => setCreateOpen(true)}><Plus aria-hidden="true" /> 역할 추가</Button>} />
-          {error ? <div role="alert" className="rounded-lg border border-rose-200 bg-white px-4 py-3 text-sm font-normal text-rose-700">{error}{failedDraft === draft ? <Button type="button" variant="ghost" size="sm" onClick={() => setFailedDraft(null)}>다시 시도</Button> : null}</div> : null}
+          {failedDraft === draft ? <div role="status" className="flex items-center gap-2 text-sm text-slate-600">변경 사항이 저장되지 않았습니다.<Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => setFailedDraft(null)}>다시 시도</Button></div> : null}
+          {error ? <div role="alert" className="rounded-lg border border-rose-200 bg-white px-4 py-3 text-sm font-normal text-rose-700">{error}</div> : null}
 
           <div className="grid min-h-[640px] gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
             <AdminCard className="self-start lg:sticky lg:top-6">

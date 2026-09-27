@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
+import { useRef } from "react";
 import { ChevronRight, Search, X } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -289,6 +290,7 @@ export function PageSearchField({
   placeholder: string;
   value: string;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className={cn("group relative min-w-0 flex-1 lg:w-80 lg:flex-none", className)}>
       <Search
@@ -296,6 +298,7 @@ export function PageSearchField({
         className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-primary"
       />
       <UiInput
+        ref={inputRef}
         type="search"
         aria-label={ariaLabel}
         placeholder={placeholder}
@@ -307,7 +310,7 @@ export function PageSearchField({
         <IconButton
           size="lg"
           aria-label={`${ariaLabel} 지우기`}
-          onClick={onClear}
+          onClick={() => { onClear(); inputRef.current?.focus(); }}
           className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400"
         >
           <X aria-hidden="true" />

@@ -64,7 +64,7 @@ export function EventsSurveysFilterBar({
       </div>
 
       <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">
-        <DateRangePicker lang={lang} value={{ from: dateFrom, to: dateTo }}
+        <DateRangePicker lang={lang} presetType="future" value={{ from: dateFrom, to: dateTo }}
           onChange={({ from, to }) => { onDateFromChange(from); onDateToChange(to); }} />
         <PageSearchField
           ariaLabel={lang === "ko" ? "행사·설문 검색" : "Search events and surveys"}

@@ -404,13 +404,14 @@ export function BoardWriteEventFields({
           <UiFormField
             label={
               lang === "ko"
-                ? "대표 썸네일 (16:9 권장)"
-                : "Representative thumbnail (16:9 recommended)"
+                ? "대표 썸네일 (16:9)"
+                : "Representative thumbnail (16:9)"
             }
           >
             <ImageUploadField
               alt={lang === "ko" ? "대표 썸네일 미리보기" : "Representative thumbnail preview"}
               compact
+              crop={{ width: 1280, height: 720 }}
               disabled={uploading}
               fileName={thumbnail?.originalFilename}
               imageUrl={thumbnail ? resolveAssetUrl(thumbnail.storageKey) : undefined}

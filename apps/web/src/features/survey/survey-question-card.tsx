@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { getResponseError } from "./survey-response-validation";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 import { resolveAssetUrl } from "@/lib/asset-url";
@@ -10,6 +10,10 @@ export function SurveyQuestionCard({ question, value, onChange, lang, error: que
   error?: string | null; disabled?: boolean; maxSelections?: number; hint?: string; id?: string;
 }) {
   const [touched, setTouched] = useState(false);
+  const titleId = useId();
+  const descriptionId = useId();
+  const hintId = useId();
+  const describedBy = [question.descriptionKo || question.descriptionEn ? descriptionId : null, hint ? hintId : null].filter(Boolean).join(" ") || undefined;
   const [blurError, setBlurError] = useState<string | null>(null);
   const validationVersion = useRef(0);
   useEffect(() => {
@@ -24,6 +28,9 @@ export function SurveyQuestionCard({ question, value, onChange, lang, error: que
   return (
     <div
       id={id ?? `survey-question-${question.id}`}
+      role="group"
+      aria-labelledby={titleId}
+      aria-describedby={describedBy}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)
           && !(event.relatedTarget instanceof Element && event.relatedTarget.closest('[role="listbox"]'))) {
@@ -43,7 +50,7 @@ export function SurveyQuestionCard({ question, value, onChange, lang, error: que
       } hover:shadow-[0_2px_5px_rgba(15,23,42,0.045)]`}
     >
       <div className="mb-3.5">
-        <div className="block min-w-0 text-[length:var(--ui-text-section-size)] font-normal leading-6 text-slate-950">
+        <div id={titleId} className="block min-w-0 text-[length:var(--ui-text-section-size)] font-normal leading-6 text-slate-950">
           <span className="min-h-6 break-words leading-6">
             <RichTextContent inline content={getLocalizedText(lang, question.titleKo, question.titleEn)} />
             {question.isRequired && (
@@ -54,8 +61,8 @@ export function SurveyQuestionCard({ question, value, onChange, lang, error: que
           </span>
         </div>
       </div>
-      {question.descriptionKo || question.descriptionEn ? <RichTextContent content={getLocalizedText(lang, question.descriptionKo, question.descriptionEn)} className="mb-3 text-sm leading-6" /> : null}
-      {hint ? <p className="mb-3 text-sm text-slate-500">{hint}</p> : null}
+      {question.descriptionKo || question.descriptionEn ? <div id={descriptionId}><RichTextContent content={getLocalizedText(lang, question.descriptionKo, question.descriptionEn)} className="mb-3 text-sm leading-6" /></div> : null}
+      {hint ? <p id={hintId} className="mb-3 text-sm text-slate-500">{hint}</p> : null}
       {questionImage ? (
         <img
           src={resolveAssetUrl(questionImage)}
@@ -66,6 +73,8 @@ export function SurveyQuestionCard({ question, value, onChange, lang, error: que
       <div>
         <SurveyQuestionInput
           question={question}
+          labelledBy={titleId}
+          describedBy={describedBy}
           value={value}
           onChange={onChange}
           lang={lang}

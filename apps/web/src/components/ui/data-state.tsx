@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { FileQuestion, FileText, RotateCcw } from "lucide-react";
+import { FileQuestion, FileText } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -66,13 +66,11 @@ export function ErrorState({
       {onRetry || actions ? <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
       {onRetry ? (
         <Button
-          className="gap-1.5 border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"
           onClick={onRetry}
           size="sm"
           type="button"
-          variant="outline"
+          variant="ghost"
         >
-          <RotateCcw aria-hidden="true" className="size-4 text-slate-500" />
           {retryLabel}
         </Button>
       ) : null}

@@ -116,7 +116,8 @@ export function FeeManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const [operationError, setOperationError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [policyLoadError, setPolicyLoadError] = useState<string | null>(null);
+  const [policyLoadAttempt, setPolicyLoadAttempt] = useState(0);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [referenceSemester, setReferenceSemester] = useState(() => {
     const current = currentSemester();
@@ -127,17 +128,19 @@ export function FeeManagementPage() {
   useEffect(() => {
     let active = true;
     setPolicyReady(false);
+    setPolicyLoadError(null);
     if (!sessionLoading && Permissions.has(session?.permission ?? 0, Permissions.MANAGE_FINANCE)) {
-      void apiClient.getStudentFeePolicy(referenceSemester).then((policy) => { if (active) { setFeePolicy(policy); setPolicyAmount(String(policy.amount)); setPolicyReady(true); } }).catch(() => { if (active) setOperationError("표준 과비 설정을 불러오지 못했습니다."); });
+      void apiClient.getStudentFeePolicy(referenceSemester).then((policy) => { if (active) { setFeePolicy(policy); setPolicyAmount(String(policy.amount)); setPolicyReady(true); } }).catch(() => { if (active) setPolicyLoadError("표준 과비 설정을 불러오지 못했습니다."); });
     }
     return () => { active = false; };
-  }, [apiClient, referenceSemester, sessionLoading, session?.permission]);
+  }, [apiClient, referenceSemester, sessionLoading, session?.permission, policyLoadAttempt]);
   const saveFeePolicy = async () => {
     const amount = Number(policyAmount);
     if (!Number.isInteger(amount) || amount <= 0) { setOperationError("표준 금액을 확인해 주세요."); return; }
+    setOperationError(null);
     setSaving(true);
-    try { const policy = await apiClient.createStudentFeePolicy({ effectiveSemester: referenceSemester, amount, coverageSemesters: 6 }); setFeePolicy(policy); setPolicyReady(true); setSuccessMessage("표준 금액을 저장했습니다. 기존 납부 내역은 유지됩니다."); }
-    catch { setOperationError("표준 금액을 저장하지 못했습니다."); }
+    try { const policy = await apiClient.createStudentFeePolicy({ effectiveSemester: referenceSemester, amount, coverageSemesters: 6 }); setFeePolicy(policy); setPolicyReady(true); toast({ type: "success", message: "표준 금액을 저장했습니다. 기존 납부 내역은 유지됩니다." }); }
+    catch { toast({ type: "error", message: "표준 금액을 저장하지 못했습니다." }); }
     finally { setSaving(false); }
   };
   const [query, setQuery] = useState("");
@@ -432,7 +435,7 @@ export function FeeManagementPage() {
       setLastSelectedUserId(null);
       setSelectionPopoverOpen(false);
       setPaymentModalOpen(false);
-      setSuccessMessage(`${payments.length}명의 납부 내역을 원장에 반영했습니다.`);
+      toast({ type: "success", message: `${payments.length}명의 납부 내역을 원장에 반영했습니다.` });
       await loadData();
     } catch (err) {
       toast({ type: "error", message: "납부 처리에 실패했습니다." });
@@ -448,6 +451,7 @@ export function FeeManagementPage() {
       const parsed = parseFeeSpreadsheet(await file.arrayBuffer());
       if (parsed.errors.length > 0) {
         setOperationError(parsed.errors.join(" "));
+        setSpreadsheetInfoOpen(true);
         return;
       }
       setImportMatches(await apiClient.previewStudentFeeImport({ updates: parsed.updates }));
@@ -464,7 +468,7 @@ export function FeeManagementPage() {
     setSaving(true);
     try {
       await apiClient.bulkUpdateStudentFeeStatuses({ updates: importPreview });
-      setSuccessMessage(`${importPreview.length}건의 과비 상태를 반영했습니다.`);
+      toast({ type: "success", message: `${importPreview.length}건의 과비 상태를 반영했습니다.` });
       setImportPreview(null);
       await loadData();
     } catch (error) { toast({ type: "error", message: "반영하지 못했습니다." }); }
@@ -539,7 +543,7 @@ export function FeeManagementPage() {
         payments: [payment],
       });
       setDetailPaymentFormOpen(false);
-      setSuccessMessage(`${detail.user.nameKo}의 납부 내역을 원장에 추가했습니다.`);
+      toast({ type: "success", message: `${detail.user.nameKo}의 납부 내역을 원장에 추가했습니다.` });
       await loadData();
       const refreshed = await apiClient.getStudentFeeDetail(detail.user.userId, referenceSemester);
       setDetail(refreshed);
@@ -588,16 +592,15 @@ export function FeeManagementPage() {
             ariaLabel="과비 관리 보기"
             role="tablist"
             value={activeSection}
-            onChange={setActiveSection}
+            onChange={(value) => { setOperationError(null); setActiveSection(value); }}
             className="w-fit"
             options={[{ value: "ledger", label: "납부 원장" }, { value: "stats", label: "통계" }, { value: "settings", label: "설정" }]}
           />
 
-          {successMessage ? <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-normal text-emerald-800"><span>{successMessage}</span><button type="button" aria-label="안내 닫기" className="shrink-0 p-1" onClick={() => setSuccessMessage(null)}>×</button></div> : null}
-          {operationError ? <div className="rounded-lg border border-rose-200 bg-white px-4 py-3 text-sm font-normal text-rose-700">{operationError}</div> : null}
+          {policyLoadError ? <div role="alert" className="flex items-center gap-2 text-sm text-slate-600">{policyLoadError}<Button type="button" variant="ghost" size="sm" onClick={() => setPolicyLoadAttempt(value => value + 1)}>다시 시도</Button></div> : null}
           {error ? <div className="rounded-lg border border-rose-200 bg-white px-4 py-3 text-sm font-normal text-rose-700">{error}</div> : null}
 
-          {activeSection === "settings" ? <section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex flex-wrap items-end gap-3"><AdminFormField label="표준 과비 (원)"><UiInput type="number" min={1} value={policyAmount} onChange={event => setPolicyAmount(event.currentTarget.value)} /></AdminFormField><Button disabled={saving || !policyReady} onClick={() => void saveFeePolicy()}>저장</Button></div></section> : activeSection === "stats" ? (
+          {activeSection === "settings" ? <section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex flex-wrap items-end gap-3"><AdminFormField label="표준 과비 (원)"><UiInput type="number" min={1} value={policyAmount} onChange={event => setPolicyAmount(event.currentTarget.value)} /></AdminFormField><Button disabled={saving || !policyReady} onClick={() => void saveFeePolicy()}>저장</Button></div>{operationError ? <p role="alert" className="mt-2 text-sm text-rose-600">{operationError}</p> : null}</section> : activeSection === "stats" ? (
             <FeeStatisticsPanel error={statsError} onRetry={() => void loadStats()}
               range={statsRange}
               onRangeChange={setStatsRange}
@@ -682,6 +685,7 @@ export function FeeManagementPage() {
         <input key={spreadsheetInputKey} ref={spreadsheetInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void handleSpreadsheetUpload(event.target.files?.[0])} />
 
         <Modal open={spreadsheetInfoOpen} onClose={() => setSpreadsheetInfoOpen(false)} title="과비 데이터 불러오기" mobileFullscreen bodyClassName="px-4 py-5 sm:px-5" footer={<><Button type="button" variant="outline" onClick={() => setSpreadsheetInfoOpen(false)}>취소</Button><Button type="button" onClick={() => { setSpreadsheetInfoOpen(false); spreadsheetInputRef.current?.click(); }}><FileUp aria-hidden="true" /> 파일 선택</Button></>}>
+          {operationError ? <p role="alert" className="mb-3 text-sm text-rose-600">{operationError}</p> : null}
           <Button variant="outline" className="mb-4" onClick={downloadTemplate}>양식 다운로드</Button>
           <div className="space-y-3 text-sm font-normal leading-6 text-slate-600"><p>XLSX 형식을 확인한 뒤 기존 납부 상태를 반영합니다. 새 납부 원장 기록은 화면의 납부 처리에서 남겨 주세요.</p><ul className="list-disc space-y-1 pl-5"><li><code>userId</code> 또는 <code>stdNo</code> 열이 필요합니다.</li><li><code>status</code>, <code>paidAmount</code>, <code>coverageSemesters</code>, <code>note</code> 열을 지원합니다.</li><li>오류가 있는 행은 저장하지 않고 오류 내용을 보여줍니다.</li></ul></div>
         </Modal>

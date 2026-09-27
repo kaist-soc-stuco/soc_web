@@ -9,7 +9,7 @@ import { createApiClient, ApiClientHttpError } from "@soc/api-client";
 import type { VoteDetailResponse, VoteResultsResponse } from "@soc/contracts";
 import { isoToMs, nowMs, meetsVoteQuorum } from "@soc/shared";
 import { ArrowLeft, Check } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 
@@ -33,6 +33,8 @@ export function VotePage() {
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<string | null>(null);
   const [receiptVerified, setReceiptVerified] = useState(false);
+  const [verifyingReceipt, setVerifyingReceipt] = useState(false);
+  const verifyingReceiptRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const { confirm, ConfirmDialog } = useConfirmDialog();
@@ -99,7 +101,23 @@ export function VotePage() {
     }
   };
 
-  if (error && !vote) return <PageShell><main className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-24 text-center text-sm text-rose-600" role="alert"><p>{error}</p><Button type="button" variant="outline" onClick={() => setReloadKey((current) => current + 1)} className="min-h-11">{t.retry}</Button></main></PageShell>;
+  const verifyReceipt = async () => {
+    if (!receipt || verifyingReceiptRef.current || receiptVerified) return;
+    verifyingReceiptRef.current = true;
+    setVerifyingReceipt(true);
+    try {
+      const result = await client.verifyVoteReceipt(id, receipt);
+      setReceiptVerified(result.accepted);
+      if (!result.accepted) toast({ type: "warning", message: lang === "ko" ? "접수 내역을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요." : "Receipt not found. Please try again shortly." });
+    } catch {
+      toast({ type: "error", message: lang === "ko" ? "접수 확인에 실패했습니다. 다시 시도해 주세요." : "Could not verify your receipt. Please try again." });
+    } finally {
+      verifyingReceiptRef.current = false;
+      setVerifyingReceipt(false);
+    }
+  };
+
+  if (error && !vote) return <PageShell><main className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-24 text-center text-sm text-rose-600" role="alert"><p>{error}</p><Button type="button" variant="ghost" size="sm" onClick={() => setReloadKey((current) => current + 1)}>{t.retry}</Button></main></PageShell>;
   if (!vote) return <PageShell><main className="flex-1 py-24 text-center text-sm text-[#344054]">불러오는 중...</main></PageShell>;
 
   const now = nowMs();
@@ -129,7 +147,7 @@ export function VotePage() {
               <h2 className="mt-3 text-xl font-semibold text-[#172033]">{t.submitted}</h2>
               <p className="mt-5 text-sm text-slate-500">{lang === "ko" ? "접수 번호" : "Receipt number"}</p>
               <code className="mt-2 inline-block max-w-full break-all rounded-lg border border-emerald-200 bg-white px-4 py-3 text-sm font-normal text-[#172033]">{receipt}</code>
-              <div className="mt-4 flex justify-center gap-2"><Button variant="ghost" size="sm" onClick={async () => { try { await navigator.clipboard.writeText(receipt); toast({ type: "success", message: lang === "ko" ? "접수 번호를 복사했습니다." : "Receipt number copied." }); } catch { toast({ type: "error", message: lang === "ko" ? "복사하지 못했습니다." : "Could not copy." }); } }}>{lang === "ko" ? "복사" : "Copy"}</Button><Button variant="outline" size="sm" onClick={async () => setReceiptVerified((await client.verifyVoteReceipt(id, receipt)).accepted)}>{receiptVerified ? t.verified : t.verify}</Button></div>
+              <div className="mt-4 flex justify-center gap-2"><Button variant="ghost" size="sm" onClick={async () => { try { await navigator.clipboard.writeText(receipt); toast({ type: "success", message: lang === "ko" ? "접수 번호를 복사했습니다." : "Receipt number copied." }); } catch { toast({ type: "error", message: lang === "ko" ? "복사하지 못했습니다." : "Could not copy." }); } }}>{lang === "ko" ? "복사" : "Copy"}</Button><Button type="button" variant="outline" size="sm" loading={verifyingReceipt} disabled={verifyingReceipt || receiptVerified} onClick={() => void verifyReceipt()}>{receiptVerified ? t.verified : t.verify}</Button></div>
             </section>
           ) : !isPreview && results ? (
             <section className="mt-5 space-y-5 rounded-xl border border-slate-200 bg-white p-4 sm:p-6 md:p-8">

@@ -71,7 +71,6 @@ test("creates and formats an executive contact sheet through the shared Sheets c
     "학번",
     "부서",
     "직책",
-    "활동 연도",
     "이메일",
     "전화번호",
     "활동 이력",
@@ -81,12 +80,11 @@ test("creates and formats an executive contact sheet through the shared Sheets c
     "20261234",
     "회장단",
     "회장",
-    2026,
     "hong@example.com",
     "010-0000-0000",
-    "2025 / 기획부 / 부원\n2026 / 회장단 / 회장",
+    "2025년 · 기획부 · 부원\n2026년 · 회장단 · 회장",
   ]]);
-  assert.deepEqual(syncCall.definition.columnWidths, [120, 100, 140, 140, 100, 230, 140, 360]);
+  assert.deepEqual(syncCall.definition.columnWidths, [120, 100, 140, 140, 230, 140, 360]);
   assert.equal(syncCall.definition.protectionDescription, "KAIST SOC · 집행부원 연락망 (읽기 전용)");
 });
 
@@ -155,6 +153,7 @@ test("rechecks consent before writing and records a non-PII sync audit trace", a
   assert.equal(findManagedCalls[0].privacyConsented, true);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].rows[0][0], "동의 사용자");
+  assert.equal(calls[0].rows[0][6], "2026년 · 집행부 · 부원");
   assert.equal(calls[0].rows.some((row) => row.includes("revoked@example.com")), false);
   assert.deepEqual(auditEntries[0].payload, {
     executor: "background-worker",

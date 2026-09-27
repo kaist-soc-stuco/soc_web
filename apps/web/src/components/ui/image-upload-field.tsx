@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ImageCropModal } from "@/components/ui/image-crop-modal";
 import { cn } from "@/lib/utils";
 
 interface ImageUploadFieldProps {
@@ -9,6 +10,7 @@ interface ImageUploadFieldProps {
   alt: string;
   className?: string;
   compact?: boolean;
+  crop?: { width: number; height: number };
   disabled?: boolean;
   emptyText?: string;
   fileName?: string;
@@ -25,6 +27,7 @@ export function ImageUploadField({
   alt,
   className,
   compact = false,
+  crop,
   disabled = false,
   emptyText,
   fileName,
@@ -37,6 +40,7 @@ export function ImageUploadField({
 }: ImageUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewFailed, setPreviewFailed] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
   useEffect(() => {
     setPreviewFailed(false);
@@ -45,6 +49,7 @@ export function ImageUploadField({
   const hasPreview = Boolean(imageUrl && !previewFailed);
 
   return (
+    <>
     <div
       className={cn(
         "overflow-hidden rounded-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white",
@@ -60,7 +65,10 @@ export function ImageUploadField({
         disabled={disabled}
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
-          if (file) void onSelect(file);
+          if (file) {
+            if (crop && ["image/jpeg", "image/png", "image/webp"].includes(file.type)) setCropFile(file);
+            else void onSelect(file);
+          }
           event.currentTarget.value = "";
         }}
       />
@@ -105,7 +113,7 @@ export function ImageUploadField({
         ) : (
           <div className="grid gap-3 p-3 sm:grid-cols-[12rem_1fr] sm:items-center">
             <div className="aspect-video overflow-hidden rounded-md bg-slate-100">
-              <img src={imageUrl} alt={alt} draggable={false} onError={() => setPreviewFailed(true)} className="h-full w-full object-cover" />
+              <img src={imageUrl} alt={alt} draggable={false} onError={() => setPreviewFailed(true)} className="h-full w-full object-contain" />
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -169,5 +177,17 @@ export function ImageUploadField({
         </div>
       )}
     </div>
+    {crop && cropFile ? <ImageCropModal
+      file={cropFile}
+      aspectRatio={crop.width / crop.height}
+      outputWidth={crop.width}
+      outputHeight={crop.height}
+      onCancel={() => setCropFile(null)}
+      onComplete={async (file) => {
+        await onSelect(file);
+        setCropFile(null);
+      }}
+    /> : null}
+    </>
   );
 }

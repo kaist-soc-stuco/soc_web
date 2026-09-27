@@ -118,6 +118,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
 
       <PageMain>
         <PageHeader
+          containerClassName={currentTab === "calendar" ? "pt-4" : undefined}
           actions={
             currentTab === "calendar" ? (
               <CalendarSubscriptionButton feedUrl={calendarFeedUrl} lang={lang} />

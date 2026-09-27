@@ -1,6 +1,7 @@
 import { CalendarPlus, Check, Copy, Download } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { PopoverPanel } from "@/components/ui/popover-panel";
 
@@ -11,6 +12,7 @@ export function CalendarSubscriptionButton({
   feedUrl: string;
   lang: string;
 }) {
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -45,6 +47,7 @@ export function CalendarSubscriptionButton({
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
       setCopied(false);
+      toast({ type: "error", message: lang === "ko" ? "주소를 복사하지 못했습니다. 다시 시도해 주세요." : "Could not copy the URL. Please try again." });
     }
   };
 
@@ -61,17 +64,12 @@ export function CalendarSubscriptionButton({
         {lang === "ko" ? "캘린더 구독" : "Subscribe to calendar"}
       </Button>
       {open ? (
-        <PopoverPanel id={panelId} className="right-0 top-full mt-2 w-[min(25rem,calc(100vw-2rem))] p-4">
+        <PopoverPanel id={panelId} className="left-0 top-full mt-2 w-[min(25rem,calc(100vw-3rem))] p-4 sm:left-auto sm:right-0">
           <div className="space-y-3">
             <div>
               <h2 className="text-sm font-semibold text-slate-900">
                 {lang === "ko" ? "캘린더 구독" : "Subscribe to the calendar"}
               </h2>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                {lang === "ko"
-                  ? "구독 주소를 캘린더 앱에 추가하면 공개 일정이 자동으로 갱신됩니다."
-                  : "Add this feed URL to your calendar app to receive updated public schedules."}
-              </p>
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
               <code className="min-w-0 flex-1 break-all text-xs leading-4 text-slate-600">{absoluteFeedUrl}</code>
@@ -89,17 +87,14 @@ export function CalendarSubscriptionButton({
                 target="_blank"
               >
                 <Download aria-hidden="true" className="size-3.5" />
-                {lang === "ko" ? "iCal 파일 다운로드" : "Download iCal file"}
+                {lang === "ko" ? "일정 파일 다운로드 (.ics)" : "Download calendar (.ics)"}
               </a>
               <p className="px-2 text-xs leading-5 text-slate-500">
                 {lang === "ko"
-                  ? "파일로 가져온 일정은 자동으로 갱신되지 않습니다."
-                  : "Events imported from a file do not update automatically."}
+                  ? "구독은 자동 갱신되며, 파일은 현재 일정만 저장합니다."
+                  : "Subscriptions stay updated; files save the current events only."}
               </p>
             </div>
-            <p className="text-xs leading-4 text-slate-400">
-              {lang === "ko" ? "로그인이 필요한 투표 일정은 구독 피드에 포함되지 않습니다." : "Vote schedules that require sign-in are not included in this public feed."}
-            </p>
           </div>
         </PopoverPanel>
       ) : null}

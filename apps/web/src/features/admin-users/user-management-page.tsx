@@ -204,7 +204,7 @@ export function UserManagementPage() {
       setSelectedUser((current) => current?.userId === user.userId ? { ...current, isActive: result.isActive } : current);
       if (result.isActive !== user.isActive) setRefreshVersion((version) => version + 1);
     } catch {
-      setError("유저 상태를 변경하지 못했습니다.");
+      toast({ type: "error", message: "유저 상태를 변경하지 못했습니다." });
     } finally {
       setUpdatingUserId(null);
     }
@@ -225,7 +225,7 @@ export function UserManagementPage() {
       setDeactivationTarget(null);
       setDeactivationReason("");
     } catch {
-      setError("계정을 비활성화하지 못했습니다.");
+      toast({ type: "error", message: "계정을 비활성화하지 못했습니다." });
     } finally {
       setUpdatingUserId(null);
     }
@@ -256,7 +256,6 @@ export function UserManagementPage() {
       setPostingSuspension(result);
       toast({ type: "success", message: "게시 작성 제한을 해제했습니다." });
     } catch {
-      setError("게시 작성 제한을 해제하지 못했습니다.");
       toast({ type: "error", message: "게시 작성 제한을 해제하지 못했습니다." });
     } finally {
       setPostingSuspensionSaving(false);
@@ -278,7 +277,6 @@ export function UserManagementPage() {
       setPostingSuspensionReason("");
       toast({ type: "success", message: "게시글·댓글 작성 제한을 적용했습니다." });
     } catch {
-      setError("게시 작성 제한을 적용하지 못했습니다.");
       toast({ type: "error", message: "게시 작성 제한을 적용하지 못했습니다." });
     } finally {
       setPostingSuspensionSaving(false);

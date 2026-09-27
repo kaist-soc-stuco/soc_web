@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
+import { useId, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
+import { stripRichText } from "@/components/ui/rich-text-content";
 import { createApiClient } from "@soc/api-client";
 import type {
   QuestionOption,
@@ -19,6 +20,8 @@ import { UiInput, UiTextarea } from "@/components/ui/form-control";
 export type ResponseQuestion = Pick<SurveyQuestionRecord, "id" | "questionType" | "options" | "config" | "titleKo" | "titleEn" | "descriptionKo" | "descriptionEn" | "isRequired"> & Partial<Pick<SurveyQuestionRecord, "answerRegex">>;
 
 interface QuestionInputProps {
+  labelledBy?: string;
+  describedBy?: string;
   maxSelections?: number;
   disabled?: boolean;
   error?: string | null;
@@ -45,7 +48,17 @@ export function SurveyQuestionInput({
   disabled = false,
   error = null,
   maxSelections,
+  labelledBy,
+  describedBy,
 }: QuestionInputProps) {
+  const errorId = useId();
+  const questionLabel = stripRichText(lang === "ko" ? question.titleKo : question.titleEn || question.titleKo);
+  const inputAccessibility = {
+    "aria-labelledby": labelledBy,
+    "aria-label": labelledBy ? undefined : questionLabel,
+    "aria-describedby": [describedBy, error ? errorId : null].filter(Boolean).join(" ") || undefined,
+    "aria-required": question.isRequired,
+  };
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
@@ -59,7 +72,7 @@ export function SurveyQuestionInput({
     "survey-answer-control min-h-11 w-full rounded-none border-0 border-b border-slate-300 bg-transparent px-0 py-1 text-base outline-none transition-[border-color,box-shadow] placeholder:text-[length:var(--ui-text-body-size)] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-0 md:text-sm";
   const controlClass = base;
   const renderError = error ? (
-    <p className="mb-2 mt-5 flex items-center gap-3 text-sm font-normal text-red-500" role="alert">
+    <p id={errorId} className="mb-2 mt-5 flex items-center gap-3 text-sm font-normal text-red-500" role="alert">
       <CircleAlert className="size-5 shrink-0" aria-hidden="true" />
       {error}
     </p>
@@ -86,6 +99,7 @@ export function SurveyQuestionInput({
       return (
         <div>
           <UiInput
+            {...inputAccessibility}
             className={`${controlClass} !w-1/2`}
             type="text"
             value={value as string}
@@ -102,6 +116,7 @@ export function SurveyQuestionInput({
       return (
         <div>
           <UiTextarea
+            {...inputAccessibility}
             rows={1}
             className={`${controlClass} min-h-11 leading-normal resize-none`}
             value={value as string}
@@ -120,6 +135,9 @@ export function SurveyQuestionInput({
         return (
           <div>
             <SelectDropdown
+              ariaLabel={questionLabel}
+              ariaLabelledBy={labelledBy}
+              ariaDescribedBy={inputAccessibility["aria-describedby"]}
               value={value as string}
               onChange={onChange}
               disabled={disabled}
@@ -568,6 +586,7 @@ export function SurveyQuestionInput({
       return (
         <div>
           <UiInput
+            {...inputAccessibility}
             className={`${controlClass} !w-auto max-w-full`}
             type={includeTime ? "datetime-local" : includeYear ? "date" : "text"}
             inputMode={!includeYear && !includeTime ? "numeric" : undefined}
@@ -588,6 +607,7 @@ export function SurveyQuestionInput({
       return (
         <div>
           <UiInput
+            {...inputAccessibility}
             className={`${controlClass} !w-auto max-w-full`}
             type={isDuration ? "text" : "time"}
             inputMode={isDuration ? "numeric" : undefined}

@@ -146,7 +146,6 @@ export function AuditLogPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  const [operationError, setOperationError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [targetType, setTargetType] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -205,7 +204,6 @@ export function AuditLogPage() {
   };
 
   const handleExport = async () => {
-    setOperationError(null);
     try {
       const blob = await client.downloadAuditLogsXlsx({
         q: query,
@@ -248,7 +246,6 @@ export function AuditLogPage() {
 
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
               <span className="text-sm font-normal tracking-[-0.02em] text-[#666]">총 {totalCount}건</span>
-              {operationError ? <span role="alert" className="text-xs font-medium text-rose-600">{operationError}</span> : null}
             </div>
 
             <div className={refreshing ? "opacity-60 transition-opacity duration-150" : "transition-opacity duration-150"}>

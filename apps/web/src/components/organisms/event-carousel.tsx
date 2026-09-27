@@ -539,8 +539,8 @@ export function EventCarousel() {
           <p>{lang === "ko" ? "행사를 불러오지 못했습니다." : "We couldn't load events."}</p>
           <Button
             type="button"
-            variant="outline"
-            size="lg"
+            variant="ghost"
+            size="sm"
             onClick={() => setRetryCount((count) => count + 1)}
           >
             {lang === "ko" ? "다시 시도" : "Try again"}

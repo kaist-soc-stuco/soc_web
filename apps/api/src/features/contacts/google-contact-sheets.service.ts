@@ -98,7 +98,6 @@ export class GoogleContactSheetsService implements OnModuleInit {
           "학번",
           "부서",
           "직책",
-          "활동 연도",
           "이메일",
           "전화번호",
           "활동 이력",
@@ -108,12 +107,12 @@ export class GoogleContactSheetsService implements OnModuleInit {
           contact.studentNumber ?? "",
           contact.departmentKo ?? "",
           contact.roleKo,
-          contact.cohort ? formatActivityYear(contact.cohort) : "",
           contact.email ?? "",
           contact.phoneNumber ?? "",
-          (contact.activities ?? []).map((activity) => `${activity.year} / ${activity.departmentKo} / ${activity.roleKo}`).join("\n"),
+          (contact.activities?.length ? contact.activities : contact.cohort ? [{ year: contact.cohort, departmentKo: contact.departmentKo, roleKo: contact.roleKo }] : [])
+            .map((activity) => `${formatActivityYear(activity.year)}년 · ${activity.departmentKo ?? ""} · ${activity.roleKo}`).join("\n"),
         ]),
-        columnWidths: [120, 100, 140, 140, 100, 230, 140, 360],
+        columnWidths: [120, 100, 140, 140, 230, 140, 360],
         protectionDescription: "KAIST SOC · 집행부원 연락망 (읽기 전용)",
       });
 

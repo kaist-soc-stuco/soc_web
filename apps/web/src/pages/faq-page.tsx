@@ -131,28 +131,13 @@ export function FaqPage() {
     });
   }, [activeFilter, deferredSearchQuery, items]);
   const faqSections = useMemo(() => {
-    const assignedIds = new Set<string>();
     const sections = FAQ_SECTIONS.flatMap((section) => {
-      const sectionItems = filteredItems.filter((item) => {
-        if (!section.titles.has(item.titleKo)) return false;
-        assignedIds.add(item.articleId);
-        return true;
-      });
+      const sectionItems = filteredItems.filter(
+        (item) => faqCategoryForTitle(item.titleKo) === section.key,
+      );
       return sectionItems.length > 0 ? [{ ...section, items: sectionItems }] : [];
     });
-    const ungroupedItems = filteredItems.filter((item) => !assignedIds.has(item.articleId));
-    return ungroupedItems.length > 0
-      ? [
-          ...sections,
-          {
-            key: "other",
-            titleKo: "기타",
-            titleEn: "Other",
-            titles: new Set<string>(),
-            items: ungroupedItems,
-          },
-        ]
-      : sections;
+    return sections;
   }, [filteredItems]);
 
   return (
@@ -200,7 +185,12 @@ export function FaqPage() {
           <span className="sr-only" aria-live="polite">
             {lang === "ko" ? `전체 ${filteredItems.length}건` : `${filteredItems.length} items`}
           </span>
-         <DataViewCard aria-label={lang === "ko" ? "FAQ 목록" : "FAQ list"} className="faq-list-card">
+         <div
+           aria-label={lang === "ko" ? "FAQ 목록" : "FAQ list"}
+           className={faqQuery.isPending || faqQuery.isError || filteredItems.length === 0
+             ? "overflow-hidden rounded-[var(--ui-card-radius)] border border-slate-200 bg-white"
+             : undefined}
+         >
            <DataViewBody>
               {faqQuery.isPending ? (
                 <div className="min-h-48 divide-y divide-slate-100" aria-label="FAQ 불러오는 중">
@@ -246,7 +236,7 @@ export function FaqPage() {
                       </span>
                       <button
                         type="button"
-                        className="text-xs font-medium text-brand-primary hover:underline"
+                        className="mx-auto mt-3 block text-xs font-medium text-brand-primary hover:underline"
                         onClick={() => {
                           setSearchQuery("");
                           setActiveFilter("all");
@@ -258,12 +248,12 @@ export function FaqPage() {
                   ) : undefined}
                 </EmptyState>
               ) : (
-                <div className="min-h-48">
-                  {faqSections.map((section, index) => (
-                    <section
+                <div className="space-y-4">
+                  {faqSections.map((section) => (
+                    <DataViewCard
                       key={section.key}
                       aria-labelledby={`faq-section-${section.key}`}
-                      className={index > 0 ? "border-t border-slate-100" : undefined}
+                      className="shadow-none"
                     >
                       <h3
                         id={`faq-section-${section.key}`}
@@ -301,7 +291,7 @@ export function FaqPage() {
                                 className="flex min-h-14 w-full items-center justify-between gap-4 rounded-none border-0 px-4 py-3 text-left text-[length:var(--ui-text-section-size)] font-medium leading-6 text-slate-800 hover:bg-slate-50 sm:px-6"
                               >
                                 <span className="flex min-w-0 flex-1 items-baseline whitespace-normal">
-                                 <span>{title}</span>
+                                 <span className="break-keep [overflow-wrap:anywhere]">{title}</span>
                                </span>
                                 <ChevronDown
                                   className={`size-4 shrink-0 text-slate-400 transition-transform duration-150 ${
@@ -331,12 +321,12 @@ export function FaqPage() {
                           );
                         })}
                       </div>
-                    </section>
+                    </DataViewCard>
                   ))}
                 </div>
               )}
             </DataViewBody>
-          </DataViewCard>
+          </div>
         </PageContainer>
       </PageMain>
     </PageShell>

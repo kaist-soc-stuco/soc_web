@@ -72,15 +72,16 @@ export class ContactsController {
       auditMetadataFromRequest(request),
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["이름", "학번", "부서", "직책", "활동 연도", "이메일", "전화번호", "개인정보동의", "표시순서"],
+      ["이름", "학번", "부서", "직책", "이메일", "전화번호", "활동 이력", "개인정보동의", "표시순서"],
       ...items.map((item) => [
         item.nameKo,
         item.studentNumber,
         item.departmentKo,
         item.roleKo,
-        item.cohort,
         item.email,
         item.phoneNumber,
+        (item.activities?.length ? item.activities : item.cohort ? [{ year: item.cohort, departmentKo: item.departmentKo, roleKo: item.roleKo }] : [])
+          .map((activity) => `${activity.year < 100 ? 2000 + activity.year : activity.year}년 · ${activity.departmentKo ?? ""} · ${activity.roleKo}`).join("\n"),
         item.privacyConsented ? "동의" : "미동의",
         item.sortOrder,
       ]),
@@ -90,7 +91,7 @@ export class ContactsController {
       { wch: 12 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 12 },
     ];
     const activities = XLSX.utils.aoa_to_sheet([
-      ["연락처 ID", "포털 사용자 ID", "이름", "활동 연도", "부서 ID", "부서", "직책"],
+      ["연락처 ID", "포털 사용자 ID", "이름", "연도", "부서 ID", "부서", "직책"],
       ...items.flatMap((item) => (item.activities ?? []).map((activity) => [
         item.id, item.portalUserId, item.nameKo, activity.year, activity.departmentId,
         activity.departmentKo, activity.roleKo,

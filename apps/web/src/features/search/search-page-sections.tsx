@@ -10,6 +10,7 @@ import type {
 import { ArrowRight, Loader2 } from "lucide-react";
 
 import { PageActionButton, PageSearchField, PageTabButton, PageTabs } from "@/components/ui/page-layout";
+import { Button } from "@/components/ui/button";
 import { MobileSectionSelector } from "@/components/ui/mobile-section-selector";
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { stripRichText } from "@/components/ui/rich-text-content";
@@ -232,9 +233,9 @@ export function SearchResults({
       <div className="flex flex-col items-start gap-3 px-1 py-6 text-sm font-normal text-red-600" role="alert">
         <p>{error}</p>
         {onRetry ? (
-          <PageActionButton type="button" onClick={onRetry}>
+          <Button type="button" variant="ghost" size="sm" onClick={onRetry}>
             {lang === "ko" ? "다시 시도" : "Retry"}
-          </PageActionButton>
+          </Button>
         ) : null}
       </div>
     );

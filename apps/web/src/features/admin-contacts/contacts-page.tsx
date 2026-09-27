@@ -210,7 +210,7 @@ function ContactsPageContent() {
       setContacts(sortContacts(savedContacts));
     } catch {
       setContacts(previousContacts);
-      setError("연락망 순서를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      toast({ type: "error", message: "연락망 순서를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요." });
     } finally {
       setOrderSaving(false);
     }
@@ -281,7 +281,7 @@ function ContactsPageContent() {
 
   const handleMemberSave = async (values: ExecutiveMemberFormValues) => {
     const latest = values.activities.reduce((current, activity) => !current || activity.year >= current.year ? activity : current, values.activities[0]);
-    if (!latest) { setError("활동 이력을 하나 이상 입력해 주세요."); return; }
+    if (!latest) { toast({ type: "error", message: "활동 이력을 하나 이상 입력해 주세요." }); return; }
     const payload: CreateContactRequest = {
       portalUserId: values.portalUserId,
       activities: values.activities,
@@ -305,7 +305,7 @@ function ContactsPageContent() {
       setEditingContact(null);
       await loadContacts();
     } catch {
-      setError("저장에 실패했습니다. 입력을 다시 확인해 주세요.");
+      toast({ type: "error", message: "저장에 실패했습니다. 입력을 다시 확인해 주세요." });
     } finally {
       setMemberSaving(false);
     }
@@ -355,7 +355,7 @@ function ContactsPageContent() {
       await Promise.all([loadDepartments(), loadContacts()]);
       toast({ type: "success", message: editingDepartment ? "부서 정보를 수정했습니다." : "부서를 추가했습니다." });
     } catch {
-      setError("부서 저장에 실패했습니다. 중복 여부와 입력값을 확인해 주세요.");
+      toast({ type: "error", message: "부서 저장에 실패했습니다. 중복 여부와 입력값을 확인해 주세요." });
     } finally {
       setDepartmentSaving(false);
     }
@@ -374,7 +374,7 @@ function ContactsPageContent() {
       await loadDepartments();
       toast({ type: "success", message: "부서를 삭제했습니다." });
     } catch {
-      setError("연락망에서 사용 중인 부서는 삭제할 수 없습니다.");
+      toast({ type: "error", message: "연락망에서 사용 중인 부서는 삭제할 수 없습니다." });
     }
   };
 
@@ -449,12 +449,12 @@ function ContactsPageContent() {
 
             <AdminTableCard className="overflow-visible">
               <div className="border-b border-slate-100 p-4"><div className="flex flex-wrap items-center justify-end gap-2">
-                <AdminSelectDropdown value={activityYearFilter} onChange={setActivityYearFilter} ariaLabel="활동 연도 필터" className="w-32 shrink-0" options={[{ value: "", label: "활동 연도" }, ...activityYearOptions.map((year) => ({ value: String(year), label: formatActivityYear(year) }))]} />
+                <AdminSelectDropdown value={activityYearFilter} onChange={setActivityYearFilter} ariaLabel="연도 필터" className="w-32 shrink-0" options={[{ value: "", label: "전체 연도" }, ...activityYearOptions.map((year) => ({ value: String(year), label: formatActivityYear(year) }))]} />
                 <AdminSelectDropdown value={departmentFilter} onChange={setDepartmentFilter} ariaLabel="부서 필터" className="w-36 shrink-0" options={[{ value: "", label: "부서 전체" }, ...departments.filter((department) => department.isActive).map((department) => ({ value: department.nameKo, label: department.nameKo })), ...legacyDepartmentOptions.map((department) => ({ value: department, label: department }))]} />
                 <PageSearchField ariaLabel="연락망 통합 검색" className="w-full max-w-[20rem] flex-none" onChange={setQuery} onClear={() => setQuery("")} placeholder="이름·학번·직책·메일·전화번호 검색" value={query} />
               </div></div>
               <div className="min-w-0">
-                {loading && contacts.length === 0 ? <AdminLoadingState /> : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext modifiers={[restrictListDrag]} autoScroll={false} sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={handleDragCancel} onDragEnd={(event) => void handleDragEnd(event)}><AdminTableViewport className={activeContactId ? "admin-contacts-table-viewport admin-table-viewport--dragging" : "admin-contacts-table-viewport"}><div className="admin-contacts-table min-w-[1120px]"><div role="row" className={`admin-contacts-table__header ${CONTACT_ROW_GRID} bg-slate-50/70 text-left text-sm font-medium text-[var(--j-color-text-secondary)]`}><div role="columnheader" className="flex h-12 items-center justify-center"><span className="sr-only">순서</span></div><div role="columnheader" className="flex h-12 items-center pl-1 pr-5">이름</div><div role="columnheader" className="flex h-12 items-center px-5">학번</div><div role="columnheader" className="flex h-12 items-center px-5">활동 연도</div><div role="columnheader" className="flex h-12 items-center px-5">부서</div><div role="columnheader" className="flex h-12 items-center px-5">직책</div><div role="columnheader" className="flex h-12 items-center px-5">연락처 정보</div></div><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}><div role="rowgroup">{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} activityYear={activityYearFilter} disabled={orderSaving} onEdit={openEditMemberModal} />)}</div></SortableContext></div></AdminTableViewport>{typeof document !== "undefined" ? createPortal(<DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>{activeContact ? <ContactDragPreview contact={activeContact} width={activeDragWidth} /> : null}</DragOverlay>, document.body) : null}</DndContext>}
+                {loading && contacts.length === 0 ? <AdminLoadingState /> : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext modifiers={[restrictListDrag]} autoScroll={false} sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={handleDragCancel} onDragEnd={(event) => void handleDragEnd(event)}><AdminTableViewport className={activeContactId ? "admin-contacts-table-viewport admin-table-viewport--dragging" : "admin-contacts-table-viewport"}><div className="admin-contacts-table min-w-[1120px]"><div role="row" className={`admin-contacts-table__header ${CONTACT_ROW_GRID} bg-slate-50/70 text-left text-sm font-medium text-[var(--j-color-text-secondary)]`}><div role="columnheader" className="flex h-12 items-center justify-center"><span className="sr-only">순서</span></div><div role="columnheader" className="flex h-12 items-center pl-1 pr-5">이름</div><div role="columnheader" className="flex h-12 items-center px-5">학번</div><div role="columnheader" className="flex h-12 items-center px-5">연도</div><div role="columnheader" className="flex h-12 items-center px-5">부서</div><div role="columnheader" className="flex h-12 items-center px-5">직책</div><div role="columnheader" className="flex h-12 items-center px-5">연락처 정보</div></div><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}><div role="rowgroup">{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} activityYear={activityYearFilter} disabled={orderSaving} onEdit={openEditMemberModal} />)}</div></SortableContext></div></AdminTableViewport>{typeof document !== "undefined" ? createPortal(<DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>{activeContact ? <ContactDragPreview contact={activeContact} width={activeDragWidth} /> : null}</DragOverlay>, document.body) : null}</DndContext>}
               </div>
               {orderSaving ? <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">표시 순서를 저장하는 중입니다...</p> : null}
             </AdminTableCard>
@@ -496,7 +496,7 @@ function ContactsPageContent() {
       await loadContacts();
       return true;
     } catch {
-      setError("삭제에 실패했습니다.");
+      toast({ type: "error", message: "삭제에 실패했습니다." });
       return false;
     }
   }
@@ -510,7 +510,7 @@ function ContactCells({ contact, activityYear = "" }: { contact: ContactRecord; 
   return <>
     <div role="cell" className="min-w-0 py-3 pl-1 pr-5"><div className="admin-table-text-emphasis truncate">{contact.nameKo}</div></div>
     <div role="cell" className="min-w-0 truncate px-5 py-3 text-sm tabular-nums text-slate-700">{contact.studentNumber || "—"}</div>
-    <div role="cell" data-mobile-label="활동 연도" className="px-5 py-3 text-sm tabular-nums text-slate-700">{years.map(formatActivityYear).join(", ") || "—"}</div>
+    <div role="cell" data-mobile-label="연도" className="px-5 py-3 text-sm tabular-nums text-slate-700">{years.map(formatActivityYear).join(", ") || "—"}</div>
     <div role="cell" data-mobile-label="부서" className="min-w-0 px-5 py-3 text-sm text-slate-700">{[...new Set(activities.map((activity) => activity.departmentKo).filter(Boolean))].join(", ") || "—"}</div>
     <div role="cell" data-mobile-label="직책" className="min-w-0 px-5 py-3 text-sm text-slate-700">{[...new Set(activities.map((activity) => activity.roleKo).filter(Boolean))].join(", ") || "—"}</div>
     <div role="cell" className="min-w-0 space-y-1 px-5 py-3"><div className="admin-table-text flex min-w-0 items-center gap-1.5"><Mail className="size-3.5 shrink-0 text-slate-400" /><span className="truncate">{contact.email || "—"}</span></div><div className="admin-table-text flex min-w-0 items-center gap-1.5"><Phone className="size-3.5 shrink-0 text-slate-400" /><span className="truncate">{contact.phoneNumber || "—"}</span></div></div>

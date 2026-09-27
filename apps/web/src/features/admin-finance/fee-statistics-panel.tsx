@@ -43,7 +43,7 @@ export function FeeStatisticsPanel({ semester, semesterOptions, loading, onSemes
   const x = (index: number) => 92 + (index + .5) * plotWidth / Math.max(chart.points.length, 1);
   const y = (value: number) => 182 - value / ceiling * 154;
   return <div className="space-y-5" aria-busy={loading}>
-    {error ? <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600"><span>{error}</span><Button variant="outline" onClick={onRetry}>다시 시도</Button></div> : null}
+    {error ? <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600"><span>{error}</span><Button type="button" variant="ghost" size="sm" onClick={onRetry}>다시 시도</Button></div> : null}
     <AdminCard className="overflow-visible">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div><h2 className="text-base font-medium text-slate-900">학기별 납부 현황</h2><p className="mt-1 text-xs text-slate-500">선택 학기에 납부 혜택이 적용되는 회원 기준입니다.</p></div>

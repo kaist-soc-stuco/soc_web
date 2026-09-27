@@ -4,6 +4,7 @@ import { Maximize2, Minus, Move, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
 interface CropPoint {
@@ -41,6 +42,7 @@ export function ImageCropModal({
   onCancel,
   onComplete,
 }: ImageCropModalProps) {
+  const { toast } = useToast();
   const stageRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const dragRef = useRef<{ point: CropPoint; offset: CropPoint } | null>(null);
@@ -50,6 +52,7 @@ export function ImageCropModal({
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState<CropPoint>({ x: 0, y: 0 });
   const [processing, setProcessing] = useState(false);
+  const processingRef = useRef(false);
 
   useEffect(() => {
     if (!file) {
@@ -115,7 +118,7 @@ export function ImageCropModal({
   }, [maxOffset.x, maxOffset.y]);
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (!dragRef.current) return;
+    if (processingRef.current || !dragRef.current) return;
     setClampedOffset({
       x: dragRef.current.offset.x + event.clientX - dragRef.current.point.x,
       y: dragRef.current.offset.y + event.clientY - dragRef.current.point.y,
@@ -124,12 +127,14 @@ export function ImageCropModal({
 
   const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
     event.preventDefault();
+    if (processingRef.current) return;
     const step = event.deltaY < 0 ? 0.1 : -0.1;
     setZoom((value) => clamp(Math.round((value + step) * 100) / 100, 1, 3));
   };
 
   const handleCrop = async () => {
     if (
+      processingRef.current ||
       !file ||
       !sourceUrl ||
       !naturalSize.width ||
@@ -139,10 +144,11 @@ export function ImageCropModal({
       !frameSize.width ||
       !frameSize.height
     ) return;
+    processingRef.current = true;
     setProcessing(true);
     try {
       const image = imageRef.current;
-      if (!image) return;
+      if (!image) throw new Error("Image unavailable");
       const scale = renderedSize.width / naturalSize.width;
       const frameLeft = (stageSize.width - frameSize.width) / 2;
       const frameTop = (stageSize.height - frameSize.height) / 2;
@@ -156,16 +162,19 @@ export function ImageCropModal({
       canvas.width = outputWidth;
       canvas.height = outputHeight;
       const context = canvas.getContext("2d");
-      if (!context) return;
+      if (!context) throw new Error("Canvas unavailable");
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = "high";
       context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, outputWidth, outputHeight);
       const type = getOutputType(file);
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, type === "image/jpeg" ? 0.92 : undefined));
-      if (!blob) return;
+      if (!blob) throw new Error("Image conversion failed");
       const baseName = file.name.replace(/\.[^/.]+$/, "");
       await onComplete(new File([blob], `${baseName}-cropped.${getOutputExtension(type)}`, { type, lastModified: nowMs() }));
+    } catch {
+      toast({ type: "error", message: "이미지를 처리하지 못했습니다. 다시 시도해 주세요." });
     } finally {
+      processingRef.current = false;
       setProcessing(false);
     }
   };
@@ -173,7 +182,8 @@ export function ImageCropModal({
   return (
     <Modal
       open={Boolean(file)}
-      onClose={onCancel}
+      onClose={() => { if (!processingRef.current) onCancel(); }}
+      showClose={!processing}
       title="이미지 자르기"
       className="h-[min(41rem,calc(100dvh-1rem))] max-w-3xl sm:h-[min(41rem,calc(100dvh-3rem))]"
       bodyClassName="space-y-4"
@@ -191,6 +201,7 @@ export function ImageCropModal({
           ref={stageRef}
           className="relative mx-auto flex h-[min(52vh,28rem)] w-full max-w-[720px] touch-none select-none items-center justify-center overflow-hidden overscroll-contain rounded-xl bg-slate-950"
           onPointerDown={(event) => {
+            if (processingRef.current) return;
             event.currentTarget.setPointerCapture(event.pointerId);
             dragRef.current = { point: { x: event.clientX, y: event.clientY }, offset };
           }}
@@ -206,6 +217,11 @@ export function ImageCropModal({
               alt="자르기 대상 이미지"
               draggable={false}
               onLoad={(event) => setNaturalSize({ height: event.currentTarget.naturalHeight, width: event.currentTarget.naturalWidth })}
+              onError={() => {
+                setNaturalSize({ height: 0, width: 0 });
+                toast({ type: "error", message: "이미지를 열지 못했습니다. 다른 파일을 선택해 주세요." });
+                onCancel();
+              }}
               className="pointer-events-none absolute max-w-none select-none"
               style={{
                 height: renderedSize.height,
@@ -229,12 +245,15 @@ export function ImageCropModal({
             </div>
           </div>
         </div>
-        <div className="flex flex-nowrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
-          <Maximize2 aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
-          <span className="min-w-0 flex-1 truncate">{outputWidth} × {outputHeight} 비율로 맞춰집니다. 이미지를 끌어 위치를 조정하세요.</span>
-          <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0" aria-label="축소" onClick={() => setZoom((value) => Math.max(1, value - 0.1))} disabled={zoom <= 1}><Minus aria-hidden="true" className="size-3.5" /></Button>
+        <div className="flex flex-col gap-2 rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-600 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
+            <Maximize2 aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+            <span>{outputWidth} × {outputHeight}px · 이미지를 끌어 위치를 조정하세요.</span>
+          </div>
+          <div className="flex min-w-0 items-center gap-2">
+          <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0" aria-label="축소" onClick={() => setZoom((value) => Math.max(1, value - 0.1))} disabled={processing || zoom <= 1}><Minus aria-hidden="true" className="size-3.5" /></Button>
           <span className="w-10 shrink-0 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-          <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0" aria-label="확대" onClick={() => setZoom((value) => Math.min(3, value + 0.1))} disabled={zoom >= 3}><Plus aria-hidden="true" className="size-3.5" /></Button>
+          <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0" aria-label="확대" onClick={() => setZoom((value) => Math.min(3, value + 0.1))} disabled={processing || zoom >= 3}><Plus aria-hidden="true" className="size-3.5" /></Button>
           <input
             aria-label="확대 비율"
             type="range"
@@ -242,9 +261,11 @@ export function ImageCropModal({
             max="3"
             step="0.01"
             value={zoom}
+            disabled={processing}
             onChange={(event) => setZoom(Number(event.currentTarget.value))}
-            className={cn("h-1.5 w-24 shrink-0 accent-brand-primary")}
+            className={cn("h-1.5 min-w-0 flex-1 accent-brand-primary sm:w-24 sm:flex-none")}
           />
+          </div>
         </div>
       </div>
     </Modal>

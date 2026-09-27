@@ -33,6 +33,8 @@ import { AdminDrawer } from "@/components/ui/admin-drawer";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { AdminCard, AdminFormField, AdminPageHeader, AdminPageMain, AdminPageShell, AdminStickyActionBar } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
+import { ErrorState } from "@/components/ui/data-state";
+import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UiInput } from "@/components/ui/form-control";
@@ -76,6 +78,7 @@ export function BoardManagementPage() {
 function BoardManagementPageContent() {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
+  const { toast } = useToast();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -88,7 +91,7 @@ function BoardManagementPageContent() {
   const [activeBoardCode, setActiveBoardCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const orderDirty = boards.map((board) => board.code).join("|") !== savedOrder.join("|");
 
@@ -100,9 +103,9 @@ function BoardManagementPageContent() {
       const visibleBoards = response.items.filter((board) => board.code !== "_EVENT");
       setBoards(visibleBoards);
       setSavedOrder(visibleBoards.map((board) => board.code));
-      setMessage(null);
+      setLoadError(null);
     } catch {
-      setMessage({ tone: "error", text: "게시판 목록을 불러오지 못했습니다." });
+      setLoadError("게시판 목록을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
@@ -136,7 +139,7 @@ function BoardManagementPageContent() {
 
   const saveBoard = async () => {
     if (!form.code.trim() || !form.nameKo.trim()) {
-      setMessage({ tone: "error", text: "게시판 코드와 한글 이름을 입력해 주세요." });
+      toast({ type: "error", message: "게시판 코드와 한글 이름을 입력해 주세요." });
       return;
     }
     setSaving(true);
@@ -149,10 +152,10 @@ function BoardManagementPageContent() {
         await apiClient.createBoard({ ...createInput, code: form.code.trim() });
       }
       setFormOpen(false);
-      setMessage({ tone: "success", text: "게시판 설정을 저장했습니다." });
+      toast({ type: "success", message: "게시판 설정을 저장했습니다." });
       await loadBoards();
     } catch {
-      setMessage({ tone: "error", text: "게시판 설정을 저장하지 못했습니다." });
+      toast({ type: "error", message: "게시판 설정을 저장하지 못했습니다." });
     } finally {
       setSaving(false);
     }
@@ -176,10 +179,10 @@ function BoardManagementPageContent() {
       await apiClient.deleteBoard(editingCode);
       setFormOpen(false);
       setEditingCode(null);
-      setMessage({ tone: "success", text: "게시판을 영구 삭제했습니다." });
+      toast({ type: "success", message: "게시판을 영구 삭제했습니다." });
       await loadBoards();
     } catch {
-      setMessage({ tone: "error", text: "게시판을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요." });
+      toast({ type: "error", message: "게시판을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요." });
     } finally {
       setSaving(false);
     }
@@ -214,9 +217,9 @@ function BoardManagementPageContent() {
       const visibleBoards = response.items.filter((board) => board.code !== "_EVENT");
       setBoards(visibleBoards);
       setSavedOrder(visibleBoards.map((board) => board.code));
-      setMessage({ tone: "success", text: "게시판 노출 순서를 저장했습니다." });
+      toast({ type: "success", message: "게시판 노출 순서를 저장했습니다." });
     } catch {
-      setMessage({ tone: "error", text: "게시판 순서를 저장하지 못했습니다." });
+      toast({ type: "error", message: "게시판 순서를 저장하지 못했습니다." });
     } finally {
       setSaving(false);
     }
@@ -226,7 +229,7 @@ function BoardManagementPageContent() {
     {ConfirmDialog}
     <AdminPageMain tableLayout>
       <AdminPageHeader title="게시판 관리" actions={<Button type="button" onClick={startCreate}><Plus aria-hidden="true" /> 게시판 추가</Button>} />
-      {message ? <div role="status" className={cn("rounded-lg border px-4 py-3 text-sm font-medium", message.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-700")}>{message.text}</div> : null}
+      {loadError ? <ErrorState title={loadError} onRetry={() => void loadBoards()} /> : null}
 
       <AdminCard>
         <DndContext modifiers={[restrictListDrag]}

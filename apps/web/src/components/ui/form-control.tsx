@@ -41,14 +41,29 @@ export const UiTextarea = React.forwardRef<HTMLTextAreaElement, UiTextareaProps>
 
     const resize = React.useCallback(() => {
       const element = textareaRef.current;
-      if (!autoResize || !element) return;
+      if (!autoResize || !element || !element.getClientRects().length) return;
       element.style.height = "auto";
-      element.style.height = `${element.scrollHeight}px`;
+      const style = getComputedStyle(element);
+      const border = parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+      element.style.height = `${element.scrollHeight + border}px`;
     }, [autoResize]);
 
     React.useLayoutEffect(() => {
       resize();
     }, [defaultValue, resize, value]);
+
+    React.useEffect(() => {
+      const element = textareaRef.current;
+      if (!autoResize || !element) return;
+      let width = -1;
+      const observer = new ResizeObserver(([entry]) => {
+        if (!entry || entry.contentRect.width === width) return;
+        width = entry.contentRect.width;
+        resize();
+      });
+      observer.observe(element);
+      return () => observer.disconnect();
+    }, [autoResize, resize]);
 
     const assignRef = React.useCallback(
       (element: HTMLTextAreaElement | null) => {

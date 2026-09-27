@@ -979,7 +979,7 @@ export function SurveyEditorPage() {
   const [publishing, setPublishing] = useState(false);
   const settingsSaveInFlight = useRef(false);
   const [saveState, setSaveState] = useState<"idle" | "creating" | "saving" | "saved" | "error">("idle");
-  const [error, setError] = useState<string | null>(null);
+  const [sectionOrderError, setSectionOrderError] = useState<string | null>(null);
   const [surveyLoading, setSurveyLoading] = useState(isEdit);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [surveyLoadAttempt, setSurveyLoadAttempt] = useState(0);
@@ -1125,7 +1125,7 @@ export function SurveyEditorPage() {
               : err.status === 403 ? "이 설문을 조회할 권한이 없습니다."
               : "서버에서 설문을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
             : "서버에 연결할 수 없습니다. 연결 상태를 확인하고 다시 시도해 주세요.");
-          setError(null);
+          setSectionOrderError(null);
         } finally {
           if (!cancelled) setSurveyLoading(false);
         }
@@ -1198,7 +1198,7 @@ export function SurveyEditorPage() {
 
     creatingDraftRef.current = (async () => {
       setSaveState("creating");
-      setError(null);
+      setSectionOrderError(null);
       try {
         const created = await client.createSurvey(
           buildSurveyBody(form.getValues(), { allowPlaceholder: true, publish: false }),
@@ -1280,7 +1280,7 @@ export function SurveyEditorPage() {
         return created.id;
       } catch (err: unknown) {
         setSaveState("error");
-        setError(getErrorMessage(err, "초안을 만들지 못했습니다."));
+        toast({ type: "error", message: getErrorMessage(err, "초안을 만들지 못했습니다.") });
         throw err;
       } finally {
         creatingDraftRef.current = null;
@@ -1312,7 +1312,7 @@ export function SurveyEditorPage() {
     setSaving(true);
     setPublishing(Boolean(options?.publish));
     setSaveState("saving");
-    setError(null);
+    setSectionOrderError(null);
     try {
       const id = loadedSurveyId ?? await ensureDraft();
       if (!(await commitEditingQuestion()) || (sectionCommitRef.current && !(await sectionCommitRef.current()))) { throw new Error("편집 중인 문항 또는 섹션을 확인해 주세요."); }
@@ -1356,10 +1356,16 @@ export function SurveyEditorPage() {
       autoSaveQueue.current = autoSaveQueue.current.catch(() => undefined).then(async () => {
         setSaveState("saving");
         try { const { isPublished: _publication, ...body } = buildSurveyBody(values, { allowPlaceholder: true }); await client.updateSurvey(loadedSurveyId, body); autoSaveError.current = null; setSaveState("saved"); }
-        catch (error) { autoSaveError.current = error; setSaveState("error"); setError(getErrorMessage(error, "자동 저장에 실패했습니다. 연결을 확인하고 다시 수정해 주세요.")); }
+        catch (error) { autoSaveError.current = error; setSaveState("error"); toast({ type: "error", message: getErrorMessage(error, "자동 저장에 실패했습니다. 연결을 확인하고 다시 수정해 주세요.") }); }
       });
     };
-    flushAutoSave.current = async () => { clearTimeout(timer); flush(); await autoSaveQueue.current; if (autoSaveError.current) throw autoSaveError.current; };
+    flushAutoSave.current = async () => {
+      clearTimeout(timer);
+      if (autoSaveError.current && !pending) pending = structuredClone(form.getValues());
+      flush();
+      await autoSaveQueue.current;
+      if (autoSaveError.current) throw autoSaveError.current;
+    };
     const subscription = form.watch(() => {
       const next = structuredClone(form.getValues());
       if (suppressAutoSave.current) { previous = next; return; }
@@ -1516,7 +1522,7 @@ export function SurveyEditorPage() {
     setSectionMenuOpenId(null);
     setSectionReorderOpen(false);
     setSectionReorderDraft([]);
-    setError(null);
+    setSectionOrderError(null);
     setSaveState("idle");
     form.reset({ titleKo: "", titleEn: "", descriptionKo: "", descriptionEn: "", descriptionImageUrlKo: null, descriptionImageUrlEn: null, resultVisibility: "PRIVATE", feePayersOnly: false, eligibleSocAffiliations: [], academicEligibility: "ANY", allowAnonymous: false, isKoreanOnly: false, allowMultipleResponses: false, allowResponseEdit: false, isPublished: false, showOnList: true, showOnCalendar: false, isAlwaysOpen: false, isAllDay: false, maxResponseCount: "", openAt: "", closeAt: "", connectedArticleId: "" });
     setFirstQuestion(emptyQuestion());
@@ -1530,7 +1536,7 @@ export function SurveyEditorPage() {
     if (!source) return;
 
     setAddingSection(true);
-    setError(null);
+    setSectionOrderError(null);
     try {
       const created = await client.createSection(loadedSurveyId, {
         titleKo: "",
@@ -1570,7 +1576,7 @@ export function SurveyEditorPage() {
       });
     } catch (err: unknown) {
       console.error(err);
-      setError(getErrorMessage(err, "섹션 추가 실패"));
+      toast({ type: "error", message: getErrorMessage(err, "섹션 추가 실패") });
     } finally {
       setAddingSection(false);
     }
@@ -1588,7 +1594,7 @@ export function SurveyEditorPage() {
     });
     if (!confirmed) return;
 
-    setError(null);
+    setSectionOrderError(null);
     try {
       await client.deleteSection(loadedSurveyId, sectionId);
       const updated = await client.getSurveyDetail(loadedSurveyId);
@@ -1601,7 +1607,7 @@ export function SurveyEditorPage() {
       setSectionMenuOpenId(null);
     } catch (err: unknown) {
       console.error(err);
-      setError(getSurveyErrorMessage(err, "섹션 삭제 실패"));
+      toast({ type: "error", message: getSurveyErrorMessage(err, "섹션 삭제 실패") });
     }
   });
 
@@ -1612,7 +1618,7 @@ export function SurveyEditorPage() {
     if (!source) return;
 
     setSectionMenuOpenId(null);
-    setError(null);
+    setSectionOrderError(null);
     try {
       // Insert the empty section directly after the source first. This keeps
       // copied branch targets valid while its questions are being created.
@@ -1668,7 +1674,7 @@ export function SurveyEditorPage() {
       toast({ type: "success", message: "섹션이 복제되었습니다." });
     } catch (err: unknown) {
       console.error(err);
-      setError(getSurveyErrorMessage(err, "섹션 복제 실패"));
+      toast({ type: "error", message: getSurveyErrorMessage(err, "섹션 복제 실패") });
     }
   });
 
@@ -1689,7 +1695,7 @@ export function SurveyEditorPage() {
     setSectionMenuOpenId(null);
     setSectionReorderDraft(orderedSections);
     setSectionReorderOpen(true);
-    setError(null);
+    setSectionOrderError(null);
   };
 
   const moveSectionReorderDraft = (index: number, direction: -1 | 1) => {
@@ -1715,19 +1721,19 @@ export function SurveyEditorPage() {
 
     const nextDraft = arrayMove(sectionReorderDraft, sourceIndex, targetIndex);
     if (!isValidSectionOrder(nextDraft)) {
-      setError("답변에 따른 섹션 이동 경로를 유지할 수 없는 순서입니다.");
+      setSectionOrderError("답변에 따른 섹션 이동 경로를 유지할 수 없는 순서입니다.");
       return;
     }
 
     setSectionReorderDraft(nextDraft);
-    setError(null);
+    setSectionOrderError(null);
   };
 
   const handleSaveSectionReorder = withStructureEdit(async () => {
     if (!loadedSurveyId || sectionReorderSaving) return;
     if (!(await commitEditingQuestion())) return;
     if (!isValidSectionOrder(sectionReorderDraft)) {
-      setError("답변에 따른 섹션 이동 경로를 유지할 수 없는 순서입니다.");
+      setSectionOrderError("답변에 따른 섹션 이동 경로를 유지할 수 없는 순서입니다.");
       return;
     }
 
@@ -1746,7 +1752,7 @@ export function SurveyEditorPage() {
       sortOrder: index,
     }));
     setSectionReorderSaving(true);
-    setError(null);
+    setSectionOrderError(null);
     setSections(nextSections);
     try {
       await client.reorderSurveySections(loadedSurveyId, {
@@ -1759,7 +1765,7 @@ export function SurveyEditorPage() {
     } catch (err: unknown) {
       console.error(err);
       setSections(previousSections);
-      setError(getSurveyErrorMessage(err, "섹션 재정렬 실패"));
+      toast({ type: "error", message: getSurveyErrorMessage(err, "섹션 재정렬 실패") });
     } finally {
       setSectionReorderSaving(false);
     }
@@ -1769,7 +1775,7 @@ export function SurveyEditorPage() {
     if (sectionReorderSaving) return;
     setSectionReorderOpen(false);
     setSectionReorderDraft([]);
-    setError(null);
+    setSectionOrderError(null);
   };
 
   const handleSectionNavigationChange = withStructureEdit(async (sectionId: string, target: string) => {
@@ -1780,7 +1786,7 @@ export function SurveyEditorPage() {
         ? { ...section, nextSectionId: target || null }
         : section,
     ));
-    setError(null);
+    setSectionOrderError(null);
     try {
       await client.updateSection(loadedSurveyId, sectionId, {
         nextSectionId: target || null,
@@ -1789,7 +1795,7 @@ export function SurveyEditorPage() {
     } catch (err: unknown) {
       console.error(err);
       setSections(previousSections);
-      setError(getSurveyErrorMessage(err, "섹션 이동 설정 실패"));
+      toast({ type: "error", message: getSurveyErrorMessage(err, "섹션 이동 설정 실패") });
     }
   });
 
@@ -1872,7 +1878,7 @@ export function SurveyEditorPage() {
     const descriptionEn = isKoreanOnly
       ? undefined
       : sectionForm.descriptionEn.trim();
-    setError(null);
+    setSectionOrderError(null);
     setSaveState("saving");
     try {
       await client.updateSection(loadedSurveyId, sectionId, {
@@ -1897,7 +1903,7 @@ export function SurveyEditorPage() {
     } catch (err: unknown) {
       setSaveState("error");
       console.error(err);
-      setError(getErrorMessage(err, "섹션 저장 실패"));
+      toast({ type: "error", message: getErrorMessage(err, "섹션 저장 실패") });
       throw err;
     }
   });
@@ -2041,7 +2047,7 @@ export function SurveyEditorPage() {
   });
   const handleSaveQuestion = withStructureEdit(async (qForm: QuestionFormState) => {
     if (!loadedSurveyId || !editingQuestion) return;
-    setError(null);
+    setSectionOrderError(null);
     setSaveState("saving");
     const editingSnapshot = editingQuestion;
     const { sectionId, questionId } = editingSnapshot;
@@ -2120,7 +2126,7 @@ export function SurveyEditorPage() {
 
   const handleDuplicateQuestion = withStructureEdit(async (sectionId: string, question: SurveyQuestionRecord) => {
     if (!loadedSurveyId) return;
-    setError(null);
+    setSectionOrderError(null);
 
     const sourceSection = sections.find((section) => section.id === sectionId);
     const sourceIndex = sourceSection?.questions.findIndex((item) => item.id === question.id) ?? -1;
@@ -2174,7 +2180,7 @@ export function SurveyEditorPage() {
       toast({ type: "success", message: "문항이 복제되었습니다." });
     } catch (err: unknown) {
       console.error(err);
-      setError(getErrorMessage(err, "문항 복제 실패"));
+      toast({ type: "error", message: getErrorMessage(err, "문항 복제 실패") });
     }
   });
 
@@ -2185,7 +2191,7 @@ export function SurveyEditorPage() {
       ?.questions.find((item) => item.id === questionId);
     if (!question) return;
 
-    setError(null);
+    setSectionOrderError(null);
     try {
       await client.deleteQuestion(loadedSurveyId, sectionId, questionId);
       const updated = await client.getSurveyDetail(loadedSurveyId);
@@ -2199,7 +2205,7 @@ export function SurveyEditorPage() {
       });
     } catch (err: unknown) {
       console.error(err);
-      setError(getErrorMessage(err, "문항 삭제 실패"));
+      toast({ type: "error", message: getErrorMessage(err, "문항 삭제 실패") });
     }
   });
 
@@ -2217,7 +2223,7 @@ export function SurveyEditorPage() {
       commitSections((await client.getSurveyDetail(loadedSurveyId)).sections);
     } catch (err: unknown) {
       console.error(err);
-      setError(getErrorMessage(err, "순서 변경 실패"));
+      toast({ type: "error", message: getErrorMessage(err, "순서 변경 실패") });
       setSections((prev) =>
         prev.map((section) =>
           section.id === sectionId ? { ...section, questions: backup } : section,
@@ -2402,13 +2408,7 @@ export function SurveyEditorPage() {
               actions={<Button type="button" variant="ghost" size="sm" onClick={() => navigate("/admin/surveys")}>목록으로</Button>}
             />
           ) : null}
-          {!loadError && error ? (
-            <ErrorState
-              className="rounded-xl border border-slate-200 bg-white shadow-[0_8px_28px_rgba(15,23,42,0.04)]"
-              description={error}
-              title="작업을 완료하지 못했습니다."
-            />
-          ) : null}
+          {!loadError && saveState === "error" ? <div role="status" className="flex items-center gap-2 text-sm text-slate-600">저장되지 않은 변경 사항이 있습니다.<Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => void handleSaveSettings(form.getValues())}>다시 시도</Button></div> : null}
 
           {!loadError && !surveyLoading && tab === "responses" && (loadedSurveyId ? <SurveyResponsesPanel surveyId={loadedSurveyId} onSheet={handleSheet} sheetBusy={sheetBusy} onResponsesDeleted={() => setResponseCount(0)} /> : <AdminEmptyState message="설문을 저장하면 응답을 확인할 수 있습니다." />)}
 
@@ -2835,9 +2835,9 @@ export function SurveyEditorPage() {
                 </div>
               </SortableContext>
             </DndContext>
-            {error ? (
-              <p className="border-t border-red-100 bg-red-50 px-6 py-3 text-sm font-normal text-red-700">
-                {error}
+            {sectionOrderError ? (
+              <p role="alert" className="px-6 py-3 text-sm font-normal text-rose-600">
+                {sectionOrderError}
               </p>
             ) : null}
           </Modal>
