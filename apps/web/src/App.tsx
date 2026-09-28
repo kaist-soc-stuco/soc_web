@@ -6,6 +6,13 @@ import { AdminLayout } from '@/components/organisms/admin-layout';
 import { AuthGuard } from '@/components/guards/auth-guard';
 import { useCurrentSession } from '@/hooks/use-current-session';
 import { resolveApiBaseUrl } from '@/lib/api-base-url';
+import { clearStoredAuthState } from '@/lib/auth-storage';
+import {
+  idleLogoutDelay,
+  initialSessionActivityAt,
+  isSessionIdle,
+  shouldRefreshActiveSession,
+} from '@/lib/session-idle';
 import { PublicOperationalContent } from '@/features/site-content/public-operational-content';
 import { ChannelTalkProvider } from '@/features/channel-talk/channel-talk-provider';
 import { BoardPage } from '@/pages/board-page';
@@ -178,24 +185,113 @@ function ScrollToTopOnRouteChange() {
  * changes and returning to a visible tab count as activity without refreshing
  * continuously in the background.
  */
+const SESSION_ACTIVITY_STORAGE_PREFIX = 'soc.auth.last-activity-at';
+const SESSION_ACTIVITY_STORAGE_KEY = SESSION_ACTIVITY_STORAGE_PREFIX;
+const SESSION_ACTIVITY_EVENTS = ['keydown', 'pointerdown', 'scroll', 'touchstart'] as const;
+
+function readSharedTimestamp(key: string): number | undefined {
+  try {
+    const storedValue = window.localStorage.getItem(key);
+    if (storedValue === null) return 0;
+    const value = Number(storedValue);
+    return Number.isFinite(value) && value > 0 ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeSharedTimestamp(key: string, value: number): boolean {
+  try {
+    window.localStorage.setItem(key, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function SessionKeepAlive() {
-  const location = useLocation();
   const { data: session } = useCurrentSession();
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
+  const lastActivityAtRef = useRef(0);
   const lastRefreshAtRef = useRef(0);
+  const logoutStartedRef = useRef(false);
 
   useEffect(() => {
     if (!session?.authenticated || session.storageMode === 'temporary') return;
 
     let cancelled = false;
-    const refreshIfNeeded = async () => {
-      if (cancelled || document.visibilityState === 'hidden') return;
+    let idleTimeoutId: number | undefined;
+    const activityStorageKey = `${SESSION_ACTIVITY_STORAGE_PREFIX}.${session.draftNamespace ?? 'persisted'}`;
+
+    const latestActivityAt = (): number | undefined => {
+      const sharedActivityAt = readSharedTimestamp(activityStorageKey);
+      return sharedActivityAt === undefined
+        ? undefined
+        : Math.max(lastActivityAtRef.current, sharedActivityAt);
+    };
+
+    const endSession = () => {
+      if (cancelled || logoutStartedRef.current) return;
+
+      logoutStartedRef.current = true;
+      const logoutRequest = apiClient.logout().catch(() => undefined);
+      clearStoredAuthState();
+      window.location.assign('/');
+      void logoutRequest;
+    };
+
+    const scheduleIdleLogout = () => {
+      window.clearTimeout(idleTimeoutId);
+      const lastActivityAt = latestActivityAt();
+      if (lastActivityAt === undefined) {
+        endSession();
+        return;
+      }
+      idleTimeoutId = window.setTimeout(
+        () => void logoutForIdleSession(),
+        idleLogoutDelay(lastActivityAt, nowMs()),
+      );
+    };
+
+    const logoutForIdleSession = () => {
+      if (cancelled || logoutStartedRef.current) return;
 
       const now = nowMs();
-      if (now - lastRefreshAtRef.current < 9 * 60 * 1000) return;
+      const lastActivityAt = latestActivityAt();
+      if (lastActivityAt === undefined) {
+        endSession();
+        return;
+      }
+      if (!isSessionIdle(lastActivityAt, now)) {
+        scheduleIdleLogout();
+        return;
+      }
+
+      endSession();
+    };
+
+    const refreshIfNeeded = async () => {
+      if (
+        cancelled ||
+        logoutStartedRef.current ||
+        document.visibilityState === 'hidden' ||
+        !navigator.locks
+      ) return;
+
+      const now = nowMs();
+      const lastActivityAt = latestActivityAt();
+      if (lastActivityAt === undefined) {
+        endSession();
+        return;
+      }
+      if (!shouldRefreshActiveSession(
+        lastActivityAt,
+        lastRefreshAtRef.current,
+        now,
+      )) return;
 
       lastRefreshAtRef.current = now;
       try {
@@ -208,19 +304,83 @@ function SessionKeepAlive() {
       }
     };
 
-    void refreshIfNeeded();
-    const intervalId = window.setInterval(() => void refreshIfNeeded(), 10 * 60 * 1000);
+    const recordActivity = () => {
+      const now = nowMs();
+      const lastActivityAt = latestActivityAt();
+      if (lastActivityAt === undefined) {
+        endSession();
+        return;
+      }
+      if (isSessionIdle(lastActivityAt, now)) {
+        void logoutForIdleSession();
+        return;
+      }
+
+      lastActivityAtRef.current = now;
+      if (
+        !writeSharedTimestamp(activityStorageKey, now) ||
+        !writeSharedTimestamp(SESSION_ACTIVITY_STORAGE_KEY, now)
+      ) {
+        endSession();
+        return;
+      }
+      scheduleIdleLogout();
+      void refreshIfNeeded();
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== activityStorageKey || !event.newValue) return;
+      const sharedActivityAt = Number(event.newValue);
+      if (!Number.isFinite(sharedActivityAt) || sharedActivityAt <= 0) {
+        endSession();
+        return;
+      }
+      lastActivityAtRef.current = Math.max(lastActivityAtRef.current, sharedActivityAt);
+      if (!writeSharedTimestamp(SESSION_ACTIVITY_STORAGE_KEY, sharedActivityAt)) {
+        endSession();
+        return;
+      }
+      scheduleIdleLogout();
+    };
+
+    const storedActivityAt = readSharedTimestamp(activityStorageKey);
+    if (storedActivityAt === undefined) {
+      endSession();
+      return;
+    }
+    const initialActivityAt = initialSessionActivityAt(storedActivityAt, nowMs());
+    lastActivityAtRef.current = initialActivityAt;
+    logoutStartedRef.current = false;
+    if (
+      (storedActivityAt === 0 && !writeSharedTimestamp(activityStorageKey, initialActivityAt)) ||
+      !writeSharedTimestamp(SESSION_ACTIVITY_STORAGE_KEY, initialActivityAt)
+    ) {
+      endSession();
+      return;
+    }
+    scheduleIdleLogout();
+
+    for (const eventName of SESSION_ACTIVITY_EVENTS) {
+      window.addEventListener(eventName, recordActivity, { passive: true });
+    }
+    window.addEventListener('focus', recordActivity);
+    window.addEventListener('storage', handleStorage);
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') void refreshIfNeeded();
+      if (document.visibilityState === 'visible') recordActivity();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
+      window.clearTimeout(idleTimeoutId);
+      for (const eventName of SESSION_ACTIVITY_EVENTS) {
+        window.removeEventListener(eventName, recordActivity);
+      }
+      window.removeEventListener('focus', recordActivity);
+      window.removeEventListener('storage', handleStorage);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [apiClient, location.pathname, location.search, session?.authenticated]);
+  }, [apiClient, session?.authenticated, session?.draftNamespace, session?.storageMode]);
 
   return null;
 }

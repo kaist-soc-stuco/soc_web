@@ -157,7 +157,7 @@ export class ContactsService {
         },
       },
       targetType: "executive_contact",
-    });
+    }, { required: true });
     return response.items;
   }
 

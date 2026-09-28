@@ -113,7 +113,7 @@ export class AuditLogController {
         reason,
       },
       targetType: "audit_log",
-    });
+    }, { required: true });
     return new StreamableFile(buffer);
   }
 
@@ -150,7 +150,7 @@ export class AuditLogController {
       },
       targetId: body.targetId ?? null,
       targetType: definition.targetType,
-    });
+    }, { required: true });
     return { success: true };
   }
 }

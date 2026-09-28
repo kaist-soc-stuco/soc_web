@@ -12,7 +12,10 @@ export class AuditLogService {
 
   constructor(private readonly auditLogRepository: AuditLogRepository) {}
 
-  async record(input: AuditLogCreateInput): Promise<void> {
+  async record(
+    input: AuditLogCreateInput,
+    options?: { required?: boolean },
+  ): Promise<void> {
     try {
       await this.auditLogRepository.create(input);
     } catch (error) {
@@ -21,6 +24,7 @@ export class AuditLogService {
           error instanceof Error ? error.message : String(error)
         }`,
       );
+      if (options?.required) throw error;
     }
   }
 

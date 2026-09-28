@@ -1,3 +1,5 @@
+import type { RefreshResponse } from "@soc/contracts";
+
 export interface ApiClientOptions {
   baseUrl: string;
   fetcher?: typeof fetch;
@@ -32,6 +34,7 @@ export interface ApiClientContext {
   emailsBaseUrl: string;
   normalizedBaseUrl: string;
   notificationsBaseUrl: string;
+  refreshSession: (requestStartedAt?: number) => Promise<RefreshResponse>;
   roadmapBaseUrl: string;
   requestJson: <T>(
     url: string,
@@ -271,41 +274,107 @@ export const createApiClientContext = ({
 }: ApiClientOptions): ApiClientContext => {
   const normalizedBaseUrl = withNoTrailingSlash(baseUrl);
   const authBaseUrl = resolveResourceBaseUrl(normalizedBaseUrl, "auth");
-  let refreshInFlight: Promise<void> | null = null;
+  let refreshInFlight: Promise<RefreshResponse> | null = null;
 
-  const sendRefreshRequest = async (): Promise<void> => {
+  const refreshCompletedAtKey = "soc.auth.refresh-completed-at";
+  const sessionActivityKey = "soc.auth.last-activity-at";
+  const assertActiveBrowserSession = (): void => {
+    if (typeof window === "undefined") return;
+
+    let storedActivityAt: string | null;
+    try {
+      storedActivityAt = window.localStorage.getItem(sessionActivityKey);
+    } catch {
+      redirectToLogin();
+      throw new ApiClientHttpError(401, "idle_session_unavailable");
+    }
+
+    const lastActivityAt = Number(storedActivityAt);
+    if (
+      storedActivityAt === null ||
+      !Number.isFinite(lastActivityAt) ||
+      lastActivityAt <= 0 ||
+      Date.now() - lastActivityAt >= 60 * 60 * 1000
+    ) {
+      redirectToLogin();
+      throw new ApiClientHttpError(401, "idle_session_expired");
+    }
+  };
+  const readRefreshCompletedAt = (): number => {
+    if (typeof window === "undefined") return 0;
+    try {
+      const value = Number(window.localStorage.getItem(refreshCompletedAtKey));
+      return Number.isFinite(value) ? value : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const sendRefreshRequest = async (
+    requestStartedAt = Date.now(),
+  ): Promise<RefreshResponse> => {
     if (readTemporaryAccessToken()) {
       redirectToLogin();
       throw new ApiClientHttpError(401, "temporary_session_expired");
     }
 
+    assertActiveBrowserSession();
+
     if (!refreshInFlight) {
       refreshInFlight = (async () => {
-        const response = await fetcher(
-          `${authBaseUrl}/refresh`,
-          withCredentialsAndTemporaryAuth(`${authBaseUrl}/refresh`, {
-            body: JSON.stringify({}),
-            headers: {
-              "Content-Type": "application/json",
-            },
-            method: "POST",
-          }),
-        );
-
-        if (!response.ok) {
-          const error = new ApiClientHttpError(response.status);
-
-          if (isAuthExpiredStatus(response.status)) {
-            redirectToLogin();
+        const refresh = async (): Promise<RefreshResponse> => {
+          assertActiveBrowserSession();
+          if (readRefreshCompletedAt() >= requestStartedAt) {
+            return { storageMode: "persisted" };
           }
 
-          throw error;
+          const response = await fetcher(
+            `${authBaseUrl}/refresh`,
+            withCredentialsAndTemporaryAuth(`${authBaseUrl}/refresh`, {
+              body: JSON.stringify({}),
+              headers: {
+                "Content-Type": "application/json",
+              },
+              method: "POST",
+            }),
+          );
+
+          if (!response.ok) {
+            const error = new ApiClientHttpError(response.status);
+
+            if (isAuthExpiredStatus(response.status)) {
+              redirectToLogin();
+            }
+
+            throw error;
+          }
+
+          const payload = await readJson<RefreshResponse>(response);
+          if (typeof window !== "undefined") {
+            try {
+              window.localStorage.setItem(refreshCompletedAtKey, String(Date.now()));
+            } catch {
+              // Refresh still succeeds when cross-tab storage is unavailable.
+            }
+          }
+          return payload;
+        };
+
+        if (typeof navigator !== "undefined" && navigator.locks) {
+          return navigator.locks.request("soc.auth.refresh", refresh);
         }
+
+        if (typeof window !== "undefined") {
+          redirectToLogin();
+          throw new ApiClientHttpError(401, "refresh_coordination_unavailable");
+        }
+
+        return refresh();
       })();
     }
 
     try {
-      await refreshInFlight;
+      return await refreshInFlight;
     } finally {
       refreshInFlight = null;
     }
@@ -316,13 +385,14 @@ export const createApiClientContext = ({
     init: RequestInit,
     options?: { retryOnUnauthorized?: boolean },
   ): Promise<T> => {
+    const requestStartedAt = Date.now();
     const response = await fetcher(
       url,
       withCredentialsAndTemporaryAuth(url, init),
     );
 
     if (response.status === 401 && options?.retryOnUnauthorized) {
-      await sendRefreshRequest();
+      await sendRefreshRequest(requestStartedAt);
 
       const retriedResponse = await fetcher(
         url,
@@ -340,13 +410,14 @@ export const createApiClientContext = ({
     init: RequestInit,
     options?: { retryOnUnauthorized?: boolean },
   ): Promise<void> => {
+    const requestStartedAt = Date.now();
     const response = await fetcher(
       url,
       withCredentialsAndTemporaryAuth(url, init),
     );
 
     if (response.status === 401 && options?.retryOnUnauthorized) {
-      await sendRefreshRequest();
+      await sendRefreshRequest(requestStartedAt);
 
       const retriedResponse = await fetcher(
         url,
@@ -370,13 +441,14 @@ export const createApiClientContext = ({
     init: RequestInit,
     options?: { retryOnUnauthorized?: boolean },
   ): Promise<string> => {
+    const requestStartedAt = Date.now();
     const response = await fetcher(
       url,
       withCredentialsAndTemporaryAuth(url, init),
     );
 
     if (response.status === 401 && options?.retryOnUnauthorized) {
-      await sendRefreshRequest();
+      await sendRefreshRequest(requestStartedAt);
 
       const retriedResponse = await fetcher(
         url,
@@ -394,13 +466,14 @@ export const createApiClientContext = ({
     init: RequestInit,
     options?: { retryOnUnauthorized?: boolean },
   ): Promise<Blob> => {
+    const requestStartedAt = Date.now();
     const response = await fetcher(
       url,
       withCredentialsAndTemporaryAuth(url, init),
     );
 
     if (response.status === 401 && options?.retryOnUnauthorized) {
-      await sendRefreshRequest();
+      await sendRefreshRequest(requestStartedAt);
 
       const retriedResponse = await fetcher(
         url,
@@ -459,6 +532,7 @@ export const createApiClientContext = ({
     emailsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "admin/emails"),
     normalizedBaseUrl,
     notificationsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "notifications"),
+    refreshSession: sendRefreshRequest,
     roadmapBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "roadmap"),
     putObject,
     postObject,

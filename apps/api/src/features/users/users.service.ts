@@ -497,7 +497,7 @@ export class UsersService {
           },
         },
         targetType: "student_fee_status",
-      });
+      }, { required: true });
     }
     return items;
   }

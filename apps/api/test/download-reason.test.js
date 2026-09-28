@@ -3,6 +3,7 @@ const test = require("node:test");
 const { BadRequestException } = require("@nestjs/common");
 
 const { AuditLogController } = require("../dist/apps/api/src/features/audit/audit-log.controller.js");
+const { AuditLogService } = require("../dist/apps/api/src/features/audit/audit-log.service.js");
 const { requireDownloadReason } = require("../dist/apps/api/src/features/audit/download-reason.js");
 
 test("download reason is required and bounded", () => {
@@ -17,8 +18,12 @@ test("download reason is required and bounded", () => {
 
 test("personal-data download records reason, actor, IP, target, and count", async () => {
   let recorded;
+  let recordOptions;
   const controller = new AuditLogController({
-    record: async (input) => { recorded = input; },
+    record: async (input, options) => {
+      recorded = input;
+      recordOptions = options;
+    },
   });
 
   const result = await controller.recordPersonalDataDownload(
@@ -42,6 +47,7 @@ test("personal-data download records reason, actor, IP, target, and count", asyn
     kind: "survey_responses",
     reason: "응답 검토",
   });
+  assert.deepEqual(recordOptions, { required: true });
 });
 
 test("personal-data download rejects a missing reason", async () => {
@@ -52,5 +58,17 @@ test("personal-data download rejects a missing reason", async () => {
       { kind: "vote_roster", targetId: "vote-1" },
     ),
     (error) => error instanceof BadRequestException && error.message === "download_reason_required",
+  );
+});
+
+test("required audit records propagate storage failures", async () => {
+  const failure = new Error("audit storage unavailable");
+  const service = new AuditLogService({
+    create: async () => { throw failure; },
+  });
+
+  await assert.rejects(
+    service.record({ action: "privacy.download", targetType: "survey_response" }, { required: true }),
+    failure,
   );
 });

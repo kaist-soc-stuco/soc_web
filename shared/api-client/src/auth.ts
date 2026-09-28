@@ -17,7 +17,11 @@ export interface LoginResultResponse {
   userId?: string;
 }
 
-export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) => ({
+export const createAuthApi = ({
+  authBaseUrl,
+  refreshSession,
+  requestJson,
+}: ApiClientContext) => ({
   getCsrfToken: async (): Promise<CsrfTokenResponse> => {
     return requestJson<CsrfTokenResponse>(`${authBaseUrl}/csrf`, {
       method: "GET",
@@ -102,13 +106,7 @@ export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) =>
   },
 
   refreshSession: async (): Promise<RefreshResponse> => {
-    return requestJson<RefreshResponse>(`${authBaseUrl}/refresh`, {
-      body: JSON.stringify({}),
-      headers: {
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-    });
+    return refreshSession();
   },
 
   logout: async (input?: { sessionId?: string }): Promise<LogoutResponse> => {
@@ -117,6 +115,7 @@ export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) =>
       headers: {
         "Content-Type": "application/json",
       },
+      keepalive: true,
       method: "POST",
     });
   },

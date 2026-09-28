@@ -207,7 +207,6 @@ export function AuditLogPage() {
   const handleExport = async () => {
     const reason = promptDownloadReason();
     if (!reason) return;
-    setOperationError(null);
     try {
       const blob = await client.downloadAuditLogsXlsx(reason, {
         q: query,

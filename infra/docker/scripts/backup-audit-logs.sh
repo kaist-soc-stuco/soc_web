@@ -3,7 +3,7 @@ set -eu
 
 backup_dir="/backups"
 interval_seconds="${AUDIT_LOG_BACKUP_INTERVAL_SECONDS:-86400}"
-retention_days="${AUDIT_LOG_BACKUP_RETENTION_DAYS:-370}"
+retention_days="${AUDIT_LOG_BACKUP_RETENTION_DAYS:-730}"
 
 umask 077
 mkdir -p "$backup_dir"
