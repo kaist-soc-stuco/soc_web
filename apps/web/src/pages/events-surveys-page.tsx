@@ -1,6 +1,5 @@
 import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "@/hooks/use-language";
-import { Header } from "@/components/organisms/header";
 import { EventsSurveysCalendar } from "@/features/events-surveys/events-surveys-calendar";
 import { CalendarSubscriptionButton } from "@/features/events-surveys/calendar-subscription-button";
 import { EventsSurveysFilterBar } from "@/features/events-surveys/events-surveys-filter-bar";
@@ -109,7 +108,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
 
   return (
     <PageShell>
-      <Header />
+
 
       <PageMain>
         <PageHeader

@@ -1,4 +1,3 @@
-import { Header } from '@/components/organisms/header';
 import { Hero } from '@/components/organisms/hero';
 import { EventCarousel } from '@/components/organisms/event-carousel';
 import { NoticeBoard } from '@/components/organisms/notice-board';
@@ -8,7 +7,7 @@ import { Footer } from '@/components/organisms/footer';
 export function HomePage() {
   return (
     <div className="home-page-shell flex min-h-screen flex-col overflow-x-clip bg-white">
-      <Header variant="home" />
+
       <main className="channel-talk-safe-area flex-1">
         <Hero />
 

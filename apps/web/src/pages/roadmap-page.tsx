@@ -1,7 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
-import { Header } from "@/components/organisms/header";
 import { normalizeRoadmapCourseCode } from "@soc/contracts";
 import { PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import { RoadmapGraph } from "@/features/roadmap/roadmap-graph";
@@ -31,7 +30,7 @@ export function RoadmapPage() {
 
   return (
     <PageShell className="overflow-x-hidden">
-      <Header />
+
       <PageMain>
         <PageHeader
           title={title}

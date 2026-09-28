@@ -1,5 +1,4 @@
 import { ErrorState } from "@/components/ui/data-state";
-import { Header } from "@/components/organisms/header";
 import { Footer } from "@/components/organisms/footer";
 import {
   MyPageActivityPanel,
@@ -42,7 +41,7 @@ export function MyPage() {
 
   return (
     <PageShell className="text-slate-950">
-      <Header />
+
 
       <main className="mx-auto flex min-w-0 w-full max-w-7xl flex-1 flex-col items-stretch gap-6 px-4 py-6 sm:px-6 md:flex-row md:items-start md:gap-8 md:px-8 md:py-8">
         {canUseMyPage ? (

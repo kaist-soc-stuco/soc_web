@@ -2,7 +2,6 @@ import { useState } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { Header } from "@/components/organisms/header";
 import { DataViewCard, PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import {
   BoardEditHeaderControls,
@@ -264,7 +263,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
   return (
     <PageShell className="text-slate-950">
       {ConfirmDialog}
-      <Header />
+
 
       <PageHeader
         className="board-write-page-header"

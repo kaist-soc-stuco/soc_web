@@ -1,6 +1,5 @@
 import { ChevronLeft } from "lucide-react";
 
-import { Header } from "@/components/organisms/header";
 import { SurveyResultsContent } from "@/features/survey-results/survey-results-sections";
 import { useSurveyResultsPageController } from "@/features/survey-results/use-survey-results-page-controller";
 import { Button } from "@/components/ui/button";
@@ -12,7 +11,7 @@ export function SurveyResultsPage() {
 
   return (
     <PageShell>
-      <Header />
+
       <main className="flex-1 bg-[#f3f5f4] px-4 py-6 sm:py-10 lg:px-0" aria-busy={loading}>
         <div className="mx-auto max-w-[52rem]">
           <div className="mb-4">

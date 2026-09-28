@@ -4,14 +4,14 @@ WORKDIR /app
 
 RUN corepack enable
 
-COPY package.json pnpm-workspace.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/web/package.json apps/web/package.json
 COPY shared/api-client/package.json shared/api-client/package.json
 COPY shared/contracts/package.json shared/contracts/package.json
 COPY shared/common/package.json shared/common/package.json
 COPY shared/config/package.json shared/config/package.json
 
-RUN pnpm install --filter @soc/web... --no-frozen-lockfile
+RUN pnpm install --filter @soc/web... --frozen-lockfile
 
 COPY apps/web apps/web
 COPY shared/api-client shared/api-client

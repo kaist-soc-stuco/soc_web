@@ -15,7 +15,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { Logo } from "@/components/atoms/logo";
@@ -43,20 +43,8 @@ type HeaderNavItem = {
   label: string;
 };
 
-// Preserve the underline position across page-owned Header remounts.
-let previousIndicatorLeft: string | null = null;
-
 export function Header({ variant = "default" }: HeaderProps) {
   const headerRef = useRef<HTMLElement>(null);
-  const indicatorRef = useRef<HTMLSpanElement>(null);
-  useLayoutEffect(() => {
-    const indicator = indicatorRef.current;
-    if (!indicator) return;
-    if (previousIndicatorLeft && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      indicator.animate([{ left: previousIndicatorLeft }, { left: getComputedStyle(indicator).left }], { duration: 260, easing: "cubic-bezier(0.22, 1, 0.36, 1)" });
-    }
-    return () => { previousIndicatorLeft = getComputedStyle(indicator).opacity === "0" ? null : getComputedStyle(indicator).left; };
-  }, []);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTriggerRef = useRef<HTMLButtonElement>(null);
@@ -196,6 +184,14 @@ export function Header({ variant = "default" }: HeaderProps) {
       cancelled = true;
     };
   }, [apiClient, user?.id]);
+
+  useEffect(() => {
+    setSearchOpen(false);
+    setDropdownOpen(false);
+    setNotificationOpen(false);
+    setMobileMenuOpen(false);
+    setHoveredIndex(null);
+  }, [location.pathname]);
 
   const closePopovers = () => {
     setSearchOpen(false);
@@ -592,7 +588,6 @@ export function Header({ variant = "default" }: HeaderProps) {
             })}
             <span
               aria-hidden="true"
-              ref={indicatorRef}
               className={`site-nav-indicator ${indicatorIndex >= 0 ? "opacity-100" : "opacity-0"}`}
               style={{
                 left: indicatorLeft,

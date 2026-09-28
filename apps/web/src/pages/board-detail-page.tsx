@@ -1,7 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 
-import { Header } from "@/components/organisms/header";
 import { CommentSection } from "@/components/ui/comment-section";
 import {
   BoardDetailArticleCard,
@@ -76,7 +75,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
   if (loading) {
     return (
       <PageShell className="bg-white">
-        <Header />
+
         <main className="flex flex-1 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-kaist-darkgreen" />
         </main>
@@ -87,7 +86,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
   if (!article) {
     return (
       <PageShell className="bg-white">
-        <Header />
+
         <main className="flex flex-1 items-center justify-center">
           <p className="text-sm font-bold text-slate-500">
             {lang === "ko"
@@ -146,7 +145,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
           />
         </label>
       </Modal>
-      <Header />
+
 
       <main className="flex-1 w-full mx-auto pb-28">
         <div className="mx-auto flex w-full max-w-[var(--ui-article-max-width)] flex-col gap-3 px-4 pb-16 pt-6 min-[360px]:px-5 min-[640px]:px-6 lg:px-8">

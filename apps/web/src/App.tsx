@@ -1,3 +1,4 @@
+import { Header } from "@/components/organisms/header";
 import { RouteScrollRestoration } from "@/components/organisms/route-scroll-restoration";
 import { createApiClient } from '@soc/api-client';
 import { nowMs } from '@soc/shared';
@@ -359,6 +360,20 @@ function PreventImageGhostDrag() {
   return null;
 }
 
+function PublicLayout() {
+  const { pathname } = useLocation();
+  return (
+    <div className="public-site-layout flex min-h-screen flex-col">
+      <Header variant={pathname === "/" ? "home" : "default"} />
+      <div className="public-site-content flex flex-1 flex-col">
+        <Suspense fallback={<div className="flex-1" aria-busy="true" />}>
+          <Outlet />
+        </Suspense>
+      </div>
+    </div>
+  );
+}
+
 function AppLayout() {
   return (
     <>
@@ -379,6 +394,7 @@ function AppLayout() {
 const router = createBrowserRouter(createRoutesFromElements(
   <Route element={<AppLayout />}>
 
+        <Route element={<PublicLayout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/life/roadmap" element={<RoadmapPage />} />
@@ -427,13 +443,15 @@ const router = createBrowserRouter(createRoutesFromElements(
               </AuthGuard>
             }
           />
-          <Route path="/survey/:id" element={<SurveyPage />} />
           <Route path="/survey/:id/results" element={<SurveyResultsPage />} />
           <Route path="/votes" element={<VoteListPage />} />
+          <Route path="/mypage" element={<MyPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+          <Route path="/survey/:id" element={<SurveyPage />} />
           <Route path="/votes/:id" element={<VotePage />} />
           <Route path="/votes/:id/result" element={<VotePage />} />
           <Route path="/login" element={<LoginCallbackPage />} />
-          <Route path="/mypage" element={<MyPage />} />
           {/* Admin Routes with nested Outlet */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminIndexPage />} />
@@ -458,7 +476,6 @@ const router = createBrowserRouter(createRoutesFromElements(
             <Route path="contacts" element={<ContactsPage />} />
             <Route path="emails" element={<BulkEmailPage />} />
           </Route>
-          <Route path="*" element={<NotFoundPage />} />
 
   </Route>
 ));

@@ -1,4 +1,3 @@
-import { Header } from "@/components/organisms/header";
 import { PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import { NotFoundPage } from "@/pages/not-found-page";
 import {
@@ -41,7 +40,7 @@ export function BoardPage() {
 
   return (
     <PageShell>
-      <Header />
+
 
       <PageMain className="board-page-main">
         <PageHeader title={boardTitle} titleId="board-page-title" />

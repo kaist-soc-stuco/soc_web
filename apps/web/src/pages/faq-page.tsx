@@ -3,7 +3,6 @@ import { ChevronDown } from "lucide-react";
 import { createApiClient } from "@soc/api-client";
 import { useQuery } from "@tanstack/react-query";
 
-import { Header } from "@/components/organisms/header";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Button as UiButton } from "@/components/ui/button";
 import {
@@ -142,7 +141,7 @@ export function FaqPage() {
 
   return (
     <PageShell>
-      <Header />
+
       <PageMain>
         <PageHeader
           className="mb-0"

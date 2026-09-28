@@ -1,4 +1,3 @@
-import { Header } from "@/components/organisms/header";
 import { PageHeader, PageShell } from "@/components/ui/page-layout";
 import {
   SearchForm,
@@ -37,7 +36,7 @@ export function SearchPage() {
 
   return (
     <PageShell>
-      <Header />
+
       <PageHeader title={lang === "ko" ? "통합검색" : "Search"} />
 
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-5 px-4 py-8 md:px-8">

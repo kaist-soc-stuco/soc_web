@@ -1,4 +1,3 @@
-import { Header } from "@/components/organisms/header";
 import { Footer } from "@/components/organisms/footer";
 import { useLanguage, type Language } from "@/hooks/use-language";
 import { PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
@@ -722,7 +721,7 @@ export function LegalDocumentPage({ kind }: { kind: "terms" | "privacy" }) {
 
   return (
     <PageShell>
-      <Header />
+
       <PageMain>
         <PageHeader
           title={localized(document.title, lang)}

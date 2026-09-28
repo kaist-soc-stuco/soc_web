@@ -4915,3 +4915,9 @@ button[data-tooltip]:focus-visible::after {
 
 .site-header-inline-search[data-open="true"] button { color: #475569; }
 .site-header-inline-search[data-open="true"] > button:disabled { opacity: 1; background: transparent; cursor: default; }
+
+/* Public routes share a persistent header; page shells fill its remaining viewport. */
+.public-site-content > * {
+  flex: 1;
+  min-height: calc(100svh - var(--ui-header-height));
+}

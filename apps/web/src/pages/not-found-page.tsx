@@ -1,7 +1,6 @@
 import { ArrowLeft, Home } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { Header } from "@/components/organisms/header";
 import { useLanguage } from "@/hooks/use-language";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/ui/page-layout";
@@ -11,7 +10,7 @@ export function NotFoundPage() {
 
   return (
     <PageShell>
-      <Header />
+
       <main className="flex flex-1 items-center justify-center px-6 py-20 sm:px-8">
         <section className="w-full max-w-3xl text-center">
           <p className="text-8xl font-black tracking-[-0.08em] text-slate-200 sm:text-9xl">

@@ -8,7 +8,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 
-import { Header } from "@/components/organisms/header";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
 import { PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
@@ -156,7 +155,7 @@ export function VoteListPage() {
 
   return (
     <PageShell>
-      <Header />
+
       <PageMain>
         <PageHeader
           title={lang === "ko" ? "투표" : "Voting"}

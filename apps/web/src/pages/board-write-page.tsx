@@ -2,7 +2,6 @@ import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { Header } from "@/components/organisms/header";
 import { DataViewCard, PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import {
   getBoardLabelFromMetadata,
@@ -274,7 +273,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
   return (
     <PageShell className="text-slate-950">
       {ConfirmDialog}
-      <Header />
+
 
       <PageHeader
         className="board-write-page-header"
