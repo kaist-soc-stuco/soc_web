@@ -1,3 +1,5 @@
+name: soc_web
+
 x-logging: &default-logging
   driver: json-file
   options:
