@@ -67,6 +67,7 @@ const surveyAuditSnapshot = (survey: SurveyRecord): Record<string, unknown> => (
   titleEn: survey.titleEn,
   kind: survey.kind,
   isPublished: survey.isPublished,
+  acceptingResponses: survey.acceptingResponses,
   isKoreanOnly: survey.isKoreanOnly,
   feePayersOnly: survey.feePayersOnly,
   academicEligibility: survey.academicEligibility,
@@ -100,11 +101,12 @@ export class SurveysService {
 
   private computeState(survey: {
     isPublished: boolean;
+    acceptingResponses?: boolean;
     isAlwaysOpen?: boolean;
     opensAt: string | null;
     closesAt?: string | null;
   }): ComputedSurveyState {
-    if (!survey.isPublished) {
+    if (!survey.isPublished || survey.acceptingResponses === false) {
       return "closed";
     }
 

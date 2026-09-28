@@ -1,3 +1,4 @@
+import { stripRichText } from "@/components/ui/rich-text-content";
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
@@ -8,6 +9,7 @@ import type {
 } from "@soc/contracts";
 import { normalizeBoardCode } from "@soc/contracts";
 import {
+  isoToMs,
   msToIso,
   nowMs,
 } from "@soc/shared";
@@ -77,11 +79,11 @@ export function useBoardWritePageController(forcedCategory?: string) {
   const [homeOrder, setHomeOrder] = useState("");
   const [isSecret, setIsSecret] = useState(false);
   const [allowComment, setAllowComment] = useState(true);
-  const [isKoreanOnly, setIsKoreanOnly] = useState(false);
   const [titleKo, setTitleKo] = useState("");
   const [titleEn, setTitleEn] = useState("");
   const [contentKo, setContentKo] = useState("");
   const [contentEn, setContentEn] = useState("");
+  const isKoreanOnly = !titleEn.trim() && !stripRichText(contentEn) && !/<img\b/i.test(contentEn);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [draftStatus, setDraftStatus] = useState<
     "idle" | "saving" | "saved" | "failed"
@@ -104,6 +106,12 @@ export function useBoardWritePageController(forcedCategory?: string) {
   const [draftRestoredAt, setDraftRestoredAt] = useState<string | null>(null);
   const lastDraftFingerprintRef = useRef<string | null>(null);
   const hasWriteContentRef = useRef(false);
+  const [draftHydrated, setDraftHydrated] = useState(false);
+  const draftIdentityRef = useRef<{ id: string | null; version?: number }>({ id: null });
+  const draftSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const draftCompletedRef = useRef(false);
+  const saveOnUnmountRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => () => { void saveOnUnmountRef.current(); }, []);
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -339,8 +347,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
   hasWriteContentRef.current = Boolean(
     titleKo.trim() ||
       titleEn.trim() ||
-      contentKo.trim() ||
-      contentEn.trim() ||
+      stripRichText(contentKo) || /<img\b/i.test(contentKo) ||
+      stripRichText(contentEn) || /<img\b/i.test(contentEn) ||
       eventDescriptionKo.trim() ||
       eventDescriptionEn.trim() ||
       eventStartDate ||
@@ -363,7 +371,6 @@ export function useBoardWritePageController(forcedCategory?: string) {
     );
     setIsSecret(draft.isSecret);
     setAllowComment(selectedCategory === "suggestions" ? true : draft.allowComment);
-    setIsKoreanOnly(draft.isKoreanOnly);
     setIsEventAlwaysOpen(
       !draft.eventStartDate &&
         !draft.eventEndDate &&
@@ -388,65 +395,47 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setEventDescriptionKo(draft.eventDescriptionKo || "");
     setEventDescriptionEn(draft.eventDescriptionEn || "");
     setSelectedSurveyId(draft.linkedSurveyId || "");
+    draftIdentityRef.current = { id: draft.draftId, version: draft.version };
     setServerDraftId(draft.draftId);
     setServerDraftVersion(draft.version);
     setDraftRestoredAt(draft.updatedAt);
   };
 
   useEffect(() => {
+    setDraftHydrated(false);
     setServerDraftId(null);
     setServerDraftVersion(undefined);
     setDraftRestoredAt(null);
+    draftIdentityRef.current = { id: null };
+    lastDraftFingerprintRef.current = null;
     if (!canUseWriteFeatures || !canWriteSelected) return;
-
     let cancelled = false;
-    const draftListRequest = apiClient.getArticleDrafts({
-      boardCode: selectedCategory,
-      limit: 20,
-      page: 1,
-    });
-    draftListRequest
-      .then((response) => {
-        if (!cancelled) {
-          setDrafts(response.items);
-          if (!routeDraftId && !hasWriteContentRef.current) {
-            const latest = response.items[0];
-            if (latest) applyDraftToForm(latest);
-          }
+    void (async () => {
+      try {
+        const response = await apiClient.getArticleDrafts({ boardCode: selectedCategory, limit: 20, page: 1 });
+        if (cancelled) return;
+        setDrafts(response.items);
+        const latest = routeDraftId ? await apiClient.getArticleDraft(routeDraftId) : response.items[0];
+        if (cancelled || hasWriteContentRef.current) return;
+        let localUpdatedAt = 0;
+        try { const raw = localDraftStorageKey && localStorage.getItem(localDraftStorageKey); if (raw) localUpdatedAt = JSON.parse(raw).updatedAt ?? 0; } catch { /* Ignore an invalid local fallback. */ }
+        if (!routeDraftId && localUpdatedAt && (!latest || localUpdatedAt > isoToMs(latest.updatedAt))) {
+          if (latest) applyDraftToForm(latest);
+          await handleRestoreDraft(undefined, true);
         }
-      })
-      .catch(() => {
-        if (!cancelled) setDrafts([]);
-      });
+        else if (latest) applyDraftToForm(latest);
+        else await handleRestoreDraft(undefined, true);
+      } catch {
+        if (!cancelled && !hasWriteContentRef.current) await handleRestoreDraft(undefined, true);
+      } finally {
+        if (!cancelled) setDraftHydrated(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [apiClient, canUseWriteFeatures, canWriteSelected, routeDraftId, selectedCategory, localDraftStorageKey]);
 
-    if (!routeDraftId) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    apiClient
-      .getArticleDraft(routeDraftId)
-      .then((latest) => {
-        if (cancelled || !latest) return;
-        applyDraftToForm(latest);
-      })
-      .catch(() => {
-        // Local storage remains a usable fallback when the server draft API is unavailable.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    apiClient,
-    canUseWriteFeatures,
-    canWriteSelected,
-    routeDraftId,
-    selectedCategory,
-  ]);
-
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = async (notify = false) => {
+    if (draftCompletedRef.current || !draftHydrated || !canUseWriteFeatures || !canWriteSelected || (!hasWriteContentRef.current && !draftIdentityRef.current.id)) return;
     setDraftStatus("saving");
     const key = localDraftStorageKey;
     const data = {
@@ -468,6 +457,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
       eventLocation,
       eventDescriptionKo,
       eventDescriptionEn,
+      assets,
+      linkedSurveyId: selectedSurveyId,
       updatedAt: nowMs(),
     };
     try {
@@ -498,12 +489,12 @@ export function useBoardWritePageController(forcedCategory?: string) {
         sortOrder: index,
       })),
       eventStartDate:
-        (selectedCategory === "_EVENT" || selectedCategory === "promotions") && eventStartDate
+        selectedCategory === "_EVENT" && eventStartDate
           ? eventDateInputToIso(eventStartDate, isAllDay)
           : null,
       eventEndDate:
         (selectedCategory === "_EVENT" || selectedCategory === "promotions") && eventEndDate
-          ? eventDateInputToIso(eventEndDate, isAllDay, true)
+          ? eventDateInputToIso(eventEndDate, selectedCategory === "promotions" || isAllDay, true)
           : null,
       eventLocation:
         (selectedCategory === "_EVENT" || selectedCategory === "promotions")
@@ -524,34 +515,45 @@ export function useBoardWritePageController(forcedCategory?: string) {
     >;
     const fingerprint = getDraftFingerprint(draftPayload);
 
-    if (
-      canUseWriteFeatures &&
-      canWriteSelected &&
-      lastDraftFingerprintRef.current !== fingerprint
-    ) {
+    const identity = draftIdentityRef.current;
+    const saved = () => {
+      setDraftStatus("saved");
+      if (notify) toast({type:"success",message:lang === "ko" ? "임시저장했습니다." : "Draft saved."});
+    };
+    const persist = async () => {
+      if (draftCompletedRef.current || draftIdentityRef.current !== identity) return;
+      if (lastDraftFingerprintRef.current === fingerprint) { saved(); return; }
       try {
         const response = await apiClient.saveArticleDraft({
           ...draftPayload,
-          draftId: serverDraftId ?? undefined,
-          expectedVersion: serverDraftVersion,
+          draftId: identity.id ?? undefined,
+          expectedVersion: identity.version,
           fingerprint,
         });
+        identity.id = response.draftId;
+        identity.version = response.version;
+        if (draftIdentityRef.current !== identity) return;
         setServerDraftId(response.draftId);
         setServerDraftVersion(response.version);
-        setDrafts((current) => [
-          response,
-          ...current.filter((draft) => draft.draftId !== response.draftId),
-        ]);
+        setDrafts((current) => [response, ...current.filter((draft) => draft.draftId !== response.draftId)]);
         lastDraftFingerprintRef.current = fingerprint;
+        saved();
       } catch (error) {
         console.error(error);
+        if (draftIdentityRef.current === identity) {
+          setDraftStatus("failed");
+          if (notify) toast({type:"error",message:lang === "ko" ? "서버에 저장하지 못했습니다. 이 브라우저에는 보관되었습니다." : "Server save failed. A copy is kept in this browser."});
+        }
       }
-    }
-    setDraftStatus("saved");
+    };
+    draftSaveQueueRef.current = draftSaveQueueRef.current.then(persist, persist);
+    await draftSaveQueueRef.current;
   };
 
-  const handleRestoreDraft = async (draftId?: string) => {
-    const requestedDraftId = draftId ?? serverDraftId;
+  saveOnUnmountRef.current = handleSaveDraft;
+
+  const handleRestoreDraft = async (draftId?: string, localOnly = false) => {
+    const requestedDraftId = localOnly ? null : draftId ?? serverDraftId;
     if (requestedDraftId) {
       try {
         const draft = await apiClient.getArticleDraft(requestedDraftId);
@@ -569,7 +571,6 @@ export function useBoardWritePageController(forcedCategory?: string) {
         );
         setIsSecret(draft.isSecret);
         setAllowComment(selectedCategory === "suggestions" ? true : draft.allowComment);
-        setIsKoreanOnly(draft.isKoreanOnly);
         setIsEventAlwaysOpen(
           !draft.eventStartDate && !draft.eventEndDate &&
             (selectedCategory === "promotions" || Boolean(draft.eventDescriptionKo)),
@@ -593,7 +594,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
         setEventDescriptionKo(draft.eventDescriptionKo || "");
         setEventDescriptionEn(draft.eventDescriptionEn || "");
         setSelectedSurveyId(draft.linkedSurveyId || "");
-        setServerDraftId(draft.draftId);
+        draftIdentityRef.current = { id: draft.draftId, version: draft.version };
+    setServerDraftId(draft.draftId);
         setServerDraftVersion(draft.version);
         setDraftRestoredAt(draft.updatedAt);
         return;
@@ -608,6 +610,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw);
+      setAssets(Array.isArray(parsed.assets) ? parsed.assets : []);
+      setSelectedSurveyId(parsed.linkedSurveyId || "");
       setTitleKo(parsed.titleKo || "");
       setTitleEn(parsed.titleEn || "");
       setContentKo(parsed.contentKo || "");
@@ -624,7 +628,6 @@ export function useBoardWritePageController(forcedCategory?: string) {
       setAllowComment(
         selectedCategory === "suggestions" ? true : parsed.allowComment ?? true,
       );
-      setIsKoreanOnly(parsed.isKoreanOnly ?? false);
       const parsedIsAllDay =
         parsed.isAllDay ??
         isAllDayDateRange(parsed.eventStartDate || null, parsed.eventEndDate || null);
@@ -675,7 +678,6 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setHomeOrder("");
     setIsSecret(false);
     setAllowComment(true);
-    setIsKoreanOnly(false);
     setAssets([]);
     setEventStartDate("");
     setEventEndDate("");
@@ -688,6 +690,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setServerDraftVersion(undefined);
     setDraftRestoredAt(null);
     lastDraftFingerprintRef.current = null;
+    draftIdentityRef.current = { id: null };
     navigate(location.pathname, { replace: true, state: location.state });
   };
 
@@ -733,25 +736,15 @@ export function useBoardWritePageController(forcedCategory?: string) {
   };
 
   useEffect(() => {
-    if (
-      !titleKo &&
-      !contentKo &&
-      !titleEn &&
-      !contentEn &&
-      !isEventAlwaysOpen &&
-      !eventStartDate &&
-      !eventEndDate &&
-      !eventLocation &&
-      !eventDescriptionKo &&
-      !eventDescriptionEn
-    ) {
-      return;
-    }
+    if (!draftHydrated || (!hasWriteContentRef.current && !draftIdentityRef.current.id)) return;
     const timer = setTimeout(() => {
       void handleSaveDraft();
-    }, 2000);
+    }, 1000);
     return () => clearTimeout(timer);
   }, [
+    draftHydrated,
+    homeVisible,
+    homeOrder,
     titleKo,
     contentKo,
     titleEn,
@@ -775,7 +768,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
 
   useEffect(() => {
     const saveOnLeave = () => {
-      if (document.visibilityState !== "hidden") return;
+      if (!draftHydrated || document.visibilityState !== "hidden") return;
       void handleSaveDraft();
     };
     window.addEventListener("pagehide", saveOnLeave);
@@ -785,6 +778,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
       document.removeEventListener("visibilitychange", saveOnLeave);
     };
   }, [
+    draftHydrated,
     titleKo,
     titleEn,
     contentKo,
@@ -832,19 +826,14 @@ export function useBoardWritePageController(forcedCategory?: string) {
       return;
     }
 
-    if (!isKoreanOnly && (!titleEn.trim() || !contentEn.trim())) {
+    if (!isKoreanOnly && (!titleEn.trim() || (!stripRichText(contentEn) && !/<img\b/i.test(contentEn)))) {
       toast({
         type: "error",
         message:
           lang === "ko"
-            ? "영문 제목과 내용을 입력하거나 '한국어 전용'을 선택해 주세요."
-            : "Enter an English title and content, or select 'Korean only'.",
+            ? "영문 제목과 본문을 모두 입력하거나, 영문 입력란을 모두 비워 주세요."
+            : "Complete both English fields, or leave both empty.",
       });
-      return;
-    }
-
-    if (selectedCategory === "promotions" && eventStartDate && eventEndDate && eventEndDate.slice(0, 10) < eventStartDate.slice(0, 10)) {
-      toast({ type: "error", message: lang === "ko" ? "게시 종료 날짜는 시작 날짜 이후여야 합니다." : "The end date must be on or after the start date." });
       return;
     }
 
@@ -853,18 +842,13 @@ export function useBoardWritePageController(forcedCategory?: string) {
         (selectedCategory === "_EVENT" &&
           (!eventDescriptionKo.trim() ||
             (!isKoreanOnly && !eventDescriptionEn.trim()))) ||
-        (!isEventAlwaysOpen && (!eventStartDate || !eventEndDate))
+        (selectedCategory === "_EVENT" && !isEventAlwaysOpen && (!eventStartDate || !eventEndDate))
       ) {
         toast({
           type: "error",
-          message:
-            selectedCategory === "promotions"
-              ? lang === "ko"
-                ? "게시 기간 또는 상시 진행 여부를 설정해 주세요."
-                : "Set a publication period or mark the post as always open."
-              : lang === "ko"
-                ? "행사 일정 또는 상시 여부, 그리고 간단한 설명은 필수입니다."
-                : "Event schedule or always-open status, plus card description, is required.",
+          message: lang === "ko"
+            ? "행사 일정 또는 상시 여부, 그리고 간단한 설명은 필수입니다."
+            : "Event schedule or always-open status, plus card description, is required.",
         });
         return;
       }
@@ -895,13 +879,13 @@ export function useBoardWritePageController(forcedCategory?: string) {
           sortOrder: index,
         })),
         eventStartDate:
-          (selectedCategory === "_EVENT" || selectedCategory === "promotions")
+          selectedCategory === "promotions" ? null : (selectedCategory === "_EVENT")
             ? isEventAlwaysOpen
               ? null
               : eventDateInputToIso(eventStartDate, isAllDay)
             : undefined,
         eventEndDate:
-          (selectedCategory === "_EVENT" || selectedCategory === "promotions")
+          selectedCategory === "promotions" ? (eventEndDate ? eventDateInputToIso(eventEndDate, true, true) : null) : (selectedCategory === "_EVENT")
             ? isEventAlwaysOpen
               ? null
               : eventDateInputToIso(eventEndDate, isAllDay, true)
@@ -964,9 +948,11 @@ export function useBoardWritePageController(forcedCategory?: string) {
               : undefined,
         });
       }
+      draftCompletedRef.current = true;
+      await draftSaveQueueRef.current;
       if (localDraftStorageKey) localStorage.removeItem(localDraftStorageKey);
-      if (serverDraftId) {
-        await apiClient.deleteArticleDraft(serverDraftId).catch(() => undefined);
+      if (draftIdentityRef.current.id) {
+        await apiClient.deleteArticleDraft(draftIdentityRef.current.id).catch(() => undefined);
       }
       toast({
         type: "success",
@@ -1045,7 +1031,6 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setIsEventAlwaysOpen,
     setHomeOrder,
     setHomeVisible,
-    setIsKoreanOnly,
     setIsPinned,
     setIsSecret,
     setSelectedSurveyId,

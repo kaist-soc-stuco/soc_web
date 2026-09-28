@@ -47,6 +47,7 @@ export class SurveysRepository {
       allowResponseEdit: row.allowResponseEdit,
       isKoreanOnly: row.isKoreanOnly,
       isPublished: row.isPublished,
+      acceptingResponses: row.acceptingResponses,
       lifecycleStatus: row.lifecycleStatus as SurveyRecord["lifecycleStatus"],
       previousVersionId: row.previousVersionId,
       versionNumber: row.versionNumber,
@@ -136,6 +137,7 @@ export class SurveysRepository {
         allowResponseEdit: dto.allowResponseEdit ?? false,
         isKoreanOnly: dto.isKoreanOnly ?? false,
         isPublished: dto.isPublished ?? false,
+        acceptingResponses: dto.acceptingResponses ?? true,
         lifecycleStatus: dto.isPublished ? "PUBLISHED" : "DRAFT",
         previousVersionId: lineage?.previousVersionId ?? null,
         versionNumber: lineage?.versionNumber ?? 1,
@@ -186,6 +188,7 @@ export class SurveysRepository {
     if (dto.allowMultipleResponses !== undefined) set.allowMultipleResponses = dto.allowMultipleResponses;
     if (dto.allowResponseEdit !== undefined) set.allowResponseEdit = dto.allowResponseEdit;
     if (dto.isKoreanOnly !== undefined) set.isKoreanOnly = dto.isKoreanOnly;
+    if (dto.acceptingResponses !== undefined) set.acceptingResponses = dto.acceptingResponses;
     if (dto.isPublished !== undefined) {
       set.isPublished = dto.isPublished;
       set.lifecycleStatus = dto.isPublished ? "PUBLISHED" : "DRAFT";

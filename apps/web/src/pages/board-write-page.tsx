@@ -12,6 +12,7 @@ import {
   BoardWriteEditorFields,
   BoardWriteEventFields,
   BoardWriteHeaderControls,
+  BoardPostToolbarOptions,
   BoardWriteSettings,
   BoardWriteFooter,
 } from "@/features/board-write/board-write-form-sections";
@@ -28,6 +29,7 @@ import {
 } from "@/features/board-write/event-date-utils";
 
 export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } = {}) {
+  const [editorView, setEditorView] = useState<"ko" | "en" | "split">("ko");
   const navigate = useNavigate();
   const {
     ConfirmDialog,
@@ -79,7 +81,6 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     setIsAnonymous,
     setIsAllDay,
     setIsEventAlwaysOpen,
-    setIsKoreanOnly,
     setIsPinned,
     setHomeVisible,
     setHomeOrder,
@@ -130,7 +131,6 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     if (template.homeOrder !== undefined) setHomeOrder(template.homeOrder);
     setIsSecret(template.isSecret);
     setAllowComment(template.allowComment);
-    setIsKoreanOnly(template.isKoreanOnly);
     setIsAllDay(Boolean(template.isAllDay));
     setIsEventAlwaysOpen(template.isEventAlwaysOpen);
     setEventStartDate(
@@ -153,7 +153,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     : selectedCategory
       ? `/board/${selectedCategory}`
       : "/board";
-  const eventFields = isEventLike ? (
+  const eventFields = isEvent ? (
     <BoardWriteEventFields
       eventDescriptionKo={eventDescriptionKo}
       eventDescriptionEn={eventDescriptionEn}
@@ -204,22 +204,23 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
       isAnonymous={isAnonymous}
       boardCode={selectedCategory}
       isEvent={isEventLike}
-      isPinned={isPinned}
       homeVisible={homeVisible}
       isSecret={isSecret}
       allowSecret={selectedBoard?.allowSecret ?? false}
       onAnonymousChange={setIsAnonymous}
-      onPinnedChange={setIsPinned}
       onHomeVisibleChange={isEvent ? setHomeVisible : undefined}
       onSecretChange={setIsSecret}
-      stacked={isEventLike}
+      stacked={isEvent}
     />
   );
   const editorCard = (includeSettings: boolean) => (
     <DataViewCard>
       <BoardWriteHeaderControls
+        editorView={editorView}
+        onEditorViewChange={setEditorView}
+        trailingActions={<BoardPostToolbarOptions lang={lang} canPin={canConfigurePostSettings} pinned={isPinned} onPinnedChange={setIsPinned}
+          promotion={selectedCategory === "promotions"} endDate={eventEndDate} onEndDateChange={(value) => { setEventEndDate(value); setIsEventAlwaysOpen(!value); }} />}
         boardByCode={boardByCode}
-        isKoreanOnly={isKoreanOnly}
         lang={lang}
         leadingActions={canManageTemplates ? (
           <ArticleTemplateControl
@@ -230,15 +231,13 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
           />
         ) : null}
         onCategoryChange={handleCategoryChange}
-        onKoreanOnlyChange={(checked) => {
-          setIsKoreanOnly(checked);
-        }}
         selectedCategory={selectedCategory}
         writableBoardCodes={writableBoardCodes}
       />
 
       <div className="min-h-[450px]">
         <BoardWriteEditorFields
+          editorView={editorView}
           contentEn={contentEn}
           contentKo={contentKo}
           isKoreanOnly={isKoreanOnly}
@@ -252,7 +251,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
           titleKo={titleKo}
           fileInputRef={fileInputRef}
           uploading={uploading}
-          onSave={handleSaveDraft}
+          onSave={() => handleSaveDraft(true)}
           onSubmit={handleSubmit}
         />
       </div>
@@ -297,7 +296,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
               draftStatus={draftStatus}
               canWriteSelected={canWriteSelected}
               onCancel={() => navigate(-1)}
-              onSaveDraft={handleSaveDraft}
+              onSaveDraft={() => handleSaveDraft(true)}
               onSubmit={handleSubmit}
             />
           </div>
@@ -323,7 +322,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
             />
           ) : null}
 
-          {isEventLike ? (
+          {isEvent ? (
             <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
               {editorCard(false)}
               <DataViewCard className="min-w-0">

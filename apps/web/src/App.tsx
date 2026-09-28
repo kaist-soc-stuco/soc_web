@@ -388,7 +388,7 @@ function SessionKeepAlive() {
 function PreventImageGhostDrag() {
   useEffect(() => {
     const preventImageDrag = (event: DragEvent) => {
-      if (event.target instanceof HTMLImageElement) {
+      if (event.target instanceof HTMLImageElement && !event.target.closest(".tiptap[contenteditable=true]")) {
         event.preventDefault();
       }
     };

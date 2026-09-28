@@ -46,7 +46,7 @@ const ARTICLE_HTML_SANITIZE_OPTIONS: IOptions = {
     ],
     ol: ["start"],
     span: ["style"],
-    img: ["src", "alt"],
+    img: ["src", "alt", "width", "height", { name: "data-align", values: ["left", "center", "right"] }],
   },
   allowedSchemes: ["http", "https", "mailto", "tel"],
   allowProtocolRelative: false,
@@ -60,12 +60,19 @@ const ARTICLE_HTML_SANITIZE_OPTIONS: IOptions = {
         /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i,
         /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i,
       ],
-      "font-size": [/^(?:14|16|18|22)px$/],
+      "font-size": [/^(?:8|9|10|11|12|14|16|18|20|22|24|28|30|36|50|72|96)px$/],
     },
   },
   parseStyleAttributes: true,
   exclusiveFilter: (frame) => frame.tag === "img" && !isSafeImageSource(frame.attribs.src),
   transformTags: {
+    img: (tagName, attributes) => {
+      const safe = { ...attributes };
+      for (const dimension of ["width", "height"]) {
+        if (!/^[1-9]\d{0,3}$/.test(safe[dimension] ?? "")) delete safe[dimension];
+      }
+      return { tagName, attribs: safe };
+    },
     a: (tagName, attributes) => {
       const href = attributes.href?.trim();
       if (!href || !isSafeUrlReference(href)) {

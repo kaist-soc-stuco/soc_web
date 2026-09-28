@@ -1,0 +1,1 @@
+ALTER TABLE "survey" ADD COLUMN "accepting_responses" boolean DEFAULT true NOT NULL;

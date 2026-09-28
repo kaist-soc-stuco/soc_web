@@ -262,3 +262,10 @@ test("updates the caller's existing response and queues Sheets", async () => {
   assert.equal(result.answers.length, 1);
   assert.deepEqual(sheetQueueCalls, ["survey-1"]);
 });
+
+
+test("manually paused always-open surveys reject new responses without unpublishing", async () => {
+  const { service, insertSubmissionCalls } = createService({ surveyRecord: survey({ isAlwaysOpen: true, acceptingResponses: false }) });
+  await expectHttpError(service.submit("survey-1", validDto, caller), ConflictException, "survey_closed");
+  assert.equal(insertSubmissionCalls.length, 0);
+});

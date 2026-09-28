@@ -116,10 +116,12 @@ export class UsersController {
     @Req() req: AuthenticatedRequest,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
+    @Query("q") query?: string,
   ) {
     return this.usersService.getMyScraps(req.user!.id, {
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
+      query,
     });
   }
 

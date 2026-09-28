@@ -1741,7 +1741,7 @@ function QuestionMoreMenu({
       style={menuStyle}
       role="menu"
       aria-label="문항 옵션"
-      className="question-editor-more-menu pr-2 fixed z-[100] min-w-0 w-max max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
+      className="question-editor-more-menu fixed z-[100] min-w-0 w-max max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
     >
       <MoreMenuItem
         label="설명"
@@ -1833,7 +1833,7 @@ function MoreMenuItem({
       aria-checked={checked}
       disabled={disabled}
       onClick={onClick}
-      className="flex min-h-9 w-max min-w-0 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm font-normal text-slate-700 transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      className="flex min-h-9 w-full min-w-0 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm font-normal text-slate-700 transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
     >
       {checked ? (
         <Check aria-hidden="true" className="size-4 shrink-0 text-slate-500" />

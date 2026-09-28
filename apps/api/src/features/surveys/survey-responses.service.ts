@@ -144,6 +144,7 @@ export class SurveyResponsesService {
     if (!survey) throw new NotFoundException("survey_not_found");
 
     if (!survey.isPublished) throw new NotFoundException("survey_not_found");
+    if (survey.acceptingResponses === false) throw new ConflictException("survey_closed");
 
     const now = nowMs();
     if (survey.opensAt && isoToMs(survey.opensAt) > now)
@@ -283,6 +284,7 @@ export class SurveyResponsesService {
     const survey = await this.surveysRepo.findById(surveyId);
     if (!survey) throw new NotFoundException("survey_not_found");
     if (!survey.isPublished) throw new NotFoundException("survey_not_found");
+    if (survey.acceptingResponses === false) throw new ConflictException("survey_closed");
     if (!survey.allowResponseEdit) {
       throw new ConflictException("response_edit_not_allowed");
     }

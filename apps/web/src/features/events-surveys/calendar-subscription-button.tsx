@@ -1,4 +1,4 @@
-import { CalendarPlus, Check, Copy, Download } from "lucide-react";
+import { CalendarPlus, Copy, Download } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { useToast } from "@/components/ui/toast";
@@ -14,7 +14,6 @@ export function CalendarSubscriptionButton({
 }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
   const absoluteFeedUrl = toAbsoluteUrl(feedUrl);
@@ -43,10 +42,8 @@ export function CalendarSubscriptionButton({
   const copyFeedUrl = async () => {
     try {
       await navigator.clipboard.writeText(absoluteFeedUrl);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
+      toast({ type: "success", message: lang === "ko" ? "구독 주소를 복사했습니다." : "Subscription URL copied." });
     } catch {
-      setCopied(false);
       toast({ type: "error", message: lang === "ko" ? "주소를 복사하지 못했습니다. 다시 시도해 주세요." : "Could not copy the URL. Please try again." });
     }
   };
@@ -73,9 +70,9 @@ export function CalendarSubscriptionButton({
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
               <code className="min-w-0 flex-1 break-all text-xs leading-4 text-slate-600">{absoluteFeedUrl}</code>
-              <Button type="button" size="sm" className="shrink-0" onClick={() => void copyFeedUrl()}>
-                {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-                {copied ? (lang === "ko" ? "복사됨" : "Copied") : lang === "ko" ? "구독 주소 복사" : "Copy subscription URL"}
+              <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={() => void copyFeedUrl()}>
+                <Copy aria-hidden="true" />
+                {lang === "ko" ? "구독 주소 복사" : "Copy subscription URL"}
               </Button>
             </div>
             <div className="border-t border-slate-100 pt-2">
@@ -89,11 +86,7 @@ export function CalendarSubscriptionButton({
                 <Download aria-hidden="true" className="size-3.5" />
                 {lang === "ko" ? "일정 파일 다운로드 (.ics)" : "Download calendar (.ics)"}
               </a>
-              <p className="px-2 text-xs leading-5 text-slate-500">
-                {lang === "ko"
-                  ? "구독은 자동 갱신되며, 파일은 현재 일정만 저장합니다."
-                  : "Subscriptions stay updated; files save the current events only."}
-              </p>
+
             </div>
           </div>
         </PopoverPanel>

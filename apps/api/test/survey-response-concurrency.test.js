@@ -681,3 +681,18 @@ test(
     assert.equal(afterDeleteRows[0].count, 0);
   },
 );
+
+
+test("manual reception pause preserves publication and responses and can reopen", integrationOptions, async () => {
+  await insertSurvey({ id: STATE_SURVEY, isAlwaysOpen: true });
+  assert.equal((await submit(STATE_SURVEY, USER_ONE)).status, "created");
+  await pool.query("UPDATE survey SET accepting_responses = false WHERE survey_id = $1", [STATE_SURVEY]);
+  assert.equal((await submit(STATE_SURVEY, USER_TWO)).status, "survey_closed");
+  const paused = await surveysRepository.findById(STATE_SURVEY);
+  assert.equal(paused.isPublished, true);
+  assert.equal(paused.acceptingResponses, false);
+  const existing = await pool.query("SELECT count(*)::int AS count FROM survey_responses WHERE survey_id = $1", [STATE_SURVEY]);
+  assert.equal(existing.rows[0].count, 1);
+  await pool.query("UPDATE survey SET accepting_responses = true WHERE survey_id = $1", [STATE_SURVEY]);
+  assert.equal((await submit(STATE_SURVEY, USER_TWO)).status, "created");
+});

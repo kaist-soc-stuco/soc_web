@@ -110,6 +110,7 @@ type UpdateSubmissionResult =
 
 type SubmissionState = {
   isPublished: boolean;
+  acceptingResponses?: boolean;
   isAlwaysOpen: boolean;
   openAt: Date | null;
   closeAt: Date | null;
@@ -125,6 +126,7 @@ const getSubmissionStateFailure = (
   currentMs: number,
 ): SubmissionStateFailure | null => {
   if (!survey.isPublished) return "survey_not_published";
+  if (survey.acceptingResponses === false) return "survey_closed";
   if (survey.isAlwaysOpen) return null;
   if (survey.openAt && survey.openAt.valueOf() > currentMs) {
     return "survey_not_open_yet";
@@ -474,6 +476,7 @@ export class SurveyResponsesRepository {
         const [lockedSurvey] = await tx
           .select({
             isPublished: surveys.isPublished,
+            acceptingResponses: surveys.acceptingResponses,
             isAlwaysOpen: surveys.isAlwaysOpen,
             openAt: surveys.openAt,
             closeAt: surveys.closeAt,
@@ -640,6 +643,7 @@ export class SurveyResponsesRepository {
       const [lockedSurvey] = await tx
         .select({
           isPublished: surveys.isPublished,
+            acceptingResponses: surveys.acceptingResponses,
           isAlwaysOpen: surveys.isAlwaysOpen,
           openAt: surveys.openAt,
           closeAt: surveys.closeAt,

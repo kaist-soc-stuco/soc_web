@@ -35,7 +35,7 @@ test("My Page titles prefer the selected language", () => {
   );
 });
 
-test("comment activity copy keeps the body and localized article context", () => {
+test("commented posts use the localized article title and comment preview", () => {
   assert.deepEqual(
     getMyActivityDisplay("en", {
       type: "comment",
@@ -43,7 +43,7 @@ test("comment activity copy keeps the body and localized article context", () =>
       titleEn: "English post",
       commentContent: "  The comment I wrote  ",
     }),
-    { title: "The comment I wrote", context: "English post" },
+    { title: "English post", context: "The comment I wrote" },
   );
 
   assert.deepEqual(
@@ -52,7 +52,7 @@ test("comment activity copy keeps the body and localized article context", () =>
       articleTitleEn: "English post",
       content: "  내가 쓴 댓글  ",
     }),
-    { title: "내가 쓴 댓글", context: "한국어 게시글" },
+    { title: "한국어 게시글", context: "내가 쓴 댓글" },
   );
 });
 

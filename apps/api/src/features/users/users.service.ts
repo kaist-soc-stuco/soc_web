@@ -558,12 +558,12 @@ export class UsersService {
 
   async getMyScraps(
     userId: string,
-    options: { page: number; limit: number },
+    options: { page: number; limit: number; query?: string },
   ): Promise<MyScrapListResponse> {
     const { limit, offset, page } = this.normalizeListOptions(options);
     const [items, total] = await Promise.all([
-      this.usersRepository.getMyScraps(userId, limit, offset),
-      this.usersRepository.countMyScraps(userId),
+      this.usersRepository.getMyScraps(userId, limit, offset, options.query),
+      this.usersRepository.countMyScraps(userId, options.query),
     ]);
 
     return { items, limit, page, total };

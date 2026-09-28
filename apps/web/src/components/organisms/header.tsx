@@ -23,7 +23,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { PopoverPanel } from "@/components/ui/popover-panel";
-import { TextInput } from "@/components/ui/text-input";
 import { useOverlayBehavior } from "@/components/ui/use-overlay-behavior";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
@@ -65,7 +64,7 @@ export function Header({ variant = "default" }: HeaderProps) {
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [loginStarting, setLoginStarting] = useState(false);
-  const previousSearchOpen = useRef(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const previousNotificationOpen = useRef(false);
   const { lang, setLanguage } = useLanguage();
   const handleMobileMenuKeyDown = useOverlayBehavior({
@@ -287,20 +286,7 @@ export function Header({ variant = "default" }: HeaderProps) {
   }, []);
 
   useEffect(() => {
-    const wasOpen = previousSearchOpen.current;
-    previousSearchOpen.current = searchOpen;
-    if (!wasOpen || searchOpen) return;
-
-    const activeElement = document.activeElement;
-    if (
-      notificationRef.current?.contains(activeElement) ||
-      profileRef.current?.contains(activeElement) ||
-      mobileMenuRef.current?.contains(activeElement)
-    ) {
-      return;
-    }
-
-    searchTriggerRef.current?.focus({ preventScroll: true });
+    if (searchOpen) searchInputRef.current?.focus({ preventScroll: true });
   }, [searchOpen]);
 
   useEffect(() => {
@@ -467,6 +453,7 @@ export function Header({ variant = "default" }: HeaderProps) {
   return (
     <header
       ref={headerRef}
+      data-search-open={searchOpen}
       className={
         variant === "home"
           ? `site-header-home sticky top-0 z-50 w-full ${
@@ -602,56 +589,37 @@ export function Header({ variant = "default" }: HeaderProps) {
         </div>
 
         <div className="home-header-utilities relative flex items-center gap-1.5 pr-3 md:gap-2 md:pr-6">
-          <div ref={searchRef} className="relative">
-            <IconButton
-              ref={searchTriggerRef}
-              aria-label={lang === "ko" ? "통합검색" : "Search"}
-              aria-expanded={searchOpen}
-              onClick={() => {
-                setSearchOpen((value) => !value);
-                setDropdownOpen(false);
-                setNotificationOpen(false);
-                setMobileMenuOpen(false);
-              }}
-              className={variant === "home" ? "home-header-icon" : undefined}
-            >
-              <Search aria-hidden="true" />
-            </IconButton>
-
-            {searchOpen && (
-              <PopoverPanel className="site-header-search-panel right-0 top-full w-[min(22rem,calc(100vw-2rem))]">
-                <form className="p-3.5" onSubmit={handleSearchSubmit}>
-                  <TextInput
-                      leading={<Search aria-hidden="true" className="h-4 w-4" />}
-                      value={searchQuery}
-                      onChange={(event) => setSearchQuery(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          handleSearchSubmit();
-                        }
-                      }}
-                      placeholder={
-                        lang === "ko"
-                          ? "제목, 내용 검색"
-                          : "Search titles and content"
-                      }
-                      autoFocus
-                      trailing={
-                        searchQuery ? (
-                          <IconButton
-                            size="sm"
-                            aria-label={lang === "ko" ? "검색어 지우기" : "Clear search"}
-                            onClick={() => setSearchQuery("")}
-                          >
-                            <X aria-hidden="true" />
-                          </IconButton>
-                        ) : null
-                      }
-                    />
-                </form>
-              </PopoverPanel>
-            )}
+          <div ref={searchRef} className="site-header-search-slot">
+            <form role="search" className="site-header-inline-search" data-open={searchOpen} onSubmit={handleSearchSubmit}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.stopPropagation();
+                  setSearchOpen(false);
+                  searchTriggerRef.current?.focus({ preventScroll: true });
+                }
+              }}>
+              <IconButton ref={searchTriggerRef}
+                aria-label={lang === "ko" ? "통합검색" : "Search"}
+                aria-expanded={searchOpen} aria-controls="site-header-search-input"
+                onClick={() => {
+                  if (searchOpen) { handleSearchSubmit(); return; }
+                  setSearchOpen(true); setHoveredIndex(null);
+                  setDropdownOpen(false); setNotificationOpen(false); setMobileMenuOpen(false);
+                }}
+                className={variant === "home" && !searchOpen ? "home-header-icon" : undefined}>
+                <Search aria-hidden="true" />
+              </IconButton>
+              <div className="site-header-search-fields" inert={!searchOpen} aria-hidden={!searchOpen}>
+                <input ref={searchInputRef} id="site-header-search-input" type="search"
+                  aria-label={lang === "ko" ? "통합검색 검색어" : "Site search query"}
+                  placeholder={lang === "ko" ? "제목, 내용 검색" : "Search titles and content"}
+                  value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
+                <IconButton size="sm" aria-label={lang === "ko" ? "검색 닫기" : "Close search"}
+                  onClick={() => { setSearchOpen(false); searchTriggerRef.current?.focus({ preventScroll: true }); }}>
+                  <X aria-hidden="true" />
+                </IconButton>
+              </div>
+            </form>
           </div>
 
           <Button

@@ -1791,8 +1791,9 @@ export class UsersRepository {
           ilike(articles.titleEn, `%${normalizedQuery}%`),
         )
       : undefined;
-    const rows = await this.db
+    const ranked = this.db
       .select({
+        rank: sql<number>`row_number() over (partition by ${comments.articleId} order by ${comments.createdAt} desc, ${comments.commentId} desc)`.as("comment_rank"),
         commentId: comments.commentId,
         content: comments.content,
         status: comments.status,
@@ -1808,10 +1809,10 @@ export class UsersRepository {
       .from(comments)
       .innerJoin(articles, eq(comments.articleId, articles.articleId))
       .innerJoin(boards, eq(articles.boardId, boards.boardId))
-      .where(and(eq(comments.authorUserId, userId), eq(comments.status, 'PUBLISHED'), searchFilter))
-      .orderBy(desc(comments.createdAt))
-      .limit(limit)
-      .offset(offset);
+      .where(and(eq(comments.authorUserId, userId), eq(comments.status, 'PUBLISHED'), eq(articles.status, 'PUBLISHED'), searchFilter))
+      .as("ranked_comments");
+    const rows = await this.db.select().from(ranked).where(eq(ranked.rank, 1))
+      .orderBy(desc(ranked.createdAt), desc(ranked.commentId)).limit(limit).offset(offset);
 
     return rows.map((r) => ({
       commentId: String(r.commentId),
@@ -1838,10 +1839,10 @@ export class UsersRepository {
         )
       : undefined;
     const rows = await this.db
-      .select({ count: sql<number>`COUNT(*)` })
+      .select({ count: sql<number>`COUNT(DISTINCT ${comments.articleId})` })
       .from(comments)
       .innerJoin(articles, eq(comments.articleId, articles.articleId))
-      .where(and(eq(comments.authorUserId, userId), eq(comments.status, "PUBLISHED"), searchFilter));
+      .where(and(eq(comments.authorUserId, userId), eq(comments.status, "PUBLISHED"), eq(articles.status, "PUBLISHED"), searchFilter));
 
     return Number(rows[0]?.count ?? 0);
   }
@@ -1909,7 +1910,9 @@ export class UsersRepository {
     query?: string,
   ): Promise<{ items: MyActivityItem[]; total: number }> {
     type MyActivityRow = {
-      activityType: "survey" | "post" | "comment";
+      activityType: "survey" | "post" | "comment" | "scrap";
+      boardNameKo: string | null;
+      boardNameEn: string | null;
       resourceId: string;
       titleKo: string;
       titleEn: string | null;
@@ -1955,6 +1958,8 @@ export class UsersRepository {
           ${articles.postedAt} AS "occurredAt",
           ${articles.articleId}::text AS "articleId",
           ${boards.code} AS "boardCode",
+          ${boards.nameKo} AS "boardNameKo",
+          ${boards.nameEn} AS "boardNameEn",
           NULL::text AS "surveyId"
         FROM ${articles}
         INNER JOIN ${boards} ON ${articles.boardId} = ${boards.boardId}
@@ -1973,13 +1978,38 @@ export class UsersRepository {
           ${comments.createdAt} AS "occurredAt",
           ${articles.articleId}::text AS "articleId",
           ${boards.code} AS "boardCode",
+          ${boards.nameKo} AS "boardNameKo",
+          ${boards.nameEn} AS "boardNameEn",
           NULL::text AS "surveyId"
         FROM ${comments}
         INNER JOIN ${articles} ON ${comments.articleId} = ${articles.articleId}
         INNER JOIN ${boards} ON ${articles.boardId} = ${boards.boardId}
         WHERE ${comments.authorUserId} = ${userId}
           AND ${comments.status} = 'PUBLISHED'
+          AND ${articles.status} = 'PUBLISHED'
           ${commentSearch}
+
+        UNION ALL
+
+        SELECT
+          'scrap' AS "activityType",
+          ${articles.articleId}::text AS "resourceId",
+          ${articles.titleKo} AS "titleKo",
+          ${articles.titleEn} AS "titleEn",
+          NULL::text AS "commentContent",
+          ${articleEngagements.updatedAt} AS "occurredAt",
+          ${articles.articleId}::text AS "articleId",
+          ${boards.code} AS "boardCode",
+          ${boards.nameKo} AS "boardNameKo",
+          ${boards.nameEn} AS "boardNameEn",
+          NULL::text AS "surveyId"
+        FROM ${articleEngagements}
+        INNER JOIN ${articles} ON ${articleEngagements.articleId} = ${articles.articleId}
+        INNER JOIN ${boards} ON ${articles.boardId} = ${boards.boardId}
+        WHERE ${articleEngagements.userId} = ${userId}
+          AND ${articleEngagements.kind} = 'SCRAP'
+          AND ${articles.status} = 'PUBLISHED'
+          ${postSearch}
 
         UNION ALL
 
@@ -1992,15 +2022,22 @@ export class UsersRepository {
           COALESCE(${surveyResponses.submittedAt}, ${surveyResponses.createdAt}) AS "occurredAt",
           NULL::text AS "articleId",
           NULL::text AS "boardCode",
+          NULL::text AS "boardNameKo",
+          NULL::text AS "boardNameEn",
           ${surveys.surveyId}::text AS "surveyId"
         FROM ${surveyResponses}
         INNER JOIN ${surveys} ON ${surveyResponses.surveyId} = ${surveys.surveyId}
         WHERE ${surveyResponses.userId} = ${userId}
           ${surveySearch}
+      ), ranked_activity AS (
+        SELECT *, ROW_NUMBER() OVER (
+          PARTITION BY "activityType", CASE WHEN "activityType" = 'comment' THEN "articleId" ELSE "resourceId" END
+          ORDER BY "occurredAt" DESC, "resourceId" DESC
+        ) AS activity_rank FROM my_activity
       )
       SELECT *, COUNT(*) OVER()::int AS "totalCount"
-      FROM my_activity
-      ORDER BY "occurredAt" DESC
+      FROM ranked_activity WHERE activity_rank = 1
+      ORDER BY "occurredAt" DESC, "resourceId" DESC
       LIMIT ${limit}
       OFFSET ${offset}
     `);
@@ -2009,6 +2046,8 @@ export class UsersRepository {
     const items = result.rows.map((row) => ({
       articleId: row.articleId,
       boardCode: row.boardCode,
+      boardNameKo: row.boardNameKo,
+      boardNameEn: row.boardNameEn,
       commentContent: row.commentContent,
       occurredAt:
         row.occurredAt instanceof Date
@@ -2028,6 +2067,7 @@ export class UsersRepository {
     userId: string,
     limit: number,
     offset: number,
+    query?: string,
   ): Promise<MyScrapItem[]> {
     const rows = await this.db
       .select({
@@ -2052,6 +2092,7 @@ export class UsersRepository {
           eq(articleEngagements.userId, userId),
           eq(articleEngagements.kind, "SCRAP"),
           eq(articles.status, "PUBLISHED"),
+          query?.trim() ? or(ilike(articles.titleKo, `%${query.trim()}%`), ilike(articles.titleEn, `%${query.trim()}%`), ilike(articles.contentKo, `%${query.trim()}%`), ilike(articles.contentEn, `%${query.trim()}%`)) : undefined,
         ),
       )
       .orderBy(desc(articleEngagements.updatedAt))
@@ -2074,7 +2115,7 @@ export class UsersRepository {
     }));
   }
 
-  async countMyScraps(userId: string): Promise<number> {
+  async countMyScraps(userId: string, query?: string): Promise<number> {
     const rows = await this.db
       .select({ count: sql<number>`COUNT(*)` })
       .from(articleEngagements)
@@ -2084,6 +2125,7 @@ export class UsersRepository {
           eq(articleEngagements.userId, userId),
           eq(articleEngagements.kind, "SCRAP"),
           eq(articles.status, "PUBLISHED"),
+          query?.trim() ? or(ilike(articles.titleKo, `%${query.trim()}%`), ilike(articles.titleEn, `%${query.trim()}%`), ilike(articles.contentKo, `%${query.trim()}%`), ilike(articles.contentEn, `%${query.trim()}%`)) : undefined,
         ),
       );
 

@@ -34,6 +34,7 @@ export interface SelectDropdownProps {
   onOpenChange?: (open: boolean) => void;
   optionClassName?: string;
   disableMenuScroll?: boolean;
+  restoreFocusOnSelect?: boolean;
 }
 
 const DROPDOWN_VIEWPORT_PADDING = 8;
@@ -64,6 +65,7 @@ export function SelectDropdown({
   onOpenChange,
   optionClassName,
   disableMenuScroll = false,
+  restoreFocusOnSelect = true,
 }: SelectDropdownProps) {
   const { lang } = useLanguage();
   const instanceId = useId();
@@ -373,7 +375,8 @@ export function SelectDropdown({
                         tabIndex={-1}
                         onClick={() => {
                           onChange(option.value);
-                          closeAndFocus();
+                          if (restoreFocusOnSelect) closeAndFocus();
+                          else { setInternalIsOpen(false); onOpenChangeRef.current?.(false); }
                         }}
                         className={`interaction-menu-item h-[var(--ui-menu-row-height)] w-full min-w-0 justify-between overflow-hidden rounded-md px-2.5 py-0 text-left text-[length:var(--ui-text-body-size)] ${
                           option.value === value

@@ -33,14 +33,15 @@ export function AdminPageMain({ className, tableLayout = false, ...props }: Comp
 }
 
 interface AdminPageHeaderProps {
+  center?: ReactNode;
   actions?: ReactNode;
   eyebrow?: ReactNode;
   title: ReactNode;
 }
 
-export function AdminPageHeader({ actions, eyebrow, title }: AdminPageHeaderProps) {
+export function AdminPageHeader({ actions, eyebrow, title, center }: AdminPageHeaderProps) {
   return (
-    <header className="admin-page__header flex flex-col gap-4 border-b border-slate-200/80 pb-5 md:flex-row md:items-center md:justify-between">
+    <header className={cn("admin-page__header flex flex-col gap-4 border-b border-slate-200/80 pb-5 md:flex-row md:items-center md:justify-between", center && "!grid grid-cols-[minmax(0,1fr)_auto] items-center xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]")}>
       <div className="min-w-0">
         {eyebrow ? (
           <div className="mb-1.5 flex items-center gap-2 text-[length:var(--ui-text-caption-size)] font-semibold uppercase tracking-[0.14em] text-brand-primary">
@@ -51,7 +52,8 @@ export function AdminPageHeader({ actions, eyebrow, title }: AdminPageHeaderProp
           {title}
         </AdminPageTitle>
       </div>
-      {actions ? <div className="flex w-full min-w-0 shrink-0 flex-wrap items-center gap-2 md:w-auto">{actions}</div> : null}
+      {center ? <div className="col-span-2 row-start-2 justify-self-center xl:col-span-1 xl:col-start-2 xl:row-start-1">{center}</div> : null}
+      {actions ? <div className={cn("flex w-full min-w-0 shrink-0 flex-wrap items-center gap-2 md:w-auto", center && "col-start-2 row-start-1 justify-self-end xl:col-start-3")}>{actions}</div> : null}
     </header>
   );
 }

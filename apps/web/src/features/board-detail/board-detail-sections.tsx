@@ -17,7 +17,7 @@ import {
   AdminActionMenuPanel,
 } from "@/components/ui/admin-action-menu";
 import { ArticleEngagementActions } from "@/components/ui/article-engagement-actions";
-import { RichTextContent } from "@/components/ui/rich-text-content";
+import { RichTextContent, stripRichText } from "@/components/ui/rich-text-content";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { Button } from "@/components/ui/button";
 
@@ -185,6 +185,9 @@ export function BoardDetailArticleCard({
       </header>
 
       <div className="pt-5">
+        {lang === "en" && !stripRichText(article.contentEn ?? "") && !/<img\b/i.test(article.contentEn ?? "") ? (
+          <p role="note" className="mb-5 rounded-md bg-slate-50 px-4 py-2 text-sm font-normal text-slate-500">This post is only available in Korean.</p>
+        ) : null}
         {posterStorageKey ? (
           <figure className="w-full mb-6 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
             <img

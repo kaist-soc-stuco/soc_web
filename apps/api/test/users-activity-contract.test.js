@@ -20,6 +20,8 @@ test("My Page activity keeps comment content beside bilingual article titles", a
             occurredAt,
             articleId: "12",
             boardCode: "free",
+        boardNameKo: "자유게시판",
+        boardNameEn: "Free board",
             surveyId: null,
           },
         ],
@@ -34,6 +36,8 @@ test("My Page activity keeps comment content beside bilingual article titles", a
       {
         articleId: "12",
         boardCode: "free",
+        boardNameKo: "자유게시판",
+        boardNameEn: "Free board",
         commentContent: "The comment I wrote",
         occurredAt: "2026-07-15T08:00:00.000Z",
         resourceId: "71",

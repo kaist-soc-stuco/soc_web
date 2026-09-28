@@ -1,3 +1,4 @@
+import { stripRichText } from "@/components/ui/rich-text-content";
 import type {
   ArticleDetailResponse,
   ArticleEngagementKind,
@@ -617,7 +618,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   const content = article
     ? lang === "ko"
       ? article.contentKo
-      : article.contentEn || article.contentKo
+      : (stripRichText(article.contentEn ?? "") || /<img\b/i.test(article.contentEn ?? "")) ? article.contentEn! : article.contentKo
     : "";
   const surveyTitle = article?.survey
     ? lang === "ko"

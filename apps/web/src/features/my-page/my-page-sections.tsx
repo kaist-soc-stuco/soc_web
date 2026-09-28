@@ -1,3 +1,4 @@
+import { ArticleListTitle } from "@/components/ui/article-list-title";
 import type { CurrentUserResponse, MyScrapItem } from "@soc/contracts";
 import { isoToMs, nowMs } from "@soc/shared";
 import { Clock3, User, type LucideIcon } from "lucide-react";
@@ -161,55 +162,43 @@ export function MyPageUnavailableState({ authenticated, lang }: UnavailableState
   );
 }
 
-function ActivityRows({ items, lang }: { items: ActivityItem[]; lang: string }) {
+function ActivityRows({
+  items,
+  lang,
+  showType = false,
+}: {
+  items: ActivityItem[];
+  lang: string;
+  showType?: boolean;
+}) {
   return (
     <div className="divide-y divide-slate-100">
-      {items.map((item, index) => {
-        const isSurvey = item.type === "survey";
-        const badgeBg = isSurvey
-          ? "bg-[#e6f4ea] text-[#137333] border-[#e6f4ea]/50"
-          : "bg-slate-50 text-slate-600 border-slate-200/50";
-
-        return (
-          <Link
-            key={`${item.type}-${item.href}-${index}`}
-            to={item.href}
-            className="group grid min-h-11 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 px-3 py-3.5 transition-colors hover:bg-slate-50/50 -mx-3 rounded-lg sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:items-center sm:gap-4"
-          >
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded text-[length:var(--ui-text-micro-size)] font-bold border shrink-0 select-none ${badgeBg}`}
-            >
+      {items.map((item) => (
+        <Link
+          key={`${item.type}-${item.href}`}
+          to={item.href}
+          className={`group grid min-h-16 items-center gap-x-4 gap-y-1 px-3 py-3 transition-colors hover:bg-slate-50 ${showType ? "grid-cols-[5rem_minmax(0,1fr)] sm:grid-cols-[5rem_minmax(0,1fr)_auto]" : "grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto]"}`}
+        >
+          {showType && (
+            <span className={`text-xs ${item.type === "survey" ? "text-kaist-darkgreen" : "text-slate-500"}`}>
               {item.label}
             </span>
-            <span className="min-w-0 pr-2">
-              <span className="block break-words text-[length:var(--ui-text-body-sm-size)] font-semibold text-slate-800 group-hover:text-kaist-darkgreen transition-colors">
-                {item.title}
-              </span>
-              {item.context && (
-                <span className="mt-0.5 block break-words text-[length:var(--ui-text-caption-size)] font-medium text-slate-400">
-                  {item.context}
-                </span>
+          )}
+          <span className="min-w-0">
+            {item.boardName && <span className="mb-1 block text-xs text-slate-500">{item.boardName}</span>}
+            <span className="flex min-w-0 items-center gap-2">
+              <ArticleListTitle>{item.title}</ArticleListTitle>
+              {!!item.commentCount && (
+                <span className="shrink-0 text-xs leading-5 text-[#1769AA]">[{item.commentCount}]</span>
               )}
             </span>
-            <span className="col-start-2 row-start-2 mr-0 whitespace-nowrap text-xs font-medium text-slate-400 sm:col-auto sm:row-auto sm:mr-1.5">
-              {formatRelative(item.date, lang)}
-            </span>
-            <svg
-              className="hidden w-3.5 h-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5 shrink-0 sm:block"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth="2.5"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
-          </Link>
-        );
-      })}
+            {item.context && <span className="mt-1 block truncate text-xs text-slate-500">{item.context}</span>}
+          </span>
+          <time dateTime={item.date} className={`whitespace-nowrap text-xs text-slate-400 ${showType ? "col-start-2" : ""} sm:col-auto`}>
+            {!showType && `${item.label} · `}{formatRelative(item.date, lang)}
+          </time>
+        </Link>
+      ))}
     </div>
   );
 }
@@ -339,17 +328,13 @@ export function MyPageActivityPanel({
   scraps,
   totalPages,
 }: ActivityPanelProps) {
-  const query = activityQuery.trim().toLocaleLowerCase();
-  const visibleScraps = scraps.filter((item) => {
-    if (!query) return true;
-    return `${item.titleKo} ${item.boardNameKo}`.toLocaleLowerCase().includes(query);
-  });
+  const visibleScraps = scraps;
 
   const tabs = [
     { id: "all", label: lang === "ko" ? "전체" : "All" },
-    { id: "survey", label: lang === "ko" ? "설문" : "Surveys" },
+    { id: "survey", label: lang === "ko" ? "내 응답" : "My responses" },
     { id: "post", label: lang === "ko" ? "작성한 글" : "Posts" },
-    { id: "comment", label: lang === "ko" ? "작성한 댓글" : "Comments" },
+    { id: "comment", label: lang === "ko" ? "댓글 단 글" : "Commented posts" },
     { id: "scraps", label: lang === "ko" ? "스크랩" : "Scraps" },
   ] as const satisfies ReadonlyArray<{ id: ActivityTab; label: string }>;
 
@@ -363,32 +348,12 @@ export function MyPageActivityPanel({
           />
         );
       }
-      return (
-        <div className="divide-y divide-slate-100">
-          {visibleScraps.map((item) => {
-            const isEvent = Boolean(item.eventStartDate || item.eventEndDate);
-            return (
-              <Link
-                key={item.articleId}
-                to={item.boardCode === "_EVENT" ? `/events/${item.articleId}` : `/board/${item.boardCode}/${item.articleId}`}
-                className="group flex min-h-0 items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-slate-50 sm:items-center"
-              >
-                <span className="inline-flex shrink-0 items-center rounded-md bg-slate-100 px-2.5 py-1 text-[length:var(--ui-text-caption-size)] font-semibold leading-4 tracking-tight text-slate-700">
-                  {isEvent ? (lang === "ko" ? "행사" : "Event") : item.boardNameKo}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block break-words text-sm font-normal leading-5 text-slate-800 group-hover:text-kaist-darkgreen">
-                    {item.titleKo}
-                  </span>
-                  <span className="mt-0.5 block break-words text-[length:var(--ui-text-caption-size)] font-normal leading-4 text-slate-400">
-                    {item.boardNameKo} · {formatRelative(item.scrapUpdatedAt, lang)}
-                  </span>
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      );
+      return <ActivityRows lang={lang} items={visibleScraps.map(item => ({
+        type: "scrap", label: lang === "ko" ? "저장" : "Saved", date: item.scrapUpdatedAt,
+        href: item.boardCode === "_EVENT" ? `/events/${item.articleId}` : `/board/${item.boardCode}/${item.articleId}`,
+        title: lang === "ko" ? item.titleKo : item.titleEn || item.titleKo,
+        boardName: lang === "ko" ? item.boardNameKo : item.boardNameEn || item.boardNameKo,
+      }))} />;
     }
 
     if (activities.length === 0) {
@@ -399,7 +364,7 @@ export function MyPageActivityPanel({
         />
       );
     }
-    return <ActivityRows items={activities} lang={lang} />;
+    return <ActivityRows items={activities} lang={lang} showType={contentTab === "all"} />;
   };
 
   return (
@@ -436,11 +401,11 @@ export function MyPageActivityPanel({
           })}
           </div>
           <PageSearchField
-            ariaLabel={lang === "ko" ? "활동 내역 검색" : "Search activity"}
+            ariaLabel={lang === "ko" ? "제목·내용 검색" : "Search titles and content"}
             className="w-full flex-none sm:w-64"
             onChange={onQueryChange}
             onClear={() => onQueryChange("")}
-            placeholder={lang === "ko" ? "활동 내역 검색" : "Search activity"}
+            placeholder={lang === "ko" ? "제목·내용 검색" : "Search titles and content"}
             value={activityQuery}
           />
         </div>

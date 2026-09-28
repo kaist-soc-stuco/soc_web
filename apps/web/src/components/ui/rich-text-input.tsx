@@ -222,7 +222,12 @@ export function RichTextInput({
           <RemoveFormatting aria-hidden="true" className="size-4" />
         </button>
       </div></div></div>
-      {linkDialog && <EditorLinkDialog anchor={linkButtonRef.current} initialText={linkDialog.text} initialUrl={linkDialog.url} onApply={applyLink} onClose={() => { flushSync(() => setLinkDialog(null)); restoreSelection(); }} />}
+      {linkDialog && <EditorLinkDialog anchor={linkButtonRef.current} getAnchorRect={() => {
+        const range = selectedRange.current?.cloneRange();
+        range?.collapse(false);
+        const rect = range?.getBoundingClientRect();
+        return rect && rect.height ? rect : editorRef.current!.getBoundingClientRect();
+      }} initialText={linkDialog.text} initialUrl={linkDialog.url} onApply={applyLink} onClose={() => { flushSync(() => setLinkDialog(null)); restoreSelection(); }} />}
       {linkPreview && <EditorLinkPopover link={linkPreview} onClose={() => setLinkPreview(null)} onEdit={() => { setLinkDialog({text:linkPreview.text,url:linkPreview.url});setLinkPreview(null); }} onUnlink={() => { restoreSelection(); document.execCommand("unlink"); emitChange(); setLinkPreview(null); }} />}
     </div>
   );

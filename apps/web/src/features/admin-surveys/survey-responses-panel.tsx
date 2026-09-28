@@ -8,7 +8,7 @@ import { answerContentToValue } from "@/features/survey/survey-answer-utils";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
-import { formatKoreanDateTime } from "@soc/shared";
+import { formatKoreanDateTime, isoToMs, nowMs } from "@soc/shared";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
 import { UiInput } from "@/components/ui/form-control";
@@ -24,14 +24,15 @@ import { SurveyQuestionSummary } from "./survey-analytics-dashboard";
 const positiveInteger = (value: string | null) => Math.max(1, Math.min(1_000_000, Number.parseInt(value ?? "1", 10) || 1));
 
 /** Shares the editor's URL and leaves its draft state mounted while reading responses. */
-export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sheetBusy = false }: { onResponsesDeleted?: () => void; surveyId: string; onSheet?: () => Promise<void>; sheetBusy?: boolean }) {
+export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle, onSheet, onResponsesDeleted, sheetBusy = false }: { beforeToggle?: () => Promise<void>; onResponsesDeleted?: () => void; surveyId: string | null; onSheet?: () => Promise<void>; sheetBusy?: boolean }) {
+  const surveyId = requestedSurveyId ?? "";
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [mutating, setMutating] = useState(false);
   const [exporting, setExporting] = useState(false);
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
-  const subscription = useQuery({ queryKey: ["survey-email-notifications", surveyId], queryFn: () => client.getSurveyEmailNotifications(surveyId) });
+  const subscription = useQuery({ queryKey: ["survey-email-notifications", surveyId], queryFn: () => client.getSurveyEmailNotifications(surveyId), enabled: Boolean(surveyId) });
   const toggleNotifications = async () => {
     setMutating(true);
     try {
@@ -63,14 +64,30 @@ export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sh
     Object.entries(values).forEach(([key, value]) => value === null ? next.delete(key) : next.set(key, value));
     return next;
   });
-  const definition = useQuery({ queryKey: ["survey-response-definition", surveyId], queryFn: () => client.getSurveyDetail(surveyId) });
-  const statistics = useQuery({ queryKey: ["survey-response-analytics", surveyId], queryFn: () => client.getSurveyAnalytics(surveyId) });
+  const definition = useQuery({ queryKey: ["survey-response-definition", surveyId], queryFn: () => client.getSurveyDetail(surveyId), enabled: Boolean(surveyId) });
+  const statistics = useQuery({ queryKey: ["survey-response-analytics", surveyId], queryFn: () => client.getSurveyAnalytics(surveyId), enabled: Boolean(surveyId) });
   const records = useQuery({
     queryKey: ["survey-response-records", surveyId, page, pageSize],
     queryFn: () => client.listResponsesWithAnswers(surveyId, { page, pageSize, sortOrder: "asc" }),
+    enabled: Boolean(surveyId),
     placeholderData: (previousData) => previousData,
   });
   const selected = useQuery({ queryKey: ["survey-response", surveyId, responseId], queryFn: () => client.getResponseDetail(surveyId, responseId!), enabled: view === "individual" && Boolean(responseId) });
+  const scheduleEnded = Boolean(definition.data?.closesAt && isoToMs(definition.data.closesAt) <= nowMs());
+  const canToggleReception = Boolean(surveyId && definition.data?.isPublished && !scheduleEnded && !mutating);
+  const acceptingResponses = Boolean(definition.data?.isPublished && definition.data.acceptingResponses !== false && !scheduleEnded);
+  const toggleReception = async (enabled: boolean) => {
+    if (!canToggleReception) return;
+    setMutating(true);
+    try {
+      await beforeToggle?.();
+      const updated = await client.updateSurvey(surveyId, { acceptingResponses: enabled });
+      queryClient.setQueryData(["survey-response-definition", surveyId], (current: typeof definition.data) => current ? {...current, ...updated} : current);
+      await queryClient.invalidateQueries({queryKey:["survey-response-definition", surveyId]});
+      toast({type:"success",message:enabled ? "응답 접수를 재개했습니다." : "응답 접수를 마감했습니다. 기존 응답은 유지됩니다."});
+    } catch { toast({type:"error",message:"응답 접수 상태를 변경하지 못했습니다. 다시 시도해 주세요."}); }
+    finally { setMutating(false); }
+  };
   const questions = definition.data?.sections.flatMap((section) => section.questions) ?? [];
   const questionIndex = Math.max(0, questions.findIndex((question) => question.id === params.get("question")));
   const question = questions[questionIndex];
@@ -128,18 +145,26 @@ export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sh
   };
   return <section aria-label="설문 응답" className="survey-responses-panel min-w-0 space-y-5">
     <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-      <div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-3xl font-normal tracking-tight sm:text-4xl">응답 {statistics.data?.totalResponses ?? "…"}개</h2>
+      <div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-3xl font-normal tracking-tight sm:text-4xl">응답 {statistics.data?.totalResponses ?? 0}개</h2>
 <div className="flex items-center gap-2">
- {onSheet ? <Button variant="ghost" className="!font-medium text-brand-primary" onClick={()=>void onSheet()} disabled={sheetBusy}><FileSpreadsheet className="size-6 text-emerald-600" />Sheets에 연결</Button> : null}
+ {onSheet && surveyId ? <Button variant="ghost" className="!font-medium text-brand-primary" onClick={()=>void onSheet()} disabled={sheetBusy}><FileSpreadsheet className="size-6 text-emerald-600" />Sheets에 연결</Button> : null}
  <DropdownMenu.Root modal={false}><DropdownMenu.Trigger asChild><Button variant="ghost" size="icon" aria-label="응답 더보기"><MoreVertical className="size-4" /></Button></DropdownMenu.Trigger>
  <DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[100] w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
- <DropdownMenu.Item disabled={exporting} onSelect={()=>void exportCsv()} className="flex cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm outline-none focus:bg-slate-100"><Download className="size-4" />응답 다운로드(.csv)</DropdownMenu.Item>
- <DropdownMenu.CheckboxItem checked={subscription.data?.enabled ?? false} disabled={mutating || subscription.isPending || subscription.isError} onCheckedChange={()=>void toggleNotifications()} className="flex cursor-pointer items-center gap-3 rounded px-3 py-3 text-sm outline-none focus:bg-slate-100"><span className="size-4 shrink-0"><DropdownMenu.ItemIndicator><SquareCheck className="size-4" /></DropdownMenu.ItemIndicator></span>새로운 응답에 대한 이메일 알림 받기</DropdownMenu.CheckboxItem>
+ <DropdownMenu.Item disabled={!surveyId || exporting} onSelect={()=>void exportCsv()} className="flex cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm outline-none focus:bg-slate-100"><Download className="size-4" />응답 다운로드(.csv)</DropdownMenu.Item>
+ <DropdownMenu.CheckboxItem checked={subscription.data?.enabled ?? false} disabled={!surveyId || mutating || subscription.isPending || subscription.isError} onCheckedChange={()=>void toggleNotifications()} className="flex cursor-pointer items-center gap-3 rounded px-3 py-3 text-sm outline-none focus:bg-slate-100"><span className="size-4 shrink-0"><DropdownMenu.ItemIndicator><SquareCheck className="size-4" /></DropdownMenu.ItemIndicator></span>새로운 응답에 대한 이메일 알림 받기</DropdownMenu.CheckboxItem>
  <DropdownMenu.Separator className="my-1 border-t border-slate-200" />
  <DropdownMenu.Item disabled={!total || mutating} onSelect={()=>setDeleteOpen(true)} className="flex cursor-pointer items-center gap-3 rounded px-3 py-3 text-sm text-rose-600 outline-none focus:bg-rose-50"><Trash2 className="size-4" />모든 응답 삭제</DropdownMenu.Item>
  </DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
 </div>
 </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+        <p className="text-sm text-slate-500">{!definition.data?.isPublished ? "게시 후 응답을 받을 수 있습니다." : scheduleEnded ? "종료일이 지났습니다. 설정에서 기간을 연장해 주세요." : acceptingResponses ? "응답을 받고 있습니다." : "응답 접수가 마감되었습니다. 기존 응답은 유지됩니다."}</p>
+        <label className={`inline-flex items-center gap-3 text-sm font-medium ${canToggleReception ? "cursor-pointer" : "opacity-60"}`}>
+          <UiInput type="checkbox" role="switch" aria-label="응답 받기" className="peer sr-only" checked={acceptingResponses} disabled={!canToggleReception} onChange={event => void toggleReception(event.target.checked)} />
+          응답 받기
+          <span aria-hidden="true" className="relative h-5 w-9 rounded-full bg-slate-200 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-brand-primary/25 after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-brand-primary peer-checked:after:translate-x-4" />
+        </label>
+      </div>
       <SegmentedControl
         ariaLabel="응답 보기 방식"
         role="tablist"

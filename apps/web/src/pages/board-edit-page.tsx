@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -5,6 +6,7 @@ import { Header } from "@/components/organisms/header";
 import { DataViewCard, PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import {
   BoardEditHeaderControls,
+  BoardPostToolbarOptions,
   BoardWriteAttachmentList,
   BoardWriteEditorFields,
   BoardWriteEventFields,
@@ -25,6 +27,7 @@ import {
 } from "@/features/board-write/event-date-utils";
 
 export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = {}) {
+  const [editorView, setEditorView] = useState<"ko" | "en" | "split">("ko");
   const {
     ConfirmDialog,
     assets,
@@ -73,7 +76,6 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     setIsAnonymous,
     setIsAllDay,
     setIsEventAlwaysOpen,
-    setIsKoreanOnly,
     setIsPinned,
     setHomeVisible,
     setHomeOrder,
@@ -126,7 +128,6 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     if (template.homeOrder !== undefined) setHomeOrder(template.homeOrder);
     setIsSecret(template.isSecret);
     setAllowComment(template.allowComment);
-    setIsKoreanOnly(template.isKoreanOnly);
     setIsAllDay(Boolean(template.isAllDay));
     setIsEventAlwaysOpen(template.isEventAlwaysOpen);
     setEventStartDate(
@@ -144,7 +145,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
 
   const isEvent = category === "_EVENT";
   const isEventLike = isEvent || category === "promotions";
-  const eventFields = isEventLike ? (
+  const eventFields = isEvent ? (
     <BoardWriteEventFields
       eventDescriptionKo={eventDescriptionKo}
       eventDescriptionEn={eventDescriptionEn}
@@ -195,32 +196,24 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
       isAnonymous={isAnonymous}
       boardCode={category}
       isEvent={isEventLike}
-      isPinned={isPinned}
       homeVisible={homeVisible}
       isSecret={isSecret}
       allowSecret={allowSecret}
       onAnonymousChange={setIsAnonymous}
-      onPinnedChange={setIsPinned}
       onHomeVisibleChange={isEvent ? setHomeVisible : undefined}
       onSecretChange={setIsSecret}
       anonymousLabel={lang === "ko" ? "익명으로 작성" : "Write Anonymously"}
-      pinnedLabel={
-        isEvent
-          ? lang === "ko"
-            ? "홈 행사 우선 노출"
-            : "Prioritize on home"
-          : lang === "ko"
-            ? "게시글 상단 고정"
-            : "Pin to Top"
-      }
-      stacked={isEventLike}
+      stacked={isEvent}
     />
   );
   const editorCard = (includeSettings: boolean) => (
     <DataViewCard>
       <BoardEditHeaderControls
+        editorView={editorView}
+        onEditorViewChange={setEditorView}
+        trailingActions={<BoardPostToolbarOptions lang={lang} canPin={canConfigurePostSettings} pinned={isPinned} onPinnedChange={setIsPinned}
+          promotion={category === "promotions"} endDate={eventEndDate} onEndDateChange={(value) => { setEventEndDate(value); setIsEventAlwaysOpen(!value); }} />}
         category={category}
-        isKoreanOnly={isKoreanOnly}
         lang={lang}
         leadingActions={canManageTemplates ? (
           <ArticleTemplateControl
@@ -230,13 +223,11 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
             snapshot={templateSnapshot}
           />
         ) : null}
-        onKoreanOnlyChange={(checked) => {
-          setIsKoreanOnly(checked);
-        }}
       />
 
       <div className="min-h-[450px]">
         <BoardWriteEditorFields
+          editorView={editorView}
           contentEn={contentEn}
           contentKo={contentKo}
           isKoreanOnly={isKoreanOnly}
@@ -335,7 +326,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
                 onChange={(event) => void handleUploadFiles(event.target.files)}
               />
 
-              {isEventLike ? (
+              {isEvent ? (
                 <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
                   {editorCard(false)}
                   <DataViewCard className="min-w-0">

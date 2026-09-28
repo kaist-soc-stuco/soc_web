@@ -55,22 +55,24 @@ function getAttachmentIcon(mimeType: string) {
 
 interface HeaderControlsProps {
   boardByCode: Map<string, BoardMetadata>;
-  isKoreanOnly: boolean;
+  editorView: "ko" | "en" | "split";
+  onEditorViewChange: (view: "ko" | "en" | "split") => void;
   lang: string;
   leadingActions?: ReactNode;
+  trailingActions?: ReactNode;
   onCategoryChange: (category: string) => void;
-  onKoreanOnlyChange: (checked: boolean) => void;
   selectedCategory: string;
   writableBoardCodes: string[];
 }
 
 export function BoardWriteHeaderControls({
   boardByCode,
-  isKoreanOnly,
+  editorView,
+  onEditorViewChange,
   lang,
   leadingActions,
+  trailingActions,
   onCategoryChange,
-  onKoreanOnlyChange,
   selectedCategory,
   writableBoardCodes,
 }: HeaderControlsProps) {
@@ -114,29 +116,9 @@ export function BoardWriteHeaderControls({
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <label className="flex min-h-[var(--ui-control-height-mobile)] items-center gap-2.5 cursor-pointer group py-1.5">
-          <div
-            className={`flex h-4 w-4 items-center justify-center rounded border ${
-              isKoreanOnly
-                ? "border-kaist-darkgreen bg-kaist-darkgreen text-white"
-                : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
-            }`}
-          >
-            {isKoreanOnly && <Check className="w-2.5 h-2.5" strokeWidth={4} />}
-          </div>
-          <UiInput
-            type="checkbox"
-            className="hidden"
-            checked={isKoreanOnly}
-            onChange={(event) => onKoreanOnlyChange(event.target.checked)}
-          />
-          <span
-            className="text-xs font-medium text-slate-600"
-          >
-            {lang === "ko" ? "한국어 전용" : "Korean only"}
-          </span>
-        </label>
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
+        {trailingActions}
+        <BoardEditorViewControl view={editorView} onChange={onEditorViewChange} lang={lang} />
       </div>
     </div>
   );
@@ -144,18 +126,20 @@ export function BoardWriteHeaderControls({
 
 interface EditHeaderControlsProps {
   category: string;
-  isKoreanOnly: boolean;
+  editorView: "ko" | "en" | "split";
+  onEditorViewChange: (view: "ko" | "en" | "split") => void;
   lang: string;
   leadingActions?: ReactNode;
-  onKoreanOnlyChange: (checked: boolean) => void;
+  trailingActions?: ReactNode;
 }
 
 export function BoardEditHeaderControls({
   category,
-  isKoreanOnly,
+  editorView,
+  onEditorViewChange,
   lang,
   leadingActions,
-  onKoreanOnlyChange,
+  trailingActions,
 }: EditHeaderControlsProps) {
   return (
     <div className="flex flex-col gap-3 bg-slate-50/40 px-4 py-3 border-b border-slate-200 rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
@@ -179,35 +163,16 @@ export function BoardEditHeaderControls({
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <label className="flex min-h-[var(--ui-control-height-mobile)] items-center gap-2.5 cursor-pointer group py-1.5">
-          <div
-            className={`flex h-4 w-4 items-center justify-center rounded border ${
-              isKoreanOnly
-                ? "border-kaist-darkgreen bg-kaist-darkgreen text-white"
-                : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
-            }`}
-          >
-            {isKoreanOnly && <Check className="w-2.5 h-2.5" strokeWidth={4} />}
-          </div>
-          <UiInput
-            type="checkbox"
-            className="hidden"
-            checked={isKoreanOnly}
-            onChange={(event) => onKoreanOnlyChange(event.target.checked)}
-          />
-          <span
-            className="text-xs font-medium text-slate-600"
-          >
-            {lang === "ko" ? "한국어 전용" : "Korean only"}
-          </span>
-        </label>
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
+        {trailingActions}
+        <BoardEditorViewControl view={editorView} onChange={onEditorViewChange} lang={lang} />
       </div>
     </div>
   );
 }
 
 interface EditorFieldsProps {
+  editorView?: "ko" | "en" | "split";
   contentEn: string;
   contentKo: string;
   isKoreanOnly: boolean;
@@ -226,6 +191,7 @@ interface EditorFieldsProps {
 }
 
 export function BoardWriteEditorFields({
+  editorView,
   contentEn,
   contentKo,
   isKoreanOnly,
@@ -244,6 +210,7 @@ export function BoardWriteEditorFields({
 }: EditorFieldsProps) {
   return (
     <BilingualRichTextEditor
+      viewMode={editorView}
       contentEn={contentEn}
       contentKo={contentKo}
       fileInputRef={fileInputRef}
@@ -582,15 +549,12 @@ interface BoardWriteSettingsProps {
   selectedSurveyId: string;
   surveys: SurveyRecord[];
   isAnonymous: boolean;
-  isPinned: boolean;
   isSecret: boolean;
   allowSecret: boolean;
   onAnonymousChange: (checked: boolean) => void;
-  onPinnedChange: (checked: boolean) => void;
   onSecretChange: (checked: boolean) => void;
   anonymousLabel?: string;
   boardCode?: string;
-  pinnedLabel?: string;
   isEvent?: boolean;
   homeVisible?: boolean;
   onHomeVisibleChange?: (checked: boolean) => void;
@@ -606,15 +570,12 @@ export function BoardWriteSettings({
   selectedSurveyId,
   surveys,
   isAnonymous,
-  isPinned,
   isSecret,
   allowSecret,
   onAnonymousChange,
-  onPinnedChange,
   onSecretChange,
   anonymousLabel,
   boardCode,
-  pinnedLabel,
   isEvent = false,
   homeVisible = true,
   onHomeVisibleChange,
@@ -674,58 +635,6 @@ export function BoardWriteSettings({
             </p>
           ) : null}
             <div className={isEvent ? "grid grid-cols-2 gap-x-4 gap-y-3" : stacked ? "grid grid-cols-1 gap-y-3" : "flex flex-wrap gap-x-10 gap-y-4"}>
-            {canConfigurePostSettings && (
-              <label className="flex min-h-11 items-center gap-2.5 cursor-pointer group">
-                <div
-                  className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
-                    isAnonymous
-                      ? "bg-kaist-darkgreen border-kaist-darkgreen text-white"
-                      : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
-                  }`}
-                >
-                  {isAnonymous && (
-                    <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                  )}
-                </div>
-                <UiInput
-                  type="checkbox"
-                  className="hidden"
-                  checked={isAnonymous}
-                  onChange={(event) => onAnonymousChange(event.target.checked)}
-                />
-                <span className="text-xs font-bold text-slate-700">
-                  {anonymousLabel ??
-                    (lang === "ko" ? "익명으로 작성" : "Write Anonymously")}
-                </span>
-              </label>
-            )}
-
-            {canConfigurePostSettings && (
-              <label className="flex min-h-11 items-center gap-2.5 cursor-pointer group">
-                <div
-                  className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
-                    isPinned
-                      ? "bg-kaist-darkgreen border-kaist-darkgreen text-white"
-                      : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
-                  }`}
-                >
-                  {isPinned && (
-                    <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                  )}
-                </div>
-                <UiInput
-                  type="checkbox"
-                  className="hidden"
-                  checked={isPinned}
-                  onChange={(event) => onPinnedChange(event.target.checked)}
-                />
-                <span className="text-xs font-bold text-slate-700">
-                  {pinnedLabel ??
-                    (lang === "ko" ? "게시글 상단 고정" : "Pin to Top")}
-                </span>
-              </label>
-            )}
-
             {allowSecret && (
               <label className="flex min-h-11 items-center gap-2.5 cursor-pointer group">
                 <div
@@ -813,6 +722,7 @@ interface BoardWriteFooterProps {
   canWriteSelected?: boolean;
   compact?: boolean;
   leadingActions?: ReactNode;
+  trailingActions?: ReactNode;
   onCancel?: () => void;
   onSaveDraft?: () => void | Promise<void>;
   onSubmit: () => void;
@@ -826,6 +736,7 @@ export function BoardWriteFooter({
   canWriteSelected = true,
   compact = false,
   leadingActions,
+  trailingActions,
   onCancel,
   onSaveDraft,
   onSubmit,
@@ -849,6 +760,7 @@ export function BoardWriteFooter({
       ) : null}
       <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
         {leadingActions}
+        {onSaveDraft ? <Button type="button" variant="ghost" disabled={isSubmitting || isSavingDraft || !canWriteSelected} onClick={() => void onSaveDraft()}>{lang === "ko" ? "임시저장" : "Save draft"}</Button> : null}
         <Button loading={isSubmitting}
           type="button"
           onClick={onSubmit}
@@ -860,4 +772,27 @@ export function BoardWriteFooter({
       </div>
     </div>
   );
+}
+
+export function BoardPostToolbarOptions({ lang, canPin, pinned, onPinnedChange, promotion, endDate, onEndDateChange }: {
+  lang: string; canPin: boolean; pinned: boolean; onPinnedChange: (value: boolean) => void;
+  promotion: boolean; endDate: string; onEndDateChange: (value: string) => void;
+}) {
+  return <>
+    {promotion && <label className="flex items-center gap-2 text-xs text-slate-600">
+      {lang === "ko" ? "게시 종료일" : "End date"}
+      <UiInput type="date" aria-label={lang === "ko" ? "게시 종료일" : "End date"} value={endDate.slice(0, 10)} onChange={(event) => onEndDateChange(event.target.value)} className="w-36" />
+    </label>}
+    {canPin && <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-medium text-slate-600">
+      <UiInput type="checkbox" checked={pinned} onChange={(event) => onPinnedChange(event.target.checked)} />
+      {lang === "ko" ? "상단 고정" : "Pin to top"}
+    </label>}
+  </>;
+}
+
+export function BoardEditorViewControl({ view, onChange, lang }: { view: "ko" | "en" | "split"; onChange: (value: "ko" | "en" | "split") => void; lang: string }) {
+  return <div role="group" aria-label={lang === "ko" ? "편집 언어 보기" : "Editor language view"} className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+    {([['ko', '한국어'], ['en', 'English'], ['split', lang === 'ko' ? '◫ 나란히 보기' : '◫ Side by side']] as const).map(([value, label]) =>
+      <Button key={value} type="button" variant="ghost" size="sm" aria-pressed={view === value} className={view === value ? "bg-white text-kaist-darkgreen shadow-sm" : "text-slate-500"} onClick={() => onChange(value)}>{label}</Button>)}
+  </div>;
 }

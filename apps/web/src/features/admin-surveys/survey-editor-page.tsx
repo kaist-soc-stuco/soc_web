@@ -1,6 +1,5 @@
 import { useDebouncedEditorSave } from "@/hooks/use-debounced-editor-save";
 import { SurveyBuilderToolbar } from "./survey-builder-toolbar";
-import { EditorBackButton } from "@/components/ui/editor-back-button";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { restrictListDrag } from "@/lib/drag-bounds";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -72,7 +71,6 @@ import {
   Eye,
   Link2,
   FileSpreadsheet,
-  Archive,
   Heart,
   GripVertical,
   MoreVertical,
@@ -1432,13 +1430,16 @@ export function SurveyEditorPage() {
 
   const [responseCount, setResponseCount] = useState(0);
   useEffect(() => { if (loadedSurveyId) void client.getSurveyDetail(loadedSurveyId).then(detail => setResponseCount(detail.responseCount ?? 0)); }, [loadedSurveyId, tab]);
-  const surveyAction = async (action: "duplicate" | "close" | "delete") => {
-    if (!loadedSurveyId) return;
-    if (action !== "duplicate" && !await requestConfirm({ title: action === "delete" ? "설문 삭제" : "설문 게시 취소", description: action === "delete" ? "설문과 응답을 삭제합니다. 이 작업은 되돌릴 수 없습니다." : "새로운 응답 접수를 중단합니다. 기존 응답은 유지됩니다.", confirmLabel: action === "delete" ? "삭제" : "마감" })) return;
+  const surveyAction = async (action: "duplicate" | "delete") => {
+    if (!loadedSurveyId) {
+      if (action === "duplicate") { try { const id = await ensureDraft(); const created = await client.duplicateSurvey(id); navigate(`/admin/surveys/${created.id}/edit`); } catch { toast({type:"error",message:"사본을 만들지 못했습니다."}); } }
+      else if (action === "delete") navigate("/admin/surveys");
+      return;
+    }
+    if (action === "delete" && !await requestConfirm({ title: "설문 삭제", description: "설문과 응답을 삭제합니다. 이 작업은 되돌릴 수 없습니다.", confirmLabel: "삭제" })) return;
     try {
       await flushAutoSave.current();
       if (action === "duplicate") { const created = await client.duplicateSurvey(loadedSurveyId); navigate(`/admin/surveys/${created.id}/edit`); }
-      if (action === "close") { await client.updateSurvey(loadedSurveyId, { isPublished: false }); form.setValue("isPublished", false); setLoadedLifecycleStatus("DRAFT"); }
       if (action === "delete") { await client.deleteSurvey(loadedSurveyId); navigate("/admin/surveys"); }
       toast({ type: "success", message: "처리했습니다." });
     } catch { toast({ type: "error", message: "처리하지 못했습니다. 다시 시도해 주세요." }); }
@@ -1471,6 +1472,24 @@ export function SurveyEditorPage() {
     } finally {
       setSheetBusy(false);
     }
+  };
+
+  const copyRespondentLink = async () => {
+    try {
+      const id = loadedSurveyId ?? await ensureDraft();
+      await navigator.clipboard.writeText(`${window.location.origin}/survey/${id}`);
+      toast({ type: "success", message: "설문 링크를 복사했습니다." });
+    } catch { toast({ type: "error", message: "링크를 복사하지 못했습니다." }); }
+  };
+  const previewSurvey = async () => {
+    const preview = window.open("about:blank", "_blank");
+    if (preview) preview.opener = null;
+    try {
+      await flushAutoSave.current();
+      const id = loadedSurveyId ?? await ensureDraft();
+      if (preview) preview.location.replace(`/survey/${id}?preview=1`);
+      else toast({ type: "error", message: "팝업 차단을 해제한 뒤 다시 시도해 주세요." });
+    } catch { preview?.close(); toast({type:"error",message:"미리보기를 열지 못했습니다."}); }
   };
 
   const handleTabChange = async (nextTab: "content" | "delivery" | "responses") => {
@@ -2343,20 +2362,29 @@ export function SurveyEditorPage() {
 
           <div data-survey-editor-header className="sticky top-0 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-1 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
           <AdminPageHeader
-            eyebrow={
-              <EditorBackButton to="/admin/surveys" />
-            }
-            title={plainText(form.watch("titleKo")) || (isEdit ? "설문조사 편집" : "새 설문조사")}
+            center={<SegmentedControl
+            ariaLabel="설문 편집 단계"
+            role="tablist"
+            className="w-fit"
+            value={tab}
+            onChange={(value) => void handleTabChange(value)}
+            options={[
+              { value: "content", label: "질문" },
+              { value: "responses", label: <span>응답 <span className="ml-1 rounded-full bg-slate-200 px-2 py-0.5 text-xs">{responseCount}</span></span> },
+              { value: "delivery", label: "설정" },
+            ]}
+          />}
+            title={<span className="flex min-w-0 items-center gap-2"><IconButton aria-label="설문 목록으로" className="shrink-0" onClick={() => { void flushAutoSave.current().then(() => navigate("/admin/surveys")); }}><ArrowLeft className="size-5" /></IconButton><span className="truncate">{plainText(form.watch("titleKo")) || (isEdit ? "설문조사 편집" : "새 설문조사")}</span></span>}
             actions={
               <div className="survey-editor-header-actions flex items-center gap-1">
                 <IconButton data-tooltip="실행 취소" aria-label="실행 취소" disabled={saving || historyBusy || (!history.current.past.length && !editingQuestion && !editingSection)} onMouseDown={event => event.preventDefault()} onClick={() => void restoreHistory("undo")}><Undo2 className="size-4" /></IconButton>
                 <IconButton data-tooltip="다시 실행" aria-label="다시 실행" disabled={saving || historyBusy || !history.current.future.length} onMouseDown={event => event.preventDefault()} onClick={() => void restoreHistory("redo")}><Redo2 className="size-4" /></IconButton>
-                {loadedSurveyId ? <>
-                  <IconButton data-tooltip="응답자 링크 복사" aria-label="응답자 링크 복사" className="border-0 text-slate-600" onClick={() => void navigator.clipboard.writeText(`${window.location.origin}/survey/${loadedSurveyId}`).then(() => toast({ type: "success", message: "설문 링크를 복사했습니다." })).catch(() => toast({ type: "error", message: "링크를 복사하지 못했습니다." }))}><Link2 className="size-5" /></IconButton>
-                  <IconButton data-tooltip="미리보기" aria-label="미리보기" className="border-0 text-slate-600" onClick={() => window.open(`/survey/${loadedSurveyId}?preview=1`, "_blank", "noopener,noreferrer")}><Eye className="size-5" /></IconButton>
+                <>
+                  <IconButton data-tooltip="응답자 링크 복사" aria-label="응답자 링크 복사" className="border-0 text-slate-600" onClick={() => void copyRespondentLink()}><Link2 className="size-5" /></IconButton>
+                  <IconButton data-tooltip="미리보기" aria-label="미리보기" className="border-0 text-slate-600" onClick={() => void previewSurvey()}><Eye className="size-5" /></IconButton>
 
-                  <DropdownMenu.Root modal={false}><DropdownMenu.Trigger asChild><IconButton aria-label="설문 더보기" className="text-slate-600"><MoreVertical className="size-5" /></IconButton></DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[100] min-w-52 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{(["duplicate", "close", "delete"] as const).map(action => <DropdownMenu.Item key={action} className={`flex cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm outline-none ${action === "delete" ? "text-rose-600 focus:bg-rose-50" : "text-slate-800 focus:bg-slate-100"}`} onSelect={() => void surveyAction(action)}>{action === "duplicate" ? <Copy className="size-4" /> : action === "close" ? <Archive className="size-4" /> : <Trash2 className="size-4" />}{action === "duplicate" ? "사본 만들기(복제)" : action === "close" ? "설문 게시 취소(마감)" : "삭제"}</DropdownMenu.Item>)}</DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
-                </> : null}
+                  <DropdownMenu.Root modal={false}><DropdownMenu.Trigger asChild><IconButton aria-label="설문 더보기" className="text-slate-600"><MoreVertical className="size-5" /></IconButton></DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[100] min-w-52 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{(["duplicate", "delete"] as const).map(action => <DropdownMenu.Item key={action} className={`flex cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm outline-none ${action === "delete" ? "text-rose-600 focus:bg-rose-50" : "text-slate-800 focus:bg-slate-100"}`} onSelect={() => void surveyAction(action)}>{action === "duplicate" ? <Copy className="size-4" /> : <Trash2 className="size-4" />}{action === "duplicate" ? "사본 만들기(복제)" : "삭제"}</DropdownMenu.Item>)}</DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
+                </>
                 <Button loading={publishing}
                   type="button"
                   disabled={saving || isPublished || Boolean(loadError)}
@@ -2386,18 +2414,7 @@ export function SurveyEditorPage() {
             />
           ) : null}
 
-          <SegmentedControl
-            ariaLabel="설문 편집 단계"
-            role="tablist"
-            className="w-fit"
-            value={tab}
-            onChange={(value) => void handleTabChange(value)}
-            options={[
-              { value: "content", label: "질문" },
-              { value: "responses", label: <span>응답 <span className="ml-1 rounded-full bg-slate-200 px-2 py-0.5 text-xs">{responseCount}</span></span> },
-              { value: "delivery", label: "설정" },
-            ]}
-          />
+
 
           {loadError ? (
             <ErrorState
@@ -2410,7 +2427,7 @@ export function SurveyEditorPage() {
           ) : null}
           {!loadError && saveState === "error" ? <div role="status" className="flex items-center gap-2 text-sm text-slate-600">저장되지 않은 변경 사항이 있습니다.<Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => void handleSaveSettings(form.getValues())}>다시 시도</Button></div> : null}
 
-          {!loadError && !surveyLoading && tab === "responses" && (loadedSurveyId ? <SurveyResponsesPanel surveyId={loadedSurveyId} onSheet={handleSheet} sheetBusy={sheetBusy} onResponsesDeleted={() => setResponseCount(0)} /> : <AdminEmptyState message="설문을 저장하면 응답을 확인할 수 있습니다." />)}
+          {!loadError && !surveyLoading && tab === "responses" && (<SurveyResponsesPanel beforeToggle={async () => { await flushAutoSave.current(); }} surveyId={loadedSurveyId} onSheet={handleSheet} sheetBusy={sheetBusy} onResponsesDeleted={() => setResponseCount(0)} />)}
 
           {!loadError && !surveyLoading && tab === "delivery" && (
             <FormProvider {...form}>

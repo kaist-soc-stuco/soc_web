@@ -35,7 +35,7 @@ export function getMyActivityDisplay(
     return { context: null, title: localizedTitle };
   }
 
-  return { context: localizedTitle, title: commentContent };
+  return { context: commentContent, title: localizedTitle };
 }
 
 export function getMyArticleTitle(
@@ -66,7 +66,7 @@ export function getMyCommentDisplay(
     return { context: null, title: articleTitle };
   }
 
-  return { context: articleTitle, title: commentContent };
+  return { context: commentContent, title: articleTitle };
 }
 
 export function getMySurveyTitle(

@@ -1,3 +1,4 @@
+import { ArticleListTitle } from "@/components/ui/article-list-title";
 import { PromotionStatus } from "@/components/ui/promotion-period";
 import type { ReactNode } from "react";
 import type { ArticleListItem } from "@soc/contracts";
@@ -212,7 +213,7 @@ export function BoardArticleTable({
         : "Anonymous"
       : (lang === "en" ? post.author.nameEn || post.author.name : post.author.name);
   const tableGridClass = `board-table-grid ${category ? "" : "board-table-grid--all"}`;
-  const renderArticleRow = (post: ArticleListItem, pinned = false) => {
+  const renderArticleRow = (post: ArticleListItem, pinned = false, boundary = false) => {
     const isNew =
       isoToMs(post.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
     const postCategory = post.boardCode || category || "notice";
@@ -222,7 +223,7 @@ export function BoardArticleTable({
       <div
         key={post.articleId}
         className={`interaction-row group flex min-h-12 border-b border-slate-100 px-4 py-1.5 md:px-6 ${
-          pinned ? "bg-emerald-100/35 hover:bg-emerald-100/50" : ""
+          boundary ? "border-t-2 border-t-slate-300" : ""
         }`}
       >
         <Link
@@ -231,16 +232,14 @@ export function BoardArticleTable({
         >
           {!category ? (
             <div className="flex shrink-0 justify-start text-left md:justify-center md:text-center">
-              <span className="inline-flex items-center rounded-md border-0 bg-slate-100 px-2 py-0.5 text-[length:var(--ui-text-caption-size)] font-semibold tracking-tight text-slate-700 select-none">
+              <span className={`text-[length:var(--ui-text-caption-size)] font-medium select-none ${pinned ? "text-kaist-darkgreen" : "text-slate-500"}`}>
                 {getBoardLabelFromMetadata(postBoard, postCategory, lang)}
               </span>
             </div>
           ) : null}
           <div className={`flex min-w-0 items-center gap-2 text-left text-[length:var(--ui-text-section-size)] leading-5 tracking-tight text-app-text-strong md:pl-1 ${pinned ? "font-semibold" : "font-medium"}`}>
-            <span className="line-clamp-2 min-w-0 md:truncate">
-              {lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}
-            </span>
             {postCategory === "promotions" && <PromotionStatus start={post.eventStartDate} end={post.eventEndDate} lang={lang} />}
+            <ArticleListTitle>{lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}</ArticleListTitle>
             {post.commentCount > 0 ? (
               <span
                 aria-label={
@@ -248,7 +247,7 @@ export function BoardArticleTable({
                     ? `댓글 ${post.commentCount}개`
                     : `${post.commentCount} comments`
                 }
-                className="shrink-0 self-end text-xs font-normal leading-4 text-[#1769AA]"
+                className="shrink-0 self-center text-xs font-normal leading-4 text-[#1769AA]"
               >
                 [{post.commentCount}]
               </span>
@@ -334,7 +333,7 @@ export function BoardArticleTable({
                 }
               />
             ) : articles.length > 0
-              ? articles.map((post) => renderArticleRow(post, post.isPinned))
+              ? articles.map((post, index) => renderArticleRow(post, post.isPinned, !post.isPinned && index > 0 && articles[index - 1].isPinned))
               : !showInitialSkeleton ? (
                 <EmptyState
                   className="min-h-48 rounded-none border-0 bg-transparent"

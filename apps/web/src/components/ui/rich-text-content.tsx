@@ -37,7 +37,7 @@ const ALLOWED_TAGS = new Set([
 const SAFE_STYLE_VALUE = {
   color: /^(?:#[0-9a-f]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\))$/i,
   "background-color": /^(?:#[0-9a-f]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\))$/i,
-  "font-size": /^(?:14|16|18|22)px$/,
+  "font-size": /^(?:8|9|10|11|12|14|16|18|20|22|24|28|30|36|50|72|96)px$/,
 };
 
 function escapeHtml(value: string) {
@@ -126,6 +126,8 @@ export function sanitizeForDisplay(value: string) {
         }
 
         if (element.tagName === "IMG" && name === "alt") continue;
+        if (element.tagName === "IMG" && ["width", "height"].includes(name) && /^[1-9]\d{0,3}$/.test(attribute.value)) continue;
+        if (element.tagName === "IMG" && name === "data-align" && /^(left|center|right)$/.test(attribute.value)) continue;
 
         if (["TH", "TD"].includes(element.tagName) && ["colspan", "rowspan"].includes(name)) {
           const span = Number.parseInt(attribute.value, 10);

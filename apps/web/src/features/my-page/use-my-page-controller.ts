@@ -24,11 +24,13 @@ import {
 
 export type ActivityItem = {
   context?: string;
+  boardName?: string;
+  commentCount?: number;
   date: string;
   href: string;
   label: string;
   title: string;
-  type: "survey" | "post" | "comment";
+  type: "survey" | "post" | "comment" | "scrap";
 };
 
 export type ActivityTab =
@@ -128,7 +130,7 @@ export function useMyPageController() {
         page: surveyPage,
         q: activityQuery,
       }),
-      apiClient.getMyScraps({ limit: ITEMS_PER_PAGE, page: scrapPage }),
+      apiClient.getMyScraps({ limit: ITEMS_PER_PAGE, page: scrapPage, q: activityQuery }),
     ])
       .then(
         ([
@@ -217,9 +219,10 @@ export function useMyPageController() {
 
   const allActivities = useMemo<ActivityItem[]>(() => {
     const labelMap = {
+      scrap: lang === "ko" ? "스크랩" : "Saved",
       comment: lang === "ko" ? "댓글" : "Comment",
-      post: lang === "ko" ? "글" : "Post",
-      survey: lang === "ko" ? "설문" : "Survey",
+      post: lang === "ko" ? "작성" : "Posted",
+      survey: lang === "ko" ? "응답 완료" : "Responded",
     };
 
     return (activities?.items ?? []).map((item) => {
@@ -227,13 +230,14 @@ export function useMyPageController() {
 
       return {
         context: display.context
-          ? `${lang === "ko" ? "게시글" : "Post"}: ${display.context}`
+          ? display.context
           : undefined,
+        boardName: (lang === "ko" ? item.boardNameKo : item.boardNameEn || item.boardNameKo) || undefined,
         date: item.occurredAt,
         href:
           item.type === "survey"
             ? `/survey/${item.surveyId}`
-            : `/board/${item.boardCode}/${item.articleId}`,
+            : item.boardCode === "_EVENT" ? `/events/${item.articleId}` : `/board/${item.boardCode}/${item.articleId}`,
         label: labelMap[item.type],
         title: display.title,
         type: item.type,
@@ -246,7 +250,7 @@ export function useMyPageController() {
       surveyItems.map((item) => ({
         date: item.submittedAt ?? "",
         href: `/survey/${item.surveyId}`,
-        label: lang === "ko" ? "설문" : "Survey",
+        label: lang === "ko" ? "응답 완료" : "Responded",
         title: getMySurveyTitle(lang, item),
         type: "survey" as const,
       })),
@@ -256,9 +260,11 @@ export function useMyPageController() {
   const postActivities = useMemo<ActivityItem[]>(
     () =>
       articleItems.map((item) => ({
+        boardName: lang === "ko" ? item.boardNameKo : item.boardNameEn || item.boardNameKo,
+        commentCount: item.commentCount,
         date: item.postedAt,
-        href: `/board/${item.boardCode}/${item.articleId}`,
-        label: lang === "ko" ? "글" : "Post",
+        href: item.boardCode === "_EVENT" ? `/events/${item.articleId}` : `/board/${item.boardCode}/${item.articleId}`,
+        label: lang === "ko" ? "작성" : "Posted",
         title: getMyArticleTitle(lang, item),
         type: "post" as const,
       })),
@@ -272,10 +278,11 @@ export function useMyPageController() {
 
         return {
           context: display.context
-            ? `${lang === "ko" ? "게시글" : "Post"}: ${display.context}`
+            ? display.context
             : undefined,
+          boardName: lang === "ko" ? item.boardNameKo : item.boardNameEn || item.boardNameKo,
           date: item.createdAt,
-          href: `/board/${item.boardCode}/${item.articleId}`,
+          href: item.boardCode === "_EVENT" ? `/events/${item.articleId}` : `/board/${item.boardCode}/${item.articleId}`,
           label: lang === "ko" ? "댓글" : "Comment",
           title: display.title,
           type: "comment" as const,

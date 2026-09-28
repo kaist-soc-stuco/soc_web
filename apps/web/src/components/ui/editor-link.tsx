@@ -5,7 +5,8 @@ import { Pencil, Unlink } from "lucide-react";
 import { isSafeUrlReference } from "@soc/contracts";
 import { Button } from "./button";
 
-export function EditorLinkDialog({ initialText, initialUrl, anchor, onApply, onClose }: {
+export function EditorLinkDialog({ initialText, initialUrl, anchor, getAnchorRect, onApply, onClose }: {
+  getAnchorRect?: () => { left: number; bottom: number };
   anchor: HTMLElement | null; initialText: string; initialUrl: string; onApply: (text: string, url: string) => void; onClose: () => void;
 }) {
   const [text, setText] = useState(initialText);
@@ -13,13 +14,13 @@ export function EditorLinkDialog({ initialText, initialUrl, anchor, onApply, onC
   const [error, setError] = useState(false);
   const urlInput = useRef<HTMLInputElement>(null);
   const root = useRef<HTMLDivElement>(null);
-  const [rect, setRect] = useState(() => anchor?.getBoundingClientRect());
+  const [rect, setRect] = useState(() => getAnchorRect?.() ?? anchor?.getBoundingClientRect());
   useEffect(() => {
-    const reposition = () => setRect(anchor?.getBoundingClientRect());
+    const reposition = () => setRect(getAnchorRect?.() ?? anchor?.getBoundingClientRect());
     window.addEventListener("scroll", reposition, true);
     window.addEventListener("resize", reposition);
     return () => { window.removeEventListener("scroll", reposition, true); window.removeEventListener("resize", reposition); };
-  }, [anchor]);
+  }, [anchor, getAnchorRect]);
   useEffect(() => {
     const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node) && !anchor?.contains(event.target as Node)) onClose(); };
     document.addEventListener("pointerdown", outside);

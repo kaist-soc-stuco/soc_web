@@ -1,3 +1,4 @@
+import { stripRichText } from "@/components/ui/rich-text-content";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
@@ -64,6 +65,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
   const [titleEn, setTitleEn] = useState("");
   const [contentKo, setContentKo] = useState("");
   const [contentEn, setContentEn] = useState("");
+  const isKoreanOnly = !titleEn.trim() && !stripRichText(contentEn) && !/<img\b/i.test(contentEn);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [homeVisible, setHomeVisible] = useState(true);
@@ -71,7 +73,6 @@ export function useBoardEditPageController(forcedCategory?: string) {
   const [isSecret, setIsSecret] = useState(false);
   const [allowSecret, setAllowSecret] = useState(false);
   const [allowComment, setAllowComment] = useState(true);
-  const [isKoreanOnly, setIsKoreanOnly] = useState(false);
   const [assets, setAssets] = useState<AttachedAsset[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,11 +126,6 @@ export function useBoardEditPageController(forcedCategory?: string) {
         );
         setIsSecret(res.isSecret);
         setAllowComment(category === "suggestions" ? true : res.allowComment);
-        setIsKoreanOnly(
-          !res.titleEn?.trim() ||
-            !res.contentEn?.trim() ||
-            (category === "_EVENT" && !res.eventDescriptionEn?.trim()),
-        );
         setIsEventAlwaysOpen(
           (category === "_EVENT" || category === "promotions") &&
             !res.eventStartDate &&
@@ -227,12 +223,12 @@ export function useBoardEditPageController(forcedCategory?: string) {
       sortOrder: index,
     })),
     eventStartDate:
-      (category === "_EVENT" || category === "promotions") && eventStartDate
+      category === "_EVENT" && eventStartDate
         ? eventDateInputToIso(eventStartDate, isAllDay)
         : null,
     eventEndDate:
       (category === "_EVENT" || category === "promotions") && eventEndDate
-        ? eventDateInputToIso(eventEndDate, isAllDay, true)
+        ? eventDateInputToIso(eventEndDate, category === "promotions" || isAllDay, true)
         : null,
     eventLocation:
       (category === "_EVENT" || category === "promotions")
@@ -479,19 +475,14 @@ export function useBoardEditPageController(forcedCategory?: string) {
       return;
     }
 
-    if (!isKoreanOnly && (!titleEn.trim() || !contentEn.trim())) {
+    if (!isKoreanOnly && (!titleEn.trim() || (!stripRichText(contentEn) && !/<img\b/i.test(contentEn)))) {
       toast({
         type: "error",
         message:
           lang === "ko"
-            ? "영문 제목과 내용을 입력하거나 '한국어 전용'을 선택해 주세요."
-            : "Enter an English title and content, or select 'Korean only'.",
+            ? "영문 제목과 본문을 모두 입력하거나, 영문 입력란을 모두 비워 주세요."
+            : "Complete both English fields, or leave both empty.",
       });
-      return;
-    }
-
-    if (category === "promotions" && eventStartDate && eventEndDate && eventEndDate.slice(0, 10) < eventStartDate.slice(0, 10)) {
-      toast({ type: "error", message: lang === "ko" ? "게시 종료 날짜는 시작 날짜 이후여야 합니다." : "The end date must be on or after the start date." });
       return;
     }
 
@@ -500,18 +491,13 @@ export function useBoardEditPageController(forcedCategory?: string) {
         (category === "_EVENT" &&
           (!eventDescriptionKo.trim() ||
             (!isKoreanOnly && !eventDescriptionEn.trim()))) ||
-        (!isEventAlwaysOpen && (!eventStartDate || !eventEndDate))
+        (category === "_EVENT" && !isEventAlwaysOpen && (!eventStartDate || !eventEndDate))
       ) {
         toast({
           type: "error",
-          message:
-            category === "promotions"
-              ? lang === "ko"
-                ? "게시 기간 또는 상시 진행 여부를 설정해 주세요."
-                : "Set a publication period or mark the post as always open."
-              : lang === "ko"
-                ? "행사 일정 또는 상시 여부, 그리고 간단한 설명은 필수입니다."
-                : "Event schedule or always-open status, plus card description, is required.",
+          message: lang === "ko"
+            ? "행사 일정 또는 상시 여부, 그리고 간단한 설명은 필수입니다."
+            : "Event schedule or always-open status, plus card description, is required.",
         });
         return;
       }
@@ -536,13 +522,13 @@ export function useBoardEditPageController(forcedCategory?: string) {
           sortOrder: index,
         })),
         eventStartDate:
-          (category === "_EVENT" || category === "promotions")
+          category === "promotions" ? null : (category === "_EVENT")
             ? isEventAlwaysOpen
               ? null
               : eventDateInputToIso(eventStartDate, isAllDay)
             : undefined,
         eventEndDate:
-          (category === "_EVENT" || category === "promotions")
+          category === "promotions" ? (eventEndDate ? eventDateInputToIso(eventEndDate, true, true) : null) : (category === "_EVENT")
             ? isEventAlwaysOpen
               ? null
               : eventDateInputToIso(eventEndDate, isAllDay, true)
@@ -690,7 +676,6 @@ export function useBoardEditPageController(forcedCategory?: string) {
     setIsAnonymous,
     setIsAllDay,
     setIsEventAlwaysOpen,
-    setIsKoreanOnly,
     setIsPinned,
     setHomeVisible,
     setHomeOrder,

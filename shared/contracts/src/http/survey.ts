@@ -71,6 +71,7 @@ export interface SurveyRecord {
   allowResponseEdit: boolean;
   isKoreanOnly: boolean;
   isPublished: boolean;
+  acceptingResponses: boolean;
   lifecycleStatus: SurveyLifecycleStatus;
   previousVersionId: string | null;
   versionNumber: number;

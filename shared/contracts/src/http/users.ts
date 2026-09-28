@@ -60,9 +60,11 @@ export interface MySurveyResponseListResponse extends MyPageListMeta {
   items: MySurveyResponseItem[];
 }
 
-export type MyActivityType = "survey" | "post" | "comment";
+export type MyActivityType = "survey" | "post" | "comment" | "scrap";
 
 export interface MyActivityItem {
+  boardNameKo?: string | null;
+  boardNameEn?: string | null;
   type: MyActivityType;
   resourceId: string;
   titleKo: string;

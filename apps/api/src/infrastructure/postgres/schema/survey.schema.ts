@@ -45,6 +45,7 @@ export const surveys = pgTable("survey", {
   allowResponseEdit: boolean("allow_response_edit").notNull().default(false),
   isKoreanOnly: boolean("is_korean_only").notNull().default(false),
   isPublished: boolean("is_published").notNull().default(false),
+  acceptingResponses: boolean("accepting_responses").notNull().default(true),
   lifecycleStatus: varchar("lifecycle_status", { length: 20 })
     .notNull()
     .default("DRAFT"),

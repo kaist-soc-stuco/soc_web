@@ -3,7 +3,7 @@ import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent, ReactNode, RefOb
 import { useEffect, useId, useRef, useState } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import TiptapImage from "@tiptap/extension-image";
+import { EditorImage } from "./editor-image";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -76,6 +76,7 @@ export interface RichTextVariableOption {
 }
 
 export interface BilingualRichTextEditorProps {
+  viewMode?: "ko" | "en" | "split";
   contentEn: string;
   contentKo: string;
   fileInputRef?: RefObject<HTMLInputElement | null>;
@@ -391,7 +392,7 @@ function useTiptapEditor({
         openOnClick: false,
         HTMLAttributes: { class: "text-blue-600 underline" },
       }),
-      TiptapImage.configure({
+      EditorImage.configure({
         allowBase64: false,
         HTMLAttributes: { class: "rich-text-image" },
       }),
@@ -544,7 +545,7 @@ function ColorPopover({
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
-      if (!popoverRef.current?.contains(event.target as Node)) onClose();
+      if (!popoverRef.current?.parentElement?.contains(event.target as Node)) onClose();
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -631,6 +632,7 @@ function MoreFormattingMenu({
   return (
     <DropdownMenu.Portal>
       <DropdownMenu.Content
+        onCloseAutoFocus={(event) => event.preventDefault()}
         align="start"
         sideOffset={6}
         collisionPadding={12}
@@ -761,7 +763,17 @@ function RichTextToolbar({
   }, [editor]);
   const saveLink = (text: string, url: string) => {
     flushSync(() => setLinkDialog(null));
-    editor.chain().focus().setTextSelection(linkSelection.current).insertContent({type:"text",text,marks:[{type:"link",attrs:{href:url,target:"_blank",rel:"noopener noreferrer"}}]}).run();
+    const { from, to } = linkSelection.current;
+    const selectedText = editor.state.doc.textBetween(from, to);
+    if (from !== to && selectedText === text) {
+      editor.chain().focus().setTextSelection({ from, to }).setLink({ href: url }).run();
+    } else {
+      const marks = (editor.state.storedMarks ?? editor.state.doc.resolve(from).marks())
+        .filter(mark => mark.type.name !== "link").map(mark => mark.toJSON());
+      editor.chain().focus().setTextSelection({ from, to }).insertContent({ type: "text", text,
+        marks: [...marks, { type: "link", attrs: { href: url, target: "_blank", rel: "noopener noreferrer" } }],
+      }).run();
+    }
   };
   const [colorPopover, setColorPopover] = useState<"text" | "background" | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -790,7 +802,9 @@ function RichTextToolbar({
 
   const runWithColorSelection = (run: (chain: ReturnType<Editor["chain"]>) => void) => {
     const chain = editor.chain();
-    if (colorSelection.current) chain.setTextSelection(colorSelection.current);
+    if (colorSelection.current && (editor.state.selection.from !== colorSelection.current.from || editor.state.selection.to !== colorSelection.current.to)) {
+      chain.setTextSelection(colorSelection.current);
+    }
     chain.focus();
     run(chain);
     chain.run();
@@ -830,8 +844,10 @@ function RichTextToolbar({
         id={`${editorId}-font-size`}
         ariaLabel={lang === "ko" ? "글자 크기" : "Font size"}
         value={sizeValue}
+        restoreFocusOnSelect={false}
         onChange={(value) => {
-          editor.chain().focus().setFontSize(value).run();
+          editor.chain().setFontSize(value).run();
+          editor.view.focus();
         }}
         options={FONT_SIZE_OPTIONS.map((option) => ({
           value: option.value,
@@ -989,6 +1005,7 @@ function RichTextToolbar({
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content
+              onCloseAutoFocus={(event) => event.preventDefault()}
               align="start"
               sideOffset={6}
               collisionPadding={12}
@@ -1067,7 +1084,7 @@ function RichTextToolbar({
         <CircleHelp />
       </ToolbarButton>
       </div>
-      {linkDialog && <EditorLinkDialog anchor={linkButtonRef.current} initialText={linkDialog.text} initialUrl={linkDialog.url} onApply={saveLink} onClose={() => { flushSync(() => setLinkDialog(null));editor.commands.focus(); }} />}
+      {linkDialog && <EditorLinkDialog anchor={linkButtonRef.current} getAnchorRect={() => editor.view.coordsAtPos(linkSelection.current.from)} initialText={linkDialog.text} initialUrl={linkDialog.url} onApply={saveLink} onClose={() => { flushSync(() => setLinkDialog(null));editor.commands.focus(); }} />}
       {linkPreview && <EditorLinkPopover link={linkPreview} onClose={() => setLinkPreview(null)} onEdit={() => { setLinkDialog({text:linkPreview.text,url:linkPreview.url});setLinkPreview(null); }} onUnlink={() => { editor.chain().focus().setTextSelection(linkSelection.current).unsetLink().run();setLinkPreview(null); }} />}
       {toolbarSuffix ? <div className="shrink-0">{toolbarSuffix}</div> : null}
     </div>
@@ -1225,6 +1242,7 @@ export function RichTextEditor({
 }
 
 export function BilingualRichTextEditor({
+  viewMode,
   contentEn,
   contentKo,
   fileInputRef,
@@ -1264,14 +1282,16 @@ export function BilingualRichTextEditor({
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
 
   useEffect(() => {
-    if (isKoreanOnly && activeLanguage === "en") setActiveLanguage("ko");
-  }, [activeLanguage, isKoreanOnly]);
+    if (viewMode === "ko" || viewMode === "en") setActiveLanguage(viewMode);
+    else if (!viewMode && isKoreanOnly && activeLanguage === "en") setActiveLanguage("ko");
+  }, [activeLanguage, isKoreanOnly, viewMode]);
 
   if (!koreanEditor || !englishEditor) return null;
 
   const activeEditor = activeLanguage === "ko" ? koreanEditor : englishEditor;
   const switchEditorLanguage = (language: "ko" | "en") => {
-    if (language === "en" && isKoreanOnly) return;
+    if (viewMode && viewMode !== "split" && language !== viewMode) return;
+    if (!viewMode && language === "en" && isKoreanOnly) return;
     setActiveLanguage(language);
     window.requestAnimationFrame(() => {
       const nextEditor = language === "ko" ? koreanEditor : englishEditor;
@@ -1307,7 +1327,8 @@ export function BilingualRichTextEditor({
         onShortcutHelp={() => setShortcutHelpOpen(true)}
         uploading={uploading}
       />
-      <div className={cn("grid min-w-0", !isKoreanOnly && "md:grid-cols-2")}>
+      <div className={cn("grid min-w-0", (viewMode ? viewMode === "split" : !isKoreanOnly) && "md:grid-cols-2")}>
+        <div className={viewMode === "en" ? "hidden" : "min-w-0"}>
         <EditorPane
           editor={koreanEditor}
           languageLabel={lang === "ko" ? "국문" : "Korean"}
@@ -1317,8 +1338,9 @@ export function BilingualRichTextEditor({
           title={titleKo}
           titleLabel={lang === "ko" ? "국문" : "Korean"}
         />
-        {!isKoreanOnly ? (
-          <div className="min-w-0 border-t border-slate-200 md:border-l md:border-t-0">
+        </div>
+        {(viewMode || !isKoreanOnly) ? (
+          <div className={cn("min-w-0", viewMode === "ko" && "hidden", (viewMode === "split" || !viewMode) && "border-t border-slate-200 md:border-l md:border-t-0")}>
             <EditorPane
               editor={englishEditor}
               languageLabel={lang === "ko" ? "영문" : "English"}
@@ -1337,7 +1359,7 @@ export function BilingualRichTextEditor({
         open={shortcutHelpOpen}
         showFileAttachment={Boolean(fileInputRef)}
         showImageUpload={Boolean(onImageUpload)}
-        showLanguageShortcuts={!isKoreanOnly}
+        showLanguageShortcuts={viewMode ? viewMode === "split" : !isKoreanOnly}
         showSaveShortcut={Boolean(onSave)}
         showSubmitShortcut={Boolean(onSubmit)}
       />
