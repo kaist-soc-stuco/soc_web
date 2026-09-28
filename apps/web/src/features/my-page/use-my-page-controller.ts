@@ -1,14 +1,8 @@
-import type {
-  CurrentUserResponse,
-  MyActivityListResponse,
-  MyArticleListResponse,
-  MyCommentListResponse,
-  MyScrapListResponse,
-  MySurveyResponseListResponse,
-} from "@soc/contracts";
+import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import { Clock3, FileText } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
@@ -41,9 +35,7 @@ export type ActivityTab =
   | "scraps";
 export type MyPageMenu = "profile" | "activity";
 
-const MY_PAGE_LIMIT = 20;
 const ITEMS_PER_PAGE = 10;
-const OVERVIEW_LIMIT = 10;
 
 const compactText = (value?: string | null) => {
   const normalized = value?.trim();
@@ -58,138 +50,53 @@ export function useMyPageController() {
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const { lang } = useLanguage();
 
-  const [user, setUser] = useState<CurrentUserResponse | null>(null);
-  const [articles, setArticles] = useState<MyArticleListResponse | null>(null);
-  const [comments, setComments] = useState<MyCommentListResponse | null>(null);
-  const [scraps, setScraps] = useState<MyScrapListResponse | null>(null);
-  const [surveyResponses, setSurveyResponses] =
-    useState<MySurveyResponseListResponse | null>(null);
-  const [activities, setActivities] = useState<MyActivityListResponse | null>(
-    null,
-  );
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [activeMenu, setActiveMenu] = useState<MyPageMenu>("profile");
-  const [activeTab, setActiveTab] = useState<ActivityTab>("all");
-  const [displayedActivityTab, setDisplayedActivityTab] =
-    useState<ActivityTab>("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [activityQuery, setActivityQuery] = useState("");
-  const hasLoadedDataRef = useRef(false);
-
-  const canUseMyPage = hasPersistedProfile(session ?? null);
-
+  const [params, setParams] = useSearchParams();
+  const activeMenu: MyPageMenu = params.get("menu") === "activity" ? "activity" : "profile";
+  const tabParam = params.get("tab");
+  const activeTab: ActivityTab = (["all", "survey", "post", "comment", "scraps"] as const).find(tab => tab === tabParam) ?? "all";
+  const displayedActivityTab = activeTab;
+  const pageParam = Number(params.get("page"));
+  const currentPage = Number.isSafeInteger(pageParam) && pageParam > 0 ? pageParam : 1;
+  const activityQuery = params.get("q") ?? "";
+  const [debouncedQuery, setDebouncedQuery] = useState(activityQuery);
   useEffect(() => {
-    if (!canUseMyPage) {
-      setUser(null);
-      setArticles(null);
-      setComments(null);
-      setScraps(null);
-      setSurveyResponses(null);
-      setActivities(null);
-      setDisplayedActivityTab("all");
-      hasLoadedDataRef.current = false;
-      setLoading(false);
-      setLoadError(null);
-      return;
+    const timer = window.setTimeout(() => setDebouncedQuery(activityQuery), 250);
+    return () => window.clearTimeout(timer);
+  }, [activityQuery]);
+  const updateParams = (changes: Record<string, string>, replace = false) => {
+    const next = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value); else next.delete(key);
     }
-
-    let cancelled = false;
-    const isActivityView = activeMenu === "activity";
-    const isListView = isActivityView;
-    const activeListPage = isListView ? currentPage : 1;
-    const activeListLimit = isListView ? ITEMS_PER_PAGE : OVERVIEW_LIMIT;
-    const activityPage = activeTab === "all" ? activeListPage : 1;
-    const articlePage = activeTab === "post" ? activeListPage : 1;
-    const commentPage = activeTab === "comment" ? activeListPage : 1;
-    const surveyPage = activeTab === "survey" ? activeListPage : 1;
-    const scrapPage = activeTab === "scraps" ? activeListPage : 1;
-
-    setLoading(true);
-    setLoadError(null);
-
-    Promise.all([
-      apiClient.getCurrentUser(),
-      apiClient.getMyActivities({
-        limit: activeTab === "all" ? activeListLimit : OVERVIEW_LIMIT,
-        page: activityPage,
-        q: activityQuery,
-      }),
-      apiClient.getMyArticles({
-        limit: activeTab === "post" ? activeListLimit : MY_PAGE_LIMIT,
-        page: articlePage,
-        q: activityQuery,
-      }),
-      apiClient.getMyComments({
-        limit: activeTab === "comment" ? activeListLimit : MY_PAGE_LIMIT,
-        page: commentPage,
-        q: activityQuery,
-      }),
-      apiClient.getMySurveyResponses({
-        limit: activeTab === "survey" ? activeListLimit : MY_PAGE_LIMIT,
-        page: surveyPage,
-        q: activityQuery,
-      }),
-      apiClient.getMyScraps({ limit: ITEMS_PER_PAGE, page: scrapPage, q: activityQuery }),
-    ])
-      .then(
-        ([
-          fetchedUser,
-          fetchedActivities,
-          fetchedArticles,
-          fetchedComments,
-          fetchedSurveyResponses,
-          fetchedScraps,
-        ]) => {
-          if (cancelled) return;
-          setUser(fetchedUser);
-          setActivities(fetchedActivities);
-          setArticles(fetchedArticles);
-          setComments(fetchedComments);
-          setSurveyResponses(fetchedSurveyResponses);
-          setScraps(fetchedScraps);
-          setDisplayedActivityTab(activeTab);
-          hasLoadedDataRef.current = true;
-        },
-      )
-      .catch(() => {
-        if (cancelled) return;
-        if (!hasLoadedDataRef.current) {
-          setUser(null);
-          setActivities({ items: [], limit: OVERVIEW_LIMIT, page: 1, total: 0 });
-          setArticles({ items: [], limit: MY_PAGE_LIMIT, page: 1, total: 0 });
-          setComments({ items: [], limit: MY_PAGE_LIMIT, page: 1, total: 0 });
-          setScraps({ items: [], limit: ITEMS_PER_PAGE, page: 1, total: 0 });
-          setSurveyResponses({
-            items: [],
-            limit: MY_PAGE_LIMIT,
-            page: 1,
-            total: 0,
-          });
-          hasLoadedDataRef.current = true;
-        }
-        setLoadError(
-          lang === "ko"
-            ? "마이페이지 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
-            : "Failed to load your account information. Please try again shortly.",
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activeMenu,
-    activeTab,
-    activityQuery,
-    apiClient,
-    canUseMyPage,
-    currentPage,
-    lang,
-  ]);
+    setParams(next, { replace, state: { preserveScroll: replace } });
+  };
+  const setActiveMenu = (menu: MyPageMenu) => updateParams({ menu, page: "" });
+  const setActiveTab = (tab: ActivityTab) => updateParams({ tab, page: "" });
+  const setCurrentPage = (page: number) => updateParams({ page: page === 1 ? "" : String(page) });
+  const setActivityQuery = (q: string) => updateParams({ q, page: "" }, true);
+  const canUseMyPage = hasPersistedProfile(session ?? null);
+  const identity = session?.userId;
+  const profile = useQuery({ queryKey: ["my-page", identity, "profile"], queryFn: () => apiClient.getCurrentUser(), enabled: canUseMyPage });
+  const options = { limit: ITEMS_PER_PAGE, page: currentPage, q: debouncedQuery };
+  const enabled = (tab: ActivityTab) => canUseMyPage && activeMenu === "activity" && activeTab === tab && activityQuery === debouncedQuery;
+  const key = (tab: ActivityTab) => ["my-page", identity, tab, currentPage, debouncedQuery];
+  const activityResult = useQuery({ queryKey: key("all"), queryFn: () => apiClient.getMyActivities(options), enabled: enabled("all") });
+  const articleResult = useQuery({ queryKey: key("post"), queryFn: () => apiClient.getMyArticles(options), enabled: enabled("post") });
+  const commentResult = useQuery({ queryKey: key("comment"), queryFn: () => apiClient.getMyComments(options), enabled: enabled("comment") });
+  const surveyResult = useQuery({ queryKey: key("survey"), queryFn: () => apiClient.getMySurveyResponses(options), enabled: enabled("survey") });
+  const scrapResult = useQuery({ queryKey: key("scraps"), queryFn: () => apiClient.getMyScraps(options), enabled: enabled("scraps") });
+  const selected = { all: activityResult, post: articleResult, comment: commentResult, survey: surveyResult, scraps: scrapResult }[activeTab];
+  const user = profile.data;
+  const articles = articleResult.data;
+  const comments = commentResult.data;
+  const scraps = scrapResult.data;
+  const surveyResponses = surveyResult.data;
+  const activities = activityResult.data;
+  const loading = activityQuery !== debouncedQuery || selected.isPending;
+  const profileError = profile.isError;
+  const loadError = selected.isError ? (lang === "ko" ? "활동 내역을 불러오지 못했습니다." : "Could not load your activity.") : null;
+  const retryActivity = () => void selected.refetch();
+  const retryProfile = () => void profile.refetch();
 
   const displayName = useMemo(() => {
     if (!user?.user) {
@@ -201,16 +108,7 @@ export function useMyPageController() {
   }, [lang, session, user]);
 
   const userInfo = user?.user;
-  const hasLoadedMyPageData =
-    user !== null ||
-    articles !== null ||
-    comments !== null ||
-    scraps !== null ||
-    surveyResponses !== null ||
-    activities !== null ||
-    loadError !== null;
-  const initialLoading =
-    sessionLoading || (canUseMyPage && loading && !hasLoadedMyPageData);
+  const initialLoading = sessionLoading || (canUseMyPage && activeMenu === "profile" && profile.isPending);
   const isAdmin = hasAdminPermission(userInfo?.permission);
   const articleItems = articles?.items ?? [];
   const commentItems = comments?.items ?? [];
@@ -338,6 +236,9 @@ export function useMyPageController() {
     isAdmin,
     lang,
     loadError,
+    profileError,
+    retryActivity,
+    retryProfile,
     loading,
     menuItems,
     session,

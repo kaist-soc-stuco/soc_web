@@ -1,3 +1,4 @@
+import type { PartialSearchKind } from "./use-search-page-controller";
 import type { FormEvent, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type {
@@ -84,6 +85,7 @@ export function SearchForm({
 }
 
 export function SearchFilterTabs({
+  partialErrors,
   activeFilter,
   boardCount,
   eventCount,
@@ -95,6 +97,7 @@ export function SearchFilterTabs({
   voteCount,
   visible,
 }: {
+  partialErrors: PartialSearchKind[];
   activeFilter: SearchFilter;
   boardCount: number;
   eventCount: number;
@@ -128,7 +131,7 @@ export function SearchFilterTabs({
         closeLabel={lang === "ko" ? "검색 결과 필터 닫기" : "Close search result filters"}
         onChange={(value) => onFilterChange(value as SearchFilter)}
         options={tabs.map((tab) => ({
-          label: `${tab.label} ${tab.count}`,
+          label: `${tab.label} ${partialErrors.some(kind => kind === tab.filter) ? "—" : tab.count}`,
           value: tab.filter,
         }))}
         title={lang === "ko" ? "검색 결과 필터" : "Search result filters"}
@@ -147,7 +150,7 @@ export function SearchFilterTabs({
             className="!h-9 !min-h-9 gap-1.5 px-2.5 text-[length:var(--ui-text-body-sm-size)]"
           >
             <span>{tab.label}</span>
-            <span className="tabular-nums text-slate-400">{tab.count}</span>
+            <span className="tabular-nums text-slate-400">{partialErrors.some(kind => kind === tab.filter) ? "—" : tab.count}</span>
           </PageTabButton>
         ))}
       </PageTabs>
@@ -181,12 +184,14 @@ export function SearchStatus({
           <>Results for &quot;{query}&quot;</>
         )}
       </span>
-      {!loading ? <span>{lang === "ko" ? `총 ${totalCount}건` : `${totalCount} results`}</span> : null}
+      {!loading ? <span>{lang === "ko" ? `표시된 결과 ${totalCount}건` : `${totalCount} results shown`}</span> : null}
     </div>
   );
 }
 
 export function SearchResults({
+  partialErrors, retryingPart, onRetryPart,
+  more, loadingMore, moreError, onLoadMore,
   aboutResults,
   boardById,
   boardArticles,
@@ -203,6 +208,13 @@ export function SearchResults({
   totalCount,
   votes,
 }: {
+  partialErrors: PartialSearchKind[];
+  retryingPart: PartialSearchKind | null;
+  onRetryPart: (kind: PartialSearchKind) => Promise<void>;
+  more: { event: boolean; survey: boolean };
+  loadingMore: "event" | "survey" | null;
+  moreError: string | null;
+  onLoadMore: (kind: "event" | "survey") => Promise<void>;
   aboutResults: AboutSearchItem[];
   boardById: Map<number, BoardSummary>;
   boardArticles: ArticleListItem[];
@@ -254,7 +266,8 @@ export function SearchResults({
               ? surveys.length
               : votes.length;
 
-  if (query && visibleCount === 0) {
+  const visibleErrors = partialErrors.filter(kind => filter === "all" || filter === kind);
+  if (query && visibleCount === 0 && visibleErrors.length === 0) {
     return (
       <p className="px-1 py-10 text-center text-sm font-normal text-slate-500" role="status">
         {lang === "ko" ? "검색 결과가 없습니다." : "No results found."}
@@ -265,6 +278,10 @@ export function SearchResults({
   const showAll = filter === "all";
   return (
     <div className="space-y-9">
+      {visibleErrors.map(kind => <div key={kind} role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4 text-sm text-slate-600">
+        <p>{lang === "ko" ? `${kind === "faq" ? "FAQ" : "투표"} 검색 결과를 불러오지 못했습니다.` : `Could not load ${kind === "faq" ? "FAQ" : "vote"} results.`}</p>
+        <Button variant="ghost" disabled={retryingPart !== null} aria-busy={retryingPart === kind} onClick={() => void onRetryPart(kind)}>{lang === "ko" ? "다시 시도" : "Retry"}</Button>
+      </div>)}
       {filter === "board" || showAll ? (
         <ArticleResults articles={boardArticles} boardById={boardById} lang={lang} query={query} />
       ) : null}
@@ -274,15 +291,17 @@ export function SearchResults({
       {filter === "event" || showAll ? (
         <>
           <EventResults articles={eventArticles} lang={lang} query={query} />
+          {more.event && <Button variant="ghost" disabled={loadingMore !== null} onClick={() => void onLoadMore("event")}>{lang === "ko" ? "행사 결과 더보기" : "Show more events"}</Button>}
           <CalendarResults events={calendarEvents} lang={lang} query={query} />
         </>
       ) : null}
       {filter === "survey" || showAll ? (
-        <SurveyResults lang={lang} query={query} surveys={surveys} />
+        <><SurveyResults lang={lang} query={query} surveys={surveys} />{more.survey && <Button variant="ghost" disabled={loadingMore !== null} onClick={() => void onLoadMore("survey")}>{lang === "ko" ? "설문 결과 더보기" : "Show more surveys"}</Button>}</>
       ) : null}
       {filter === "vote" || showAll ? (
         <VoteResults lang={lang} query={query} votes={votes} />
       ) : null}
+      {moreError && <p role="alert" className="text-sm text-rose-600">{moreError}</p>}
       {showAll ? <AboutResults items={aboutResults} lang={lang} query={query} /> : null}
     </div>
   );

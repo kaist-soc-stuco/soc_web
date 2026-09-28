@@ -70,9 +70,16 @@ export function CalendarSubscriptionButton({
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
               <code className="min-w-0 flex-1 break-all text-xs leading-4 text-slate-600">{absoluteFeedUrl}</code>
-              <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={() => void copyFeedUrl()}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="shrink-0"
+                aria-label={lang === "ko" ? "구독 주소 복사" : "Copy subscription URL"}
+                data-tooltip={lang === "ko" ? "구독 주소 복사" : "Copy subscription URL"}
+                onClick={() => void copyFeedUrl()}
+              >
                 <Copy aria-hidden="true" />
-                {lang === "ko" ? "구독 주소 복사" : "Copy subscription URL"}
               </Button>
             </div>
             <div className="border-t border-slate-100 pt-2">

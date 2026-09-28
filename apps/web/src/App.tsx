@@ -1,3 +1,4 @@
+import { RouteScrollRestoration } from "@/components/organisms/route-scroll-restoration";
 import { createApiClient } from '@soc/api-client';
 import { nowMs } from '@soc/shared';
 import { lazy, Suspense, useEffect, useMemo, useRef } from 'react';
@@ -135,48 +136,6 @@ function LegacyEventsSurveysRedirect() {
   const query = selected ? `?selected=${encodeURIComponent(selected)}` : '';
 
   return <Navigate to={`${destination}${query}`} replace />;
-}
-
-function ScrollToTopOnRouteChange() {
-  const location = useLocation();
-  const previousLocationRef = useRef<{
-    pathname: string;
-    search: string;
-    hash: string;
-  } | null>(null);
-
-  useEffect(() => {
-    const previousLocation = previousLocationRef.current;
-    const pathChanged =
-      !previousLocation ||
-      previousLocation.pathname !== location.pathname ||
-      previousLocation.search !== location.search;
-    const hashWasCleared =
-      previousLocation?.pathname === location.pathname &&
-      previousLocation.search === location.search &&
-      Boolean(previousLocation.hash) &&
-      !location.hash;
-
-    if (!location.hash && (pathChanged || hashWasCleared)) {
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-    }
-
-    previousLocationRef.current = {
-      pathname: location.pathname,
-      search: location.search,
-      hash: location.hash,
-    };
-  }, [location.hash, location.pathname, location.search]);
-
-  useEffect(() => {
-    const previousScrollRestoration = window.history.scrollRestoration;
-    window.history.scrollRestoration = "manual";
-    return () => {
-      window.history.scrollRestoration = previousScrollRestoration;
-    };
-  }, []);
-
-  return null;
 }
 
 /**
@@ -403,7 +362,7 @@ function PreventImageGhostDrag() {
 function AppLayout() {
   return (
     <>
-      <ScrollToTopOnRouteChange />
+      <RouteScrollRestoration />
       <PreventImageGhostDrag />
       <SessionKeepAlive />
       <ChannelTalkProvider>

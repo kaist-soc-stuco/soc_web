@@ -4,7 +4,7 @@ import { isoToMs, nowMs } from "@soc/shared";
 import { Clock3, User, type LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { EmptyState } from "@/components/ui/data-state";
+import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Pagination } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageSearchField } from "@/components/ui/page-layout";
@@ -302,6 +302,9 @@ export function MyPageProfilePanel({
 }
 
 interface ActivityPanelProps {
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
   activeTab: ActivityTab;
   activities: ActivityItem[];
   activityQuery: string;
@@ -316,6 +319,7 @@ interface ActivityPanelProps {
 }
 
 export function MyPageActivityPanel({
+  loading, error, onRetry,
   activeTab,
   activities,
   activityQuery,
@@ -339,6 +343,10 @@ export function MyPageActivityPanel({
   ] as const satisfies ReadonlyArray<{ id: ActivityTab; label: string }>;
 
   const renderCollection = () => {
+    if (loading) return <div aria-busy="true" aria-label={lang === "ko" ? "활동 내역 불러오기" : "Loading activity"} className="min-h-[200px] space-y-4 py-5 motion-safe:animate-pulse">{[0, 1, 2].map(i => <div key={i} className="h-8 rounded bg-slate-100" />)}</div>;
+    if (error) return <ErrorState title={error} onRetry={onRetry} />;
+    if (activityQuery.trim() && (contentTab === "scraps" ? visibleScraps.length === 0 : activities.length === 0)) return <div className="py-10 text-center text-sm text-slate-500"><p>{lang === "ko" ? "검색 결과가 없습니다." : "No results found."}</p><Button variant="ghost" onClick={() => onQueryChange("")}>{lang === "ko" ? "검색어 지우기" : "Clear search"}</Button></div>;
+
     if (contentTab === "scraps") {
       if (visibleScraps.length === 0) {
         return (
@@ -412,7 +420,7 @@ export function MyPageActivityPanel({
 
         <div className="min-h-[200px] flex-1 divide-y divide-slate-100">{renderCollection()}</div>
 
-        {totalPages > 1 && (
+        {!loading && !error && totalPages > 1 && (
           <div className="border-t border-slate-100 pt-4 mt-4 flex justify-center select-none">
             <Pagination
               currentPage={currentPage}

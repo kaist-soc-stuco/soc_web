@@ -1436,7 +1436,7 @@ export function SurveyEditorPage() {
       else if (action === "delete") navigate("/admin/surveys");
       return;
     }
-    if (action === "delete" && !await requestConfirm({ title: "설문 삭제", description: "설문과 응답을 삭제합니다. 이 작업은 되돌릴 수 없습니다.", confirmLabel: "삭제" })) return;
+    if (action === "delete" && !await requestConfirm({ tone: "danger", title: "설문 삭제", description: "설문과 응답을 삭제합니다. 이 작업은 되돌릴 수 없습니다.", confirmLabel: "삭제" })) return;
     try {
       await flushAutoSave.current();
       if (action === "duplicate") { const created = await client.duplicateSurvey(loadedSurveyId); navigate(`/admin/surveys/${created.id}/edit`); }

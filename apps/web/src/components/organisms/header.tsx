@@ -15,7 +15,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { Logo } from "@/components/atoms/logo";
@@ -43,8 +43,20 @@ type HeaderNavItem = {
   label: string;
 };
 
+// Preserve the underline position across page-owned Header remounts.
+let previousIndicatorLeft: string | null = null;
+
 export function Header({ variant = "default" }: HeaderProps) {
   const headerRef = useRef<HTMLElement>(null);
+  const indicatorRef = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const indicator = indicatorRef.current;
+    if (!indicator) return;
+    if (previousIndicatorLeft && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      indicator.animate([{ left: previousIndicatorLeft }, { left: getComputedStyle(indicator).left }], { duration: 260, easing: "cubic-bezier(0.22, 1, 0.36, 1)" });
+    }
+    return () => { previousIndicatorLeft = getComputedStyle(indicator).opacity === "0" ? null : getComputedStyle(indicator).left; };
+  }, []);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTriggerRef = useRef<HTMLButtonElement>(null);
@@ -580,6 +592,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             })}
             <span
               aria-hidden="true"
+              ref={indicatorRef}
               className={`site-nav-indicator ${indicatorIndex >= 0 ? "opacity-100" : "opacity-0"}`}
               style={{
                 left: indicatorLeft,
@@ -595,14 +608,14 @@ export function Header({ variant = "default" }: HeaderProps) {
                 if (event.key === "Escape") {
                   event.stopPropagation();
                   setSearchOpen(false);
-                  searchTriggerRef.current?.focus({ preventScroll: true });
+                  requestAnimationFrame(() => searchTriggerRef.current?.focus({ preventScroll: true }));
                 }
               }}>
               <IconButton ref={searchTriggerRef}
                 aria-label={lang === "ko" ? "통합검색" : "Search"}
+                disabled={searchOpen}
                 aria-expanded={searchOpen} aria-controls="site-header-search-input"
                 onClick={() => {
-                  if (searchOpen) { handleSearchSubmit(); return; }
                   setSearchOpen(true); setHoveredIndex(null);
                   setDropdownOpen(false); setNotificationOpen(false); setMobileMenuOpen(false);
                 }}
@@ -615,7 +628,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                   placeholder={lang === "ko" ? "제목, 내용 검색" : "Search titles and content"}
                   value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
                 <IconButton size="sm" aria-label={lang === "ko" ? "검색 닫기" : "Close search"}
-                  onClick={() => { setSearchOpen(false); searchTriggerRef.current?.focus({ preventScroll: true }); }}>
+                  onClick={() => { setSearchOpen(false); requestAnimationFrame(() => searchTriggerRef.current?.focus({ preventScroll: true })); }}>
                   <X aria-hidden="true" />
                 </IconButton>
               </div>

@@ -76,8 +76,8 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
     setCurrentDate,
     setCalendarQuery,
     setCurrentPage,
-    setDateFrom,
-    setDateTo,
+    setDateRange,
+    resetListFilters,
     itemQuery,
     setItemQuery,
     setSelectedDate,
@@ -105,12 +105,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
         ? "No surveys match these filters."
         : "No events match these filters."
     : getEmptyStateMessage(currentTab, stateFilter, lang);
-  const resetListFilters = () => {
-    setItemQuery("");
-    setDateFrom("");
-    setDateTo("");
-    setStateFilter("all");
-  };
+
 
   return (
     <PageShell>
@@ -150,8 +145,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
             <EventsSurveysFilterBar
               lang={lang}
               onQueryChange={setItemQuery}
-              onDateFromChange={setDateFrom}
-              onDateToChange={setDateTo}
+              onDateRangeChange={setDateRange}
               onStateFilterChange={setStateFilter}
               dateFrom={dateFrom}
               dateTo={dateTo}

@@ -19,8 +19,7 @@ const stateFilters: Array<{
 interface EventsSurveysFilterBarProps {
   lang: string;
   onQueryChange: (value: string) => void;
-  onDateFromChange: (value: string) => void;
-  onDateToChange: (value: string) => void;
+  onDateRangeChange: (value: { from: string; to: string }) => void;
   onStateFilterChange: (filter: EventsSurveysStateFilter) => void;
   dateFrom: string;
   dateTo: string;
@@ -32,8 +31,7 @@ interface EventsSurveysFilterBarProps {
 export function EventsSurveysFilterBar({
   lang,
   onQueryChange,
-  onDateFromChange,
-  onDateToChange,
+  onDateRangeChange,
   onStateFilterChange,
   dateFrom,
   dateTo,
@@ -65,7 +63,7 @@ export function EventsSurveysFilterBar({
 
       <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">
         <DateRangePicker lang={lang} presetType="future" value={{ from: dateFrom, to: dateTo }}
-          onChange={({ from, to }) => { onDateFromChange(from); onDateToChange(to); }} />
+          onChange={onDateRangeChange} />
         <PageSearchField
           ariaLabel={lang === "ko" ? "행사·설문 검색" : "Search events and surveys"}
           className="order-last basis-full w-full sm:basis-auto sm:w-64 lg:w-72"

@@ -31,6 +31,8 @@ export function SearchPage() {
     surveys,
     votes,
     totalCount,
+    more, loadingMore, moreError, loadMore,
+    partialErrors, retryingPart, retryPart,
   } = useSearchPageController();
 
   return (
@@ -48,6 +50,7 @@ export function SearchPage() {
           searchBy={searchBy}
         />
         <SearchFilterTabs
+          partialErrors={partialErrors}
           activeFilter={filter}
           boardCount={boardArticles.length}
           eventCount={eventArticles.length + calendarEvents.length}
@@ -66,6 +69,8 @@ export function SearchPage() {
           totalCount={totalCount}
         />
         <SearchResults
+          partialErrors={partialErrors} retryingPart={retryingPart} onRetryPart={retryPart}
+          more={more} loadingMore={loadingMore} moreError={moreError} onLoadMore={loadMore}
           aboutResults={aboutResults}
           boardById={boardById}
           boardArticles={boardArticles}

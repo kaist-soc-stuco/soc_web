@@ -82,6 +82,8 @@ export function DateRangePicker({
   const todayStamp = stamp(nowDate());
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
+  const [focusedDay, setFocusedDay] = useState(todayStamp);
+  const pendingDayFocus = useRef(false);
   const [month, setMonth] = useState(nowDate());
   const [activePreset, setActivePreset] = useState<PresetKind | null>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -140,6 +142,12 @@ export function DateRangePicker({
     };
   }, [align, open]);
 
+  useLayoutEffect(() => {
+    if (!open || !pendingDayFocus.current) return;
+    const button = panel.current?.querySelector<HTMLButtonElement>(`[data-date="${focusedDay}"]`);
+    if (button) { button.focus(); pendingDayFocus.current = false; }
+  }, [open, month, focusedDay]);
+
   const format = (valueToFormat: string) => valueToFormat.replaceAll("-", ".");
   const rangeLabel = value.from || value.to
     ? `${value.from ? format(value.from) : "…"} ~ ${value.to ? format(value.to).slice(value.from.slice(0, 4) === value.to.slice(0, 4) ? 5 : 0) : "…"}`
@@ -181,6 +189,7 @@ export function DateRangePicker({
           setDraft(value);
           setActivePreset(presetKinds.find(kind => sameRange(value, getPresetRange(kind, presetType))) ?? null);
           setMonth(value.from ? parse(value.from) : nowDate());
+          setFocusedDay(value.from || todayStamp);
           setOpen(true);
         }}
       >
@@ -261,12 +270,31 @@ export function DateRangePicker({
                     aria-label={day}
                     aria-pressed={Boolean(endpoint || inRange)}
                     aria-current={day === todayStamp ? "date" : undefined}
+                    data-date={day}
+                    tabIndex={day === (focusedDay.slice(0, 7) === stamp(month).slice(0, 7) || (typeof window !== "undefined" && window.matchMedia("(min-width: 640px)").matches && focusedDay.slice(0, 7) === stamp(localDate(month.getFullYear(), month.getMonth() + 1, 1)).slice(0, 7)) ? focusedDay : stamp(localDate(month.getFullYear(), month.getMonth(), 1))) ? 0 : -1}
+                    onKeyDown={event => {
+                      const offsets: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7, Home: -weekday, End: 6 - weekday };
+                      if (!(event.key in offsets) && event.key !== "PageUp" && event.key !== "PageDown") return;
+                      event.preventDefault();
+                      const next = parse(day);
+                      if (event.key === "PageUp" || event.key === "PageDown") {
+                        const targetMonth = next.getMonth() + (event.key === "PageDown" ? 1 : -1);
+                        const lastDay = localDate(next.getFullYear(), targetMonth + 1, 0).getDate();
+                        next.setDate(1); next.setMonth(targetMonth); next.setDate(Math.min(index + 1, lastDay));
+                      } else next.setDate(next.getDate() + offsets[event.key]);
+                      const target = disableFuture && stamp(next) > todayStamp ? todayStamp : stamp(next);
+                      const visibleMonths = window.matchMedia("(min-width: 640px)").matches ? 2 : 1;
+                      if (target < stamp(localDate(month.getFullYear(), month.getMonth(), 1)) || target >= stamp(localDate(month.getFullYear(), month.getMonth() + visibleMonths, 1))) setMonth(parse(target));
+                      pendingDayFocus.current = true;
+                      setFocusedDay(target);
+                    }}
                     onClick={() => {
+                      setFocusedDay(day);
                       setActivePreset(null);
                       choose(day);
                     }}
-                    className={`relative z-10 flex size-8 items-center justify-center rounded-full text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:!bg-transparent disabled:!text-slate-300 ${day === todayStamp && !endpoint ? "ring-1 ring-inset ring-emerald-600" : ""} ${endpoint ? "bg-brand-primary text-white" : inRange ? "text-emerald-900 hover:bg-emerald-100" : `${dayColor} hover:bg-slate-100`}`}
-                  >{index + 1}</button>
+                    className={`relative z-10 flex size-8 items-center justify-center rounded-full text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:!bg-transparent disabled:!text-slate-300 ${endpoint ? "bg-brand-primary text-white" : inRange ? "text-emerald-900 hover:bg-emerald-100" : `${dayColor} hover:bg-slate-100`}`}
+                  >{index + 1}{day === todayStamp ? <span aria-hidden="true" className={`absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full ${endpoint ? "bg-white" : "bg-brand-primary"}`} /> : null}</button>
                 </span>;
               })}
             </div>

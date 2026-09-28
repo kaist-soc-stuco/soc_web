@@ -4,7 +4,7 @@ import { createApiClient } from "@soc/api-client";
 import type { AuditLogEventKind, AuditLogRecord } from "@soc/contracts";
 import { isoToDate, nowIso } from "@soc/shared";
 import { Activity, ArrowDown, Download, FileJson } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
@@ -19,7 +19,7 @@ import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { downloadBlob } from "@/lib/download-blob";
-import { promptDownloadReason } from "@/lib/download-reason";
+import { useDownloadReasonDialog } from "@/components/ui/download-reason-dialog";
 import { Permissions } from "@/lib/permissions";
 
 type SortBy = "createdAt" | "actor" | "action";
@@ -140,6 +140,7 @@ const dateInputToday = () => {
 };
 
 export function AuditLogPage() {
+  const { promptDownloadReason, DownloadReasonDialog } = useDownloadReasonDialog();
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const canViewAuditLogs = Permissions.has(session?.permission ?? 0, Permissions.VIEW_AUDIT_LOG);
@@ -157,7 +158,9 @@ export function AuditLogPage() {
   const [pageSize, setPageSize] = useState(20);
   const [selectedLog, setSelectedLog] = useState<AuditLogRecord | null>(null);
 
+  const logRequest = useRef(0);
   const loadLogs = useCallback(async () => {
+    const request = ++logRequest.current;
     if (sessionLoading || !canViewAuditLogs) return;
     setLoading(true);
     try {
@@ -171,17 +174,19 @@ export function AuditLogPage() {
         dateFrom,
         dateTo,
       });
+      if (request !== logRequest.current) return;
       setData(response);
       setError(null);
     } catch (err) {
-      setError("운영 로그를 불러오지 못했습니다.");
+      if (request === logRequest.current) setError("운영 로그를 불러오지 못했습니다.");
     } finally {
-      setLoading(false);
+      if (request === logRequest.current) setLoading(false);
     }
   }, [canViewAuditLogs, client, currentPage, dateFrom, dateTo, pageSize, query, sessionLoading, sortBy, sortDirection, targetType]);
 
   useEffect(() => {
     void loadLogs();
+    return () => { logRequest.current++; };
   }, [loadLogs]);
 
   const totalCount = data?.total ?? 0;
@@ -204,10 +209,15 @@ export function AuditLogPage() {
     setCurrentPage(1);
   };
 
+  const [exporting, setExporting] = useState(false);
+  const exportLock = useRef(false);
   const handleExport = async () => {
-    const reason = promptDownloadReason();
-    if (!reason) return;
+    if (exportLock.current) return;
+    exportLock.current = true;
+    setExporting(true);
     try {
+      const reason = await promptDownloadReason();
+      if (!reason) return;
       const blob = await client.downloadAuditLogsXlsx(reason, {
         q: query,
         sortBy,
@@ -219,16 +229,17 @@ export function AuditLogPage() {
       downloadBlob(blob, `audit-logs-${dateFrom || "all"}-${dateTo || dateInputToday()}.xlsx`);
     } catch (err) {
       toast({ type: "error", message: "엑셀 파일을 만들지 못했습니다." });
-    }
+    } finally { exportLock.current = false; setExporting(false); }
   };
 
   return (
     <AuthGuard requirePermission={Permissions.VIEW_AUDIT_LOG}>
       <AdminPageShell>
+      {DownloadReasonDialog}
         <AdminPageMain>
           <AdminPageHeader
             title="운영 로그"
-            actions={<Button type="button" onClick={() => void handleExport()}><Download aria-hidden="true" className="size-4" />내보내기</Button>}
+            actions={<Button type="button" disabled={exporting} aria-busy={exporting} onClick={() => void handleExport()}><Download aria-hidden="true" className="size-4" />내보내기</Button>}
           />
 
           <AdminTableCard className="overflow-visible">

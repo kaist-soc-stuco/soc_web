@@ -78,8 +78,8 @@ export function BoardCategoryNavigation({
       />
       <PageTabs
         aria-label={lang === "ko" ? "게시판 분류" : "Board categories"}
-        variant="trackless"
-        className="hidden md:inline-flex"
+        variant="segmented"
+        className="clean-segmented-control hidden md:inline-flex"
       >
         <PageTabLink to="/board" active={!category}>
           {lang === "ko" ? "전체" : "All"}
@@ -213,7 +213,7 @@ export function BoardArticleTable({
         : "Anonymous"
       : (lang === "en" ? post.author.nameEn || post.author.name : post.author.name);
   const tableGridClass = `board-table-grid ${category ? "" : "board-table-grid--all"}`;
-  const renderArticleRow = (post: ArticleListItem, pinned = false, boundary = false) => {
+  const renderArticleRow = (post: ArticleListItem, pinned = false) => {
     const isNew =
       isoToMs(post.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
     const postCategory = post.boardCode || category || "notice";
@@ -223,7 +223,7 @@ export function BoardArticleTable({
       <div
         key={post.articleId}
         className={`interaction-row group flex min-h-12 border-b border-slate-100 px-4 py-1.5 md:px-6 ${
-          boundary ? "border-t-2 border-t-slate-300" : ""
+          pinned ? "bg-emerald-50/70 hover:bg-emerald-100/60" : ""
         }`}
       >
         <Link
@@ -333,7 +333,7 @@ export function BoardArticleTable({
                 }
               />
             ) : articles.length > 0
-              ? articles.map((post, index) => renderArticleRow(post, post.isPinned, !post.isPinned && index > 0 && articles[index - 1].isPinned))
+              ? articles.map((post) => renderArticleRow(post, post.isPinned))
               : !showInitialSkeleton ? (
                 <EmptyState
                   className="min-h-48 rounded-none border-0 bg-transparent"

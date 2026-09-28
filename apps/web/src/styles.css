@@ -4433,9 +4433,10 @@ html { scrollbar-gutter: stable; }
 }
 
 .roadmap-flow-viewport__controls--top [data-tooltip]::after {
-  left: 50%;
+  left: auto;
+  right: 0;
   top: calc(100% + 0.5rem);
-  transform: translateX(-50%);
+  transform: none;
 }
 
 .roadmap-flow-viewport__controls--bottom [data-tooltip]::after {
@@ -4894,8 +4895,8 @@ button[data-tooltip]:focus-visible::after {
 
 /* The search icon travels left as its inline field expands from a fixed right edge. */
 .site-header-search-slot { position: relative; width: var(--ui-control-height); height: var(--ui-control-height); flex-shrink: 0; }
-.site-header-inline-search { position: absolute; right: 0; top: 0; display: flex; align-items: center; width: var(--ui-control-height); height: 100%; border-radius: .75rem; background: transparent; transition: width 240ms ease, background-color 180ms ease, box-shadow 180ms ease; }
-.site-header-inline-search[data-open="true"] { width: min(20rem, calc(100vw - 9rem)); background: #f8fafc; box-shadow: inset 0 0 0 1px #cbd5e1; }
+.site-header-inline-search { position: absolute; right: 0; top: 0; display: flex; align-items: center; width: var(--ui-control-height); height: 100%; border-radius: .5rem; background: transparent; transition: width 240ms ease, background-color 180ms ease, box-shadow 180ms ease; }
+.site-header-inline-search[data-open="true"] { width: min(20rem, calc(100vw - 9rem)); background: #fcfdfd; box-shadow: inset 0 0 0 1px var(--color-brand-primary); }
 .site-header-search-fields { display: flex; flex: 1; align-items: center; min-width: 0; overflow: hidden; opacity: 0; transition: opacity 160ms ease; }
 .site-header-inline-search[data-open="true"] .site-header-search-fields { opacity: 1; }
 .site-header-search-fields input { width: 100%; min-width: 0; height: var(--ui-control-height); border: 0; outline: 0; background: transparent; color: #172033; font-size: .875rem; }
@@ -4911,3 +4912,6 @@ button[data-tooltip]:focus-visible::after {
 @media (prefers-reduced-motion: reduce) {
   .site-header-inline-search, .site-header-search-fields { transition: none; }
 }
+
+.site-header-inline-search[data-open="true"] button { color: #475569; }
+.site-header-inline-search[data-open="true"] > button:disabled { opacity: 1; background: transparent; cursor: default; }

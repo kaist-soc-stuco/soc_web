@@ -454,7 +454,7 @@ export function BoardWriteEventFields({
               id="event-description"
               type="text"
               aria-label={lang === "ko" ? "카드 요약 설명" : "Card summary"}
-              placeholder="설명을 입력하세요"
+              placeholder={lang === "ko" ? "설명을 입력하세요" : "Enter a description"}
               className="w-full"
               value={activeDescriptionLanguage === "ko" ? eventDescriptionKo : eventDescriptionEn}
               onChange={(event) => {

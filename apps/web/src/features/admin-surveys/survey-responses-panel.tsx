@@ -18,13 +18,14 @@ import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { formatSurveyAnswer } from "@/lib/survey-answer-display";
-import { promptDownloadReason } from "@/lib/download-reason";
+import { useDownloadReasonDialog } from "@/components/ui/download-reason-dialog";
 import { SurveyQuestionSummary } from "./survey-analytics-dashboard";
 
 const positiveInteger = (value: string | null) => Math.max(1, Math.min(1_000_000, Number.parseInt(value ?? "1", 10) || 1));
 
 /** Shares the editor's URL and leaves its draft state mounted while reading responses. */
 export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle, onSheet, onResponsesDeleted, sheetBusy = false }: { beforeToggle?: () => Promise<void>; onResponsesDeleted?: () => void; surveyId: string | null; onSheet?: () => Promise<void>; sheetBusy?: boolean }) {
+  const { promptDownloadReason, DownloadReasonDialog } = useDownloadReasonDialog();
   const surveyId = requestedSurveyId ?? "";
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -119,7 +120,7 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
 
 
   const exportCsv = async () => {
-    const reason = promptDownloadReason();
+    const reason = await promptDownloadReason();
     if (!reason) return;
     setExporting(true);
     try {
@@ -144,6 +145,7 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
     finally {setExporting(false);}
   };
   return <section aria-label="설문 응답" className="survey-responses-panel min-w-0 space-y-5">
+      {DownloadReasonDialog}
     <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
       <div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-3xl font-normal tracking-tight sm:text-4xl">응답 {statistics.data?.totalResponses ?? 0}개</h2>
 <div className="flex items-center gap-2">

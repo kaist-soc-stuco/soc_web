@@ -33,7 +33,7 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Permissions } from "@/lib/permissions";
-import { promptDownloadReason } from "@/lib/download-reason";
+import { useDownloadReasonDialog } from "@/components/ui/download-reason-dialog";
 
 type DraftItem = CreateVoteRequest["items"][number];
 type Draft = Omit<CreateVoteRequest, "startsAt" | "endsAt"> & { startsAt: string; endsAt: string };
@@ -171,6 +171,7 @@ export function VoteEditorPage() {
   const [candidates, setCandidates] = useState<Pick<AdminUserRecord, "userId" | "nameKo" | "stdNo">[]>([]);
   const [busy, setBusy] = useState(false);
   const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { promptDownloadReason, DownloadReasonDialog } = useDownloadReasonDialog();
   const { toast } = useToast();
 
   const load = async (voteId: string) => {
@@ -376,21 +377,31 @@ export function VoteEditorPage() {
   const [rosterPage, setRosterPage] = useState(1);
   const [rosterPageSize, setRosterPageSize] = useState(20);
   const [addingVoter, setAddingVoter] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const exportLock = useRef(false);
   const exportRoster = async () => {
-    const reason = promptDownloadReason();
-    if (!reason || !id) return;
+    if (!id || exportLock.current) return;
+    exportLock.current = true; setExporting(true);
+    try {
+    const reason = await promptDownloadReason();
+    if (!reason) return;
     await client.recordPersonalDataDownload({ count: effectiveVoters.length, kind: "vote_roster", reason, targetId: id });
     const sheet = XLSX.utils.json_to_sheet(effectiveVoters.map(voter => ({ 학번: voter.studentNumber, 이름: voter.nameKo, 참여: voter.hasVoted ? "참여" : "미참여", 상태: voter.status, "투표 일시": formatVotedTime(voter.votedAt) })));
     const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, sheet, "선거인명부"); XLSX.writeFile(workbook, "선거인명부.xlsx");
+    } catch { toast({ type: "error", message: "선거인명부를 내려받지 못했습니다. 다시 시도해 주세요." }); }
+    finally { exportLock.current = false; setExporting(false); }
   };
   const exportResults = async () => {
-    if (!id) return;
-    const reason = promptDownloadReason();
+    if (!id || exportLock.current) return;
+    exportLock.current = true; setExporting(true);
+    try {
+    const reason = await promptDownloadReason();
     if (!reason) return;
-    try { const results = await client.getVoteResults(id); const workbook = XLSX.utils.book_new(); const rows = results.items.flatMap(item => item.options.map(option => ({ 안건: stripRichText(item.titleKo), 선택지: option.labelKo, 득표: option.count, 비율: option.percentage })));
+    const results = await client.getVoteResults(id); const workbook = XLSX.utils.book_new(); const rows = results.items.flatMap(item => item.options.map(option => ({ 안건: stripRichText(item.titleKo), 선택지: option.labelKo, 득표: option.count, 비율: option.percentage })));
       await client.recordPersonalDataDownload({ count: rows.length, kind: "vote_results", reason, targetId: id });
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), "개표 결과"); XLSX.writeFile(workbook, "투표 결과.xlsx");
     } catch { toast({ type: "error", message: "결과를 내려받지 못했습니다." }); }
+    finally { exportLock.current = false; setExporting(false); }
   };
   const visibleVoters = effectiveVoters.filter((voter) => `${voter.nameKo} ${voter.studentNumber ?? ""} ${voter.email}`.toLowerCase().includes(voterQuery.toLowerCase()));
   const quorumMet = !!vote && meetsVoteQuorum(vote.eligibleCount, vote.votedCount, vote.quorumPercent, vote.quorumInclusive);
@@ -408,7 +419,7 @@ export function VoteEditorPage() {
             <IconButton aria-label="미리보기" data-tooltip="미리보기" className="border-0 text-slate-600" onClick={() => { const tab=window.open("about:blank","_blank"); if(tab)tab.opener=null; void (editable ? save() : Promise.resolve()).then(()=>{if(tab)tab.location.href=`/votes/${voteIdRef.current}?preview=1`;}).catch(()=>{tab?.close();toast({type:"error",message:"미리보기를 열지 못했습니다."});}); }}><Eye className="size-5" /></IconButton>
             <DropdownMenu.Root modal={false}><DropdownMenu.Trigger asChild><IconButton aria-label="투표 더보기"><MoreVertical className="size-5" /></IconButton></DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[100] w-44 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
               <DropdownMenu.Item disabled={busy} className="flex cursor-pointer items-center gap-2 rounded px-3 py-2 text-sm outline-none focus:bg-slate-100" onSelect={() => void (async()=>{try{if(editable)await save();const body=payload();const copy=await client.createVote({...body,titleKo:`${body.titleKo} 사본`,items:body.items.map(item=>({...item,id:uid(),options:item.options.map(option=>({...option,id:uid()}))}))});navigate(`/admin/votes/${copy.id}`);}catch{toast({type:"error",message:"사본을 만들지 못했습니다."});}})()}><Copy className="size-4" />사본 만들기</DropdownMenu.Item>
-              {editable && <DropdownMenu.Item disabled={busy} className="flex cursor-pointer items-center gap-2 rounded px-3 py-2 text-sm text-rose-600 outline-none focus:bg-rose-50" onSelect={() => void (async()=>{if(!await confirm({title:"투표 삭제",description:"이 투표와 선거인명부를 삭제하시겠습니까?",confirmLabel:"삭제"}))return;setBusy(true);try{await save();await client.deleteVote(voteIdRef.current!);setDirty(false);navigate("/admin/votes");}catch{toast({type:"error",message:"투표를 삭제하지 못했습니다."});}finally{setBusy(false);}})()}><Trash2 className="size-4" />삭제</DropdownMenu.Item>}
+              {editable && <DropdownMenu.Item disabled={busy} className="flex cursor-pointer items-center gap-2 rounded px-3 py-2 text-sm text-rose-600 outline-none focus:bg-rose-50" onSelect={() => void (async()=>{if(!await confirm({tone:"danger",title:"투표 삭제",description:"이 투표와 선거인명부를 삭제하시겠습니까?",confirmLabel:"삭제"}))return;setBusy(true);try{await save();await client.deleteVote(voteIdRef.current!);setDirty(false);navigate("/admin/votes");}catch{toast({type:"error",message:"투표를 삭제하지 못했습니다."});}finally{setBusy(false);}})()}><Trash2 className="size-4" />삭제</DropdownMenu.Item>}
             </DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
             {editable ? <Button onClick={() => void run("게시", () => client.publishVote(voteIdRef.current!))} disabled={busy}>게시</Button> : null}
             {vote?.status === "PUBLISHED" && clock < isoToMs(vote.endsAt) ? <Button onClick={() => void run("마감", () => client.closeVote(voteIdRef.current!))} disabled={busy || !quorumMet} title={!quorumMet ? "개표 정족수에 도달해야 마감할 수 있습니다." : undefined}>투표 조기 마감</Button> : null}
@@ -424,7 +435,7 @@ export function VoteEditorPage() {
           <div className="space-y-5 p-5">
             {vote?.status === "CLOSED" && <p className="text-sm text-slate-600">투표가 마감되었습니다. 상단의 ‘개표’를 누르면 결과를 집계합니다.</p>}
             {vote ? <VoteProgress vote={vote} /> : <p className="text-sm text-slate-500">투표를 저장하면 진행 현황을 확인할 수 있습니다.</p>}
-            {results ? <div className="flex gap-2"><Button variant="outline" onClick={()=>void exportResults()}>결과 엑셀 다운로드</Button><Button variant="outline" onClick={()=>window.print()}>인쇄</Button></div> : null}
+            {results ? <div className="flex gap-2"><Button variant="outline" disabled={exporting} aria-busy={exporting} onClick={()=>void exportResults()}>결과 엑셀 다운로드</Button><Button variant="outline" onClick={()=>window.print()}>인쇄</Button></div> : null}
             {results ? <div className="space-y-6 border-t border-slate-100 pt-5"><h2 className="font-semibold">{stripRichText(vote?.titleKo)} 개표 결과</h2><p className="text-sm">총 {results.totalBallots}명 참여</p>{results.items.map(item => <section key={item.itemId} className="space-y-3"><h3 className="font-medium">{stripRichText(item.titleKo)}</h3>{item.options.map(option => <div key={option.optionId}><div className="mb-1 flex justify-between gap-3 text-sm"><span>{option.labelKo}</span><span>{option.count}표 ({option.percentage.toFixed(1)}%)</span></div><div className="h-3 rounded-full bg-slate-100"><div className={`h-full rounded-full ${option.count > 0 && option.count === Math.max(...item.options.map(value => value.count)) ? "bg-emerald-500" : "bg-emerald-500"}`} style={{ width: `${Math.min(100, option.percentage)}%` }} /></div></div>)}</section>)}</div> : null}
           </div>
         </AdminCard> : null}
@@ -514,7 +525,7 @@ export function VoteEditorPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5">
             <UiInput className="w-full max-w-xs md:ml-auto" placeholder="학번 또는 이름 검색" value={voterQuery} onChange={e=>{setVoterQuery(e.target.value);setRosterPage(1);}} />
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => void exportRoster()}><Download />내보내기</Button>
+              <Button variant="outline" disabled={exporting} aria-busy={exporting} onClick={() => void exportRoster()}><Download />내보내기</Button>
               {rosterEditable ? <>
                 <Button variant="outline" onClick={() => setUploadDialogOpen(true)}><Upload className="size-4" />엑셀 업로드</Button>
                 <Button variant="outline" onClick={()=>setAddingVoter(true)}><UserPlus />수동 추가</Button>
@@ -583,6 +594,7 @@ export function VoteEditorPage() {
 
       </AdminPageMain></AdminPageShell>
       {ConfirmDialog}
+      {DownloadReasonDialog}
     </AuthGuard>
   );
 }

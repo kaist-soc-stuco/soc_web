@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import type { ArticleEngagementKind, KoreanHolidayRecord } from "@soc/contracts";
@@ -73,8 +73,27 @@ export function useEventsSurveysPageController({
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
-  const [stateFilter, setStateFilter] =
-    useState<EventsSurveysStateFilter>("all");
+  const [params, setParams] = useSearchParams();
+  const stateFilter: EventsSurveysStateFilter = (["all", "before_open", "open", "closed"] as const).find(value => value === params.get("state")) ?? "all";
+  const itemQuery = params.get("q") ?? "";
+  const dateFrom = params.get("from") ?? "";
+  const dateTo = params.get("to") ?? "";
+  const requestedPage = Number(params.get("page"));
+  const currentPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const updateFilters = useCallback((changes: Record<string, string>, preserveScroll = false) => {
+    setParams(previous => {
+      const next = new URLSearchParams(previous);
+      for (const [key, value] of Object.entries(changes)) {
+        if (value) next.set(key, value); else next.delete(key);
+      }
+      return next;
+    }, { replace: true, state: { preserveScroll } });
+  }, [setParams]);
+  const setStateFilter = (value: EventsSurveysStateFilter) => updateFilters({ state: value === "all" ? "" : value, page: "" });
+  const setItemQuery = (value: string) => updateFilters({ q: value, page: "" }, true);
+  const setDateRange = ({ from, to }: { from: string; to: string }) => updateFilters({ from, to, page: "" });
+  const setCurrentPage = (page: number) => updateFilters({ page: page > 1 ? String(page) : "" });
+  const resetListFilters = () => updateFilters({ q: "", from: "", to: "", state: "", page: "" });
   const [currentDate, setCurrentDate] = useState(() => {
     const selected = parseSelectedCalendarDate(selectedParam);
     return selected
@@ -91,10 +110,6 @@ export function useEventsSurveysPageController({
     () => parseSelectedCalendarDate(selectedParam) ?? nowDate(),
   );
   const [calendarQuery, setCalendarQuery] = useState("");
-  const [itemQuery, setItemQuery] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
   const [engagementSubmitting, setEngagementSubmitting] = useState<string | null>(null);
   const [engagementOverrides, setEngagementOverrides] = useState<
     Record<string, Partial<UnifiedItem>>
@@ -293,12 +308,10 @@ export function useEventsSurveysPageController({
   const totalPages = Math.max(1, Math.ceil(totalItems / PUBLIC_ITEMS_PAGE_SIZE));
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [currentTab, dateFrom, dateTo, itemQuery, stateFilter]);
-
-  useEffect(() => {
-    setCurrentPage((page) => Math.min(page, totalPages));
-  }, [totalPages]);
+    if (listQuery.isSuccess && !listQuery.isFetching && currentTab !== "calendar" && currentPage > totalPages) {
+      updateFilters({ page: totalPages > 1 ? String(totalPages) : "" }, true);
+    }
+  }, [currentPage, currentTab, listQuery.isSuccess, listQuery.isFetching, totalPages, updateFilters]);
 
   const visibleItems = useMemo(() => {
     const start = (currentPage - 1) * PUBLIC_ITEMS_PAGE_SIZE;
@@ -446,8 +459,8 @@ export function useEventsSurveysPageController({
     setCurrentDate: handleCurrentDateChange,
     setCalendarQuery,
     setCurrentPage,
-    setDateFrom,
-    setDateTo,
+    setDateRange,
+    resetListFilters,
     itemQuery,
     setItemQuery,
     setSelectedDate,

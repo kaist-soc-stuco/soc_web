@@ -1,3 +1,4 @@
+import { ErrorState } from "@/components/ui/data-state";
 import { Header } from "@/components/organisms/header";
 import { Footer } from "@/components/organisms/footer";
 import {
@@ -24,6 +25,10 @@ export function MyPage() {
     isAdmin,
     lang,
     loadError,
+    loading,
+    profileError,
+    retryActivity,
+    retryProfile,
     menuItems,
     session,
     scraps,
@@ -53,7 +58,6 @@ export function MyPage() {
                   const nextMenu = menuItems.find((item) => item.id === event.currentTarget.value)?.id;
                   if (!nextMenu) return;
                   setActiveMenu(nextMenu);
-                  setCurrentPage(1);
                 }}
                 className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/15"
               >
@@ -68,10 +72,7 @@ export function MyPage() {
               activeMenu={activeMenu}
               lang={lang}
               menuItems={menuItems}
-              onMenuChange={(menu) => {
-                setActiveMenu(menu);
-                setCurrentPage(1);
-              }}
+              onMenuChange={setActiveMenu}
             />
           </>
         ) : null}
@@ -86,13 +87,7 @@ export function MyPage() {
             />
           ) : (
             <div className="flex flex-col gap-5 w-full">
-              {loadError && (
-                <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3 text-xs font-bold text-amber-800">
-                  {loadError}
-                </div>
-              )}
-
-              {activeMenu === "profile" && (
+              {activeMenu === "profile" && (profileError ? <ErrorState onRetry={retryProfile} /> :
                 <MyPageProfilePanel
                   displayName={displayName}
                   isAdmin={isAdmin}
@@ -103,6 +98,9 @@ export function MyPage() {
 
               {activeMenu === "activity" && (
                 <MyPageActivityPanel
+                  loading={loading}
+                  error={loadError}
+                  onRetry={retryActivity}
                   activeTab={activeTab}
                   activities={filteredActivities}
                   activityQuery={activityQuery}
@@ -110,14 +108,8 @@ export function MyPage() {
                   currentPage={currentPage}
                   scraps={scraps}
                   onPageChange={setCurrentPage}
-                  onQueryChange={(query) => {
-                    setActivityQuery(query);
-                    setCurrentPage(1);
-                  }}
-                  onTabChange={(tab) => {
-                    setActiveTab(tab);
-                    setCurrentPage(1);
-                  }}
+                  onQueryChange={setActivityQuery}
+                  onTabChange={setActiveTab}
                   lang={lang}
                   totalPages={totalPages}
                 />
