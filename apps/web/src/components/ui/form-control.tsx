@@ -24,7 +24,7 @@ export const UiInput = React.forwardRef<
     ref={ref}
     type={type}
     data-slot="input"
-    className={cn(unstyledInputTypes.has(type) ? undefined : textControlClassName, className)}
+    className={cn(unstyledInputTypes.has(type) ? undefined : textControlClassName, type === "checkbox" && "ui-checkbox", className)}
     {...props}
   />
 ));

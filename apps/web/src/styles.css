@@ -4921,3 +4921,36 @@ button[data-tooltip]:focus-visible::after {
   flex: 1;
   min-height: calc(100svh - var(--ui-header-height));
 }
+
+/* Native checkbox semantics with one shared visual treatment. */
+.ui-checkbox {
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  border: 1px solid #b8c5d3;
+  border-radius: 0.25rem;
+  background-color: white;
+  background-position: center;
+  background-repeat: no-repeat;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background-color 120ms, border-color 120ms;
+}
+.ui-checkbox:checked, .ui-checkbox:indeterminate {
+  background-color: var(--color-brand-primary);
+  border-color: var(--color-brand-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m2 6 2.5 2.5L10 3' fill='none' stroke='white' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.ui-checkbox:indeterminate { background-image: linear-gradient(white,white); background-size: 0.5rem 2px; }
+.ui-checkbox:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 3px; }
+.ui-checkbox:disabled { opacity: 0.45; cursor: not-allowed; }
+@media (forced-colors: active) { .ui-checkbox { appearance: auto; } }
+
+.crop-zoom-slider { appearance: none; height: 1rem; background: transparent; cursor: pointer; }
+.crop-zoom-slider::-webkit-slider-runnable-track { height: 3px; border-radius: 999px; background: #e2e8f0; }
+.crop-zoom-slider::-moz-range-track { height: 3px; border-radius: 999px; background: #e2e8f0; }
+.crop-zoom-slider::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; margin-top: -4.5px; border-radius: 50%; background: #1e293b; }
+.crop-zoom-slider::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #1e293b; }
+.crop-zoom-slider:focus-visible { outline: 2px solid #64748b; outline-offset: 3px; border-radius: 4px; }
+.crop-zoom-slider:disabled { cursor: not-allowed; opacity: 0.4; }

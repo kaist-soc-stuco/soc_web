@@ -2,7 +2,6 @@ import type { ReactNode, RefObject } from "react";
 import { useState } from "react";
 import type { SurveyRecord } from "@soc/contracts";
 import {
-  Check,
   ChevronDown,
   FileText,
   Image,
@@ -296,46 +295,22 @@ export function BoardWriteEventFields({
     <div className="space-y-4 p-5 animate-in fade-in duration-300">
       <div className="flex items-center gap-6">
         <label className="inline-flex shrink-0 cursor-pointer items-center gap-2.5 group">
-          <div
-            className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${
-              isAllDay
-                ? "bg-kaist-darkgreen border-kaist-darkgreen text-white"
-                : "border-slate-300 group-hover:border-kaist-darkgreen"
-            }`}
-          >
-            {isAllDay && (
-              <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-            )}
-          </div>
           <UiInput
             type="checkbox"
-            className="hidden"
             checked={isAllDay}
             onChange={(event) => onAllDayChange(event.target.checked)}
           />
-          <span className="text-[length:var(--ui-text-caption-size)] font-bold text-slate-700">
+          <span className="text-sm font-medium text-slate-600">
             {lang === "ko" ? "종일" : "All day"}
           </span>
         </label>
         <label className="inline-flex shrink-0 cursor-pointer items-center gap-2.5 group">
-          <div
-            className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${
-              isEventAlwaysOpen
-                ? "bg-kaist-darkgreen border-kaist-darkgreen text-white"
-                : "border-slate-300 group-hover:border-kaist-darkgreen"
-            }`}
-          >
-            {isEventAlwaysOpen && (
-              <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-            )}
-          </div>
           <UiInput
             type="checkbox"
-            className="hidden"
             checked={isEventAlwaysOpen}
             onChange={(event) => onEventAlwaysOpenChange(event.target.checked)}
           />
-          <span className="text-[length:var(--ui-text-caption-size)] font-bold text-slate-700">
+          <span className="text-sm font-medium text-slate-600">
             {lang === "ko" ? "상시 진행" : "Always open"}
           </span>
         </label>
@@ -641,20 +616,8 @@ export function BoardWriteSettings({
             <div className={isEvent ? "grid grid-cols-2 gap-x-4 gap-y-3" : stacked ? "grid grid-cols-1 gap-y-3" : "flex flex-wrap gap-x-10 gap-y-4"}>
             {allowSecret && (
               <label className="flex min-h-11 items-center gap-2.5 cursor-pointer group">
-                <div
-                  className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
-                    isSecret
-                      ? "bg-amber-600 border-amber-600 text-white"
-                      : "border-slate-300 bg-white group-hover:border-amber-600"
-                  }`}
-                >
-                  {isSecret && (
-                    <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                  )}
-                </div>
                 <UiInput
                   type="checkbox"
-                  className="hidden"
                   checked={isSecret}
                   onChange={(event) => onSecretChange(event.target.checked)}
                 />
@@ -666,20 +629,8 @@ export function BoardWriteSettings({
 
             {boardCode !== "suggestions" ? (
               <label className="flex min-h-11 items-center gap-2.5 cursor-pointer group">
-                <div
-                  className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
-                    allowComment
-                      ? "bg-kaist-darkgreen border-kaist-darkgreen text-white"
-                      : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
-                  }`}
-                >
-                  {allowComment && (
-                    <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                  )}
-                </div>
                 <UiInput
                   type="checkbox"
-                  className="hidden"
                   checked={allowComment}
                   onChange={(event) => onAllowCommentChange(event.target.checked)}
                 />
@@ -691,18 +642,8 @@ export function BoardWriteSettings({
 
             {isEvent && canConfigurePostSettings && onHomeVisibleChange ? (
               <label className="flex min-h-11 cursor-pointer items-center gap-2.5 group">
-                <div
-                  className={`flex h-4.5 w-4.5 items-center justify-center rounded border transition-all ${
-                    homeVisible
-                      ? "border-kaist-darkgreen bg-kaist-darkgreen text-white"
-                      : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
-                  }`}
-                >
-                  {homeVisible && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
-                </div>
                 <UiInput
                   type="checkbox"
-                  className="hidden"
                   checked={homeVisible}
                   onChange={(event) => onHomeVisibleChange(event.target.checked)}
                 />
@@ -784,16 +725,20 @@ export function BoardPostToolbarOptions({ lang, canPin, pinned, onPinnedChange, 
       {lang === "ko" ? "게시 종료일" : "End date"}
       <UiInput type="date" aria-label={lang === "ko" ? "게시 종료일" : "End date"} value={endDate.slice(0, 10)} onChange={(event) => onEndDateChange(event.target.value)} className="w-36" />
     </label>}
-    {canPin && <label className="ml-2 flex min-h-8 cursor-pointer items-center gap-2 border-l border-slate-200 pl-4 text-sm font-medium text-slate-600">
-      <UiInput type="checkbox" checked={pinned} onChange={(event) => onPinnedChange(event.target.checked)} />
-      {lang === "ko" ? "상단 고정" : "Pin to top"}
+    {canPin && <label className="ml-2 inline-flex h-8 shrink-0 cursor-pointer items-center gap-2 border-l border-slate-200 pl-4 text-sm font-medium leading-none text-slate-600">
+      <UiInput type="checkbox" checked={pinned} onChange={(event) => onPinnedChange(event.target.checked)} className="size-4 shrink-0 accent-emerald-700" />
+      <span className="leading-5">{lang === "ko" ? "상단 고정" : "Pin to top"}</span>
     </label>}
   </>;
 }
 
 export function BoardEditorViewControl({ view, onChange, lang }: { view: "ko" | "en" | "split"; onChange: (value: "ko" | "en" | "split") => void; lang: string }) {
+  const labels = lang === "ko"
+    ? { ko: "한국어", en: "영어", split: "분할" }
+    : { ko: "Korean", en: "English", split: "Split" };
+
   return <div role="group" aria-label={lang === "ko" ? "편집 언어 보기" : "Editor language view"} className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5">
-    {([['ko', '한국어'], ['en', 'English'], ['split', lang === 'ko' ? '분할' : 'Split']] as const).map(([value, label]) =>
-      <Button key={value} type="button" variant="ghost" size="sm" aria-pressed={view === value} className={view === value ? "h-7 bg-white text-sm !font-bold text-kaist-darkgreen shadow-sm" : "h-7 text-sm text-slate-500"} onClick={() => onChange(value)}>{label}</Button>)}
+    {(["ko", "en", "split"] as const).map((value) =>
+      <Button key={value} type="button" variant="ghost" size="sm" aria-pressed={view === value} className={view === value ? "h-7 bg-white text-sm !font-bold text-kaist-darkgreen shadow-sm" : "h-7 text-sm text-slate-500"} onClick={() => onChange(value)}>{labels[value]}</Button>)}
   </div>;
 }

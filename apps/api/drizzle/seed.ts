@@ -1,3 +1,4 @@
+import { nowMs } from "@soc/shared";
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { and, asc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
@@ -47,6 +48,12 @@ import {
   ROADMAP_REFERENCE_OFFERINGS,
   ROADMAP_REFERENCE_RELATIONS,
 } from "./roadmap-reference";
+
+// Keep demo dates stable throughout one seed run, relative to today's Korean date.
+const seedNow = nowMs();
+const seedDay = Math.floor((seedNow + 9 * 3600000) / 86400000) * 86400000 - 9 * 3600000;
+const demoDate = (days: number, hour = 9, minute = 0) =>
+  new Date(seedDay + days * 86400000 + hour * 3600000 + minute * 60000);
 
 const readRequiredEnv = (name: string): string => {
   const value = process.env[name]?.trim();
@@ -863,6 +870,8 @@ type QuestionOptionSeed = {
 };
 
 type QuestionConfigSeed = {
+  validationType?: "regex";
+  validationErrorMessage?: string;
   rows?: QuestionOptionSeed[];
   columns?: QuestionOptionSeed[];
   ratingMax?: number;
@@ -891,6 +900,7 @@ type QuestionSeed = {
     | "rating";
   options?: QuestionOptionSeed[];
   config?: QuestionConfigSeed;
+  answerRegex?: string;
   isRequired?: boolean;
   sortOrder: number;
 };
@@ -955,6 +965,8 @@ const OPERATIONAL_SURVEY_SEEDS: OperationalSurveySeed[] = [
         "id": "7a130000-0000-4000-8000-000000000101",
         "titleKo": "이메일",
         "titleEn": "Email",
+        "answerRegex": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+        "config": { "validationType": "regex", "validationErrorMessage": "올바른 이메일 주소를 입력해 주세요. (예: name@example.com)" },
         "questionType": "short_text",
         "sortOrder": 0
       },
@@ -1087,7 +1099,7 @@ const OPERATIONAL_SURVEY_SEEDS: OperationalSurveySeed[] = [
 - 2026학년도에 접수된 홍보 글은 20~25학번 채팅방에 공지될 예정입니다.
 
 2️⃣ 승인 절차
-- 구글 설문지 (https://bit.ly/4bF7Zi)를 통해 홍보 요청 양식을 제출합니다.
+- 이 페이지 아래의 홍보 요청 양식을 작성한 뒤 ‘제출’을 눌러 주세요.
 - 문서 하단의 '4. 승인 기준'에 따라 검토 후 승인되는 경우, 전산학부 게시판에 업로드 이후 매주 월요일에 학번별 채팅방에 게시됩니다.
 - 문서의 보완이 필요하거나 채팅방 성격에 맞지 않는 공지인 경우, 기재해주신 연락처로 연락드릴 예정입니다.
 
@@ -1120,6 +1132,8 @@ This form is for requesting promotion of external events, recruitment, research 
         "id": "7a130000-0000-4000-8000-000000000034",
         "titleKo": "이메일",
         "titleEn": "Email",
+        "answerRegex": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+        "config": { "validationType": "regex", "validationErrorMessage": "올바른 이메일 주소를 입력해 주세요. (예: name@example.com)" },
         "questionType": "short_text",
         "sortOrder": 0
       },
@@ -1362,8 +1376,8 @@ function makeAllQuestionTypesSurvey(): SurveySeed {
     allowMultipleResponses: true,
     allowResponseEdit: true,
     resultVisibility: "PRIVATE",
-    openAt: new Date("2026-08-20T09:00:00+09:00"),
-    closeAt: new Date("2026-12-31T23:59:00+09:00"),
+    openAt: demoDate(-7),
+    closeAt: demoDate(30, 23, 59),
     sections: [
       {
         titleKo: "기본 입력",
@@ -2580,7 +2594,8 @@ async function seedOperationalSurveys() {
           row.questionType === definition.questionType && row.sortOrder === definition.sortOrder &&
           row.isRequired === (definition.isRequired ?? true) &&
           isDeepStrictEqual(row.options, definition.options ?? null) &&
-          isDeepStrictEqual(row.config, definition.config ?? null);
+          isDeepStrictEqual(row.config, definition.config ?? null) &&
+          row.answerRegex === (definition.answerRegex ?? null);
       });
       if (unchanged && existing.descriptionKo === seed.descriptionKo && existing.descriptionEn === seed.descriptionEn &&
         JSON.stringify(existing.eligibleSocAffiliations) === JSON.stringify(seed.eligibleSocAffiliations)) continue;
@@ -2663,6 +2678,7 @@ async function seedOperationalSurveys() {
           questionType: question.questionType,
           options: question.options,
           config: question.config,
+          answerRegex: question.answerRegex,
           isRequired: question.isRequired ?? true,
           sortOrder: question.sortOrder,
         })
@@ -2820,8 +2836,8 @@ async function seedVotes(creatorId: string) {
       titleEn: "Fall 2026 Student Council Program Poll",
       descriptionKo: "이번 학기에 함께하고 싶은 학생회 프로그램을 선택해 주세요.",
       descriptionEn: "Choose the student council programs you would like to join this semester.",
-      startsAt: new Date("2026-08-24T09:00:00+09:00"),
-      endsAt: new Date("2026-09-07T23:59:00+09:00"),
+      startsAt: demoDate(-21),
+      endsAt: demoDate(-7, 23, 59),
       items: [
         {
           titleKo: "가장 참여하고 싶은 프로그램을 골라 주세요.",
@@ -2857,8 +2873,8 @@ async function seedVotes(creatorId: string) {
       titleEn: "Fall 2026 Student Council Program Preferences",
       descriptionKo: "2026 가을학기에 열렸으면 하는 학생회 프로그램을 골라 주세요.",
       descriptionEn: "Choose the student council programs you would like to see this fall.",
-      startsAt: new Date("2026-09-08T09:00:00+09:00"),
-      endsAt: new Date("2026-09-30T23:59:00+09:00"),
+      startsAt: demoDate(3),
+      endsAt: demoDate(17, 23, 59),
       items: [
         {
           titleKo: "가장 기대되는 가을 프로그램을 골라 주세요.",
@@ -3883,7 +3899,17 @@ async function seedMockData() {
     },
   ];
 
-  for (const event of eventItems) {
+  // Preserve each event's local time and duration while covering past, ongoing,
+  // and upcoming states on every run. Linked registration dates move with it.
+  const eventDayOffsets = [-45, -28, -14, -7, -2, -1, 7, 14];
+  for (const [index, event] of eventItems.entries()) {
+    const originalDay = Math.floor((event.eventStartDate.getTime() + 9 * 3600000) / 86400000) * 86400000 - 9 * 3600000;
+    const shift = demoDate(eventDayOffsets[index], 0).getTime() - originalDay;
+    event.eventStartDate = new Date(event.eventStartDate.getTime() + shift);
+    event.eventEndDate = new Date(event.eventEndDate.getTime() + shift);
+    event.postedAt = new Date(event.postedAt.getTime() + shift);
+    event.survey.openAt = new Date(event.survey.openAt.getTime() + shift);
+    event.survey.closeAt = new Date(event.survey.closeAt.getTime() + shift);
     const [articleRow] = await db.insert(articles).values({
       boardId: eventBoard.boardId,
       authorUserId: seedAuthor.userId,
@@ -3938,7 +3964,7 @@ async function seedOngoingVote() {
   await createSeedVote(demoAccount.userId, demoAccount, {
     titleKo: title, titleEn: "Student council initiative vote",
     descriptionKo: "로컬 테스트용 투표입니다.", descriptionEn: "Local demonstration election.",
-    startsAt: new Date(Date.now() - 86400000), endsAt: new Date(Date.now() + 7 * 86400000),
+    startsAt: demoDate(-1), endsAt: demoDate(7, 23, 59),
     items: [{titleKo: "학생회 사업 추진 승인", titleEn: "Approve the student council initiative", descriptionKo: null, descriptionEn: null,
       type: "YES_NO_ABSTAIN", maxSelections: 1, options: [
         {labelKo: "찬성", labelEn: "Yes"}, {labelKo: "반대", labelEn: "No"}, {labelKo: "기권", labelEn: "Abstain"}
