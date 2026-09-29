@@ -829,9 +829,6 @@ export function RoadmapGraph({
               onOfferedOnlyChange={setOfferedOnly}
               onTermChange={setSelectedTerm}
             />
-            <span className="hidden min-h-9 items-center text-xs font-medium text-slate-500 sm:inline-flex">
-              {lang === "ko" ? "드래그 이동 · Ctrl/⌘ + 휠 확대" : "Drag to pan · Ctrl/⌘ + wheel to zoom"}
-            </span>
           </div>
         </div>
 
@@ -1005,9 +1002,9 @@ function RoadmapOfferingControls({
         options={termOptions}
         onChange={(value) => onTermChange(value as RoadmapOfferingTerm)}
         className="w-36 shrink-0"
-        buttonClassName="h-11 !min-h-11 text-xs"
+        buttonClassName="h-11 !min-h-11 text-[length:var(--ui-text-body-sm-size)] font-medium"
       />
-      <label className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900">
+      <label className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900">
         <input
           type="checkbox"
           checked={offeredOnly}

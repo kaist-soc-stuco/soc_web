@@ -99,7 +99,7 @@ export function DateRangePicker({
 
   const close = () => {
     setOpen(false);
-    trigger.current?.focus();
+    trigger.current?.focus({ preventScroll: true });
   };
 
   useLayoutEffect(() => {
@@ -126,7 +126,7 @@ export function DateRangePicker({
     };
 
     place();
-    panel.current?.focus();
+    panel.current?.focus({ preventScroll: true });
     const outside = (event: PointerEvent) => {
       if (!panel.current?.contains(event.target as Node) && !trigger.current?.contains(event.target as Node)) {
         setOpen(false);
@@ -145,16 +145,16 @@ export function DateRangePicker({
   useLayoutEffect(() => {
     if (!open || !pendingDayFocus.current) return;
     const button = panel.current?.querySelector<HTMLButtonElement>(`[data-date="${focusedDay}"]`);
-    if (button) { button.focus(); pendingDayFocus.current = false; }
+    if (button) { button.focus({ preventScroll: true }); pendingDayFocus.current = false; }
   }, [open, month, focusedDay]);
 
   const format = (valueToFormat: string) => valueToFormat.replaceAll("-", ".");
   const rangeLabel = value.from || value.to
     ? `${value.from ? format(value.from) : "…"} ~ ${value.to ? format(value.to).slice(value.from.slice(0, 4) === value.to.slice(0, 4) ? 5 : 0) : "…"}`
-    : ko ? "전체 기간" : "All dates";
+    : "";
   const rangeSummary = draft.from
     ? `${format(draft.from)} – ${draft.to ? format(draft.to).slice(draft.from.slice(0, 4) === draft.to.slice(0, 4) ? 5 : 0) : ko ? "종료일 선택" : "Select end date"}`
-    : ko ? "전체 기간" : "All dates";
+    : "";
 
   const choose = (day: string) => {
     if (disableFuture && day > todayStamp) return;
@@ -179,7 +179,7 @@ export function DateRangePicker({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        aria-label={`${label}: ${rangeLabel}`}
+        aria-label={rangeLabel ? `${label}: ${rangeLabel}` : label}
         className={`max-w-full gap-2 font-normal ${value.from || value.to ? "pr-10" : ""}`}
         onClick={() => {
           if (open) {

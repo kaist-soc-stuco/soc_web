@@ -10,9 +10,9 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { hasAdminPermission } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 import {
-  getMyActivityDisplay,
   getMyArticleTitle,
-  getMyCommentDisplay,
+  getMyActivityTitle,
+  getMyCommentArticleTitle,
   getMySurveyTitle,
 } from "@/lib/my-page-localization";
 
@@ -120,24 +120,22 @@ export function useMyPageController() {
       scrap: lang === "ko" ? "스크랩" : "Saved",
       comment: lang === "ko" ? "댓글" : "Comment",
       post: lang === "ko" ? "작성" : "Posted",
-      survey: lang === "ko" ? "응답 완료" : "Responded",
+      survey: lang === "ko" ? "설문" : "Survey",
     };
 
     return (activities?.items ?? []).map((item) => {
-      const display = getMyActivityDisplay(lang, item);
-
       return {
-        context: display.context
-          ? display.context
-          : undefined,
-        boardName: (lang === "ko" ? item.boardNameKo : item.boardNameEn || item.boardNameKo) || undefined,
+        boardName:
+          item.type === "survey"
+            ? lang === "ko" ? "설문" : "Survey"
+            : (lang === "ko" ? item.boardNameKo : item.boardNameEn || item.boardNameKo) || undefined,
         date: item.occurredAt,
         href:
           item.type === "survey"
             ? `/survey/${item.surveyId}`
             : item.boardCode === "_EVENT" ? `/events/${item.articleId}` : `/board/${item.boardCode}/${item.articleId}`,
         label: labelMap[item.type],
-        title: display.title,
+        title: getMyActivityTitle(lang, item),
         type: item.type,
       };
     });
@@ -148,7 +146,7 @@ export function useMyPageController() {
       surveyItems.map((item) => ({
         date: item.submittedAt ?? "",
         href: `/survey/${item.surveyId}`,
-        label: lang === "ko" ? "응답 완료" : "Responded",
+        label: lang === "ko" ? "설문 응답" : "Survey response",
         title: getMySurveyTitle(lang, item),
         type: "survey" as const,
       })),
@@ -172,17 +170,13 @@ export function useMyPageController() {
   const commentActivities = useMemo<ActivityItem[]>(
     () =>
       commentItems.map((item) => {
-        const display = getMyCommentDisplay(lang, item);
-
         return {
-          context: display.context
-            ? display.context
-            : undefined,
           boardName: lang === "ko" ? item.boardNameKo : item.boardNameEn || item.boardNameKo,
+          commentCount: item.commentCount,
           date: item.createdAt,
           href: item.boardCode === "_EVENT" ? `/events/${item.articleId}` : `/board/${item.boardCode}/${item.articleId}`,
           label: lang === "ko" ? "댓글" : "Comment",
-          title: display.title,
+          title: getMyCommentArticleTitle(lang, item),
           type: "comment" as const,
         };
       }),

@@ -1805,6 +1805,12 @@ export class UsersRepository {
         boardNameKo: boards.nameKo,
         boardNameEn: boards.nameEn,
         boardCode: boards.code,
+        commentCount: sql<number>`(
+          select count(*)
+          from ${comments} as article_comments
+          where article_comments.article_id = ${comments.articleId}
+            and article_comments.status = 'PUBLISHED'
+        )`,
       })
       .from(comments)
       .innerJoin(articles, eq(comments.articleId, articles.articleId))
@@ -1823,6 +1829,7 @@ export class UsersRepository {
       boardCode: r.boardCode,
       articleTitleKo: r.articleTitleKo,
       articleTitleEn: r.articleTitleEn,
+      commentCount: Number(r.commentCount),
       content: r.content,
       status: r.status as CommentStatus,
       createdAt: msToIso(r.createdAt.valueOf()),

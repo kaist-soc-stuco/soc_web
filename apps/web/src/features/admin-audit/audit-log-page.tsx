@@ -259,10 +259,10 @@ export function AuditLogPage() {
             </div>
 
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-              <span className="text-sm font-normal tracking-[-0.02em] text-[#666]">총 {totalCount}건</span>
+              <span className="text-sm font-normal tracking-[-0.02em] text-[#666]">{data ? `총 ${totalCount}건` : "총 —건"}</span>
             </div>
 
-            <div className={refreshing ? "opacity-60 transition-opacity duration-150" : "transition-opacity duration-150"}>
+            <div aria-busy={loading} style={data === null && loading ? { minHeight: 320 } : undefined} className={refreshing ? "opacity-60 transition-opacity duration-150" : "transition-opacity duration-150"}>
               {error && data === null ? <div className="p-6"><EmptyState message={error} /></div> : data && data.items.length > 0 ? (
                 <AdminDataTable minWidth={900} mobileMode="cards">
                   <colgroup><col style={{ width: 150 }} /><col style={{ width: 112 }} /><col style={{ width: 230 }} /><col /><col style={{ width: 150 }} /></colgroup>
@@ -302,7 +302,7 @@ export function AuditLogPage() {
                 currentPage={currentPage}
                 onPageChange={setCurrentPage}
                 pageSizeControl={<PageSizeSelect value={pageSize} onChange={(size) => { setPageSize(size); setCurrentPage(1); }} />}
-                range={`총 ${totalCount}건 중 ${rangeStart}-${rangeEnd}`}
+                range={data ? `총 ${totalCount}건 중 ${rangeStart}-${rangeEnd}` : ""}
                 totalPages={totalPages}
               />
             </div>

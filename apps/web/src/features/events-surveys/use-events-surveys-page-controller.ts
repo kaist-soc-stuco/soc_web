@@ -80,18 +80,18 @@ export function useEventsSurveysPageController({
   const dateTo = params.get("to") ?? "";
   const requestedPage = Number(params.get("page"));
   const currentPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-  const updateFilters = useCallback((changes: Record<string, string>, preserveScroll = false) => {
+  const updateFilters = useCallback((changes: Record<string, string>, preserveScroll = false, flushSync = false) => {
     setParams(previous => {
       const next = new URLSearchParams(previous);
       for (const [key, value] of Object.entries(changes)) {
         if (value) next.set(key, value); else next.delete(key);
       }
       return next;
-    }, { replace: true, state: { preserveScroll } });
+    }, { replace: true, state: { preserveScroll }, flushSync });
   }, [setParams]);
   const setStateFilter = (value: EventsSurveysStateFilter) => updateFilters({ state: value === "all" ? "" : value, page: "" });
   const setItemQuery = (value: string) => updateFilters({ q: value, page: "" }, true);
-  const setDateRange = ({ from, to }: { from: string; to: string }) => updateFilters({ from, to, page: "" });
+  const setDateRange = ({ from, to }: { from: string; to: string }) => updateFilters({ from, to, page: "" }, true, true);
   const setCurrentPage = (page: number) => updateFilters({ page: page > 1 ? String(page) : "" });
   const resetListFilters = () => updateFilters({ q: "", from: "", to: "", state: "", page: "" });
   const [currentDate, setCurrentDate] = useState(() => {

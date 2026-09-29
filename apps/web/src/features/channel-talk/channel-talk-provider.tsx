@@ -155,6 +155,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
           shutdownChannelTalk();
         }
         bootChannelTalk({
+          hidePopup: window.matchMedia("(max-width: 767px)").matches,
           language: config.language,
           memberHash: config.memberHash,
           memberId: config.memberId,

@@ -598,7 +598,7 @@ export function Header({ variant = "default" }: HeaderProps) {
 
         <div className="home-header-utilities relative flex items-center gap-1.5 pr-3 md:gap-2 md:pr-6">
           <div ref={searchRef} className="site-header-search-slot">
-            <form role="search" className="site-header-inline-search" data-open={searchOpen} onSubmit={handleSearchSubmit}
+            <form role="search" autoComplete="off" className="site-header-inline-search" data-open={searchOpen} onSubmit={handleSearchSubmit}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   event.stopPropagation();
@@ -618,7 +618,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                 <Search aria-hidden="true" />
               </IconButton>
               <div className="site-header-search-fields" inert={!searchOpen} aria-hidden={!searchOpen}>
-                <input ref={searchInputRef} id="site-header-search-input" type="search"
+                <input ref={searchInputRef} id="site-header-search-input" type="search" autoComplete="off"
                   aria-label={lang === "ko" ? "통합검색 검색어" : "Site search query"}
                   placeholder={lang === "ko" ? "제목, 내용 검색" : "Search titles and content"}
                   value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />

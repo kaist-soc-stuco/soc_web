@@ -38,6 +38,7 @@ export interface MyCommentItem {
   boardCode: string;
   articleTitleKo: string;
   articleTitleEn: string | null;
+  commentCount: number;
   content: string;
   status: CommentStatus;
   createdAt: string;

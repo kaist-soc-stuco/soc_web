@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArticleListTitle } from "@/components/ui/article-list-title";
 import type { CurrentUserResponse, MyScrapItem } from "@soc/contracts";
 import { isoToMs, nowMs } from "@soc/shared";
@@ -180,7 +181,7 @@ function ActivityRows({
           className={`group grid min-h-16 items-center gap-x-4 gap-y-1 px-3 py-3 transition-colors hover:bg-slate-50 ${showType ? "grid-cols-[5rem_minmax(0,1fr)] sm:grid-cols-[5rem_minmax(0,1fr)_auto]" : "grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto]"}`}
         >
           {showType && (
-            <span className={`text-xs ${item.type === "survey" ? "text-kaist-darkgreen" : "text-slate-500"}`}>
+            <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-100 pl-2 pr-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-medium leading-4 text-slate-600">
               {item.label}
             </span>
           )}
@@ -192,10 +193,9 @@ function ActivityRows({
                 <span className="shrink-0 text-xs leading-5 text-[#1769AA]">[{item.commentCount}]</span>
               )}
             </span>
-            {item.context && <span className="mt-1 block truncate text-xs text-slate-500">{item.context}</span>}
           </span>
           <time dateTime={item.date} className={`whitespace-nowrap text-xs text-slate-400 ${showType ? "col-start-2" : ""} sm:col-auto`}>
-            {!showType && `${item.label} · `}{formatRelative(item.date, lang)}
+            {formatRelative(item.date, lang)}
           </time>
         </Link>
       ))}
@@ -342,9 +342,31 @@ export function MyPageActivityPanel({
     { id: "scraps", label: lang === "ko" ? "스크랩" : "Scraps" },
   ] as const satisfies ReadonlyArray<{ id: ActivityTab; label: string }>;
 
+  const lastCollection = useRef<ReactNode>(null);
+  const activityTabsRef = useRef<HTMLDivElement>(null);
+  const [moreTabs, setMoreTabs] = useState(false);
+  useEffect(() => {
+    const strip = activityTabsRef.current;
+    if (!strip) return;
+    const update = () => setMoreTabs(strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 2);
+    const observer = new ResizeObserver(update);
+    observer.observe(strip);
+    strip.addEventListener("scroll", update);
+    update();
+    return () => { observer.disconnect(); strip.removeEventListener("scroll", update); };
+  }, []);
+  useEffect(() => {
+    const strip = activityTabsRef.current;
+    const selected = strip?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!strip || !selected) return;
+    const parent = strip.getBoundingClientRect();
+    const child = selected.getBoundingClientRect();
+    if (child.left < parent.left) strip.scrollLeft -= parent.left - child.left;
+    else if (child.right > parent.right) strip.scrollLeft += child.right - parent.right;
+  }, [activeTab]);
   const renderCollection = () => {
-    if (loading) return <div aria-busy="true" aria-label={lang === "ko" ? "활동 내역 불러오기" : "Loading activity"} className="min-h-[200px] space-y-4 py-5 motion-safe:animate-pulse">{[0, 1, 2].map(i => <div key={i} className="h-8 rounded bg-slate-100" />)}</div>;
-    if (error) return <ErrorState title={error} onRetry={onRetry} />;
+
+    if (error) return <ErrorState className="min-h-[200px] rounded-none border-0 bg-transparent px-0 py-10 shadow-none" title={error} onRetry={onRetry} />;
     if (activityQuery.trim() && (contentTab === "scraps" ? visibleScraps.length === 0 : activities.length === 0)) return <div className="py-10 text-center text-sm text-slate-500"><p>{lang === "ko" ? "검색 결과가 없습니다." : "No results found."}</p><Button variant="ghost" onClick={() => onQueryChange("")}>{lang === "ko" ? "검색어 지우기" : "Clear search"}</Button></div>;
 
     if (contentTab === "scraps") {
@@ -375,6 +397,9 @@ export function MyPageActivityPanel({
     return <ActivityRows items={activities} lang={lang} showType={contentTab === "all"} />;
   };
 
+  const collection = loading ? lastCollection.current : renderCollection();
+  useEffect(() => { if (!loading) lastCollection.current = collection; }, [collection, loading]);
+
   return (
     <div className="flex flex-col gap-4 animate-in fade-in duration-300">
       <div className="mb-1.5 select-none">
@@ -385,12 +410,13 @@ export function MyPageActivityPanel({
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)] flex flex-col">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto select-none">
+          <div ref={activityTabsRef} data-more={moreTabs} className="activity-tab-strip scrollbar-hidden flex min-w-0 flex-1 gap-1 overflow-x-auto select-none">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <Button variant="ghost"
                 key={tab.id}
+                aria-pressed={isActive}
                 onClick={() => onTabChange(tab.id)}
                 className={`relative flex min-h-11 shrink-0 items-center justify-center border-0 bg-transparent px-2.5 pb-2 text-[length:var(--ui-text-body-sm-size)] font-normal cursor-pointer transition-colors ${
                   isActive
@@ -409,16 +435,16 @@ export function MyPageActivityPanel({
           })}
           </div>
           <PageSearchField
-            ariaLabel={lang === "ko" ? "제목·내용 검색" : "Search titles and content"}
+            ariaLabel={lang === "ko" ? "제목, 내용 검색" : "Search titles and content"}
             className="w-full flex-none sm:w-64"
             onChange={onQueryChange}
             onClear={() => onQueryChange("")}
-            placeholder={lang === "ko" ? "제목·내용 검색" : "Search titles and content"}
+            placeholder={lang === "ko" ? "제목, 내용 검색" : "Search titles and content"}
             value={activityQuery}
           />
         </div>
 
-        <div className="min-h-[200px] flex-1 divide-y divide-slate-100">{renderCollection()}</div>
+        <div aria-busy={loading} className="min-h-[200px] flex-1 divide-y divide-slate-100">{collection}</div>
 
         {!loading && !error && totalPages > 1 && (
           <div className="border-t border-slate-100 pt-4 mt-4 flex justify-center select-none">

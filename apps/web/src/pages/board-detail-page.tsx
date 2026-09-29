@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { ArticleLoading } from "@/components/ui/article-loading";
 import { useState } from "react";
 
 import { CommentSection } from "@/components/ui/comment-section";
@@ -72,16 +72,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
   const [hideReason, setHideReason] = useState("");
   const [hideSubmitting, setHideSubmitting] = useState(false);
 
-  if (loading) {
-    return (
-      <PageShell className="bg-white">
-
-        <main className="flex flex-1 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-kaist-darkgreen" />
-        </main>
-      </PageShell>
-    );
-  }
+  if (loading) return <ArticleLoading />;
 
   if (!article) {
     return (

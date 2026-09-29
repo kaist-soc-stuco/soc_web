@@ -160,6 +160,8 @@ function SiteContentPageContent() {
   const [orderedBlocks, setOrderedBlocks] = useState<ContentBlockRecord[]>([]);
   const [orderSaving, setOrderSaving] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{ url: string; field: "ko" | "en"; target: "create" | "draft" } | null>(null);
+  useEffect(() => () => { if (imagePreview) URL.revokeObjectURL(imagePreview.url); }, [imagePreview]);
   const [cropRequest, setCropRequest] = useState<{ file: File; field: "ko" | "en"; target: "create" | "draft"; type: "HERO" | "LOGO" | "ORGANIZATION_CHART" } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -227,11 +229,13 @@ function SiteContentPageContent() {
     const target = cropRequest.target;
     const field = cropRequest.field;
     setCropRequest(null);
+    setImagePreview({ url: URL.createObjectURL(file), target, field });
     await uploadImage(file, (imageReference) => {
       const key = field === "en" ? "imageUrlEn" : "imageUrl";
       if (target === "draft") setDraft((current) => ({ ...current, [key]: imageReference }));
       else setCreateDraft((current) => ({ ...current, [key]: imageReference }));
     });
+    setImagePreview(null);
   };
 
   const persistBlockOrder = async (reorderedCategory: ContentBlockRecord[], previous: ContentBlockRecord[]) => {
@@ -395,7 +399,7 @@ function SiteContentPageContent() {
               </div> : null}
               <div className="grid gap-4">
                 {!isImageOnlyType(draft.type) && draft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={draft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
-                {isImageOnlyType(draft.type) ? <ContentImageInput spec={getImageSpec(draft.type)!} previewBorderless={draft.type === "ORGANIZATION_CHART"} value={draft.imageUrl} secondaryValue={draft.type === "ORGANIZATION_CHART" ? draft.imageUrlEn : undefined} secondaryLabel={draft.type === "ORGANIZATION_CHART" ? "영문 조직도" : undefined} uploading={imageUploading} onSelect={(file) => requestImageCrop("draft", draft.type, file)} onSecondarySelect={(file) => requestImageCrop("draft", draft.type, file, "en")} onRemove={() => setDraft((current) => ({ ...current, imageUrl: "" }))} onSecondaryRemove={() => setDraft((current) => ({ ...current, imageUrlEn: "" }))} /> : null}
+                {isImageOnlyType(draft.type) ? <ContentImageInput spec={getImageSpec(draft.type)!} previewBorderless={draft.type === "ORGANIZATION_CHART"} value={imagePreview?.target === "draft" && imagePreview.field === "ko" ? imagePreview.url : draft.imageUrl} secondaryValue={draft.type === "ORGANIZATION_CHART" ? (imagePreview?.target === "draft" && imagePreview.field === "en" ? imagePreview.url : draft.imageUrlEn) : undefined} secondaryLabel={draft.type === "ORGANIZATION_CHART" ? "영문 조직도" : undefined} uploading={imageUploading} onSelect={(file) => requestImageCrop("draft", draft.type, file)} onSecondarySelect={(file) => requestImageCrop("draft", draft.type, file, "en")} onRemove={() => setDraft((current) => ({ ...current, imageUrl: "" }))} onSecondaryRemove={() => setDraft((current) => ({ ...current, imageUrlEn: "" }))} /> : null}
               </div>
             </div>
           </AdminCard>
@@ -416,7 +420,7 @@ function SiteContentPageContent() {
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "QUICK_LINK" ? <AdminFormField label="영문 본문"><UiTextarea className="min-h-24" value={createDraft.bodyEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, bodyEn: value })); }} /></AdminFormField> : null}
         {createDraft.type === "PLEDGE" ? <AdminFormField label="이행 상태"><AdminSelectDropdown ariaLabel="이행 상태" value={createDraft.pledgeStatus ?? "PLANNED"} options={pledgeStatusOptions} onChange={(value) => setCreateDraft((current) => ({ ...current, pledgeStatus: value as BlockDraft["pledgeStatus"] }))} /></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={createDraft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
-        {isImageOnlyType(createDraft.type) ? <ContentImageInput spec={getImageSpec(createDraft.type)!} previewBorderless={createDraft.type === "ORGANIZATION_CHART"} value={createDraft.imageUrl} secondaryValue={createDraft.type === "ORGANIZATION_CHART" ? createDraft.imageUrlEn : undefined} secondaryLabel={createDraft.type === "ORGANIZATION_CHART" ? "영문 조직도" : undefined} uploading={imageUploading} onSelect={(file) => requestImageCrop("create", createDraft.type, file)} onSecondarySelect={(file) => requestImageCrop("create", createDraft.type, file, "en")} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} onSecondaryRemove={() => setCreateDraft((current) => ({ ...current, imageUrlEn: "" }))} /> : null}
+        {isImageOnlyType(createDraft.type) ? <ContentImageInput spec={getImageSpec(createDraft.type)!} previewBorderless={createDraft.type === "ORGANIZATION_CHART"} value={imagePreview?.target === "create" && imagePreview.field === "ko" ? imagePreview.url : createDraft.imageUrl} secondaryValue={createDraft.type === "ORGANIZATION_CHART" ? (imagePreview?.target === "create" && imagePreview.field === "en" ? imagePreview.url : createDraft.imageUrlEn) : undefined} secondaryLabel={createDraft.type === "ORGANIZATION_CHART" ? "영문 조직도" : undefined} uploading={imageUploading} onSelect={(file) => requestImageCrop("create", createDraft.type, file)} onSecondarySelect={(file) => requestImageCrop("create", createDraft.type, file, "en")} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} onSecondaryRemove={() => setCreateDraft((current) => ({ ...current, imageUrlEn: "" }))} /> : null}
       </div>
     </Modal>
     {cropRequest ? <ImageCropModal aspectRatio={getImageSpec(cropRequest.type)!.width / getImageSpec(cropRequest.type)!.height} file={cropRequest.file} outputHeight={getImageSpec(cropRequest.type)!.height} outputWidth={getImageSpec(cropRequest.type)!.width} onCancel={() => setCropRequest(null)} onComplete={applyCroppedImage} /> : null}

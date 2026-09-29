@@ -179,6 +179,7 @@ export function ImageCropModal({
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, type === "image/jpeg" ? 0.92 : undefined));
       if (!blob) throw new Error("Image conversion failed");
       const baseName = file.name.replace(/\.[^/.]+$/, "");
+      onCancel();
       await onComplete(new File([blob], `${baseName}-cropped.${getOutputExtension(type)}`, { type, lastModified: nowMs() }));
     } catch {
       toast({ type: "error", message: ko ? "이미지를 처리하지 못했습니다. 다시 시도해 주세요." : "Could not process the image. Please try again." });
@@ -199,7 +200,7 @@ export function ImageCropModal({
       footer={(
         <>
           <Button type="button" variant="outline" onClick={onCancel} disabled={processing}>{ko ? "취소" : "Cancel"}</Button>
-          <Button loading={processing} type="button" onClick={() => void handleCrop()} disabled={processing || !naturalSize.width}>
+          <Button type="button" onClick={() => void handleCrop()} disabled={processing || !naturalSize.width}>
             {ko ? "적용" : "Apply"}
           </Button>
         </>

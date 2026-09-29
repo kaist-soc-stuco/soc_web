@@ -96,7 +96,15 @@ export function useOverlayBehavior({
     overlayStack.push(surface);
 
     const focusFrame = window.requestAnimationFrame(() => {
-      if (overlayStack.at(-1) === surface) focusSurface(surface);
+      if (overlayStack.at(-1) !== surface) return;
+      const focusable = getFocusableElements(surface);
+      const preferred = focusable.find(element => element.hasAttribute("data-initial-focus"));
+      if (preferred) preferred.focus({ preventScroll: true });
+      else if (!surface.contains(document.activeElement)) {
+        const input = focusable.find(element => element.matches('input:not([type="checkbox"]):not([type="radio"]), textarea, [contenteditable="true"]'));
+        if (input) input.focus({ preventScroll: true });
+        else focusSurface(surface);
+      }
     });
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {

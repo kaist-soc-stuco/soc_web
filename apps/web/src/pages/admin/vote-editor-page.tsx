@@ -326,7 +326,7 @@ export function VoteEditorPage() {
     const query = candidateQuery.trim();
     if (!query || candidateAddLock.current) return;
     const version = ++candidateSearchVersion.current;
-    setSearchingCandidates(true); setSearchedCandidates(false); setCandidateError(null); setCandidates([]);
+    setSearchingCandidates(true); setCandidateError(null);
     try {
       const rows = await client.searchVoteVoterCandidates(query);
       if (version !== candidateSearchVersion.current) return;
@@ -575,14 +575,14 @@ export function VoteEditorPage() {
           <form className="flex gap-2" onSubmit={event => { event.preventDefault(); void searchCandidates(); }}>
             <UiInput aria-label="선거인 검색" className="min-w-0 flex-1" autoFocus disabled={addingCandidates} placeholder="학번, 이름, 이메일 검색" value={candidateQuery} onChange={event => {
               candidateSearchVersion.current += 1;
-              setCandidateQuery(event.target.value); setCandidates([]); setSearchedCandidates(false); setSearchingCandidates(false); setCandidateError(null);
+              setCandidateQuery(event.target.value); setSearchingCandidates(false); setCandidateError(null);
             }} />
             <Button type="submit" loading={searchingCandidates} variant="outline" disabled={searchingCandidates || addingCandidates || !candidateQuery.trim()}>검색</Button>
           </form>
           {selectedCandidates.length > 0 ? <div className="flex flex-wrap gap-2" aria-label="선택한 선거인">{selectedCandidates.map(candidate => <button type="button" key={candidate.userId} disabled={addingCandidates} aria-label={`${candidate.nameKo} ${candidate.stdNo ?? ""} 선택 해제`} onClick={() => setSelectedCandidates(current => current.filter(user => user.userId !== candidate.userId))} className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs text-emerald-800 hover:bg-emerald-100 disabled:opacity-50">{candidate.nameKo}<span>{candidate.stdNo}</span><X aria-hidden="true" className="size-3" /></button>)}</div> : null}
           {candidateError ? <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{candidateError}</p> : null}
           <div className="max-h-72 min-h-40 overflow-y-auto rounded-lg border border-slate-200" aria-busy={searchingCandidates}>
-            {searchingCandidates ? <div role="status" aria-label="회원 검색" className="space-y-3 p-4">{[0,1,2].map(index => <div key={index} className="h-10 animate-pulse rounded bg-slate-100 motion-reduce:animate-none" />)}</div> : candidates.length ? <div className="divide-y divide-slate-100">{candidates.map(candidate => {
+            {candidates.length ? <div className="divide-y divide-slate-100">{candidates.map(candidate => {
               const existing = voters.some(voter => voter.userId === candidate.userId && voter.status === "ELIGIBLE");
               const checked = selectedCandidates.some(user => user.userId === candidate.userId);
               return <label key={candidate.userId} className={`flex min-h-16 items-center gap-3 px-4 py-3 ${existing ? "bg-slate-50 text-slate-400" : "cursor-pointer hover:bg-slate-50"}`}>

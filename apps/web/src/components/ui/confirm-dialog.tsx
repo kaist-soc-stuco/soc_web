@@ -77,6 +77,7 @@ export function useConfirmDialog() {
                 type="button"
                 size="sm"
                 variant="outline"
+                data-initial-focus
                 onClick={() => close(false)}
               >
                 {state.cancelLabel}

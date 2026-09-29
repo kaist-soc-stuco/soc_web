@@ -1,3 +1,4 @@
+import { ArticleLoading } from "@/components/ui/article-loading";
 import { Header } from "@/components/organisms/header";
 import { RouteScrollRestoration } from "@/components/organisms/route-scroll-restoration";
 import { createApiClient } from '@soc/api-client';
@@ -362,11 +363,13 @@ function PreventImageGhostDrag() {
 
 function PublicLayout() {
   const { pathname } = useLocation();
+  const articleRoute = /^\/board\/[^/]+\/[^/]+\/?$/.test(pathname) || /^\/events\/[^/]+\/?$/.test(pathname);
+  const isArticleDetail = articleRoute && !/\/(write|new|edit)\/?$/.test(pathname);
   return (
     <div className="public-site-layout flex min-h-screen flex-col">
       <Header variant={pathname === "/" ? "home" : "default"} />
       <div className="public-site-content flex flex-1 flex-col">
-        <Suspense fallback={<div className="flex-1" aria-busy="true" />}>
+        <Suspense fallback={isArticleDetail ? <ArticleLoading /> : <div className="flex-1" aria-busy="true" />}>
           <Outlet />
         </Suspense>
       </div>

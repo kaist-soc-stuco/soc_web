@@ -97,6 +97,7 @@ export function MyPage() {
 
               {activeMenu === "activity" && (
                 <MyPageActivityPanel
+                  key={session?.userId}
                   loading={loading}
                   error={loadError}
                   onRetry={retryActivity}

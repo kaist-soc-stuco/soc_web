@@ -5,7 +5,7 @@ import type {
   ArticleAssetItem,
   ArticleEngagementKind,
 } from "@soc/contracts";
-import { Check, ChevronLeft, ChevronRight, ClipboardCheck, Edit2, EllipsisVertical, Eye, EyeOff, Share2, Trash2 } from "lucide-react";
+import { ArrowUpRight, Check, ChevronLeft, ChevronRight, ClipboardCheck, Edit2, EllipsisVertical, Eye, EyeOff, Share2, Trash2 } from "lucide-react";
 import { isoToDate } from "@soc/shared";
 import { Link } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -213,12 +213,12 @@ export function BoardDetailArticleCard({
       {article.survey && (
         <Link
           to={`/survey/${article.survey.surveyId}`} target="_blank" rel="noopener noreferrer"
-          aria-label={lang === "ko" ? `${surveyTitle} 설문조사 참여하기` : `Take the ${surveyTitle} survey`}
-          className="group mt-6 block rounded-xl border border-brand-primary-border bg-brand-primary-light/55 px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.025)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-brand-primary/45 hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+          aria-label={lang === "ko" ? `${surveyTitle} 설문조사 참여하기 (새 탭)` : `Take the ${surveyTitle} survey (opens in a new tab)`}
+          className="group mt-6 block rounded-xl border border-brand-primary-border bg-brand-primary-light/55 px-4 py-3.5 transition-colors duration-150 hover:bg-brand-primary-light/75 hover:border-brand-primary/45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/80 bg-white text-brand-primary shadow-sm">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/80 bg-white text-brand-primary">
                 <ClipboardCheck className="h-4.5 w-4.5" />
               </span>
               <div className="min-w-0">
@@ -228,28 +228,16 @@ export function BoardDetailArticleCard({
                 {surveyDescription && (
                   <RichTextContent
                     content={surveyDescription}
-                    className="mt-1 line-clamp-2 text-xs font-medium leading-relaxed text-app-text-muted"
+                    className="mt-1 line-clamp-2 text-[length:var(--ui-text-body-sm-size)] font-normal leading-relaxed text-app-text-muted"
                   />
                 )}
               </div>
             </div>
             <span
-              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition-colors group-hover:bg-[#053b23]"
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand-primary px-3.5 py-1.5 text-xs font-bold text-white transition-colors duration-150 group-hover:bg-[#006b3e]"
             >
               <span>{lang === "ko" ? "설문조사 참여하기" : "Take Survey"}</span>
-              <svg
-                className="w-2.5 h-2.5 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                strokeWidth="3"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
+              <ArrowUpRight aria-hidden="true" className="size-3.5" />
             </span>
           </div>
         </Link>

@@ -32,6 +32,7 @@ type ToastOptions = {
 
 type ToastItem = ToastOptions & {
   id: string;
+  revision: number;
 };
 
 type ToastContextValue = {
@@ -50,8 +51,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toast = useCallback((options: ToastOptions) => {
-    const id = `toast-${++nextId.current}`;
-    setToasts((current) => [...current.slice(-2), { ...options, id }]);
+    const revision = ++nextId.current;
+    // Action toasts stay distinct: identical labels can refer to different operations.
+    const id = options.action ? `toast-${revision}` : `toast-${JSON.stringify([options.type ?? "info", options.message])}`;
+    setToasts((current) => {
+      const item = { ...options, id, revision };
+      return current.some(existing => existing.id === id)
+        ? current.map(existing => existing.id === id ? item : existing)
+        : [...current.slice(-2), item];
+    });
     return id;
   }, []);
 
@@ -122,6 +130,13 @@ function ToastCard({
   useEffect(() => () => window.clearTimeout(exitTimer.current), []);
 
   useEffect(() => {
+    window.clearTimeout(exitTimer.current);
+    leaving.current = false;
+    remaining.current = item.duration ?? 4500;
+    setIsLeaving(false);
+  }, [item.revision, item.duration]);
+
+  useEffect(() => {
     if (hovered || focused || isLeaving) return;
     const started = performance.now();
     const timeoutId = window.setTimeout(requestDismiss, remaining.current);
@@ -129,7 +144,7 @@ function ToastCard({
       window.clearTimeout(timeoutId);
       remaining.current = Math.max(0, remaining.current - (performance.now() - started));
     };
-  }, [hovered, focused, isLeaving, requestDismiss]);
+  }, [hovered, focused, isLeaving, requestDismiss, item.revision]);
 
   return (
     <div

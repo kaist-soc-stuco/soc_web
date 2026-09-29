@@ -45,6 +45,8 @@ export function ImageUploadField({
   const ko = lang === "ko";
   const [dragging, setDragging] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
+  useEffect(() => () => { if (pendingPreview) URL.revokeObjectURL(pendingPreview); }, [pendingPreview]);
   const [selecting, setSelecting] = useState(false);
   const selectingRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,15 +61,18 @@ export function ImageUploadField({
     if (selectingRef.current) return;
     selectingRef.current = true;
     setSelecting(true);
+    setPreviewFailed(false);
+    setPendingPreview(URL.createObjectURL(file));
     try { await onSelect(file); }
     catch (error) {
       setFileError(ko ? "이미지를 첨부하지 못했습니다. 다시 시도해 주세요." : "Could not attach the image. Please try again.");
       throw error;
-    } finally { selectingRef.current = false; setSelecting(false); }
+    } finally { selectingRef.current = false; setSelecting(false); setPendingPreview(null); setPreviewFailed(false); }
   };
   const blocked = disabled || selecting;
   const formatHint = accept.split(",").map(value => value.trim().replace("image/", "").replace("*", ko ? "이미지" : "Images").toUpperCase()).join(", ");
-  const hasPreview = Boolean(imageUrl && !previewFailed);
+  const previewUrl = pendingPreview ?? imageUrl;
+  const hasPreview = Boolean(previewUrl && !previewFailed);
 
   const acceptFile = (file: File | undefined) => {
     setFileError(null);
@@ -114,15 +119,15 @@ export function ImageUploadField({
       >
         <button type="button" disabled={blocked} aria-label={selectLabel} onClick={() => inputRef.current?.click()}
           className="relative flex aspect-video w-full flex-col items-center justify-center gap-2 overflow-hidden p-4 text-slate-500 transition-colors hover:bg-slate-100/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand-primary disabled:cursor-not-allowed">
-          {hasPreview ? <img src={imageUrl} alt={alt} draggable={false} onError={() => setPreviewFailed(true)} className="absolute inset-0 size-full object-contain" /> : <>
+          {hasPreview ? <img src={previewUrl} alt={alt} draggable={false} onError={() => setPreviewFailed(true)} className="absolute inset-0 size-full object-contain" /> : <>
             <ImagePlus aria-hidden="true" className="size-6 text-slate-400" />
             <span className={compact ? "text-xs font-medium" : "text-sm font-medium"}>{emptyText || (ko ? "이미지를 놓거나 클릭해서 선택" : "Drop an image or click to choose")}</span>
+            <span className="text-xs font-normal text-slate-400">{formatHint} · {maxSizeBytes / 1_000_000}MB {ko ? "이하" : "max"}</span>
           </>}
         </button>
         {hasPreview && <Button type="button" variant="ghost" size="icon" disabled={blocked} onClick={() => { setFileError(null); onRemove(); }} aria-label={removeLabel} className="absolute right-2 top-2 size-8 rounded-md bg-white/80 text-slate-600 hover:bg-white hover:text-slate-900"><X aria-hidden="true" className="size-4" /></Button>}
       </div>
       {hasPreview && fileName ? <p className="truncate text-xs text-slate-500" title={fileName}>{fileName}</p> : null}
-      <p className="text-xs text-slate-400">{formatHint} · {maxSizeBytes / 1_000_000}MB {ko ? "이하" : "max"}</p>
       {fileError || previewFailed ? <p role="alert" className="text-xs text-rose-600">{fileError ?? previewErrorText}</p> : null}
     </div>
     {crop && cropFile ? <ImageCropModal
@@ -131,10 +136,7 @@ export function ImageUploadField({
       outputWidth={crop.width}
       outputHeight={crop.height}
       onCancel={() => setCropFile(null)}
-      onComplete={async (file) => {
-        await selectFile(file);
-        setCropFile(null);
-      }}
+      onComplete={selectFile}
     /> : null}
     </>
   );

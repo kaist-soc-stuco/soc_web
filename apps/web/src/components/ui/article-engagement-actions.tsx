@@ -1,5 +1,5 @@
 import type { ArticleEngagementKind } from '@soc/contracts';
-import { Bookmark, Heart, Loader2 } from 'lucide-react';
+import { Bookmark, Heart } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 
@@ -71,7 +71,6 @@ export function ArticleEngagementActions({
           }
           label={lang === 'ko' ? '스크랩' : 'Scrap'}
           loading={submitting === 'SCRAP'}
-          showLoadingIndicator={!scrapIconOnly}
           onClick={() => onToggle('SCRAP', !scrapActive)}
           className={scrapIconOnly ? 'size-8 rounded-md p-0' : buttonClass}
           tone="scrap"
@@ -89,7 +88,6 @@ export function EngagementActionButton({
   label,
   loading,
   onClick,
-  showLoadingIndicator,
   tone,
 }: {
   active: boolean;
@@ -99,11 +97,9 @@ export function EngagementActionButton({
   label: string;
   loading: boolean;
   onClick: () => void;
-  showLoadingIndicator?: boolean;
   tone: 'like' | 'scrap';
 }) {
   const [isBouncing, setIsBouncing] = useState(false);
-  const resolvedShowLoadingIndicator = showLoadingIndicator ?? true;
   const activeClass =
     tone === 'like'
       ? 'text-rose-600'
@@ -117,19 +113,18 @@ export function EngagementActionButton({
       aria-label={label}
       aria-pressed={active}
       disabled={loading}
+      aria-busy={loading}
       onClick={() => {
         setIsBouncing(false);
         window.requestAnimationFrame(() => setIsBouncing(true));
         window.setTimeout(() => setIsBouncing(false), 220);
         onClick();
       }}
-      className={`interaction-action inline-flex items-center justify-center gap-1 border-0 bg-transparent font-bold transition-[background-color,opacity] duration-200 ease-out disabled:cursor-wait disabled:opacity-60 hover:bg-slate-100 hover:text-current ${className} ${
+      className={`interaction-action inline-flex items-center justify-center gap-1 border-0 bg-transparent font-bold transition-[background-color,opacity] duration-200 ease-out disabled:cursor-wait disabled:opacity-100 hover:bg-slate-100 hover:text-current ${className} ${
         active ? activeClass : inactiveClass
       }`}
     >
-      {loading && resolvedShowLoadingIndicator ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-      ) : isBouncing ? (
+      {isBouncing ? (
         <span className="engagement-icon-bounce">{icon}</span>
       ) : (
         icon

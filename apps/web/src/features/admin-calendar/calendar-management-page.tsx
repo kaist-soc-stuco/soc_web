@@ -540,8 +540,11 @@ function CalendarManagementContent() {
               <CalendarDays className="mt-0.5 size-4 shrink-0 text-[#344054]" aria-hidden="true" />
               <p className="text-sm font-normal leading-5 text-[#344054]">행사 게시글에 입력된 일정이 자동으로 표시됩니다. 제목과 기간은 행사 게시글에서 수정해 주세요.</p>
             </div>
-            <AdminFormField label="제목">
+            <AdminFormField label="국문 제목">
               <UiInput value={editingEvent.titleKo} disabled />
+            </AdminFormField>
+            <AdminFormField label="영문 제목">
+              <UiInput value={editingEvent.titleEn ?? ""} placeholder="등록된 영문 제목이 없습니다" disabled />
             </AdminFormField>
             <AdminFormField label="기간">
               <UiInput value={formatPeriod(editingEvent)} disabled />
@@ -563,14 +566,14 @@ function CalendarManagementContent() {
                 <p className="text-sm font-normal leading-5 text-[#344054]">KAIST 학사일정의 제목과 기간은 자동 동기화됩니다. 이 화면에서는 표시 분류와 공개 여부만 변경할 수 있습니다. 공휴일은 날짜 기준으로 자동 분류됩니다.</p>
               </div>
             ) : null}
-            <AdminFormField label="제목">
+            <AdminFormField label="국문 제목">
               <UiInput required value={draft.titleKo} disabled={editingEvent?.isReadOnly} onChange={(event) => setDraft((current) => ({ ...current, titleKo: event.currentTarget.value }))} />
+            </AdminFormField>
+            <AdminFormField label="영문 제목">
+              <UiInput value={draft.titleEn} disabled={editingEvent?.isReadOnly} placeholder={editingEvent?.isReadOnly ? "등록된 영문 제목이 없습니다" : "영문 제목 입력 (선택)"} onChange={(event) => setDraft((current) => ({ ...current, titleEn: event.currentTarget.value }))} />
             </AdminFormField>
             {!editingEvent?.isReadOnly ? (
               <>
-                <AdminFormField label="영문 제목">
-                  <UiInput value={draft.titleEn} onChange={(event) => setDraft((current) => ({ ...current, titleEn: event.currentTarget.value }))} />
-                </AdminFormField>
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                   <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[#344054]">
                     <UiInput
