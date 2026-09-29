@@ -3,14 +3,13 @@ import { QuestionInlineEditor, type QuestionFormState } from "@/components/organ
 import { SectionInlineEditor } from "@/components/organisms/section-editor-modal";
 import { BuilderRuleRow } from "@/components/ui/builder-field";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { EditorBackButton } from "@/components/ui/editor-back-button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { Pagination, PageSizeSelect } from "@/components/ui/pagination";
 import { IconButton } from "@/components/ui/icon-button";
 import { CreateVoteSchema } from "@soc/contracts";
 import { VoteProgress } from "@/components/organisms/vote-progress";
-import { VoteStatusBadge } from "@/components/ui/vote-status-badge";
 import { restrictListDrag } from "@/lib/drag-bounds";
 import { randomId } from "@/lib/random-id";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
@@ -18,7 +17,7 @@ import type { AdminUserRecord, CreateVoteRequest, VoteDetailResponse, VoteItemTy
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Copy, Undo2, Redo2, Link2, Eye, MoreVertical, Download, Upload, GripVertical, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Copy, Undo2, Redo2, Link2, Eye, MoreVertical, Download, Upload, GripVertical, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode, type SetStateAction } from "react";
 import { useBlocker, useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx";
@@ -410,9 +409,12 @@ export function VoteEditorPage() {
 
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_VOTE}>
-      <AdminPageShell><AdminPageMain className="admin-vote-editor">
-        <div className="admin-vote-editor__header sticky top-0 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-1 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
-          <AdminPageHeader eyebrow={<EditorBackButton to="/admin/votes" beforeLeave={() => dirty ? save() : Promise.resolve()} />} title={<span className="flex flex-wrap items-center gap-3"><span>{stripRichText(draft.titleKo) || "제목 없는 투표"}</span>{vote && vote.status !== "DRAFT" && <VoteStatusBadge status={vote.status} startsAt={vote.startsAt} endsAt={vote.endsAt} />}</span>} actions={<>
+      <AdminPageShell><AdminPageMain className="admin-vote-editor !max-w-[76rem] !pt-0">
+        <div className="admin-vote-editor__header sticky top-0 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-6 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
+          <AdminPageHeader
+            center={<SegmentedControl ariaLabel="투표 편집 영역" role="tablist" className="w-fit" value={editorTab} onChange={setEditorTab} options={[{value:"questions",label:"안건"},{value:"voters",label:"선거인명부"},{value:"settings",label:"설정"},{value:"operations",label:"진행·개표"}]} />}
+            title={<span className="flex min-w-0 items-center gap-2"><IconButton aria-label="투표 목록으로" className="shrink-0" onClick={() => navigate("/admin/votes")}><ArrowLeft className="size-5" /></IconButton><span className="min-w-0 break-words">{stripRichText(draft.titleKo) || "제목 없는 투표"}</span></span>}
+            actions={<div className="survey-editor-header-actions flex flex-wrap items-center gap-2">
             <IconButton aria-label="실행 취소" data-tooltip="실행 취소" disabled={!editable || !history.current.length} onClick={() => restore("undo")}><Undo2 className="size-4" /></IconButton>
             <IconButton aria-label="다시 실행" data-tooltip="다시 실행" disabled={!editable || !future.current.length} onClick={() => restore("redo")}><Redo2 className="size-4" /></IconButton>
             <IconButton aria-label="링크 복사" data-tooltip="링크 복사" className="border-0 text-slate-600" onClick={() => void ensureStored().then(voteId => navigator.clipboard.writeText(`${window.location.origin}/votes/${voteId}`)).then(()=>toast({type:"success",message:"투표 링크를 복사했습니다."})).catch(()=>toast({type:"error",message:"링크를 복사하지 못했습니다."}))}><Link2 className="size-5" /></IconButton>
@@ -426,11 +428,11 @@ export function VoteEditorPage() {
             {(vote?.status === "CLOSED" || (vote?.status === "PUBLISHED" && clock >= isoToMs(vote.endsAt))) ? <Button onClick={() => void run("개표", async () => { if (vote.status === "PUBLISHED") await client.closeVote(voteIdRef.current!); return client.tallyVote(voteIdRef.current!); })} disabled={busy || !quorumMet}>개표</Button> : null}
             {vote?.status === "TALLIED" && !vote.resultsPublishedAt ? <Button onClick={() => void run("결과 공개", () => client.publishVoteResults(voteIdRef.current!))} disabled={busy}>결과 공개</Button> : null}
             {vote?.resultsPublishedAt ? <Button onClick={() => void run("결과 비공개 전환", () => client.unpublishVoteResults(voteIdRef.current!))} disabled={busy}>결과 비공개 전환</Button> : null}
-          </>} />
+          </div>} />
 
         </div>
 
-        <div className="flex flex-wrap gap-2" aria-label="투표 편집 영역">{([["questions", "안건"], ["voters", "선거인명부"], ["settings", "설정"], ["operations", "진행·개표"]] as const).map(([value, label]) => <button type="button" key={value} className={`min-h-11 border-b-2 px-4 text-sm transition-colors ${editorTab === value ? "border-emerald-600 font-semibold text-emerald-700" : "border-transparent text-slate-500 hover:text-slate-900"}`} aria-pressed={editorTab === value} onClick={() => setEditorTab(value)}>{label}</button>)}</div>
+
         {editorTab === "operations" ? <AdminCard>
           <div className="space-y-5 p-5">
             {vote?.status === "CLOSED" && <p className="text-sm text-slate-600">투표가 마감되었습니다. 상단의 ‘개표’를 누르면 결과를 집계합니다.</p>}

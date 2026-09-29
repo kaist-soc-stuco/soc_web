@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import { DataViewCard, PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import {
@@ -21,7 +21,6 @@ import {
 } from "@/features/board-write/article-template-control";
 import { useBoardWritePageController } from "@/features/board-write/use-board-write-page-controller";
 import { UiInput } from "@/components/ui/form-control";
-import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 import {
   switchEventDateInputMode,
   switchEventEndDateInputMode,
@@ -29,7 +28,6 @@ import {
 
 export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } = {}) {
   const [editorView, setEditorView] = useState<"ko" | "en" | "split">("ko");
-  const navigate = useNavigate();
   const {
     ConfirmDialog,
     assets,
@@ -41,7 +39,6 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     contentEn,
     contentKo,
     draftStatus,
-    draftRestoredAt,
     eventDescriptionKo,
     eventDescriptionEn,
     eventEndDate,
@@ -49,7 +46,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     eventStartDate,
     fileInputRef,
     handleCategoryChange,
-    handleStartNewDraft,
+    handleCancelDraft,
     handleSaveDraft,
     handleSubmit,
     handleUploadThumbnail,
@@ -93,8 +90,6 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     uploading,
     writableBoardCodes,
   } = useBoardWritePageController(forcedCategory);
-  const [dismissedDraftAt, setDismissedDraftAt] = useState<string | null>(null);
-  const showDraftRestoredBanner = Boolean(draftRestoredAt && draftRestoredAt !== dismissedDraftAt);
   const boardLabel = selectedCategory === "_EVENT" ? (lang === "ko" ? "행사" : "Events") : getBoardLabelFromMetadata(selectedBoard, selectedCategory, lang);
   const templateSnapshot: BoardTemplateSnapshot = {
     boardCode: selectedCategory,
@@ -217,7 +212,9 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
       <BoardWriteHeaderControls
         editorView={editorView}
         onEditorViewChange={setEditorView}
-        trailingActions={<BoardPostToolbarOptions lang={lang} canPin={canConfigurePostSettings} pinned={isPinned} onPinnedChange={setIsPinned}
+        pinnedActions={<BoardPostToolbarOptions lang={lang} canPin={canConfigurePostSettings} pinned={isPinned} onPinnedChange={setIsPinned}
+          promotion={false} endDate="" onEndDateChange={() => undefined} />}
+        trailingActions={<BoardPostToolbarOptions lang={lang} canPin={false} pinned={isPinned} onPinnedChange={setIsPinned}
           promotion={selectedCategory === "promotions"} endDate={eventEndDate} onEndDateChange={(value) => { setEventEndDate(value); setIsEventAlwaysOpen(!value); }} />}
         boardByCode={boardByCode}
         lang={lang}
@@ -250,7 +247,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
           titleKo={titleKo}
           fileInputRef={fileInputRef}
           uploading={uploading}
-          onSave={() => handleSaveDraft(true)}
+          onSave={() => handleSaveDraft()}
           onSubmit={handleSubmit}
         />
       </div>
@@ -294,8 +291,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
               isSubmitting={isSubmitting}
               draftStatus={draftStatus}
               canWriteSelected={canWriteSelected}
-              onCancel={() => navigate(-1)}
-              onSaveDraft={() => handleSaveDraft(true)}
+              onCancel={() => void handleCancelDraft()}
               onSubmit={handleSubmit}
             />
           </div>
@@ -312,14 +308,6 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
             className="hidden"
             onChange={(event) => void handleUploadFiles(event.target.files)}
           />
-
-          {showDraftRestoredBanner ? (
-            <DraftRestoredBanner
-              savedAt={draftRestoredAt ?? undefined}
-              onStartNew={handleStartNewDraft}
-              onDismiss={() => setDismissedDraftAt(draftRestoredAt)}
-            />
-          ) : null}
 
           {isEvent ? (
             <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">

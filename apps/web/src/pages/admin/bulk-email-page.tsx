@@ -41,7 +41,6 @@ import { RichTextEditor } from "@/components/organisms/rich-text-editor";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 import { AdminEditorGuidance, AdminFormField, AdminPageShell, AdminPageHeader } from "@/components/ui/admin-page";
 import { Button } from "@/components/ui/button";
-import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { UiInput, UiTextarea } from "@/components/ui/form-control";
@@ -156,9 +155,6 @@ function BulkEmailPageContent() {
   const [initialLocalDraft, setInitialLocalDraft] = useState<StoredEmailDraft | null>(null);
   const [draftIdentityKey, setDraftIdentityKey] = useState<string | null | undefined>(undefined);
   const [loadedDraftIdentityKey, setLoadedDraftIdentityKey] = useState<string | null>(null);
-  const [draftRestored, setDraftRestored] = useState(false);
-  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
-  const [draftNoticeVisible, setDraftNoticeVisible] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
   const draftClearedRef = useRef(false);
   const skipNextDraftSaveRef = useRef(false);
@@ -201,9 +197,6 @@ function BulkEmailPageContent() {
     setDraftIdentityKey(emailDraftStorageKey);
     setLoadedDraftIdentityKey(null);
     setDraftReady(false);
-    setDraftRestored(false);
-    setDraftSavedAt(null);
-    setDraftNoticeVisible(false);
     setRecipientType("UNPAID_STUDENTS");
     setFilters({});
     setSubject("");
@@ -256,9 +249,6 @@ function BulkEmailPageContent() {
     setScheduledAt("");
     setAttachments(draft.attachments ?? []);
     setOperationError(null);
-    setDraftRestored(true);
-    setDraftSavedAt(draft.savedAt);
-    setDraftNoticeVisible(true);
   };
 
   useEffect(() => {
@@ -302,7 +292,7 @@ function BulkEmailPageContent() {
   }, [apiClient, filterSignature, filters, recipientType]);
 
   useEffect(() => {
-    if (!draftReady) return;
+    if (!draftReady || loadedDraftIdentityKey !== emailDraftStorageKey) return;
     if (skipNextDraftSaveRef.current) {
       skipNextDraftSaveRef.current = false;
       return;
@@ -314,29 +304,24 @@ function BulkEmailPageContent() {
     if (draftClearedRef.current && !hasDraftContent) return;
     if (draftClearedRef.current) draftClearedRef.current = false;
 
-    const timer = window.setTimeout(() => {
-      const savedAt = msToIso(nowMs());
-      const draft: StoredEmailDraft = {
-        attachments,
-        content,
-        contentType,
-        filters: normalizeFilters(filters),
-        recipientType,
-        savedAt,
-        subject,
-      };
-      try {
-        if (emailDraftStorageKey) {
-          window.localStorage.setItem(emailDraftStorageKey, JSON.stringify(draft));
-        }
-        if (draftRestored) setDraftSavedAt(savedAt);
-      } catch {
-        // Storage can be unavailable in private browsing; the editor remains usable.
+    const savedAt = msToIso(nowMs());
+    const draft: StoredEmailDraft = {
+      attachments,
+      content,
+      contentType,
+      filters: normalizeFilters(filters),
+      recipientType,
+      savedAt,
+      subject,
+    };
+    try {
+      if (emailDraftStorageKey) {
+        window.localStorage.setItem(emailDraftStorageKey, JSON.stringify(draft));
       }
-    }, 500);
-
-    return () => window.clearTimeout(timer);
-  }, [attachments, content, contentType, draftReady, draftRestored, emailDraftStorageKey, filters, recipientType, subject]);
+    } catch {
+      // Storage can be unavailable in private browsing; the editor remains usable.
+    }
+  }, [attachments, content, contentType, draftReady, loadedDraftIdentityKey, emailDraftStorageKey, filters, recipientType, subject]);
 
   const buildRequest = (options?: {
     includeSchedule?: boolean;
@@ -390,23 +375,6 @@ function BulkEmailPageContent() {
       // Storage can be unavailable in private browsing; continue clearing the form.
     }
     draftClearedRef.current = true;
-    setDraftRestored(false);
-    setDraftSavedAt(null);
-    setDraftNoticeVisible(false);
-  };
-
-  const handleStartNew = () => {
-    clearStoredDraft();
-    setRecipientType("ALL");
-    setFilters({});
-    setSubject("");
-    setContent("");
-    setContentType("html");
-    setAttachments([]);
-    setScheduledAt("");
-    setRecipientMenuOpen(false);
-    setOperationError(null);
-    setStatusNotice(null);
   };
 
   const handleRecipientMenuSelect = (option: RecipientFilterMenuOption) => {
@@ -602,14 +570,6 @@ function BulkEmailPageContent() {
 
         <form id="bulk-email-compose" className="w-full" onSubmit={(event) => void handleReview(event)}>
           <div className="email-composer-canvas bg-white p-4 sm:p-6 md:p-8">
-            {draftRestored && draftSavedAt && draftNoticeVisible ? (
-              <DraftRestoredBanner
-                className="mb-5"
-                savedAt={draftSavedAt}
-                onStartNew={handleStartNew}
-                onDismiss={() => setDraftNoticeVisible(false)}
-              />
-            ) : null}
             <section className="border-b border-slate-100 pb-5" aria-label="수신자">
               <div className="flex min-h-10 flex-wrap items-start justify-between gap-3 sm:items-center sm:gap-4">
                 <div className="flex min-w-0 flex-wrap items-center gap-2.5">

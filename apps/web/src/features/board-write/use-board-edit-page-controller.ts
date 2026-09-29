@@ -97,6 +97,9 @@ export function useBoardEditPageController(forcedCategory?: string) {
     "idle" | "saving" | "saved" | "failed" | "conflict"
   >("idle");
   const initialFingerprintRef = useRef<string | null>(null);
+  const draftDiscardingRef = useRef(false);
+  const draftSavesRef = useRef(new Set<Promise<unknown>>());
+  const draftIdsRef = useRef(new Set<string>());
   const lastDraftFingerprintRef = useRef<string | null>(null);
   const canConfigurePostSettings = !PUBLIC_WRITE_BOARD_CODES.has(category);
   const canManageTemplates = hasAdminPermission(session?.permission);
@@ -245,8 +248,24 @@ export function useBoardEditPageController(forcedCategory?: string) {
     linkedSurveyId: selectedSurveyId || null,
   });
 
+  const handleCancelDraft = async () => {
+    if (draftDiscardingRef.current) return;
+    draftDiscardingRef.current = true;
+    setDraftStatus("saving");
+    try {
+      await Promise.allSettled([...draftSavesRef.current]);
+      if (serverDraftId) draftIdsRef.current.add(serverDraftId);
+      await Promise.all([...draftIdsRef.current].map((id) => apiClient.deleteArticleDraft(id)));
+      backToArticle();
+    } catch {
+      draftDiscardingRef.current = false;
+      setDraftStatus("failed");
+      toast({ type: "error", message: lang === "ko" ? "초안을 삭제하지 못했습니다. 다시 취소해 주세요." : "Could not discard the draft. Please try again." });
+    }
+  };
+
   const handleSaveDraft = async () => {
-    if (!articleId || (!titleKo.trim() && !contentKo.trim())) return;
+    if (draftDiscardingRef.current || !articleId || (!titleKo.trim() && !contentKo.trim())) return;
 
     const payload = buildDraftPayload();
     const fingerprint = getDraftFingerprint(payload);
@@ -254,12 +273,15 @@ export function useBoardEditPageController(forcedCategory?: string) {
 
     setDraftStatus("saving");
     try {
-      const response = await apiClient.saveArticleDraft({
+      const request = apiClient.saveArticleDraft({
         ...payload,
         draftId: serverDraftId ?? undefined,
         expectedVersion: serverDraftVersion,
         fingerprint,
       });
+      draftSavesRef.current.add(request);
+      const response = await request.finally(() => draftSavesRef.current.delete(request));
+      draftIdsRef.current.add(response.draftId);
       setServerDraftId(response.draftId);
       setServerDraftVersion(response.version);
       setDraftStatus("saved");
@@ -649,6 +671,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     fileInputRef,
     handleSubmit,
     handleSaveDraft,
+    handleCancelDraft,
     handleUploadThumbnail,
     handleUploadFiles,
     handleUploadInlineImage,

@@ -33,6 +33,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     allowComment,
     allowSecret,
     backToArticle,
+    handleCancelDraft,
     canConfigurePostSettings,
     canManageTemplates,
     category,
@@ -210,7 +211,9 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
       <BoardEditHeaderControls
         editorView={editorView}
         onEditorViewChange={setEditorView}
-        trailingActions={<BoardPostToolbarOptions lang={lang} canPin={canConfigurePostSettings} pinned={isPinned} onPinnedChange={setIsPinned}
+        pinnedActions={<BoardPostToolbarOptions lang={lang} canPin={canConfigurePostSettings} pinned={isPinned} onPinnedChange={setIsPinned}
+          promotion={false} endDate="" onEndDateChange={() => undefined} />}
+        trailingActions={<BoardPostToolbarOptions lang={lang} canPin={false} pinned={isPinned} onPinnedChange={setIsPinned}
           promotion={category === "promotions"} endDate={eventEndDate} onEndDateChange={(value) => { setEventEndDate(value); setIsEventAlwaysOpen(!value); }} />}
         category={category}
         lang={lang}
@@ -283,8 +286,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
               lang={lang}
               isSubmitting={isSubmitting}
               draftStatus={draftStatus}
-              onCancel={backToArticle}
-              onSaveDraft={handleSaveDraft}
+              onCancel={() => void handleCancelDraft()}
               onSubmit={handleSubmit}
               submitLabel={lang === "ko" ? "수정" : "Save"}
 

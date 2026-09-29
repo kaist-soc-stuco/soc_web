@@ -1093,7 +1093,6 @@ function RichTextToolbar({
 
 function EditorPane({
   editor,
-  languageLabel,
   onFocus,
   onTitleChange,
   placeholder,
@@ -1101,7 +1100,6 @@ function EditorPane({
   titleLabel,
 }: {
   editor: Editor;
-  languageLabel: string;
   onFocus: () => void;
   onTitleChange: (value: string) => void;
   placeholder: string;
@@ -1110,11 +1108,6 @@ function EditorPane({
 }) {
   return (
     <section className="min-w-0 px-4 py-4 md:px-6 md:py-5" onFocusCapture={onFocus}>
-      <div className="mb-2 flex min-h-5 items-center">
-        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">
-          {languageLabel}
-        </span>
-      </div>
       <input
         type="text"
         spellCheck={false}
@@ -1331,7 +1324,7 @@ export function BilingualRichTextEditor({
         <div className={viewMode === "en" ? "hidden" : "min-w-0"}>
         <EditorPane
           editor={koreanEditor}
-          languageLabel={lang === "ko" ? "국문" : "Korean"}
+
           onFocus={() => setActiveLanguage("ko")}
           onTitleChange={onTitleKoChange}
           placeholder={lang === "ko" ? "국문 제목을 입력하세요" : "Enter Korean title"}
@@ -1343,7 +1336,7 @@ export function BilingualRichTextEditor({
           <div className={cn("min-w-0", viewMode === "ko" && "hidden", (viewMode === "split" || !viewMode) && "border-t border-slate-200 md:border-l md:border-t-0")}>
             <EditorPane
               editor={englishEditor}
-              languageLabel={lang === "ko" ? "영문" : "English"}
+
               onFocus={() => setActiveLanguage("en")}
               onTitleChange={onTitleEnChange}
               placeholder={lang === "ko" ? "영문 제목을 입력하세요" : "Enter English title"}

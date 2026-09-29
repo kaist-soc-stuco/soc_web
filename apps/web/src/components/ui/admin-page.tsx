@@ -41,7 +41,7 @@ interface AdminPageHeaderProps {
 
 export function AdminPageHeader({ actions, eyebrow, title, center }: AdminPageHeaderProps) {
   return (
-    <header className={cn("admin-page__header flex flex-col gap-4 border-b border-slate-200/80 pb-5 md:flex-row md:items-center md:justify-between", center && "!grid grid-cols-[minmax(0,1fr)_auto] items-center xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]")}>
+    <header className={cn("admin-page__header flex flex-col gap-4 border-b border-slate-200/80 pb-5 md:flex-row md:items-center md:justify-between", center && "!grid grid-cols-1 items-center md:grid-cols-[minmax(0,1fr)_auto]")}>
       <div className="min-w-0">
         {eyebrow ? (
           <div className="mb-1.5 flex items-center gap-2 text-[length:var(--ui-text-caption-size)] font-semibold uppercase tracking-[0.14em] text-brand-primary">
@@ -52,8 +52,8 @@ export function AdminPageHeader({ actions, eyebrow, title, center }: AdminPageHe
           {title}
         </AdminPageTitle>
       </div>
-      {center ? <div className="col-span-2 row-start-2 justify-self-center xl:col-span-1 xl:col-start-2 xl:row-start-1">{center}</div> : null}
-      {actions ? <div className={cn("flex w-full min-w-0 shrink-0 flex-wrap items-center gap-2 md:w-auto", center && "col-start-2 row-start-1 justify-self-end xl:col-start-3")}>{actions}</div> : null}
+      {center ? <div className="row-start-3 min-w-0 max-w-full justify-self-center md:col-span-2 md:row-start-2">{center}</div> : null}
+      {actions ? <div className={cn("flex w-full min-w-0 shrink-0 flex-wrap items-center gap-2 md:w-auto", center && "row-start-2 md:col-start-2 md:row-start-1 md:justify-self-end")}>{actions}</div> : null}
     </header>
   );
 }

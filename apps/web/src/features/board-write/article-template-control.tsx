@@ -158,7 +158,7 @@ export function ArticleTemplateControl({
       <Button
         type="button"
         variant="outline"
-        className="h-[var(--ui-control-height)] !font-medium"
+        className="h-8 text-sm !font-medium"
         onClick={() => {
           setError(null);
           setOpen(true);

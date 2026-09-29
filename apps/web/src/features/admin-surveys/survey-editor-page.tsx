@@ -2360,7 +2360,7 @@ export function SurveyEditorPage() {
         {ConfirmDialog}
         <main inert={historyBusy || undefined} className="admin-page__main admin-survey-editor mx-auto flex w-full max-w-[76rem] flex-col gap-5 px-4 pb-6 pt-0 sm:px-5 md:gap-6 md:px-8 md:pb-7 xl:px-10">
 
-          <div data-survey-editor-header className="sticky top-0 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-1 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
+          <div data-survey-editor-header className="sticky top-0 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-6 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
           <AdminPageHeader
             center={<SegmentedControl
             ariaLabel="설문 편집 단계"
@@ -2374,7 +2374,7 @@ export function SurveyEditorPage() {
               { value: "delivery", label: "설정" },
             ]}
           />}
-            title={<span className="flex min-w-0 items-center gap-2"><IconButton aria-label="설문 목록으로" className="shrink-0" onClick={() => { void flushAutoSave.current().then(() => navigate("/admin/surveys")); }}><ArrowLeft className="size-5" /></IconButton><span className="truncate">{plainText(form.watch("titleKo")) || (isEdit ? "설문조사 편집" : "새 설문조사")}</span></span>}
+            title={<span className="flex min-w-0 items-center gap-2"><IconButton aria-label="설문 목록으로" className="shrink-0" onClick={() => { void flushAutoSave.current().then(() => navigate("/admin/surveys")); }}><ArrowLeft className="size-5" /></IconButton><span className="min-w-0 break-words">{plainText(form.watch("titleKo")) || (isEdit ? "설문조사 편집" : "새 설문조사")}</span></span>}
             actions={
               <div className="survey-editor-header-actions flex items-center gap-1">
                 <IconButton data-tooltip="실행 취소" aria-label="실행 취소" disabled={saving || historyBusy || (!history.current.past.length && !editingQuestion && !editingSection)} onMouseDown={event => event.preventDefault()} onClick={() => void restoreHistory("undo")}><Undo2 className="size-4" /></IconButton>

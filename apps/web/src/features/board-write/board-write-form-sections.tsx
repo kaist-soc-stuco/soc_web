@@ -60,6 +60,7 @@ interface HeaderControlsProps {
   lang: string;
   leadingActions?: ReactNode;
   trailingActions?: ReactNode;
+  pinnedActions?: ReactNode;
   onCategoryChange: (category: string) => void;
   selectedCategory: string;
   writableBoardCodes: string[];
@@ -72,6 +73,7 @@ export function BoardWriteHeaderControls({
   lang,
   leadingActions,
   trailingActions,
+  pinnedActions,
   onCategoryChange,
   selectedCategory,
   writableBoardCodes,
@@ -81,10 +83,10 @@ export function BoardWriteHeaderControls({
   );
 
   return (
-    <div className="flex flex-col gap-3 bg-slate-50/40 px-4 py-3 border-b border-slate-200 rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 bg-slate-50/40 px-3 py-2 border-b border-slate-200 rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <SelectDropdown
+        <div className="flex flex-wrap items-center gap-2">
+          {selectedCategory !== "_EVENT" && <SelectDropdown
             id="board-category-select"
             value={selectedCategory}
             onChange={onCategoryChange}
@@ -107,12 +109,13 @@ export function BoardWriteHeaderControls({
                   ]
             }
             className="w-32 shrink-0"
-            buttonClassName="h-[var(--ui-control-height)] rounded-lg border-slate-200 px-2.5 py-0 text-xs !font-medium text-slate-800 shadow-xs"
+            buttonClassName="h-8 rounded-lg border-slate-200 px-2.5 py-0 text-sm !font-medium text-slate-800 shadow-xs"
             menuClassName="rounded-lg border-slate-200"
-            optionClassName="text-xs"
+            optionClassName="text-sm"
             emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
-          />
+          />}
           {leadingActions}
+          {pinnedActions}
         </div>
       </div>
 
@@ -131,6 +134,7 @@ interface EditHeaderControlsProps {
   lang: string;
   leadingActions?: ReactNode;
   trailingActions?: ReactNode;
+  pinnedActions?: ReactNode;
 }
 
 export function BoardEditHeaderControls({
@@ -140,12 +144,13 @@ export function BoardEditHeaderControls({
   lang,
   leadingActions,
   trailingActions,
+  pinnedActions,
 }: EditHeaderControlsProps) {
   return (
-    <div className="flex flex-col gap-3 bg-slate-50/40 px-4 py-3 border-b border-slate-200 rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 bg-slate-50/40 px-3 py-2 border-b border-slate-200 rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <SelectDropdown
+        <div className="flex flex-wrap items-center gap-2">
+          {category !== "_EVENT" && <SelectDropdown
             id="edit-board-category-select"
             value={category}
             onChange={() => undefined}
@@ -157,9 +162,10 @@ export function BoardEditHeaderControls({
               },
             ]}
             className="w-32 shrink-0"
-            buttonClassName="h-[var(--ui-control-height)] rounded-lg border-slate-200 px-2.5 py-0 text-xs !font-medium shadow-xs"
-          />
+            buttonClassName="h-8 rounded-lg border-slate-200 px-2.5 py-0 text-sm !font-medium shadow-xs"
+          />}
           {leadingActions}
+          {pinnedActions}
         </div>
       </div>
 
@@ -334,36 +340,34 @@ export function BoardWriteEventFields({
           </span>
         </label>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,24rem),1fr))] gap-3">
         <UiFormField
-          className="min-w-0"
+          className="min-w-0 grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-2"
           htmlFor="event-start-date"
           label={lang === "ko" ? "시작" : "Start"}
         >
           <UiInput
             id="event-start-date"
-            type="date"
+            type={isAllDay ? "date" : "datetime-local"}
             disabled={isEventAlwaysOpen}
             className="w-full min-w-0 text-[length:var(--ui-text-body-sm-size)]"
-            value={eventStartInputValue.slice(0, 10)}
-            onChange={(event) => onEventStartDateChange(!event.target.value ? "" : isAllDay ? event.target.value : `${event.target.value}T${eventStartInputValue.slice(11, 16) || "00:00"}`)}
+            value={isAllDay ? eventStartInputValue.slice(0, 10) : eventStartInputValue}
+            onChange={(event) => onEventStartDateChange(event.target.value)}
           />
-          {!isAllDay ? <UiInput type="time" aria-label={lang === "ko" ? "시작 시간 (한국 시간)" : "Start time (Seoul)"} disabled={isEventAlwaysOpen || !eventStartInputValue} value={eventStartInputValue.slice(11, 16)} onChange={(event) => onEventStartDateChange(`${eventStartInputValue.slice(0, 10)}T${event.target.value}`)} className="mt-2 w-full min-w-0" /> : null}
         </UiFormField>
         <UiFormField
-          className="min-w-0"
+          className="min-w-0 grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-2"
           htmlFor="event-end-date"
           label={lang === "ko" ? "종료" : "End"}
         >
           <UiInput
             id="event-end-date"
-            type="date"
+            type={isAllDay ? "date" : "datetime-local"}
             disabled={isEventAlwaysOpen}
             className="w-full min-w-0 text-[length:var(--ui-text-body-sm-size)]"
-            value={eventEndInputValue.slice(0, 10)}
-            onChange={(event) => onEventEndDateChange(!event.target.value ? "" : isAllDay ? event.target.value : `${event.target.value}T${eventEndInputValue.slice(11, 16) || "23:59"}`)}
+            value={isAllDay ? eventEndInputValue.slice(0, 10) : eventEndInputValue}
+            onChange={(event) => onEventEndDateChange(event.target.value)}
           />
-          {!isAllDay ? <UiInput type="time" aria-label={lang === "ko" ? "종료 시간 (한국 시간)" : "End time (Seoul)"} disabled={isEventAlwaysOpen || !eventEndInputValue} value={eventEndInputValue.slice(11, 16)} onChange={(event) => onEventEndDateChange(`${eventEndInputValue.slice(0, 10)}T${event.target.value}`)} className="mt-2 w-full min-w-0" /> : null}
         </UiFormField>
       </div>
       {showCardDetails ? (
@@ -724,7 +728,6 @@ interface BoardWriteFooterProps {
   leadingActions?: ReactNode;
   trailingActions?: ReactNode;
   onCancel?: () => void;
-  onSaveDraft?: () => void | Promise<void>;
   onSubmit: () => void;
   submitLabel?: string;
 }
@@ -738,7 +741,6 @@ export function BoardWriteFooter({
   leadingActions,
   trailingActions,
   onCancel,
-  onSaveDraft,
   onSubmit,
   submitLabel,
 }: BoardWriteFooterProps) {
@@ -760,7 +762,6 @@ export function BoardWriteFooter({
       ) : null}
       <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
         {leadingActions}
-        {onSaveDraft ? <Button type="button" variant="ghost" disabled={isSubmitting || isSavingDraft || !canWriteSelected} onClick={() => void onSaveDraft()}>{lang === "ko" ? "임시저장" : "Save draft"}</Button> : null}
         <Button loading={isSubmitting}
           type="button"
           onClick={onSubmit}
@@ -783,7 +784,7 @@ export function BoardPostToolbarOptions({ lang, canPin, pinned, onPinnedChange, 
       {lang === "ko" ? "게시 종료일" : "End date"}
       <UiInput type="date" aria-label={lang === "ko" ? "게시 종료일" : "End date"} value={endDate.slice(0, 10)} onChange={(event) => onEndDateChange(event.target.value)} className="w-36" />
     </label>}
-    {canPin && <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-medium text-slate-600">
+    {canPin && <label className="ml-2 flex min-h-8 cursor-pointer items-center gap-2 border-l border-slate-200 pl-4 text-sm font-medium text-slate-600">
       <UiInput type="checkbox" checked={pinned} onChange={(event) => onPinnedChange(event.target.checked)} />
       {lang === "ko" ? "상단 고정" : "Pin to top"}
     </label>}
@@ -791,8 +792,8 @@ export function BoardPostToolbarOptions({ lang, canPin, pinned, onPinnedChange, 
 }
 
 export function BoardEditorViewControl({ view, onChange, lang }: { view: "ko" | "en" | "split"; onChange: (value: "ko" | "en" | "split") => void; lang: string }) {
-  return <div role="group" aria-label={lang === "ko" ? "편집 언어 보기" : "Editor language view"} className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
-    {([['ko', '한국어'], ['en', 'English'], ['split', lang === 'ko' ? '◫ 나란히 보기' : '◫ Side by side']] as const).map(([value, label]) =>
-      <Button key={value} type="button" variant="ghost" size="sm" aria-pressed={view === value} className={view === value ? "bg-white text-kaist-darkgreen shadow-sm" : "text-slate-500"} onClick={() => onChange(value)}>{label}</Button>)}
+  return <div role="group" aria-label={lang === "ko" ? "편집 언어 보기" : "Editor language view"} className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5">
+    {([['ko', '한국어'], ['en', 'English'], ['split', lang === 'ko' ? '분할' : 'Split']] as const).map(([value, label]) =>
+      <Button key={value} type="button" variant="ghost" size="sm" aria-pressed={view === value} className={view === value ? "h-7 bg-white text-sm !font-bold text-kaist-darkgreen shadow-sm" : "h-7 text-sm text-slate-500"} onClick={() => onChange(value)}>{label}</Button>)}
   </div>;
 }

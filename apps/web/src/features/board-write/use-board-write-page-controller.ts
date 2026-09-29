@@ -660,6 +660,23 @@ export function useBoardWritePageController(forcedCategory?: string) {
     }
   };
 
+  const handleCancelDraft = async () => {
+    if (draftCompletedRef.current) return;
+    draftCompletedRef.current = true;
+    setDraftStatus("saving");
+    try {
+      // An in-flight save may assign the first server ID. Wait before deleting it.
+      await draftSaveQueueRef.current;
+      if (draftIdentityRef.current.id) await apiClient.deleteArticleDraft(draftIdentityRef.current.id);
+      if (localDraftStorageKey) localStorage.removeItem(localDraftStorageKey);
+      navigate(selectedCategory === "_EVENT" ? "/events" : `/board/${selectedCategory}`);
+    } catch {
+      draftCompletedRef.current = false;
+      setDraftStatus("failed");
+      toast({ type: "error", message: lang === "ko" ? "초안을 삭제하지 못했습니다. 다시 취소해 주세요." : "Could not discard the draft. Please try again." });
+    }
+  };
+
   const handleStartNewDraft = () => {
     if (serverDraftId) {
       void apiClient.deleteArticleDraft(serverDraftId).catch(() => undefined);
@@ -999,6 +1016,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     handleDeleteDraft,
     handleRestoreDraft,
     handleStartNewDraft,
+    handleCancelDraft,
     handleSaveDraft,
     handleSubmit,
     handleUploadThumbnail,
