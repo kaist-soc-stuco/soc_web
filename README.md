@@ -47,6 +47,7 @@ cp .env.example .env.production
 
 - `API_PORT`, `WEB_PORT`, `NGINX_PORT`: 로컬 포트
 - `VITE_API_BASE_URL`: 프론트엔드 API base URL. nginx를 통해 접근하면 `/api` 사용
+- `TRUST_PROXY_IPS`, `TRUST_PROXY_HOPS`: 신뢰할 리버스 프록시 IP/CIDR과 홉 수. 운영 Compose는 Docker 내부 `172.16.0.0/12` 두 홉을 기본값으로 사용
 - `AUTH_JWT_SECRET`: JWT 서명 secret. 운영에서는 반드시 교체
 - `AUTH_PENDING_LOGIN_ENCRYPTION_KEY`: SSO pending login 암호화 키. 32자 이상의 랜덤 문자열 권장
 - `VOTE_BALLOT_ENCRYPTION_KEY`: 투표 데이터 전용 암호화 키. 인증 키와 분리하고 DB 백업과 함께 보관

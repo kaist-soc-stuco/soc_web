@@ -18,6 +18,11 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       REDIS_URL: redis://redis:6379
+      # Public ingress -> Docker gateway -> nginx -> API. Trust only the two
+      # private proxy hops so forged client-supplied forwarding headers stop
+      # at the first untrusted address.
+      TRUST_PROXY_IPS: ${TRUST_PROXY_IPS:-172.16.0.0/12}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
       ASSET_UPLOAD_DIR: /app/apps/api/uploads/assets
       ASSET_ORPHAN_CLEANUP_ENABLED: ${ASSET_ORPHAN_CLEANUP_ENABLED:-false}
     expose:

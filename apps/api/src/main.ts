@@ -11,6 +11,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 
 import { RequestRateLimitService } from './infrastructure/redis/request-rate-limit.service';
+import { createTrustedProxyCheck } from './infrastructure/http/trusted-proxy';
 import {
   AUTH_ACCESS_COOKIE_NAME,
   AUTH_CSRF_COOKIE_NAME,
@@ -76,9 +77,9 @@ async function bootstrap(): Promise<void> {
   const allowedCorsOrigins = Array.from(
     new Set([...configuredCorsOrigins, ...localDevelopmentOrigins]),
   );
-  const trustedProxyIps = (configService.get<string>('TRUST_PROXY_IPS') ?? '')
+  const trustedProxyEntries = (configService.get<string>('TRUST_PROXY_IPS') ?? '')
     .split(',')
-    .map((value) => value.trim().toLowerCase())
+    .map((value) => value.trim())
     .filter(Boolean);
   const trustedProxyHops = Number.parseInt(
     configService.get<string>('TRUST_PROXY_HOPS') ?? '0',
@@ -87,10 +88,10 @@ async function bootstrap(): Promise<void> {
 
   // Never trust an arbitrary X-Forwarded-* header. A proxy hop is trusted only
   // when its address is explicitly configured by the operator.
-  if (trustedProxyHops > 0 && trustedProxyIps.length > 0) {
-    app.getHttpAdapter().getInstance().set('trust proxy', (ip: string, hop: number) =>
-      hop < trustedProxyHops &&
-      trustedProxyIps.includes(ip.replace(/^::ffff:/i, '').toLowerCase()),
+  if (trustedProxyHops > 0 && trustedProxyEntries.length > 0) {
+    app.getHttpAdapter().getInstance().set(
+      'trust proxy',
+      createTrustedProxyCheck(trustedProxyEntries, trustedProxyHops),
     );
   } else {
     app.getHttpAdapter().getInstance().set('trust proxy', false);
