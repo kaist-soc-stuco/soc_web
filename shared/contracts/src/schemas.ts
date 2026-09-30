@@ -328,6 +328,7 @@ const ArticleAssetsSchema = z
   eventStartDate: z.string().nullable().optional(),
   eventEndDate: z.string().nullable().optional(),
   eventLocation: z.string().trim().max(255).nullable().optional(),
+  eventLocationEn: z.string().trim().max(255).nullable().optional(),
   eventDescriptionKo: z.string().nullable().optional(),
   eventDescriptionEn: z.string().nullable().optional(),
 });
@@ -349,6 +350,7 @@ export const ArticleUpdateSchema = z.object({
   eventStartDate: z.string().nullable().optional(),
   eventEndDate: z.string().nullable().optional(),
   eventLocation: z.string().trim().max(255).nullable().optional(),
+  eventLocationEn: z.string().trim().max(255).nullable().optional(),
   eventDescriptionKo: z.string().nullable().optional(),
   eventDescriptionEn: z.string().nullable().optional(),
 });
@@ -385,6 +387,7 @@ export const ArticleDraftSaveSchema = z.object({
   eventStartDate: z.string().nullable().optional(),
   eventEndDate: z.string().nullable().optional(),
   eventLocation: z.string().trim().max(255).nullable().optional(),
+  eventLocationEn: z.string().trim().max(255).nullable().optional(),
   eventDescriptionKo: z.string().nullable().optional(),
   eventDescriptionEn: z.string().nullable().optional(),
   linkedSurveyId: z.string().uuid().nullable().optional(),

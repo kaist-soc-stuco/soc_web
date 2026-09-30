@@ -588,7 +588,7 @@ export class UsersRepository {
     )))!);
     const studentNumbers = filterValues(filters?.studentNumber);
     if (studentNumbers.length) conditions.push(or(...studentNumbers.map(value =>
-      value === "2024_OR_EARLIER" ? lt(users.stdNo, "20250000") : ilike(users.stdNo, `${value}%`),
+      /^20\d{2}_OR_EARLIER$/.test(value) ? lt(users.stdNo, `${Number(value.slice(0, 4)) + 1}0000`) : ilike(users.stdNo, `${value}%`),
     ))!);
     const majors = filterValues(filters?.primaryMajor);
     if (majors.length) conditions.push(or(...majors.map(value => ilike(users.primaryMajor, `%${value}%`)))!);
@@ -1810,7 +1810,7 @@ export class UsersRepository {
           from ${comments} as article_comments
           where article_comments.article_id = ${comments.articleId}
             and article_comments.status = 'PUBLISHED'
-        )`,
+        )`.as("comment_count"),
       })
       .from(comments)
       .innerJoin(articles, eq(comments.articleId, articles.articleId))

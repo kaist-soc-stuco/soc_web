@@ -380,7 +380,7 @@ export function EventCarousel() {
             homeOrder: item.homeOrder ?? null,
             startAt: item.eventStartDate ?? null,
             endAt: item.eventEndDate ?? null,
-            location: item.eventLocation ?? null,
+            location: (lang === "en" ? item.eventLocationEn || item.eventLocation : item.eventLocation) ?? null,
             eventState,
             surveyId: item.surveyId ?? item.survey?.surveyId ?? null,
             linkedSurveyState: normalizeEventState(item.survey?.computedState),

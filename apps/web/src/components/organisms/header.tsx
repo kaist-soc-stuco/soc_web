@@ -622,7 +622,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                   aria-label={lang === "ko" ? "통합검색 검색어" : "Site search query"}
                   placeholder={lang === "ko" ? "제목, 내용 검색" : "Search titles and content"}
                   value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
-                <IconButton size="sm" aria-label={lang === "ko" ? "검색 닫기" : "Close search"}
+                <IconButton tone="search-clear" size="sm" aria-label={lang === "ko" ? "검색 닫기" : "Close search"}
                   onClick={() => { setSearchOpen(false); requestAnimationFrame(() => searchTriggerRef.current?.focus({ preventScroll: true })); }}>
                   <X aria-hidden="true" />
                 </IconButton>

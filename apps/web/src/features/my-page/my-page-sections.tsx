@@ -366,7 +366,7 @@ export function MyPageActivityPanel({
   }, [activeTab]);
   const renderCollection = () => {
 
-    if (error) return <ErrorState className="min-h-[200px] rounded-none border-0 bg-transparent px-0 py-10 shadow-none" title={error} onRetry={onRetry} />;
+    if (error) return <ErrorState className="min-h-[360px] rounded-none border-0 bg-transparent px-0 py-10 shadow-none" title={error} onRetry={onRetry} />;
     if (activityQuery.trim() && (contentTab === "scraps" ? visibleScraps.length === 0 : activities.length === 0)) return <div className="py-10 text-center text-sm text-slate-500"><p>{lang === "ko" ? "검색 결과가 없습니다." : "No results found."}</p><Button variant="ghost" onClick={() => onQueryChange("")}>{lang === "ko" ? "검색어 지우기" : "Clear search"}</Button></div>;
 
     if (contentTab === "scraps") {
@@ -374,7 +374,7 @@ export function MyPageActivityPanel({
         return (
           <EmptyState
             message={lang === "ko" ? "스크랩한 콘텐츠가 없습니다." : "No saved content."}
-            minHeightClassName="min-h-[200px]"
+            minHeightClassName="min-h-[360px]"
           />
         );
       }
@@ -390,7 +390,7 @@ export function MyPageActivityPanel({
       return (
         <EmptyState
           message={lang === "ko" ? "내역이 없습니다." : "No activity found."}
-          minHeightClassName="min-h-[200px]"
+          minHeightClassName="min-h-[360px]"
         />
       );
     }
@@ -444,7 +444,7 @@ export function MyPageActivityPanel({
           />
         </div>
 
-        <div aria-busy={loading} className="min-h-[200px] flex-1 divide-y divide-slate-100">{collection}</div>
+        <div aria-busy={loading} className="min-h-[360px] flex-1 divide-y divide-slate-100">{collection}</div>
 
         {!loading && !error && totalPages > 1 && (
           <div className="border-t border-slate-100 pt-4 mt-4 flex justify-center select-none">

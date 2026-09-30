@@ -151,7 +151,7 @@ export function DateRangePicker({
   const format = (valueToFormat: string) => valueToFormat.replaceAll("-", ".");
   const rangeLabel = value.from || value.to
     ? `${value.from ? format(value.from) : "…"} ~ ${value.to ? format(value.to).slice(value.from.slice(0, 4) === value.to.slice(0, 4) ? 5 : 0) : "…"}`
-    : "";
+    : label;
   const rangeSummary = draft.from
     ? `${format(draft.from)} – ${draft.to ? format(draft.to).slice(draft.from.slice(0, 4) === draft.to.slice(0, 4) ? 5 : 0) : ko ? "종료일 선택" : "Select end date"}`
     : "";

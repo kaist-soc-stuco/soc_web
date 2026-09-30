@@ -80,6 +80,7 @@ const maskSecretListItem = (item: ArticleListItem): ArticleListItem => ({
   eventStartDate: undefined,
   eventEndDate: undefined,
   eventLocation: undefined,
+  eventLocationEn: undefined,
   eventDescriptionKo: undefined,
   eventDescriptionEn: undefined,
   surveyId: undefined,

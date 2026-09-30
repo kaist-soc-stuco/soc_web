@@ -42,6 +42,7 @@ export interface UnifiedItem {
   isAlwaysOpen?: boolean;
   imageUrl?: string | null;
   location?: string | null;
+  locationEn?: string | null;
   articleBoardCode?: string;
   likeCount?: number;
   scrapCount?: number;
@@ -74,6 +75,7 @@ export interface CalendarEvent {
   isAllDay?: boolean;
   isAlways?: boolean;
   location?: string | null;
+  locationEn?: string | null;
 }
 
 export const stripCalendarPrefix = (title: string) =>
@@ -323,6 +325,7 @@ export const buildUnifiedItems = (
       isAlwaysOpen: !event.eventStartDate && !event.eventEndDate,
       imageUrl: event.imageUrl ?? null,
       location: event.eventLocation?.trim() || null,
+      locationEn: event.eventLocationEn?.trim() || null,
       articleBoardCode: event.boardCode ?? "_EVENT",
       likeCount: event.likeCount,
       scrapCount: event.scrapCount,
@@ -424,7 +427,7 @@ export const buildCalendarEvents = (
           computedState: item.computedState,
           articleId: item.id,
           surveyId: item.surveyId,
-          location: item.location,
+          location: lang === "en" ? item.locationEn || item.location : item.location,
         });
       }
       return;
@@ -444,7 +447,7 @@ export const buildCalendarEvents = (
         articleId: item.kind === "EVENT" ? item.id : null,
         surveyId: item.surveyId,
         startAt: isoToDate(item.opensAt),
-        location: item.location,
+        location: lang === "en" ? item.locationEn || item.location : item.location,
       });
     }
 
@@ -463,7 +466,7 @@ export const buildCalendarEvents = (
         surveyId: item.surveyId,
         startAt: isoToDate(item.closesAt),
         endAt: isoToDate(item.closesAt),
-        location: item.location,
+        location: lang === "en" ? item.locationEn || item.location : item.location,
       });
     }
   });
@@ -519,7 +522,7 @@ export const buildCalendarEventsFromPublicItems = (
       endAt,
       isAllDay: item.isAllDay,
       isAlways: item.isAlways,
-      location: item.location,
+      location: lang === "en" ? item.locationEn || item.location : item.location,
     };
   });
 

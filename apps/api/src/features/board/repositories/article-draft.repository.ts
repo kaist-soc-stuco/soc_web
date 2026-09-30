@@ -73,6 +73,7 @@ const mapRow = (row: DraftSelectRow): ArticleDraftRecord => {
     eventStartDate: toOptionalString(payload.eventStartDate),
     eventEndDate: toOptionalString(payload.eventEndDate),
     eventLocation: toOptionalString(payload.eventLocation),
+    eventLocationEn: toOptionalString(payload.eventLocationEn),
     eventDescriptionKo: toOptionalString(payload.eventDescriptionKo),
     eventDescriptionEn: toOptionalString(payload.eventDescriptionEn),
     linkedSurveyId: toOptionalString(payload.linkedSurveyId),

@@ -37,6 +37,7 @@ export interface PublicCalendarEventItem {
   isAllDay?: boolean;
   isAlways?: boolean;
   location?: string | null;
+  locationEn?: string | null;
   calendarEventId?: string | null;
   category?: CalendarEventCategory;
 }
@@ -54,6 +55,7 @@ export interface CalendarEventRecord {
   startAt: string;
   endAt: string;
   location?: string | null;
+  locationEn?: string | null;
   sourceUid?: string | null;
   sourceType: "ARTICLE" | "MANUAL" | "KAIST_ACADEMIC";
   articleId?: string | null;

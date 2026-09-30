@@ -80,6 +80,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
   const [eventStartDate, setEventStartDate] = useState("");
   const [eventEndDate, setEventEndDate] = useState("");
   const [eventLocation, setEventLocation] = useState("");
+  const [eventLocationEn, setEventLocationEn] = useState("");
   const [eventDescriptionKo, setEventDescriptionKo] = useState("");
   const [eventDescriptionEn, setEventDescriptionEn] = useState("");
   const [isAllDay, setIsAllDay] = useState(false);
@@ -151,6 +152,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
             : "",
         );
         setEventLocation(res.eventLocation || "");
+        setEventLocationEn(res.eventLocationEn || "");
         setEventDescriptionKo(res.eventDescriptionKo || "");
         setEventDescriptionEn(res.eventDescriptionEn || "");
         setSelectedSurveyId(res.survey?.surveyId ?? "");
@@ -236,6 +238,10 @@ export function useBoardEditPageController(forcedCategory?: string) {
     eventLocation:
       (category === "_EVENT" || category === "promotions")
         ? eventLocation.trim() || null
+        : null,
+    eventLocationEn:
+      (category === "_EVENT" || category === "promotions")
+        ? eventLocationEn.trim() || null
         : null,
     eventDescriptionKo:
       (category === "_EVENT" || category === "promotions")
@@ -325,6 +331,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     eventStartDate,
     eventEndDate,
     eventLocation,
+    eventLocationEn,
     eventDescriptionKo,
     eventDescriptionEn,
     selectedSurveyId,
@@ -357,6 +364,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     eventStartDate,
     eventEndDate,
     eventLocation,
+    eventLocationEn,
     eventDescriptionKo,
     eventDescriptionEn,
     selectedSurveyId,
@@ -559,6 +567,10 @@ export function useBoardEditPageController(forcedCategory?: string) {
           (category === "_EVENT" || category === "promotions")
             ? eventLocation.trim() || undefined
             : undefined,
+        eventLocationEn:
+          (category === "_EVENT" || category === "promotions")
+            ? eventLocationEn.trim() || null
+            : undefined,
         eventDescriptionKo:
           (category === "_EVENT" || category === "promotions")
             ? eventDescriptionKo.trim()
@@ -667,6 +679,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     eventDescriptionEn,
     eventEndDate,
     eventLocation,
+    eventLocationEn,
     eventStartDate,
     fileInputRef,
     handleSubmit,
@@ -695,6 +708,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     setEventDescriptionEn,
     setEventEndDate,
     setEventLocation,
+    setEventLocationEn,
     setEventStartDate,
     setIsAnonymous,
     setIsAllDay,

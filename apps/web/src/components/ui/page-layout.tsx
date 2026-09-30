@@ -309,6 +309,7 @@ export function PageSearchField({
       {value ? (
         <IconButton
           size="lg"
+          tone="search-clear"
           aria-label={`${ariaLabel} 지우기`}
           onClick={() => { onClear(); inputRef.current?.focus(); }}
           className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400"

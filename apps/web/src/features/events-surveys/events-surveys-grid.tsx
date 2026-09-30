@@ -244,7 +244,7 @@ export function EventsSurveysGrid({
         const isSurvey = item.kind !== "EVENT";
         const isHomeEventCard = item.kind === "EVENT";
         const period = getCardPeriodText(item, lang);
-        const location = item.location?.trim() || null;
+        const location = (lang === "en" ? item.locationEn || item.location : item.location)?.trim() || null;
         const badges = getCardBadges(item, lang);
         const canEngage = item.kind === "EVENT" && onEngagementToggle;
         const submitting =

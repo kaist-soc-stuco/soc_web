@@ -413,7 +413,7 @@ export function VoteEditorPage() {
         <div className="admin-vote-editor__header sticky top-0 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-6 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
           <AdminPageHeader
             center={<SegmentedControl ariaLabel="투표 편집 영역" role="tablist" className="w-fit" value={editorTab} onChange={setEditorTab} options={[{value:"questions",label:"안건"},{value:"voters",label:"선거인명부"},{value:"settings",label:"설정"},{value:"operations",label:"진행·개표"}]} />}
-            title={<span className="flex min-w-0 items-center gap-2"><IconButton aria-label="투표 목록으로" className="shrink-0" onClick={() => navigate("/admin/votes")}><ArrowLeft className="size-5" /></IconButton><span className="min-w-0 break-words">{stripRichText(draft.titleKo) || "제목 없는 투표"}</span></span>}
+            title={<span className="flex min-w-0 items-center gap-2"><IconButton tone="navigation" aria-label="투표 목록으로" className="shrink-0" onClick={() => navigate("/admin/votes")}><ArrowLeft className="size-5" /></IconButton><span className="min-w-0 break-words">{stripRichText(draft.titleKo) || "제목 없는 투표"}</span></span>}
             actions={<div className="survey-editor-header-actions flex flex-wrap items-center gap-2">
             <IconButton aria-label="실행 취소" data-tooltip="실행 취소" disabled={!editable || !history.current.length} onClick={() => restore("undo")}><Undo2 className="size-4" /></IconButton>
             <IconButton aria-label="다시 실행" data-tooltip="다시 실행" disabled={!editable || !future.current.length} onClick={() => restore("redo")}><Redo2 className="size-4" /></IconButton>

@@ -628,34 +628,36 @@ export function RoadmapGraph({
     ).slice(0, 6);
   }, [displayCodeByCourse, offeringsByCourse, roadmapCourses, searchText]);
 
-  const focusCourse = useCallback(
-    (code: string) => {
-      onSelectedCourseChange(code);
-      setSearchText("");
-      const nodeId = layout.canonicalNodeByCode.get(code);
-      if (nodeId && flow) {
-        void flow.fitView({
-          nodes: [{ id: nodeId }],
-          duration: 380,
-          padding: 0.85,
-          maxZoom: 1.25,
-        });
-      }
-    },
-    [flow, layout.canonicalNodeByCode, onSelectedCourseChange],
-  );
-
-  useEffect(() => {
-    if (!flow || !selectedCourseCode || selectedInstanceId) return;
-    const nodeId = layout.canonicalNodeByCode.get(selectedCourseCode);
-    if (!nodeId) return;
+  const focusedCourseRef = useRef<string | null>(null);
+  const moveToCourse = useCallback((code: string) => {
+    const nodeId = layout.canonicalNodeByCode.get(code);
+    if (!flow || !nodeId) return;
+    focusedCourseRef.current = code;
     void flow.fitView({
       nodes: [{ id: nodeId }],
-      duration: 0,
+      duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650,
+      ease: (t) => t * t * (3 - 2 * t),
+      interpolate: "linear",
       padding: 0.85,
       maxZoom: 1.25,
     });
-  }, [flow, layout.canonicalNodeByCode, selectedCourseCode, selectedInstanceId]);
+  }, [flow, layout.canonicalNodeByCode]);
+
+  const focusCourse = useCallback((code: string) => {
+    moveToCourse(code);
+    onSelectedCourseChange(code);
+    setSearchText("");
+    setSelectedInstanceId(null);
+  }, [moveToCourse, onSelectedCourseChange]);
+
+  useEffect(() => {
+    if (!selectedCourseCode) {
+      focusedCourseRef.current = null;
+      return;
+    }
+    if (selectedInstanceId || focusedCourseRef.current === selectedCourseCode) return;
+    moveToCourse(selectedCourseCode);
+  }, [moveToCourse, selectedCourseCode, selectedInstanceId]);
 
   const toggleTrack = (trackId: string) => {
     setSelectedTrackIds((current) => {
@@ -683,6 +685,7 @@ export function RoadmapGraph({
     <>
       <div className="lg:hidden">
         <TextInput
+              type="search"
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}
           aria-label={lang === "ko" ? "과목 검색" : "Search courses"}
@@ -771,6 +774,7 @@ export function RoadmapGraph({
         <div className="relative z-20 mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:max-w-sm">
             <TextInput
+              type="search"
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}
               onKeyDown={(event) => {
@@ -782,6 +786,7 @@ export function RoadmapGraph({
               trailing={
                 searchText ? (
                   <IconButton
+                    tone="search-clear"
                     aria-label={lang === "ko" ? "검색어 지우기" : "Clear search"}
                     size="sm"
                     onClick={() => setSearchText("")}

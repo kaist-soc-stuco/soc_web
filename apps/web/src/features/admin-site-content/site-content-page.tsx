@@ -289,6 +289,9 @@ function SiteContentPageContent() {
       if (!discard) return;
     }
     setError(null);
+    const nextBlock = blocks.find((block) => categoryMeta[nextCategory].types.includes(block.type));
+    setSelectedId(nextBlock?.contentBlockId ?? null);
+    setDraft(nextBlock ? draftFromBlock(nextBlock) : draftForCategory(nextCategory));
     setCategory(nextCategory);
   };
 
@@ -354,7 +357,7 @@ function SiteContentPageContent() {
     <AdminPageMain className="admin-site-content max-w-[var(--ui-admin-page-max-width)]">
       <AdminPageHeader
         title="사이트 설정"
-        actions={canCreateCategory ? <Button type="button" onClick={() => { setCreateDraft(draftForCategory(category)); setCreateOpen(true); }}><Plus aria-hidden="true" /> {categoryMeta[category].createLabel}</Button> : undefined}
+        actions={canCreateCategory ? <Button type="button" onClick={() => { setCreateDraft(draftForCategory(category)); setCreateOpen(true); }}><Plus aria-hidden="true" /> {categoryMeta[category].createLabel}</Button> : <span aria-hidden="true" className="h-[var(--ui-control-height)]" />}
       />
 
       <AdminEditorGuidance>
@@ -370,7 +373,7 @@ function SiteContentPageContent() {
         options={Object.entries(categoryMeta).map(([value, meta]) => ({ value, label: meta.label, disabled: imageUploading || saving }))}
       />
 
-      <div className={cn("grid gap-4", !categoryMeta[category].singleton && "xl:grid-cols-[280px_minmax(0,1fr)]")}>
+      <div className={cn("grid min-h-[42rem] content-start gap-4 [overflow-anchor:none]", !categoryMeta[category].singleton && "xl:grid-cols-[280px_minmax(0,1fr)]")}>
         {!categoryMeta[category].singleton ? <AdminCard className="admin-site-content__list self-start xl:sticky xl:top-6">
           <AdminCardHeader><div><AdminSectionTitle>{categoryMeta[category].label}</AdminSectionTitle><AdminMetaText>{filteredBlocks.length}개 표시</AdminMetaText></div></AdminCardHeader>
           <div className="scrollbar-hidden max-h-none overflow-y-visible p-2 sm:max-h-[680px] sm:overflow-y-auto">

@@ -213,6 +213,7 @@ export class CalendarService {
         eventStartDate: articles.eventStartDate,
         eventEndDate: articles.eventEndDate,
         eventLocation: articles.eventLocation,
+        eventLocationEn: articles.eventLocationEn,
         status: articles.status,
         createdAt: articles.postedAt,
         updatedAt: articles.updatedAt,
@@ -243,6 +244,7 @@ export class CalendarService {
         startAt: msToIso(row.eventStartDate.valueOf()),
         endAt: msToIso(row.eventEndDate.valueOf()),
         location: row.eventLocation,
+        locationEn: row.eventLocationEn,
         sourceUid: null,
         sourceType: "ARTICLE" as const,
         sourceYear: null,
@@ -842,6 +844,8 @@ export class CalendarService {
         titleEn: articles.titleEn,
         startsAt: articles.eventStartDate,
         endsAt: articles.eventEndDate,
+        location: articles.eventLocation,
+        locationEn: articles.eventLocationEn,
       })
       .from(articles)
       .innerJoin(boards, eq(articles.boardId, boards.boardId))
@@ -888,6 +892,8 @@ export class CalendarService {
         dateType: "open" as const,
         startAt: msToIso(start.valueOf()),
         endAt: msToIso(end.valueOf()),
+        location: row.location,
+        locationEn: row.locationEn,
       }];
     });
   }

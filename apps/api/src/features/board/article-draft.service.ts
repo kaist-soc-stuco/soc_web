@@ -171,7 +171,7 @@ function safeDraftSnapshot(draft: ArticleDraftRecord) {
   return {
     allowComment: draft.allowComment,
     boardCode: draft.boardCode,
-    eventConfigured: Boolean(draft.eventStartDate || draft.eventEndDate || draft.eventLocation),
+    eventConfigured: Boolean(draft.eventStartDate || draft.eventEndDate || draft.eventLocation || draft.eventLocationEn),
     hasAssets: Boolean(draft.assets?.length),
     hasContentEn: Boolean(draft.contentEn?.trim()),
     hasContentKo: Boolean(draft.contentKo.trim()),

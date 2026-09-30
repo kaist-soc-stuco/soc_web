@@ -27,6 +27,7 @@ export interface BoardTemplateSnapshot {
   eventStartDate: string;
   eventEndDate: string;
   eventLocation: string;
+  eventLocationEn: string;
   eventDescriptionKo: string;
   eventDescriptionEn: string;
   selectedSurveyId: string;

@@ -240,6 +240,7 @@ interface EventFieldsProps {
   eventDescriptionEn: string;
   eventEndDate: string;
   eventLocation: string;
+  eventLocationEn: string;
   eventStartDate: string;
   isAllDay: boolean;
   isEventAlwaysOpen: boolean;
@@ -249,6 +250,7 @@ interface EventFieldsProps {
   onEventDescriptionEnChange: (value: string) => void;
   onEventEndDateChange: (value: string) => void;
   onEventLocationChange: (value: string) => void;
+  onEventLocationEnChange: (value: string) => void;
   onEventStartDateChange: (value: string) => void;
   onAllDayChange: (checked: boolean) => void;
   onEventAlwaysOpenChange: (checked: boolean) => void;
@@ -264,6 +266,7 @@ export function BoardWriteEventFields({
   eventDescriptionEn,
   eventEndDate,
   eventLocation,
+  eventLocationEn,
   eventStartDate,
   isAllDay,
   isEventAlwaysOpen,
@@ -275,6 +278,7 @@ export function BoardWriteEventFields({
   onEventDescriptionEnChange,
   onEventEndDateChange,
   onEventLocationChange,
+  onEventLocationEnChange,
   onEventStartDateChange,
   onThumbnailRemove,
   onThumbnailSelect,
@@ -282,6 +286,7 @@ export function BoardWriteEventFields({
   thumbnail,
   uploading,
 }: EventFieldsProps) {
+  const [locationLanguage, setLocationLanguage] = useState<"ko" | "en">("ko");
   const [descriptionLanguage, setDescriptionLanguage] = useState<"ko" | "en">("ko");
   const activeDescriptionLanguage = isKoreanOnly ? "ko" : descriptionLanguage;
   const eventStartInputValue = isAllDay
@@ -380,18 +385,32 @@ export function BoardWriteEventFields({
               }
             />
           </UiFormField>
-          <UiFormField label={lang === "ko" ? "행사 장소" : "Event location"} htmlFor="event-location" className="min-w-0">
+          <div className="grid min-w-0 gap-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="event-location" className="text-xs font-normal text-[#344054]">
+                {lang === "ko" ? "행사 장소" : "Event location"}
+              </label>
+              <div role="tablist" aria-label={lang === "ko" ? "장소 언어" : "Location language"} className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5">
+                {(["ko", "en"] as const).map(language => (
+                  <button type="button" role="tab" key={language} aria-selected={locationLanguage === language}
+                    onClick={() => setLocationLanguage(language)}
+                    className={`rounded px-2 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold ${locationLanguage === language ? "bg-white text-brand-primary shadow-sm" : "text-slate-400 hover:text-slate-700"}`}>
+                    {language.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
             <UiInput
               id="event-location"
               type="text"
               maxLength={255}
               aria-label={lang === "ko" ? "행사 장소" : "Event location"}
-              placeholder={lang === "ko" ? "행사 장소를 입력하세요" : "Enter event location"}
+              placeholder={locationLanguage === "ko" ? "행사 장소를 입력하세요" : "Enter event location"}
               className="w-full"
-              value={eventLocation}
-              onChange={(event) => onEventLocationChange(event.target.value)}
+              value={locationLanguage === "ko" ? eventLocation : eventLocationEn}
+              onChange={(event) => (locationLanguage === "ko" ? onEventLocationChange : onEventLocationEnChange)(event.target.value)}
             />
-          </UiFormField>
+          </div>
           <div className="grid gap-1.5">
             <div className="flex items-center justify-between gap-3">
               <label

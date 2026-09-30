@@ -12,7 +12,7 @@ const sizeClasses: Record<IconButtonSize, string> = {
 
 interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: IconButtonSize;
-  tone?: "ghost" | "outline" | "navigation" | "table-action";
+  tone?: "ghost" | "outline" | "navigation" | "table-action" | "search-clear";
   "data-tooltip"?: string;
 }
 
@@ -27,7 +27,9 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         className={cn(
           "ui-icon-button interaction-button inline-flex shrink-0 cursor-pointer select-none items-center justify-center rounded-lg text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-45",
           sizeClasses[size],
-          tone === "outline"
+          tone === "search-clear"
+            ? "border-0 bg-transparent text-slate-400 shadow-none hover:bg-transparent hover:text-slate-600"
+            : tone === "outline"
             ? "border border-slate-200 bg-white shadow-card hover:bg-slate-50 hover:text-slate-900"
             : tone === "navigation"
               ? "bg-transparent shadow-none hover:bg-slate-100 hover:text-slate-900"

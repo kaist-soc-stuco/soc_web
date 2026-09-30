@@ -50,3 +50,17 @@ test("My Page activity keeps comment content beside bilingual article titles", a
     total: 0,
   });
 });
+
+
+test("commented-post query can select the comment count from its ranked subquery", async () => {
+  const { drizzle } = require("drizzle-orm/node-postgres");
+  const queries = [];
+  const db = drizzle({ query: async (query) => {
+    queries.push(typeof query === "string" ? query : query.text);
+    return { rows: [] };
+  } });
+  const repository = new UsersRepository(db, null, null);
+  assert.deepEqual(await repository.getMyComments("user-1", 20, 0), []);
+  assert.equal(queries.length, 1);
+  assert.match(queries[0], /as "comment_count"/);
+});

@@ -45,6 +45,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     eventDescriptionEn,
     eventEndDate,
     eventLocation,
+    eventLocationEn,
     eventStartDate,
     fileInputRef,
     handleSaveDraft,
@@ -72,6 +73,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     setEventDescriptionEn,
     setEventEndDate,
     setEventLocation,
+    setEventLocationEn,
     setEventStartDate,
     setIsAnonymous,
     setIsAllDay,
@@ -112,6 +114,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     eventStartDate,
     eventEndDate,
     eventLocation,
+    eventLocationEn,
     eventDescriptionKo,
     eventDescriptionEn,
     selectedSurveyId,
@@ -137,6 +140,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
       switchEventEndDateInputMode(template.eventEndDate, Boolean(template.isAllDay)),
     );
     setEventLocation(template.eventLocation || "");
+    setEventLocationEn(template.eventLocationEn || "");
     setEventDescriptionKo(template.eventDescriptionKo);
     setEventDescriptionEn(template.eventDescriptionEn);
     setSelectedSurveyId(template.selectedSurveyId);
@@ -151,6 +155,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
       eventDescriptionEn={eventDescriptionEn}
       eventEndDate={eventEndDate}
       eventLocation={eventLocation}
+      eventLocationEn={eventLocationEn}
       eventStartDate={eventStartDate}
       isAllDay={isAllDay}
       isEventAlwaysOpen={isEventAlwaysOpen}
@@ -167,6 +172,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
       onEventDescriptionEnChange={setEventDescriptionEn}
       onEventEndDateChange={setEventEndDate}
       onEventLocationChange={setEventLocation}
+      onEventLocationEnChange={setEventLocationEn}
       onEventStartDateChange={setEventStartDate}
       onThumbnailRemove={() =>
         setAssets((current) =>
@@ -271,13 +277,13 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
       <PageHeader
         className="board-write-page-header"
         title={
-          <Link
-            to={boardHref}
-            className="inline-flex min-w-0 items-center gap-2 text-inherit transition-colors hover:text-brand-primary"
-          >
-            <ArrowLeft aria-hidden="true" className="size-5 shrink-0" />
+          <span className="inline-flex min-w-0 items-center gap-2">
+            <Link to={boardHref} aria-label={lang === "ko" ? "목록으로" : "Back to list"}
+              className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30">
+              <ArrowLeft aria-hidden="true" className="size-5" />
+            </Link>
             <span className="truncate">{categoryLabel}</span>
-          </Link>
+          </span>
         }
         actions={
           <div className="board-write-page-actions flex items-center justify-end gap-2">

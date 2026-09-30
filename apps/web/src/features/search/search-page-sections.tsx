@@ -347,7 +347,7 @@ function ArticleResults({
         const boardCode = article.boardCode ?? board?.code ?? "notice";
         const title = lang === "ko" ? article.titleKo : article.titleEn || article.titleKo;
         const snippet = getSnippet(
-          lang === "ko" ? article.snippetKo : article.snippetEn || article.snippetKo,
+          matchingSnippet(article.snippetKo, article.snippetEn, article.titleKo, article.titleEn, query, lang),
           query,
         );
 
@@ -384,7 +384,7 @@ function EventResults({
         const start = formatDate(article.eventStartDate ?? article.postedAt, lang);
         const end = article.eventEndDate ? formatDate(article.eventEndDate, lang) : "";
         const period = end && end !== start ? `${start} ～ ${end}` : start;
-        const description = lang === "ko" ? article.eventDescriptionKo : article.eventDescriptionEn || article.eventDescriptionKo;
+        const description = matchingSnippet(article.eventDescriptionKo, article.eventDescriptionEn, article.titleKo, article.titleEn, query, lang);
         const title = lang === "ko" ? article.titleKo : article.titleEn || article.titleKo;
         const snippet = getSnippet(description, query);
 
@@ -465,7 +465,7 @@ function SurveyResults({
     <SectionShell count={surveys.length} title={lang === "ko" ? "설문" : "Surveys"}>
       {surveys.map((survey) => {
         const title = lang === "ko" ? survey.titleKo : survey.titleEn || survey.titleKo;
-        const description = lang === "ko" ? survey.descriptionKo : survey.descriptionEn || survey.descriptionKo;
+        const description = matchingSnippet(survey.descriptionKo, survey.descriptionEn, survey.titleKo, survey.titleEn, query, lang);
         const snippet = getSnippet(description, query);
 
         return (
@@ -499,7 +499,7 @@ function FaqResults({
       {articles.map((article) => {
         const title = lang === "ko" ? article.titleKo : article.titleEn || article.titleKo;
         const snippet = getSnippet(
-          lang === "ko" ? article.snippetKo : article.snippetEn || article.snippetKo,
+          matchingSnippet(article.snippetKo, article.snippetEn, article.titleKo, article.titleEn, query, lang),
           query,
         );
 
@@ -534,7 +534,7 @@ function VoteResults({
     <SectionShell count={votes.length} title={lang === "ko" ? "투표" : "Votes"}>
       {votes.map((vote) => {
         const title = lang === "ko" ? vote.titleKo : vote.titleEn || vote.titleKo;
-        const description = lang === "ko" ? vote.descriptionKo : vote.descriptionEn || vote.descriptionKo;
+        const description = matchingSnippet(vote.descriptionKo, vote.descriptionEn, vote.titleKo, vote.titleEn, query, lang);
         const period = `${formatDate(vote.startsAt, lang)} ～ ${formatDate(vote.endsAt, lang)}`;
         const status = vote.status === "PUBLISHED"
           ? lang === "ko" ? "진행 중" : "Open"
@@ -573,7 +573,7 @@ function AboutResults({
     <SectionShell count={items.length} title={lang === "ko" ? "소개" : "About"}>
       {items.map((item) => {
         const title = lang === "ko" ? item.titleKo : item.titleEn;
-        const description = lang === "ko" ? item.descriptionKo : item.descriptionEn;
+        const description = matchingSnippet(item.descriptionKo, item.descriptionEn, item.titleKo, item.titleEn, query, lang) || "";
 
         return (
           <SearchLink key={item.id} to={item.href}>
@@ -649,4 +649,13 @@ function HighlightedText({ value, query }: { value: string; query: string }) {
   if (cursor === 0) return value;
   if (cursor < value.length) nodes.push(value.slice(cursor));
   return nodes;
+}
+
+function matchingSnippet(ko: string | null | undefined, en: string | null | undefined, titleKo: string | null | undefined, titleEn: string | null | undefined, query: string, lang: string) {
+  const needle = query.trim().toLocaleLowerCase();
+  const matches = (value: string | null | undefined) => Boolean(needle && stripRichText(value).toLocaleLowerCase().includes(needle));
+  if (matches(en) && !matches(ko)) return en;
+  if (matches(titleEn) && !matches(titleKo) && en) return en;
+  if (matches(ko) && !matches(en)) return ko;
+  return lang === "ko" ? ko : en || ko;
 }

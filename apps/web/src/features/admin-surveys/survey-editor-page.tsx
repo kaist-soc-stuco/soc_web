@@ -2374,7 +2374,7 @@ export function SurveyEditorPage() {
               { value: "delivery", label: "설정" },
             ]}
           />}
-            title={<span className="flex min-w-0 items-center gap-2"><IconButton aria-label="설문 목록으로" className="shrink-0" onClick={() => { void flushAutoSave.current().then(() => navigate("/admin/surveys")); }}><ArrowLeft className="size-5" /></IconButton><span className="min-w-0 break-words">{plainText(form.watch("titleKo")) || (isEdit ? "설문조사 편집" : "새 설문조사")}</span></span>}
+            title={<span className="flex min-w-0 items-center gap-2"><IconButton tone="navigation" aria-label="설문 목록으로" className="shrink-0" onClick={() => { void flushAutoSave.current().then(() => navigate("/admin/surveys")); }}><ArrowLeft className="size-5" /></IconButton><span className="min-w-0 break-words">{plainText(form.watch("titleKo")) || (isEdit ? "설문조사 편집" : "새 설문조사")}</span></span>}
             actions={
               <div className="survey-editor-header-actions flex items-center gap-1">
                 <IconButton data-tooltip="실행 취소" aria-label="실행 취소" disabled={saving || historyBusy || (!history.current.past.length && !editingQuestion && !editingSection)} onMouseDown={event => event.preventDefault()} onClick={() => void restoreHistory("undo")}><Undo2 className="size-4" /></IconButton>

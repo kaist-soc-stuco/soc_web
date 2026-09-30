@@ -109,6 +109,7 @@ export interface ArticleListItem {
   snippetEn?: string | null;
   eventStartDate?: string | null;
   eventLocation?: string | null;
+  eventLocationEn?: string | null;
   eventEndDate?: string | null;
   eventDescriptionKo?: string | null;
   eventDescriptionEn?: string | null;
@@ -184,6 +185,7 @@ export interface ArticleDetailResponse {
   prevArticle?: { articleId: string; titleKo: string; titleEn?: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
   nextArticle?: { articleId: string; titleKo: string; titleEn?: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
   eventLocation?: string | null;
+  eventLocationEn?: string | null;
   eventStartDate?: string | null;
   eventEndDate?: string | null;
   eventDescriptionKo?: string | null;
@@ -273,6 +275,7 @@ export interface ArticleDraftRecord {
   eventStartDate?: string | null;
   eventEndDate?: string | null;
   eventLocation?: string | null;
+  eventLocationEn?: string | null;
   eventDescriptionKo?: string | null;
   eventDescriptionEn?: string | null;
   linkedSurveyId?: string | null;

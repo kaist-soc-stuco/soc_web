@@ -86,6 +86,8 @@ type RecipientFilterMenuOption =
       value: SendBulkEmailRequest["recipientType"];
     };
 
+const currentAdmissionYear = Number(msToIso(nowMs() + 9 * 60 * 60 * 1000).slice(0, 4));
+
 const RECIPIENT_FILTER_GROUPS: ReadonlyArray<{
   label: string;
   options: ReadonlyArray<RecipientFilterMenuOption>;
@@ -93,14 +95,11 @@ const RECIPIENT_FILTER_GROUPS: ReadonlyArray<{
   {
     label: "학번",
     options: [
-      { kind: "filter", key: "studentNumber", value: "2026", label: "26학번" },
-      { kind: "filter", key: "studentNumber", value: "2025", label: "25학번" },
-      {
-        kind: "filter",
-        key: "studentNumber",
-        value: "2024_OR_EARLIER",
-        label: "24학번 이전",
-      },
+      ...Array.from({ length: 6 }, (_, index): RecipientFilterMenuOption => {
+        const year = currentAdmissionYear - index;
+        return { kind: "filter", key: "studentNumber", value: String(year), label: `${String(year).slice(2)}학번` };
+      }),
+      { kind: "filter", key: "studentNumber", value: `${currentAdmissionYear - 6}_OR_EARLIER`, label: `${String(currentAdmissionYear - 6).slice(2)}학번 이전` },
     ],
   },
   {
@@ -123,6 +122,7 @@ type AttachmentView = {
   filename: string;
   mimeType: string;
   sizeBytes: number;
+  inlineUrl?: string;
 };
 
 const EXECUTION_HISTORY_STATUSES = new Set<BulkEmailRecord["status"]>([
@@ -381,9 +381,13 @@ function BulkEmailPageContent() {
     if (option.kind === "recipientType") {
       setRecipientType(option.value);
     } else {
-      setFilters((previous) => ({ ...previous, [option.key]: [...new Set([...(previous[option.key]?.split(",") ?? []), option.value])].join(",") }));
+      setFilters((previous) => {
+        const values = previous[option.key]?.split(",").filter(Boolean) ?? [];
+        const next = values.includes(option.value) ? values.filter(value => value !== option.value) : [...values, option.value];
+        return { ...previous, [option.key]: next.join(",") || undefined };
+      });
     }
-    setRecipientMenuOpen(false);
+    if (option.kind === "recipientType") setRecipientMenuOpen(false);
     setOperationError(null);
   };
 
@@ -503,6 +507,7 @@ function BulkEmailPageContent() {
             filename: asset.originalFilename,
             mimeType: asset.mimeType,
             sizeBytes: asset.sizeBytes,
+            inlineUrl: resolveAssetUrl(asset.storageKey),
           },
         ].slice(0, 10),
       );
@@ -614,10 +619,12 @@ function BulkEmailPageContent() {
                                 {group.options.map((option) => (
                                   <DropdownMenu.Item
                                     key={`${option.kind}-${option.label}`}
-                                    onSelect={() => handleRecipientMenuSelect(option)}
+                                    role={option.kind === "filter" ? "menuitemcheckbox" : "menuitem"}
+                                    aria-checked={option.kind === "filter" ? Boolean(filters[option.key]?.split(",").includes(option.value)) : undefined}
+                                    onSelect={(event) => { if (option.kind === "filter") event.preventDefault(); handleRecipientMenuSelect(option); }}
                                     className="flex h-9 cursor-pointer items-center rounded-md px-2.5 text-sm font-normal text-slate-700 outline-none data-[highlighted]:bg-slate-100"
                                   >
-                                    {option.label}
+                                    <span className="mr-2 inline-block w-4">{option.kind === "filter" && filters[option.key]?.split(",").includes(option.value) ? "✓" : ""}</span>{option.label}
                                   </DropdownMenu.Item>
                                 ))}
                               </DropdownMenu.SubContent>
@@ -720,7 +727,16 @@ function BulkEmailPageContent() {
                       size="icon"
                       aria-label={`${attachment.filename} 첨부 제거`}
                       data-tooltip="파일 삭제"
-                      onClick={() => setAttachments((previous) => previous.filter((item) => item.assetId !== attachment.assetId))}
+                      onClick={() => {
+                        setAttachments((previous) => previous.filter((item) => item.assetId !== attachment.assetId));
+                        if (attachment.inlineUrl) setContent((previous) => {
+                          const document = new DOMParser().parseFromString(previous, "text/html");
+                          document.querySelectorAll("img").forEach((image) => {
+                            if (image.getAttribute("src") === attachment.inlineUrl) image.remove();
+                          });
+                          return document.body.innerHTML;
+                        });
+                      }}
                       className="min-h-11 min-w-11 rounded text-slate-400 hover:bg-slate-200 sm:size-5 sm:min-h-0 sm:min-w-0"
                     >
                       <X aria-hidden="true" />
@@ -888,7 +904,7 @@ function isContentType(value: unknown): value is SendBulkEmailRequest["contentTy
 
 function formatStudentNumberFilter(value: string | undefined): string | undefined {
   if (!value) return undefined;
-  if (value === "2024_OR_EARLIER") return "24학번 이전";
+  if (/^20\d{2}_OR_EARLIER$/.test(value)) return `${value.slice(2, 4)}학번 이전`;
   if (/^20\d{2}$/.test(value)) return `${value.slice(2)}학번`;
   return value;
 }
