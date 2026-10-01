@@ -193,6 +193,11 @@ export function Header({ variant = "default" }: HeaderProps) {
     setHoveredIndex(null);
   }, [location.pathname]);
 
+  const navClickClosed = useRef<number | null>(null);
+  const closeNavigation = () => {
+    navClickClosed.current = hoveredIndex;
+    closePopovers();
+  };
   const closePopovers = () => {
     setSearchOpen(false);
     setDropdownOpen(false);
@@ -469,7 +474,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             }`
           : "sticky top-0 z-50 shrink-0 border-b border-[var(--ui-menu-divider)] bg-white"
       }
-      onMouseLeave={() => setHoveredIndex(null)}
+      onMouseLeave={() => { navClickClosed.current = null; setHoveredIndex(null); }}
     >
       <div className="flex h-[var(--ui-header-height)] w-full items-stretch justify-between">
         <div className="flex items-stretch">
@@ -484,9 +489,12 @@ export function Header({ variant = "default" }: HeaderProps) {
               const item = (event.target as HTMLElement).closest<HTMLElement>("[data-nav-index]");
               if (!item) return;
               const index = Number(item.dataset.navIndex);
-              if (Number.isInteger(index)) setHoveredIndex(index);
+              if (Number.isInteger(index) && navClickClosed.current !== index) {
+                navClickClosed.current = null;
+                setHoveredIndex(index);
+              }
             }}
-            onMouseLeave={() => setHoveredIndex(null)}
+            onMouseLeave={() => { navClickClosed.current = null; setHoveredIndex(null); }}
           >
             {navItems.map((item, index) => {
               const active = isNavItemActive(item);
@@ -495,7 +503,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                   key={item.label}
                   data-nav-index={index}
                   className="group relative flex h-full items-stretch"
-                  onMouseEnter={() => setHoveredIndex(index)}
+                  onMouseEnter={() => { if (navClickClosed.current !== index) { navClickClosed.current = null; setHoveredIndex(index); } }}
                   onFocus={() => setHoveredIndex(index)}
                   onBlur={(event) => {
                     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -505,6 +513,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                 >
                   <Link
                     to={item.href}
+                    onClick={closeNavigation}
                     aria-current={active ? "page" : undefined}
                     aria-expanded={hoveredIndex === index}
                     aria-haspopup="menu"
@@ -545,7 +554,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                         ? "visible pointer-events-auto translate-y-0 opacity-100"
                         : "invisible pointer-events-none translate-y-0 opacity-0"
                     }`}
-                    onMouseEnter={() => setHoveredIndex(index)}
+                    onMouseEnter={() => { if (navClickClosed.current !== index) { navClickClosed.current = null; setHoveredIndex(index); } }}
                   >
                     <ul>
                       {item.megaItems.map((child) => {
@@ -563,7 +572,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                               role="menuitem"
                               aria-current={childActive ? "page" : undefined}
                               tabIndex={hoveredIndex === index ? 0 : -1}
-                              onClick={closePopovers}
+                              onClick={closeNavigation}
                               target={child.newTab ? "_blank" : undefined}
                               rel={child.newTab ? "noopener noreferrer" : undefined}
                               className={`flex h-11 w-full items-center justify-center whitespace-nowrap rounded-none px-3 text-center text-sm font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${

@@ -144,7 +144,7 @@ export function BoardDetailArticleCard({
                   sideOffset={6}
                   collisionPadding={12}
                 >
-                  <AdminActionMenuPanel className="w-44 !shadow-[0_4px_12px_rgb(15_23_42_/_0.08)]">
+                  <AdminActionMenuPanel className="!w-max !min-w-32 !shadow-[0_4px_12px_rgb(15_23_42_/_0.08)]">
                     {canEdit ? (
                       <>
                         <DropdownMenu.Item asChild>

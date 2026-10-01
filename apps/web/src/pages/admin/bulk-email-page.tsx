@@ -25,6 +25,7 @@ import {
   nowMs,
 } from "@soc/shared";
 import {
+  ArrowLeft,
   CalendarClock,
   ChevronDown,
   ChevronRight,
@@ -34,7 +35,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { PopoverPanel } from "@/components/ui/popover-panel";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { RichTextEditor } from "@/components/organisms/rich-text-editor";
@@ -150,6 +151,11 @@ function BulkEmailPageContent() {
     [session?.authenticated, session?.storageMode, session?.draftNamespace],
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const subjectInputRef = useRef<HTMLInputElement>(null);
+  const bodySectionRef = useRef<HTMLElement>(null);
+  const recipientPopoverRef = useRef<HTMLDivElement>(null);
+  const recipientTriggerRef = useRef<HTMLButtonElement>(null);
+  const recipientPanelRef = useRef<HTMLDivElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
 
   const [initialLocalDraft, setInitialLocalDraft] = useState<StoredEmailDraft | null>(null);
@@ -164,6 +170,7 @@ function BulkEmailPageContent() {
   );
   const [filters, setFilters] = useState<RecipientFilters>({});
   const [recipientMenuOpen, setRecipientMenuOpen] = useState(false);
+  const [recipientFilterGroup, setRecipientFilterGroup] = useState<string | null>(null);
   const [recipientCount, setRecipientCount] = useState<number | null>(null);
   const [recipientCountLoading, setRecipientCountLoading] = useState(false);
 
@@ -224,11 +231,45 @@ function BulkEmailPageContent() {
       if (normalized) entries.push({ key, label, tokenLabel: tokenLabel ?? normalized, value: normalized });
     };
 
-    for (const value of filters.studentNumber?.split(",").filter(Boolean) ?? []) add("studentNumber", "학번", value, formatStudentNumberFilter(value));
+    for (const value of filters.studentNumber?.split(",").filter(Boolean).sort((left, right) => parseInt(right, 10) - parseInt(left, 10)) ?? []) add("studentNumber", "학번", value, formatStudentNumberFilter(value));
     for (const value of filters.primaryMajor?.split(",").filter(Boolean) ?? []) add("primaryMajor", "주전공", value, `${value} 주전공`);
     for (const value of filters.query?.split(",").filter(Boolean) ?? []) add("query", "검색", value, `검색: ${value}`);
     return entries;
   }, [filters]);
+  const activeFilterChips = useMemo(() => {
+    const groups = new Map<RecipientFilterKey, { key: RecipientFilterKey; label: string; values: string[] }>();
+    for (const entry of activeFilterEntries) {
+      const group = groups.get(entry.key) ?? { key: entry.key, label: entry.label, values: [] };
+      group.values.push(entry.key === "studentNumber" ? entry.tokenLabel.replace("학번", "") : entry.value);
+      groups.set(entry.key, group);
+    }
+    return Array.from(groups.values()).map((group) => ({ key: group.key, label: `${group.label}: ${group.values.join(" · ")}` }));
+  }, [activeFilterEntries]);
+
+  useEffect(() => {
+    if (!recipientMenuOpen) return;
+    const frame = requestAnimationFrame(() => recipientPanelRef.current?.querySelector<HTMLElement>("button, input")?.focus());
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!recipientPopoverRef.current?.contains(event.target as Node)) setRecipientMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setRecipientMenuOpen(false);
+      recipientTriggerRef.current?.focus();
+    };
+    const closeOnFocusOutside = (event: FocusEvent) => {
+      if (!recipientPopoverRef.current?.contains(event.target as Node)) setRecipientMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("focusin", closeOnFocusOutside);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("focusin", closeOnFocusOutside);
+    };
+  }, [recipientMenuOpen, recipientFilterGroup]);
   const selectedRecipientLabel =
     RECIPIENT_TYPES.find((option) => option.value === recipientType)?.label ?? "수신자";
   const previewVariables = {
@@ -339,13 +380,24 @@ function BulkEmailPageContent() {
     ...(options?.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
   });
 
+  const hasBody = contentType === "html"
+    ? Boolean(new DOMParser().parseFromString(content, "text/html").body.textContent?.trim() || /<(img|table|video)\b/i.test(content))
+    : Boolean(content.trim());
   const validateMessage = () => {
-    if (!subject.trim() || !content.trim()) {
-      setOperationError("제목과 본문을 입력해 주세요.");
+    if (!subject.trim() || !hasBody) {
+      if (!subject.trim()) {
+        subjectInputRef.current?.focus();
+        setOperationError("제목을 입력해 주세요.");
+      } else {
+        setEditorMode("editor");
+        requestAnimationFrame(() => bodySectionRef.current?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus());
+        setOperationError("본문을 입력해 주세요.");
+      }
       return false;
     }
-    if (deliveryMode === "scheduled" && !scheduledAt) {
-      setOperationError("예약 발송 일시를 선택해 주세요.");
+    if (deliveryMode === "scheduled" && (!scheduledAt || Date.parse(scheduledAt) <= nowMs())) {
+      document.querySelector<HTMLInputElement>('input[type="datetime-local"]')?.focus();
+      setOperationError("현재 시간 이후의 예약 발송 일시를 선택해 주세요.");
       return false;
     }
     return true;
@@ -379,7 +431,7 @@ function BulkEmailPageContent() {
 
   const handleRecipientMenuSelect = (option: RecipientFilterMenuOption) => {
     if (option.kind === "recipientType") {
-      setRecipientType(option.value);
+      setRecipientType((current) => current === option.value ? "ALL" : option.value);
     } else {
       setFilters((previous) => {
         const values = previous[option.key]?.split(",").filter(Boolean) ?? [];
@@ -387,7 +439,6 @@ function BulkEmailPageContent() {
         return { ...previous, [option.key]: next.join(",") || undefined };
       });
     }
-    if (option.kind === "recipientType") setRecipientMenuOpen(false);
     setOperationError(null);
   };
 
@@ -573,77 +624,60 @@ function BulkEmailPageContent() {
 
 
 
-        <form id="bulk-email-compose" className="w-full" onSubmit={(event) => void handleReview(event)}>
+        <form id="bulk-email-compose" noValidate className="w-full" onSubmit={(event) => void handleReview(event)}>
           <div className="email-composer-canvas bg-white p-4 sm:p-6 md:p-8">
-            <section className="border-b border-slate-100 pb-5" aria-label="수신자">
-              <div className="flex min-h-10 flex-wrap items-start justify-between gap-3 sm:items-center sm:gap-4">
-                <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-                  <span className="shrink-0 text-sm font-medium text-slate-600">수신자:</span>
+            <section className="border-b border-slate-100 pb-4" aria-label="수신자">
+              <div className="flex min-h-9 items-start gap-3">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  <span className="shrink-0 py-1.5 text-sm font-medium text-slate-600">수신자:</span>
                   <RecipientToken label={selectedRecipientLabel} onRemove={() => setRecipientType("ALL")} />
-                  {activeFilterEntries.map((entry) => (
-                    <RecipientToken
-                      key={`${entry.key}-${entry.value}`}
-                      label={entry.tokenLabel}
-                      onRemove={() => setFilters((previous) => ({ ...previous, [entry.key]: previous[entry.key]?.split(",").filter((value) => value !== entry.value).join(",") || undefined }))}
-                    />
+                  {activeFilterChips.map((entry) => (
+                    <RecipientToken key={entry.key} label={entry.label} onRemove={() => setFilters((previous) => ({ ...previous, [entry.key]: undefined }))} />
                   ))}
-                  <DropdownMenu.Root modal={false} open={recipientMenuOpen} onOpenChange={setRecipientMenuOpen}>
-                    <DropdownMenu.Trigger asChild>
-                      <Button type="button" variant="ghost" size="sm" className="shrink-0 text-slate-500">
-                        <Plus aria-hidden="true" />
-                        필터 추가
-                        <ChevronDown aria-hidden="true" />
-                      </Button>
-                    </DropdownMenu.Trigger>
-                    <DropdownMenu.Portal>
-                      <DropdownMenu.Content
-                        side="bottom"
-                        align="start"
-                        sideOffset={8}
-                        collisionPadding={12}
-                        className="z-[100] min-w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_16px_40px_rgb(15_23_42_/_0.14)]"
-                      >
-                        {RECIPIENT_FILTER_GROUPS.map((group) => (
-                          <DropdownMenu.Sub key={group.label}>
-                            <DropdownMenu.SubTrigger className="flex h-9 w-full items-center justify-between rounded-md px-2.5 text-sm font-normal text-slate-700 outline-none data-[highlighted]:bg-slate-100 data-[state=open]:bg-slate-100">
-                              {group.label}
-                              <ChevronRight aria-hidden="true" className="size-4 text-slate-400" />
-                            </DropdownMenu.SubTrigger>
-                            <DropdownMenu.Portal>
-                              <DropdownMenu.SubContent
-                                align="start"
-                                sideOffset={6}
-                                collisionPadding={12}
-                                className="z-[101] min-w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_16px_40px_rgb(15_23_42_/_0.14)]"
-                              >
-                                {group.options.map((option) => (
-                                  <DropdownMenu.Item
-                                    key={`${option.kind}-${option.label}`}
-                                    role={option.kind === "filter" ? "menuitemcheckbox" : "menuitem"}
-                                    aria-checked={option.kind === "filter" ? Boolean(filters[option.key]?.split(",").includes(option.value)) : undefined}
-                                    onSelect={(event) => { if (option.kind === "filter") event.preventDefault(); handleRecipientMenuSelect(option); }}
-                                    className="flex h-9 cursor-pointer items-center rounded-md px-2.5 text-sm font-normal text-slate-700 outline-none data-[highlighted]:bg-slate-100"
-                                  >
-                                    <span className="mr-2 inline-block w-4">{option.kind === "filter" && filters[option.key]?.split(",").includes(option.value) ? "✓" : ""}</span>{option.label}
-                                  </DropdownMenu.Item>
-                                ))}
-                              </DropdownMenu.SubContent>
-                            </DropdownMenu.Portal>
-                          </DropdownMenu.Sub>
-                        ))}
-                      </DropdownMenu.Content>
-                    </DropdownMenu.Portal>
-                  </DropdownMenu.Root>
                 </div>
-                <span className="w-full shrink-0 text-right text-sm font-normal text-slate-500 sm:w-auto sm:whitespace-nowrap">
-                  수신자: {recipientCountLoading ? "계산 중…" : recipientCount === null ? "—" : `총 ${recipientCount}명`}
-                </span>
+                <div ref={recipientPopoverRef} className="relative shrink-0">
+                  <Button ref={recipientTriggerRef} type="button" variant="ghost" size="sm" className="text-slate-600"
+                    aria-expanded={recipientMenuOpen} aria-haspopup="dialog" aria-controls={recipientMenuOpen ? "recipient-filter-popover" : undefined}
+                    onClick={() => { setRecipientFilterGroup(null); setRecipientMenuOpen((open) => !open); }}>
+                    <Plus aria-hidden="true" />필터 추가<ChevronDown aria-hidden="true" />
+                  </Button>
+                  {recipientMenuOpen ? (
+                    <PopoverPanel id="recipient-filter-popover" role="dialog" aria-label="수신자 필터" className="right-0 !mt-2 w-60 max-w-[calc(100vw-2rem)] !rounded-lg p-1.5 !shadow-[0_2px_8px_rgb(15_23_42_/_0.08)]">
+                      <div ref={recipientPanelRef}>
+                        {recipientFilterGroup ? (
+                          <>
+                            <Button type="button" variant="ghost" size="sm" className="mb-1 w-full justify-start text-slate-700" onClick={() => setRecipientFilterGroup(null)}>
+                              <ArrowLeft aria-hidden="true" className="size-4" />{recipientFilterGroup}
+                            </Button>
+                            <div className="border-t border-slate-100 pt-1">
+                              {RECIPIENT_FILTER_GROUPS.find((group) => group.label === recipientFilterGroup)?.options.map((option) => (
+                                <label key={option.label} className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-sm font-normal text-slate-700 hover:bg-slate-50">
+                                  <input type="checkbox" className="ui-checkbox" checked={option.kind === "filter" ? Boolean(filters[option.key]?.split(",").includes(option.value)) : recipientType === option.value}
+                                    onChange={() => handleRecipientMenuSelect(option)} />
+                                  {option.label}
+                                </label>
+                              ))}
+                            </div>
+                          </>
+                        ) : RECIPIENT_FILTER_GROUPS.map((group) => (
+                          <Button key={group.label} type="button" variant="ghost" size="sm" className="w-full justify-between text-sm font-normal text-slate-700" onClick={() => setRecipientFilterGroup(group.label)}>
+                            {group.label}<ChevronRight aria-hidden="true" className="size-4 text-slate-400" />
+                          </Button>
+                        ))}
+                      </div>
+                    </PopoverPanel>
+                  ) : null}
+                </div>
+              </div>
+              <div className="mt-1 text-right text-xs font-normal text-slate-500" aria-live="polite">
+                수신자: {recipientCountLoading ? "계산 중…" : recipientCount === null ? "—" : `총 ${recipientCount}명`}
               </div>
             </section>
 
-          <section className="pb-8 pt-6 md:pt-7">
+          <section ref={bodySectionRef} className="pb-8 pt-6 md:pt-7">
             <UiInput
               aria-label="메일 제목"
+              ref={subjectInputRef}
               spellCheck={false}
               value={subject}
               onChange={(event) => setSubject(event.target.value)}

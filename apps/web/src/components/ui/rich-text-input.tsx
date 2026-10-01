@@ -126,7 +126,7 @@ export function RichTextInput({
         data-placeholder={placeholder}
         className={cn(
           "rich-text-input min-h-10 w-full rounded-none border-0 border-b border-slate-300 bg-slate-100/70 px-3 py-2 text-sm font-normal leading-6 text-[#172033] outline-none transition-colors hover:border-slate-300 focus:border-brand-primary focus:ring-0 empty:before:pointer-events-none empty:before:text-slate-400 empty:before:content-[attr(data-placeholder)]",
-          singleLine && "h-10 overflow-hidden whitespace-nowrap",
+          singleLine && "h-10 overflow-x-auto overflow-y-hidden whitespace-nowrap [scrollbar-width:none]",
           inputClassName,
         )}
         onClick={event => {

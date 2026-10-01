@@ -88,7 +88,7 @@ export function Modal({
         {footer ? (
           <div
             className={cn(
-              "ui-modal__footer flex shrink-0 flex-wrap justify-end gap-2 bg-transparent px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-0",
+              "ui-modal__footer flex shrink-0 flex-wrap justify-end gap-2 bg-transparent px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4",
             )}
           >
             {footer}

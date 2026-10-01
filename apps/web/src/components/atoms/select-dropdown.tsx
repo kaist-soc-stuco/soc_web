@@ -161,7 +161,7 @@ export function SelectDropdown({
     setMenuStyle({ visibility: "hidden", width: "max-content" });
 
     const updateMenuPosition = () => {
-      const trigger = containerRef.current;
+      const trigger = containerRef.current?.querySelector("button");
       const menu = menuRef.current;
       if (!trigger || !menu) return;
 
@@ -180,23 +180,9 @@ export function SelectDropdown({
       const positionedHeight = disableMenuScroll
         ? naturalHeight
         : Math.min(menu.scrollHeight, maxMenuHeight ?? DROPDOWN_MAX_HEIGHT);
-      const optionNode = menu.querySelector<HTMLElement>('[role="option"]');
-      const font = optionNode ? window.getComputedStyle(optionNode).font : window.getComputedStyle(menu).font;
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d");
-      if (context) context.font = font;
-      const measuredLabelWidth = optionLabelsKey.split("\u0001").reduce((width, label) => {
-        const labelWidth = context?.measureText(label).width ?? 0;
-        return Math.max(width, labelWidth);
-      }, 0);
-      // Measure labels directly. An auto-width fixed element can otherwise
-      // stretch to the remaining viewport width before its position is set.
-      const contentWidth = Math.min(Math.ceil(measuredLabelWidth + 58), 320);
-      const viewportWidth = Math.max(
-        DROPDOWN_VIEWPORT_PADDING * 2,
-        window.innerWidth - DROPDOWN_VIEWPORT_PADDING * 2,
-      );
-      const menuWidth = Math.min(Math.max(triggerRect.width, contentWidth), viewportWidth);
+      const triggerTypography = window.getComputedStyle(trigger);
+      const viewportWidth = Math.max(0, window.innerWidth - DROPDOWN_VIEWPORT_PADDING * 2);
+      const menuWidth = Math.min(triggerRect.width, viewportWidth);
       const left = Math.min(
         Math.max(DROPDOWN_VIEWPORT_PADDING, triggerRect.left),
         Math.max(DROPDOWN_VIEWPORT_PADDING, window.innerWidth - menuWidth - DROPDOWN_VIEWPORT_PADDING),
@@ -225,6 +211,9 @@ export function SelectDropdown({
           : triggerRect.bottom + DROPDOWN_GAP;
 
       setMenuStyle({
+        fontSize: triggerTypography.fontSize,
+        fontWeight: triggerTypography.fontWeight,
+        lineHeight: triggerTypography.lineHeight,
         left,
         ...(maxMenuHeight === undefined ? {} : { maxHeight: maxMenuHeight }),
         top,
@@ -319,7 +308,7 @@ export function SelectDropdown({
         </span>
         <ChevronDown
           className={`w-4 h-4 text-kaist-grey/60 transition-transform duration-200 ${
-            isOpen ? "rotate-180 text-kaist-darkgreen" : ""
+            isOpen ? "rotate-180" : ""
           }`}
         />
       </Button>
@@ -370,6 +359,7 @@ export function SelectDropdown({
                         type="button"
                         variant="ghost"
                         size="sm"
+                        style={{ fontSize: "inherit", fontWeight: "inherit", lineHeight: "inherit" }}
                         role="option"
                         aria-selected={option.value === value}
                         tabIndex={-1}
@@ -380,15 +370,15 @@ export function SelectDropdown({
                         }}
                         className={`interaction-menu-item h-[var(--ui-menu-row-height)] w-full min-w-0 justify-between overflow-hidden rounded-md px-2.5 py-0 text-left text-[length:var(--ui-text-body-size)] ${
                           option.value === value
-                            ? "bg-brand-primary-light text-brand-primary font-medium"
-                            : "text-kaist-black font-normal"
+                            ? "bg-slate-100 text-slate-700"
+                            : "text-slate-700"
                         } ${optionClassName || ""}`}
                       >
                         <span className="flex min-w-0 flex-1 items-center gap-2.5">
                           {OptionIcon ? <OptionIcon aria-hidden="true" className="size-4 shrink-0 text-slate-500" /> : null}
                           <span className="min-w-0 flex-1 truncate whitespace-nowrap">{option.label}</span>
                         </span>
-                        {option.value === value && <Check className="size-3.5 shrink-0 text-kaist-darkgreen" />}
+                        {option.value === value && <Check className="size-3.5 shrink-0 text-slate-700" />}
                       </Button>
                     </Fragment>
                   );

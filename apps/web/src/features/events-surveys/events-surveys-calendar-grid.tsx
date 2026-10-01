@@ -138,8 +138,8 @@ function getDateTextClass(
   holiday?: KoreanHolidayRecord,
 ) {
   if (!cell.isCurrentMonth) return "text-slate-300";
-  if (holiday?.isHoliday || cellIndex % 7 === 0) return "text-rose-300";
-  if (cellIndex % 7 === 6) return "text-sky-300";
+  if (holiday?.isHoliday || cellIndex % 7 === 0) return "text-rose-500";
+  if (cellIndex % 7 === 6) return "text-sky-600";
   return "text-slate-700";
 }
 
@@ -253,8 +253,8 @@ export function EventsSurveysCalendarGrid({
         <div className="grid grid-cols-7 border-b border-slate-200 text-center text-[length:var(--ui-text-caption-size)] font-semibold text-slate-400">
           {weekHeaders.map((header, index) => (
             <div
-              className={`py-2 ${index === 0 ? "text-rose-300" : ""} ${
-                index === weekHeaders.length - 1 ? "text-sky-300" : ""
+              className={`py-1 ${index === 0 ? "text-rose-500" : ""} ${
+                index === weekHeaders.length - 1 ? "text-sky-600" : ""
               }`}
               key={header}
             >
@@ -327,14 +327,14 @@ export function EventsSurveysCalendarGrid({
                     : ""
                 }`}
                 aria-pressed={selected}
-                className={`relative !z-auto !transform-none !shadow-none flex h-full min-h-0 min-w-0 flex-col overflow-visible p-1.5 text-left focus:outline-none focus-visible:outline-none focus-visible:ring-0 ${selected ? "bg-slate-100" : "bg-white hover:bg-slate-50/80"}`}
+                className={`relative !z-auto !transform-none !shadow-none flex h-full min-h-0 min-w-0 flex-col overflow-visible border-b border-r border-slate-100 px-1.5 py-1 text-left focus:outline-none focus-visible:outline-none focus-visible:ring-0 ${selected ? "bg-slate-100" : "bg-white hover:bg-slate-50/80"}`}
                 key={toDateKey(cell.date)}
                 onClick={() => onSelectedDateChange(cell.date)}
                 title={holidayName || undefined}
                 type="button"
               >
                 <span
-                  className={`shrink-0 text-xs font-semibold ${getDateTextClass(
+                  className={`shrink-0 text-sm font-medium ${getDateTextClass(
                     cell,
                     cellIndex,
                     holiday,
@@ -343,7 +343,7 @@ export function EventsSurveysCalendarGrid({
                   {cell.day}
                 </span>
 
-                <span className="mt-2 grid min-h-0 w-full flex-1 grid-rows-[repeat(4,20px)_16px] gap-y-0.5 overflow-visible">
+                <span className="mt-1 grid min-h-0 w-full flex-1 grid-rows-[repeat(4,20px)_16px] gap-y-0.5 overflow-visible">
                   {Array.from({ length: MAX_VISIBLE_EVENTS }, (_, laneIndex) => {
                     const entry = eventByLane.get(laneIndex);
                     if (!entry) {
@@ -386,8 +386,8 @@ export function EventsSurveysCalendarGrid({
                         <span
                           aria-label={`${titleText}, ${formatCalendarEventRange(event, lang)}`}
                           className={`group relative ${labelSegment ? "z-30" : "z-10"} flex h-5 min-h-5 items-center overflow-visible rounded-md px-2 py-0.5 text-[length:var(--ui-text-micro-size)] font-medium leading-4 transition-[background-color,box-shadow] ${cell.isCurrentMonth ? "" : "opacity-40"} focus:outline-none focus-visible:outline-none ${segmentWidthClass} ${
-                            isStart ? "rounded-l-md" : "rounded-l-none"
-                          } ${isEnd ? "rounded-r-md" : "rounded-r-none"} ${
+                            isStart || cellIndex % 7 === 0 ? "rounded-l-md" : "rounded-l-none"
+                          } ${isEnd || isWeekEnd ? "rounded-r-md" : "rounded-r-none"} ${
                             eventStyle.bg
                           } ${isEventHovered ? eventStyle.hoverBg : ""}`}
                           data-calendar-event-key={eventKey}

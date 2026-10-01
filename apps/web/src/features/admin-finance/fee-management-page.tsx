@@ -185,8 +185,8 @@ export function FeeManagementPage() {
   });
   const statsRequest = useRef(0);
   const statsKey = JSON.stringify([statsSemester, statsRange]);
-  const [statsResult, setStatsResult] = useState<{ key: string; data: StudentFeeStatsResponse } | null>(null);
-  const stats = statsResult?.key === statsKey ? statsResult.data : null;
+  const [statsResult, setStatsResult] = useState<{ key: string; data: StudentFeeStatsResponse; range: DateRange } | null>(null);
+  const stats = statsResult?.data ?? null;
   const [statsError, setStatsError] = useState<string | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
@@ -282,7 +282,6 @@ export function FeeManagementPage() {
     const request = ++statsRequest.current;
     setStatsLoading(true);
     setStatsError(null);
-    setStatsResult(null);
     try {
       const response = await apiClient.getStudentFeeStats({
         bucket: "day",
@@ -291,7 +290,7 @@ export function FeeManagementPage() {
         referenceSemester: statsSemester,
       });
       if (request !== statsRequest.current) return;
-      setStatsResult({ key: statsKey, data: response });
+      setStatsResult({ key: statsKey, data: response, range: statsRange });
     } catch (err) {
       if (request === statsRequest.current) setStatsError("납부 통계를 불러오지 못했습니다. 다시 시도해 주세요.");
     } finally {
@@ -603,10 +602,11 @@ export function FeeManagementPage() {
           {activeSection === "settings" ? <section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex flex-wrap items-end gap-3"><AdminFormField label="표준 과비 (원)"><UiInput type="number" min={1} value={policyAmount} onChange={event => setPolicyAmount(event.currentTarget.value)} /></AdminFormField><Button disabled={saving || !policyReady} onClick={() => void saveFeePolicy()}>저장</Button></div>{operationError ? <p role="alert" className="mt-2 text-sm text-rose-600">{operationError}</p> : null}</section> : activeSection === "stats" ? (
             <FeeStatisticsPanel error={statsError} onRetry={() => void loadStats()}
               range={statsRange}
+              displayedRange={statsResult?.range ?? statsRange}
               onRangeChange={setStatsRange}
               semester={statsSemester}
               semesterOptions={semesterOptions}
-              loading={statsLoading}
+              loading={statsLoading || (!statsError && statsResult?.key !== statsKey)}
               onSemesterChange={setStatsSemester}
               stats={stats}
             />

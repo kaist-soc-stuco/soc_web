@@ -1365,7 +1365,7 @@ export function QuestionInlineEditor({
       ) : null}
 
       {form.questionType === "date" ? (
-        <div className="mt-5 flex items-center gap-4 text-base text-slate-500">
+        <div className="mt-5 flex items-center gap-4 text-[length:var(--ui-builder-text-size)] text-slate-500">
           <span>
             {form.config?.dateIncludeTime
               ? `${form.config?.dateIncludeYear === false ? "월, 일" : "월, 일, 년"}, 시간`
@@ -1378,7 +1378,7 @@ export function QuestionInlineEditor({
       ) : null}
 
       {form.questionType === "time" ? (
-        <div className="mt-5 flex items-center gap-4 text-base text-slate-500">
+        <div className="mt-5 flex items-center gap-4 text-[length:var(--ui-builder-text-size)] text-slate-500">
           <span>{form.config?.timeAnswerType === "duration" ? "기간" : "시간"}</span>
           <Clock3 aria-hidden="true" className="size-5 text-slate-400" />
         </div>

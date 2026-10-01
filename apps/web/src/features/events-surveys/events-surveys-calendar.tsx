@@ -77,14 +77,14 @@ export function EventsSurveysCalendar({
     <div className="space-y-6">
       <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-4">
         <div className="flex h-full min-w-0 flex-col rounded-lg border border-card-border-subtle bg-white p-4 sm:p-5 lg:col-span-3">
-          <div className="mb-3 grid min-w-0 grid-cols-1 items-center gap-2 border-b border-slate-200 pb-3 select-none sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+          <div className="calendar-header mb-1 grid min-w-0 grid-cols-1 items-center gap-1.5 border-b border-slate-200 pb-2 select-none sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
             <div
               className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--ui-text-caption-size)] font-semibold text-slate-500"
               aria-label={lang === "ko" ? "캘린더 공급원 안내" : "Calendar sources"}
             >
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-brand-primary" aria-hidden="true" />
-                {lang === "ko" ? "학생회 행사·일정" : "Council Schedule"}
+                {lang === "ko" ? "행사" : "Events"}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-sky-500" aria-hidden="true" />
@@ -101,7 +101,7 @@ export function EventsSurveysCalendar({
             </div>
             <div className="flex min-w-0 flex-wrap items-center justify-center gap-1.5 sm:gap-2">
               <IconButton
-                size="md"
+                size="sm"
                 tone="navigation"
                 type="button"
                 aria-label={lang === "ko" ? "이전 달" : "Previous month"}
@@ -111,11 +111,11 @@ export function EventsSurveysCalendar({
               >
                 <ChevronLeft className="h-4 w-4" />
               </IconButton>
-              <h3 className="whitespace-nowrap px-0.5 text-lg font-bold tracking-tight text-slate-800 md:text-xl">
+              <h3 className="whitespace-nowrap px-0.5 text-base font-semibold tracking-tight text-slate-800">
                 {formatMonthTitle(currentYear, currentMonth, lang)}
               </h3>
               <IconButton
-                size="md"
+                size="sm"
                 tone="navigation"
                 type="button"
                 aria-label={lang === "ko" ? "다음 달" : "Next month"}
@@ -129,7 +129,7 @@ export function EventsSurveysCalendar({
             <div className="min-w-0 w-full justify-self-end sm:max-w-56">
               <PageSearchField
                 ariaLabel={lang === "ko" ? "일정 검색" : "Search calendar events"}
-                className="!w-full"
+                className="!w-full [&_input]:!h-8 [&_button]:!size-8"
                 onChange={onCalendarQueryChange}
                 onClear={() => onCalendarQueryChange("")}
                 placeholder={lang === "ko" ? "일정 검색" : "Search events"}

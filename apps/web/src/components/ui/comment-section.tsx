@@ -396,7 +396,7 @@ function CommentRow({
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Portal>
                   <DropdownMenu.Content asChild align="end" sideOffset={4}>
-                    <AdminActionMenuPanel className="z-50">
+                    <AdminActionMenuPanel className="z-50 !w-max !min-w-28">
                       {canDelete ? <DropdownMenu.Item asChild onSelect={() => { setEditText(comment.content); setEditing(true); }}>
                         <AdminActionMenuItem icon={<Edit2 />}>{lang === "ko" ? "수정" : "Edit"}</AdminActionMenuItem>
                       </DropdownMenu.Item> : null}

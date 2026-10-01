@@ -629,34 +629,48 @@ export function RoadmapGraph({
   }, [displayCodeByCourse, offeringsByCourse, roadmapCourses, searchText]);
 
   const focusedCourseRef = useRef<string | null>(null);
-  const moveToCourse = useCallback((code: string) => {
-    const nodeId = layout.canonicalNodeByCode.get(code);
-    if (!flow || !nodeId) return;
+  const requestedCourseRef = useRef<{ code: string; instanceId?: string } | null>(null);
+  const moveToCourse = useCallback((code: string, instanceId?: string) => {
+    const nodeId = instanceId ?? layout.canonicalNodeByCode.get(code);
+    const node = layout.nodes.find((item) => item.id === nodeId);
+    if (!flow || !node) return;
     focusedCourseRef.current = code;
-    void flow.fitView({
-      nodes: [{ id: nodeId }],
-      duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650,
+    // Move directly from the current camera, including unmeasured initial nodes.
+    void flow.setCenter(node.position.x + COURSE_WIDTH / 2, node.position.y + COURSE_HEIGHT / 2, {
+      zoom: 1.15,
+      duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 700,
       ease: (t) => t * t * (3 - 2 * t),
       interpolate: "linear",
-      padding: 0.85,
-      maxZoom: 1.25,
     });
-  }, [flow, layout.canonicalNodeByCode]);
+  }, [flow, layout]);
 
-  const focusCourse = useCallback((code: string) => {
-    moveToCourse(code);
+  const focusCourse = useCallback((code: string, instanceId?: string) => {
+    requestedCourseRef.current = { code, instanceId };
+    if (code === selectedCourseCode && (instanceId ?? null) === selectedInstanceId) {
+      moveToCourse(code, instanceId);
+      requestedCourseRef.current = null;
+    }
     onSelectedCourseChange(code);
     setSearchText("");
-    setSelectedInstanceId(null);
-  }, [moveToCourse, onSelectedCourseChange]);
+    setSelectedInstanceId(instanceId ?? null);
+  }, [moveToCourse, onSelectedCourseChange, selectedCourseCode, selectedInstanceId]);
 
   useEffect(() => {
     if (!selectedCourseCode) {
       focusedCourseRef.current = null;
       return;
     }
-    if (selectedInstanceId || focusedCourseRef.current === selectedCourseCode) return;
-    moveToCourse(selectedCourseCode);
+    const requested = requestedCourseRef.current;
+    // A URL transition can briefly render the old selection. Wait for its target.
+    if (requested && requested.code !== selectedCourseCode) return;
+    if (!requested && focusedCourseRef.current === selectedCourseCode) return;
+    // Start after selection rendering, so expensive node updates cannot consume
+    // the animation duration before the camera's first visible frame.
+    const frame = requestAnimationFrame(() => {
+      moveToCourse(selectedCourseCode, requested?.instanceId ?? selectedInstanceId ?? undefined);
+      requestedCourseRef.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
   }, [moveToCourse, selectedCourseCode, selectedInstanceId]);
 
   const toggleTrack = (trackId: string) => {
@@ -847,7 +861,9 @@ export function RoadmapGraph({
               edgeTypes={edgeTypes}
               onInit={setFlow}
               onNodeClick={(_, node) => {
-                if (node.type === "course") { setSelectedInstanceId(node.id); onSelectedCourseChange(node.data.course.code); }
+                if (node.type === "course") {
+                  focusCourse(node.data.course.code, node.id);
+                }
               }}
               onPaneClick={() => onSelectedCourseChange(null)}
               fitView
@@ -1007,7 +1023,8 @@ function RoadmapOfferingControls({
         options={termOptions}
         onChange={(value) => onTermChange(value as RoadmapOfferingTerm)}
         className="w-36 shrink-0"
-        buttonClassName="h-11 !min-h-11 text-[length:var(--ui-text-body-sm-size)] font-medium"
+        buttonClassName="h-11 !min-h-11 text-[length:var(--ui-text-body-sm-size)] font-normal"
+        optionClassName="text-[length:var(--ui-text-body-sm-size)] !font-normal"
       />
       <label className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900">
         <input

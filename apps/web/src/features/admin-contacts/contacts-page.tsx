@@ -366,7 +366,7 @@ function ContactsPageContent() {
       description: <>정말 <strong className="font-semibold text-slate-900">“{department.nameKo}”</strong> 부서를 삭제하시겠습니까?</>,
       title: "부서 삭제",
       tone: "danger",
-      warning: "연락망에서 사용 중인 부서는 삭제할 수 없습니다.",
+      warning: "기존 연락망의 소속 기록은 유지됩니다. 필요하면 같은 이름으로 새 부서를 만들 수 있습니다.",
     });
     if (!confirmed) return;
     try {
@@ -374,7 +374,7 @@ function ContactsPageContent() {
       await loadDepartments();
       toast({ type: "success", message: "부서를 삭제했습니다." });
     } catch {
-      toast({ type: "error", message: "연락망에서 사용 중인 부서는 삭제할 수 없습니다." });
+      toast({ type: "error", message: "부서를 삭제하지 못했습니다. 다시 시도해 주세요." });
     }
   };
 

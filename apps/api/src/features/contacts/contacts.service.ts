@@ -113,10 +113,6 @@ export class ContactsService {
   async deleteDepartment(id: string, audit?: AuditMetadata): Promise<void> {
     const department = await this.contactsRepo.findDepartmentById(id);
     if (!department) throw new NotFoundException("contact_department_not_found");
-    const linked = await this.contactsRepo.findManaged({ department: department.nameKo, page: 1, pageSize: 1 });
-    if (linked.total && linked.total > 0) {
-      throw new ConflictException("contact_department_in_use");
-    }
     await this.contactsRepo.deleteDepartment(id);
     await this.auditLogService.record({
       action: "executive_contact.department.delete",
