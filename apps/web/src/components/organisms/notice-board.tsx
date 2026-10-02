@@ -24,10 +24,7 @@ export function NoticeBoard() {
     const items = (noticesQuery.data?.items ?? [])
       .filter((item) => item.titleKo.trim())
       .sort((a, b) => isoToMs(b.postedAt) - isoToMs(a.postedAt));
-    return [
-      ...items.filter((item) => item.isPinned).slice(0, 3),
-      ...items.filter((item) => !item.isPinned),
-    ].slice(0, HOME_NOTICE_LIMIT);
+    return items.slice(0, HOME_NOTICE_LIMIT);
   }, [noticesQuery.data]);
 
   return (
@@ -60,13 +57,13 @@ export function NoticeBoard() {
               <li key={notice.articleId}>
                 <Link
                   to={`/board/notice/${notice.articleId}`}
-                  className={`home-notice-entry${notice.isPinned ? " home-notice-entry-pinned" : ""}`}
+                  className="home-notice-entry"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex min-w-0 flex-1 items-center gap-2">
                       <h3 className="truncate">{title}</h3>
                       {isNew ? (
-                        <span className="size-1.5 shrink-0 rounded-full bg-rose-500">
+                        <span className="size-1 shrink-0 rounded-full bg-rose-500">
                           <span className="sr-only">{lang === "ko" ? "새 글" : "New post"}</span>
                         </span>
                       ) : null}

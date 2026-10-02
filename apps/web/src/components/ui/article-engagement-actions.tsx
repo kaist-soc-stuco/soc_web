@@ -16,6 +16,7 @@ interface ArticleEngagementActionsProps {
   allowLike?: boolean;
   allowScrap?: boolean;
   scrapIconOnly?: boolean;
+  scrapClassName?: string;
 }
 
 export function ArticleEngagementActions({
@@ -28,6 +29,7 @@ export function ArticleEngagementActions({
   onToggle,
   scrapCount,
   scrapIconOnly = false,
+  scrapClassName,
   submitting,
   viewerHasLiked,
   viewerHasScrapped,
@@ -72,7 +74,7 @@ export function ArticleEngagementActions({
           label={lang === 'ko' ? '스크랩' : 'Scrap'}
           loading={submitting === 'SCRAP'}
           onClick={() => onToggle('SCRAP', !scrapActive)}
-          className={scrapIconOnly ? 'size-8 rounded-md p-0' : buttonClass}
+          className={[scrapIconOnly ? 'size-8 rounded-md p-0' : buttonClass, scrapClassName].filter(Boolean).join(' ')}
           tone="scrap"
         />
       ) : null}
@@ -115,16 +117,18 @@ export function EngagementActionButton({
       disabled={loading}
       aria-busy={loading}
       onClick={() => {
-        setIsBouncing(false);
-        window.requestAnimationFrame(() => setIsBouncing(true));
-        window.setTimeout(() => setIsBouncing(false), 220);
+        if (tone === "like") {
+          setIsBouncing(false);
+          window.requestAnimationFrame(() => setIsBouncing(true));
+          window.setTimeout(() => setIsBouncing(false), 220);
+        }
         onClick();
       }}
       className={`interaction-action inline-flex items-center justify-center gap-1 border-0 bg-transparent font-bold transition-[background-color,opacity] duration-200 ease-out disabled:cursor-wait disabled:opacity-100 hover:bg-slate-100 hover:text-current ${className} ${
         active ? activeClass : inactiveClass
       }`}
     >
-      {isBouncing ? (
+      {isBouncing && tone === "like" ? (
         <span className="engagement-icon-bounce">{icon}</span>
       ) : (
         icon

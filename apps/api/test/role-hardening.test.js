@@ -18,8 +18,24 @@ const permissionRecords = PERMISSION_REGISTRY.map((permission, index) => ({
 const permissionIdFor = (bit) =>
   permissionRecords.find((permission) => permission.bitValue === bit).permissionId;
 
-function createHarness({ actorMask = Permissions.MANAGE_ROLES, systemAdmin = false, target } = {}) {
-  const calls = { create: 0, add: 0, replace: 0, update: 0, invalidated: [], audit: [] };
+test("system administrators cannot remove their own system membership through either endpoint", async () => {
+  const { calls, service } = createHarness({
+    systemAdmin: true,
+    target: { isSystem: true, permissionMask: Permissions.MANAGE_ROLES, roleGroupId: 1 },
+    members: [{ userId: "manager" }, { userId: "other-admin" }],
+  });
+  const ownRoleError = error => error instanceof ForbiddenException && error.message === "cannot_remove_own_system_role";
+  await assert.rejects(service.removeUserFromRoleGroup(1, "manager", { actorUserId: "manager" }), ownRoleError);
+  await assert.rejects(service.replaceRoleGroupMembers(1, { userIds: ["other-admin"] }, { actorUserId: "manager" }), ownRoleError);
+  assert.equal(calls.remove, 0);
+  assert.equal(calls.replace, 0);
+  assert.equal(calls.audit.length, 0);
+  await service.replaceRoleGroupMembers(1, { userIds: ["manager"] }, { actorUserId: "manager" });
+  assert.equal(calls.replace, 1);
+});
+
+function createHarness({ actorMask = Permissions.MANAGE_ROLES, systemAdmin = false, target, members = [] } = {}) {
+  const calls = { create: 0, add: 0, replace: 0, remove: 0, update: 0, invalidated: [], audit: [] };
   const repository = {
     listPermissions: async () => permissionRecords,
     listRoleGroups: async () => target ? [target] : [],
@@ -43,7 +59,8 @@ function createHarness({ actorMask = Permissions.MANAGE_ROLES, systemAdmin = fal
       };
     },
     findRoleGroupById: async () => target ?? null,
-    listRoleGroupMembers: async () => [],
+    listRoleGroupMembers: async () => members,
+    removeUserFromRoleGroup: async () => { calls.remove++; },
     addUserToRoleGroup: async (roleGroupId, input) => {
       calls.add += 1;
       return { roleGroupId, userId: input.userId };

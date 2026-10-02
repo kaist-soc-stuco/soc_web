@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
 import { AdminDrawer } from "@/components/ui/admin-drawer";
-import { AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
+import { AdminEmptyState, AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/data-state";
@@ -236,36 +236,35 @@ export function AuditLogPage() {
     <AuthGuard requirePermission={Permissions.VIEW_AUDIT_LOG}>
       <AdminPageShell>
       {DownloadReasonDialog}
-        <AdminPageMain>
+        <AdminPageMain tableLayout className="!max-w-6xl">
           <AdminPageHeader
             title="운영 로그"
             actions={<Button type="button" disabled={exporting} aria-busy={exporting} onClick={() => void handleExport()}><Download aria-hidden="true" className="size-4" />내보내기</Button>}
           />
 
           <AdminTableCard className="overflow-visible">
-            <div className="flex flex-col gap-3 border-b border-slate-100 p-4 xl:flex-row xl:items-end xl:justify-between">
-              <div className="flex flex-wrap items-end gap-2">
+            <div className="admin-table-toolbar flex flex-wrap items-center justify-end gap-2 px-5 py-2">
+              <span className="mr-auto text-sm font-normal text-slate-500">{data ? `총 ${totalCount}건` : ""}</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="self-end"><DateRangePicker label="기간 선택" disableFuture align="end" value={{ from: dateFrom, to: dateTo }} onChange={({ from, to }) => { updatePageFilter(setDateFrom, from); updatePageFilter(setDateTo, to); }} /></div>
                 <AdminSelectDropdown ariaLabel="로그 도메인" value={targetType} options={domainOptions} onChange={(value) => updatePageFilter(setTargetType, value)} className="w-36 shrink-0" buttonClassName="h-[var(--ui-control-height)]" />
               </div>
               <PageSearchField
                 ariaLabel="운영 로그 검색"
-                className="ml-auto w-full xl:w-[25rem]"
+                className="w-full sm:w-72"
                 onChange={(value) => updatePageFilter(setQuery, value)}
                 onClear={() => updatePageFilter(setQuery, "")}
                 placeholder="담당자, 대상, 액션 검색"
                 value={query}
               />
-              <div className="self-end"><DateRangePicker label="기간 선택" disableFuture align="end" value={{ from: dateFrom, to: dateTo }} onChange={({ from, to }) => { updatePageFilter(setDateFrom, from); updatePageFilter(setDateTo, to); }} /></div>
             </div>
 
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-              <span className="text-sm font-normal tracking-[-0.02em] text-[#666]">{data ? `총 ${totalCount}건` : "총 —건"}</span>
-            </div>
+
 
             <div aria-busy={loading} style={data === null && loading ? { minHeight: 320 } : undefined} className={refreshing ? "opacity-60 transition-opacity duration-150" : "transition-opacity duration-150"}>
               {error && data === null ? <div className="p-6"><EmptyState message={error} /></div> : data && data.items.length > 0 ? (
-                <AdminDataTable minWidth={900} mobileMode="cards">
-                  <colgroup><col style={{ width: 150 }} /><col style={{ width: 112 }} /><col style={{ width: 230 }} /><col /><col style={{ width: 150 }} /></colgroup>
+                <AdminDataTable minWidth={0} mobileMode="cards">
+                  <colgroup><col style={{ width: "18%" }} /><col style={{ width: "13%" }} /><col style={{ width: "23%" }} /><col style={{ width: "28%" }} /><col style={{ width: "18%" }} /></colgroup>
                   <AdminTableHeader>
                     <tr>
                       <SortableHead label="발생 시각" active={sortBy === "createdAt"} ascending={sortDirection === "asc"} onClick={() => changeSort("createdAt")} />
@@ -293,7 +292,7 @@ export function AuditLogPage() {
                     ))}
                   </AdminTableBody>
                 </AdminDataTable>
-              ) : data ? <EmptyState message="등록된 운영 로그가 없습니다." className="m-5" /> : null}
+              ) : data ? <AdminEmptyState message="등록된 운영 로그가 없습니다." className="flex-1" /> : null}
             </div>
 
             <div className="border-t border-slate-100 px-5 py-3">
@@ -318,7 +317,7 @@ export function AuditLogPage() {
 function SortableHead({ label, active, ascending, onClick }: { label: string; active: boolean; ascending: boolean; onClick: () => void }) {
   return (
     <AdminTableHead>
-      <button type="button" onClick={onClick} className="inline-flex h-8 items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900">
+      <button type="button" onClick={onClick} className="inline-flex h-6 items-center gap-1 text-xs font-medium text-slate-600 transition-colors hover:text-slate-900">
         {label}
         <ArrowDown aria-hidden="true" className={`size-3 ${active ? "text-brand-primary" : "opacity-40"} ${active && ascending ? "rotate-180" : ""}`} />
       </button>
@@ -333,7 +332,7 @@ function AuditLogDetailDrawer({ log, onClose }: { log: AuditLogRecord | null; on
   const snapshots = log ? snapshotEntries(log) : [];
 
   return (
-    <AdminDrawer open={Boolean(log)} onClose={onClose} title="로그 상세" width="max-w-2xl">
+    <AdminDrawer open={Boolean(log)} onClose={onClose} title="운영 로그 상세" width="max-w-2xl">
       {log ? (
         <div className="space-y-6">
           <header className="space-y-3">

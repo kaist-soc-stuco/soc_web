@@ -1,4 +1,4 @@
-import { ArrowDown, MoreHorizontal } from "lucide-react";
+import { ArrowDown, FileText, MoreHorizontal } from "lucide-react";
 import type { ComponentProps, CSSProperties, ReactNode } from "react";
 
 import { AdminTableViewport } from "@/components/ui/admin-page";
@@ -42,7 +42,7 @@ export function AdminDataTable({
 }
 
 export function AdminTableHeader({ className, ...props }: ComponentProps<"thead">) {
-  return <thead className={cn("admin-data-table__header border-t-2 border-t-brand-primary bg-slate-50/70", className)} {...props} />;
+  return <thead className={cn("admin-data-table__header", className)} {...props} />;
 }
 
 export function AdminTableBody({ className, ...props }: ComponentProps<"tbody">) {
@@ -50,7 +50,7 @@ export function AdminTableBody({ className, ...props }: ComponentProps<"tbody">)
 }
 
 export function AdminTableHead({ className, ...props }: ComponentProps<"th">) {
-  return <th className={cn("h-[var(--ui-table-head-height)] align-middle px-4 text-[length:var(--ui-text-body-size)] font-medium tracking-tight text-[var(--j-color-text-secondary)]", className)} {...props} />;
+  return <th className={cn("h-[var(--ui-table-head-height)] align-middle px-4 text-xs font-medium tracking-tight text-[var(--j-color-text-secondary)]", className)} {...props} />;
 }
 
 export function AdminTableCell({
@@ -61,7 +61,7 @@ export function AdminTableCell({
   return (
     <td
       className={cn(
-        "admin-table-text select-text px-4 py-3.5 [word-break:keep-all]",
+        "admin-table-text select-text px-4 py-1.5 [word-break:keep-all]",
         truncate && "overflow-hidden text-ellipsis whitespace-nowrap",
         className,
       )}
@@ -89,7 +89,7 @@ export function AdminSortableHead({
         type="button"
         onClick={onClick}
         className={cn(
-          "inline-flex h-8 items-center gap-1 rounded-md px-0 text-[length:var(--ui-text-body-size)] font-medium text-[var(--j-color-text-secondary)] transition-colors hover:bg-slate-100",
+          "inline-flex h-6 items-center gap-1 rounded-md px-0 align-middle text-xs font-medium text-[var(--j-color-text-secondary)] transition-colors hover:bg-slate-100",
         )}
       >
         {children}
@@ -112,7 +112,7 @@ export function AdminRowActions({
   onClick: ComponentProps<"button">["onClick"];
 }) {
   return (
-    <IconButton size="sm" tone="table-action" aria-label={label} onClick={onClick}>
+    <IconButton className="admin-row-action" size="sm" tone="table-action" aria-label={label} onClick={onClick}>
       <MoreHorizontal aria-hidden="true" />
     </IconButton>
   );
@@ -127,8 +127,8 @@ export function AdminTableEmpty({
 }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="px-4 py-16 text-center text-[length:var(--ui-text-body-size)] font-normal text-[var(--j-color-text-secondary)]">
-        {children}
+      <td colSpan={colSpan} className="px-4 py-4 text-center text-[length:var(--ui-text-body-size)] font-normal text-[var(--j-color-text-secondary)]">
+        <div className="admin-table-empty flex min-h-36 flex-col items-center justify-center gap-2"><FileText aria-hidden="true" className="size-5 text-slate-300" strokeWidth={1.6} /><span>{children}</span></div>
       </td>
     </tr>
   );

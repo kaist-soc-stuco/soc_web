@@ -2,16 +2,17 @@ import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type { PermissionRecord, RoleGroupCandidateListResponse, RoleGroupMemberRecord, RoleGroupRecord } from "@soc/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { isoToDate } from "@soc/shared";
-import { Pencil, Plus, ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableEmpty, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
-import { AdminCard, AdminCardHeader, AdminFormField, AdminLoadingState, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSearchField, AdminSectionTitle } from "@/components/ui/admin-page";
+import { AdminCard, AdminCardHeader, AdminEmptyState, AdminFormField, AdminLoadingState, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSearchField, AdminSectionTitle } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { useToast } from "@/components/ui/toast";
+import { useCurrentSession } from "@/hooks/use-current-session";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UiInput } from "@/components/ui/form-control";
@@ -77,6 +78,7 @@ const displayError = (error: unknown, fallback: string) => {
 };
 
 export function PermissionPage() {
+  const { data: session } = useCurrentSession();
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -302,9 +304,17 @@ export function PermissionPage() {
   };
 
   const membersChanged = selectedMemberIds.length !== members.length || members.some(member => !selectedMemberIds.includes(member.userId));
+  const wouldRemoveOwnSystemRole = (userIds: string[]) => Boolean(
+    selectedRole?.isSystem && session?.userId &&
+    members.some(member => member.userId === session.userId) && !userIds.includes(session.userId),
+  );
 
   const saveMembers = async () => {
     if (!selectedRole || !membersChanged || candidateSaving) return;
+    if (wouldRemoveOwnSystemRole(selectedMemberIds)) {
+      toast({ type: "error", message: "자신의 최고 관리자 권한은 제거할 수 없습니다." });
+      return;
+    }
     setCandidateSaving(true);
     setError(null);
     try {
@@ -323,6 +333,17 @@ export function PermissionPage() {
   const removeMember = async (userId: string) => {
     if (!selectedRole || !canManageMembers || candidateSaving) return;
     const nextUserIds = members.filter((member) => member.userId !== userId).map((member) => member.userId);
+    if (wouldRemoveOwnSystemRole(nextUserIds)) {
+      toast({ type: "error", message: "자신의 최고 관리자 권한은 제거할 수 없습니다." });
+      return;
+    }
+    const approved = await confirm({
+      title: "구성원 제외",
+      description: `${members.find(member => member.userId === userId)?.nameKo ?? "선택한 구성원"} 님을 ${selectedRole.nameKo}에서 제외할까요?`,
+      confirmLabel: "제외",
+      tone: "danger",
+    });
+    if (!approved) return;
     setCandidateSaving(true);
     setError(null);
     try {
@@ -341,8 +362,8 @@ export function PermissionPage() {
     <AuthGuard requirePermission={Permissions.MANAGE_ROLES}>
       <AdminPageShell>
         {ConfirmDialog}
-        <AdminPageMain>
-          <AdminPageHeader title="권한 관리" actions={<Button type="button" onClick={() => setCreateOpen(true)}><Plus aria-hidden="true" /> 역할 추가</Button>} />
+        <AdminPageMain className="!max-w-6xl">
+          <AdminPageHeader title="권한 관리" actions={<Button type="button" onClick={() => setCreateOpen(true)}> 역할 추가</Button>} />
           {failedDraft === draft ? <div role="status" className="flex items-center gap-2 text-sm text-slate-600">변경 사항이 저장되지 않았습니다.<Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => setFailedDraft(null)}>다시 시도</Button></div> : null}
           {error ? <div role="alert" className="rounded-lg border border-rose-200 bg-white px-4 py-3 text-sm font-normal text-rose-700">{error}</div> : null}
 
@@ -354,7 +375,7 @@ export function PermissionPage() {
               <div className="border-b border-slate-100 p-3"><AdminSearchField aria-label="역할 검색" placeholder="역할 검색" value={roleQuery} onValueChange={setRoleQuery} /></div>
               <div className="scrollbar-hidden max-h-[560px] overflow-y-auto p-2">
                 {loading && roles.length === 0 ? <AdminLoadingState className="min-h-24 px-2 py-6" />
-                  : filteredRoles.length === 0 ? <p className="px-3 py-10 text-center text-sm font-normal text-[#344054]">검색 결과가 없습니다.</p>
+                  : filteredRoles.length === 0 ? <AdminEmptyState message="검색 결과가 없습니다." />
                   : <div className="grid gap-1" role="listbox" aria-label="역할 목록">{filteredRoles.map((role) => {
                       const selected = role.roleGroupId === selectedRoleId;
                       return <Button key={role.roleGroupId} type="button" variant="ghost" role="option" aria-selected={selected} onClick={() => void selectRole(role)} className={cn("relative h-auto min-h-14 w-full rounded-lg px-3 py-2 text-left", selected ? "bg-slate-100 text-[#172033]" : "text-[#344054] hover:bg-slate-50 hover:text-[#172033]")}>
@@ -365,7 +386,7 @@ export function PermissionPage() {
             </AdminCard>
 
             {selectedRole ? <AdminCard className="min-w-0">
-              <AdminCardHeader className="min-h-[84px] px-5 py-4">
+              <AdminCardHeader className="min-h-12 px-5 py-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     {editingField === "name" ? (
@@ -398,10 +419,10 @@ export function PermissionPage() {
 
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {canEditRole ? <Button type="button" size="sm" variant="outline" className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void deleteRole()}><Trash2 aria-hidden="true" /> 역할 삭제</Button> : null}
+                  {canEditRole ? <Button type="button" size="sm" variant="outline" className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void deleteRole()}> 역할 삭제</Button> : null}
                 </div>
               </AdminCardHeader>
-              <div className="border-b border-slate-100 px-5 pt-3"><SegmentedControl ariaLabel="역할 상세 탭" role="tablist" value={selectedTab} onChange={(tab) => setSelection(selectedRole.roleGroupId, tab)} className="clean-segmented-control mb-3 w-fit" options={[{ value: "members", label: `구성원 (${selectedRole.userCount})` }, { value: "permissions", label: `권한 설정 (${draft.permissionIds.length})` }]} /></div>
+              <div className="px-5"><SegmentedControl variant="underline" ariaLabel="역할 상세 탭" role="tablist" value={selectedTab} onChange={(tab) => setSelection(selectedRole.roleGroupId, tab)} className="clean-segmented-control w-full" options={[{ value: "members", label: `구성원 (${selectedRole.userCount})` }, { value: "permissions", label: `권한 설정 (${draft.permissionIds.length})` }]} /></div>
 
               {selectedTab === "permissions" ? <div className="p-5">
                 <div className="grid items-start gap-4 xl:grid-cols-2">{groupedPermissions.map((group) => {
@@ -420,23 +441,23 @@ export function PermissionPage() {
                   </section>;
                 })}</div>
               </div> : <div className="min-w-0">
-                <div className="flex items-center justify-between gap-3 px-5 py-4"><span className="text-sm font-normal text-[#344054]">총 {members.length}명</span><Button type="button" size="sm" disabled={!canManageMembers} onClick={() => void openMemberEditor()}><UserPlus aria-hidden="true" /> 구성원 추가</Button></div>
+                <div className="flex items-center justify-between gap-3 px-5 py-2"><span className="text-sm font-normal text-[#344054]">총 {members.length}명</span><Button type="button" variant="outline" size="sm" disabled={!canManageMembers} onClick={() => void openMemberEditor()}>구성원 추가</Button></div>
                 <div className={cn("transition-opacity duration-150", membersLoading ? "opacity-60" : "opacity-100")} aria-busy={membersLoading}>
-                <AdminDataTable minWidth={0} viewportClassName="!overflow-visible"><colgroup><col style={{ width: "28%" }} /><col style={{ width: "16%" }} /><col style={{ width: "30%" }} /><col style={{ width: "18%" }} /><col style={{ width: "8%" }} /></colgroup><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>학번</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>부여일</AdminTableHead><AdminTableHead className="text-right">작업</AdminTableHead></tr></AdminTableHeader><AdminTableBody>
+                <AdminDataTable minWidth={0} viewportClassName="!overflow-visible"><colgroup><col style={{ width: "28%" }} /><col style={{ width: "16%" }} /><col style={{ width: "30%" }} /><col style={{ width: "18%" }} /><col style={{ width: "8%" }} /></colgroup><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>학번</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>부여일</AdminTableHead><AdminTableHead className="text-right"><span className="sr-only">작업</span></AdminTableHead></tr></AdminTableHeader><AdminTableBody>
                   {members.length === 0 ? <AdminTableEmpty colSpan={5}>이 역할에 지정된 구성원이 없습니다.</AdminTableEmpty>
                     : members.map((member) => <tr key={member.userId}><AdminTableCell truncate className="admin-table-text-emphasis">{member.nameKo}</AdminTableCell><AdminTableCell truncate>{member.stdNo ?? member.kaistUid}</AdminTableCell><AdminTableCell truncate>{member.email}</AdminTableCell><AdminTableCell truncate>{formatDate(member.grantedAt)}</AdminTableCell><AdminTableCell className="text-right"><Button type="button" variant="ghost" size="icon" aria-label={`${member.nameKo} 제외`} data-tooltip="구성원 제외" className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => void removeMember(member.userId)} disabled={candidateSaving || !canManageMembers}><Trash2 aria-hidden="true" className="size-4" /></Button></AdminTableCell></tr>)}
                 </AdminTableBody></AdminDataTable>
                 </div>
               </div>}
-            </AdminCard> : <AdminCard className="grid min-h-[360px] place-items-center p-8 text-center"><div><ShieldCheck aria-hidden="true" className="mx-auto mb-3 size-8 text-slate-300" /><p className="text-sm font-normal text-[#344054]">선택할 역할이 없습니다.</p></div></AdminCard>}
+            </AdminCard> : <AdminCard className="grid min-h-[360px] place-items-center"><AdminEmptyState message="선택할 역할이 없습니다." /></AdminCard>}
           </div>
         </AdminPageMain>
 
-        <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="새 역할 만들기" footer={<><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>취소</Button><Button loading={saving} type="button" onClick={() => void createRole()} disabled={saving || !createDraft.nameKo.trim()}>{"역할 만들기"}</Button></>}>
+        <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="역할 추가" footer={<><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>취소</Button><Button loading={saving} type="button" onClick={() => void createRole()} disabled={saving || !createDraft.nameKo.trim()}>{"추가"}</Button></>}>
           <div className="grid gap-4"><AdminFormField label="역할 이름"><UiInput autoFocus value={createDraft.nameKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, nameKo: value })); }} placeholder="예: 콘텐츠 관리자" /></AdminFormField></div>
         </Modal>
 
-        <Modal open={memberEditorOpen} onClose={() => setMemberEditorOpen(false)} title={selectedRole ? `${selectedRole.nameKo} 구성원 편집` : "구성원 편집"} className="h-[680px] max-h-[calc(100dvh-3rem)] max-w-4xl" bodyClassName="!overflow-hidden flex min-h-0 flex-1 flex-col" footer={<><Button type="button" variant="outline" onClick={() => setMemberEditorOpen(false)}>취소</Button><Button loading={candidateSaving} type="button" onClick={() => void saveMembers()} disabled={candidateSaving || !membersChanged}>{"적용"}</Button></>}>
+        <Modal open={memberEditorOpen} onClose={() => setMemberEditorOpen(false)} title={selectedRole ? `${selectedRole.nameKo} 구성원 편집` : "구성원 편집"} size="wide" className="h-[680px] max-h-[calc(100dvh-3rem)]" bodyClassName="!overflow-hidden flex min-h-0 flex-1 flex-col" footer={<><Button type="button" variant="outline" onClick={() => setMemberEditorOpen(false)}>취소</Button><Button loading={candidateSaving} type="button" onClick={() => void saveMembers()} disabled={candidateSaving || !membersChanged}>{"적용"}</Button></>}>
           <div className="flex min-h-0 flex-1 flex-col gap-4">
             <div className="grid shrink-0 gap-2">
               <AdminSearchField aria-label="구성원 검색" value={candidateQuery} onValueChange={setCandidateQuery} placeholder="이름, 학번, 이메일, 소속 검색" />

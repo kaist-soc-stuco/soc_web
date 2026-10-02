@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Save, Trash2 } from "lucide-react";
+import { Save, Trash2 } from "lucide-react";
 import { msToIso, nowMs } from "@soc/shared";
 
 import { Button } from "@/components/ui/button";
@@ -165,7 +165,7 @@ export function ArticleTemplateControl({
           setOpen(true);
         }}
       >
-        <FileText aria-hidden="true" />
+
         {lang === "ko" ? "템플릿" : "Templates"}
       </Button>
 
@@ -181,11 +181,11 @@ export function ArticleTemplateControl({
             className="h-[var(--ui-control-height)] !font-medium"
             onClick={saveTemplate}
           >
-            <Save aria-hidden="true" />
+
             {lang === "ko" ? "저장" : "Save"}
           </Button>
         }
-        className="max-w-2xl"
+        size="standard"
       >
         <div className="space-y-5">
           {error ? (

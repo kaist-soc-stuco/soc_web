@@ -1784,7 +1784,7 @@ export function SurveyEditorPage() {
     } catch (err: unknown) {
       console.error(err);
       setSections(previousSections);
-      toast({ type: "error", message: getSurveyErrorMessage(err, "섹션 재정렬 실패") });
+      toast({ type: "error", message: getSurveyErrorMessage(err, "섹션 순서 변경 실패") });
     } finally {
       setSectionReorderSaving(false);
     }
@@ -2363,7 +2363,7 @@ export function SurveyEditorPage() {
           <div data-survey-editor-header className="sticky top-0 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-6 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
           <AdminPageHeader
             center={<SegmentedControl
-            ariaLabel="설문 편집 단계"
+            variant="underline" ariaLabel="설문 편집 단계"
             role="tablist"
             className="w-fit"
             value={tab}
@@ -2389,7 +2389,7 @@ export function SurveyEditorPage() {
                   type="button"
                   disabled={saving || isPublished || Boolean(loadError)}
                   aria-busy={publishing}
-                  className={`w-24 shrink-0 border-slate-200 ${isPublished ? "bg-slate-100 text-slate-500 hover:bg-slate-100" : "bg-brand-primary text-white hover:bg-brand-primary/90"}`}
+                  className={`w-24 shrink-0 border-slate-200 ${isPublished ? "!bg-brand-primary !text-white disabled:!opacity-100" : "bg-brand-primary text-white hover:bg-brand-primary/90"}`}
                   onClick={() => void form.handleSubmit(
                     (values) => handleSaveSettings(values, { publish: true }),
                     (errors) => {
@@ -2427,7 +2427,7 @@ export function SurveyEditorPage() {
           ) : null}
           {!loadError && saveState === "error" ? <div role="status" className="flex items-center gap-2 text-sm text-slate-600">저장되지 않은 변경 사항이 있습니다.<Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => void handleSaveSettings(form.getValues())}>다시 시도</Button></div> : null}
 
-          {!loadError && !surveyLoading && tab === "responses" && (<SurveyResponsesPanel beforeToggle={async () => { await flushAutoSave.current(); }} surveyId={loadedSurveyId} onSheet={handleSheet} sheetBusy={sheetBusy} onResponsesDeleted={() => setResponseCount(0)} />)}
+          {!loadError && !surveyLoading && tab === "responses" && (<SurveyResponsesPanel ensureSurvey={async () => loadedSurveyId ?? await ensureDraft()} beforeToggle={async () => { await flushAutoSave.current(); }} surveyId={loadedSurveyId} onSheet={handleSheet} sheetBusy={sheetBusy} onResponsesDeleted={() => setResponseCount(0)} />)}
 
           {!loadError && !surveyLoading && tab === "delivery" && (
             <FormProvider {...form}>
@@ -2793,9 +2793,9 @@ export function SurveyEditorPage() {
           <Modal
             open
             onClose={closeSectionReorder}
-            title="섹션 재정렬"
+            title="섹션 순서 변경"
             mobileFullscreen
-            className="max-w-2xl"
+            size="standard"
             bodyClassName="!p-0"
             footer={
               <>
@@ -2863,8 +2863,8 @@ export function SurveyEditorPage() {
             open
             onClose={() => handleConfirmOverwrite(false)}
             title="일정 정보 덮어쓰기"
-            className="max-w-md"
-            bodyClassName="space-y-4 px-6 py-5"
+            size="compact"
+            bodyClassName="space-y-4"
             footer={
               <>
                 <Button

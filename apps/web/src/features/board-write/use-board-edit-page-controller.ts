@@ -284,10 +284,13 @@ export function useBoardEditPageController(forcedCategory?: string) {
         draftId: serverDraftId ?? undefined,
         expectedVersion: serverDraftVersion,
         fingerprint,
+      }).then((response) => {
+        // Cleanup waits on this promise, including IDs assigned by in-flight saves.
+        draftIdsRef.current.add(response.draftId);
+        return response;
       });
       draftSavesRef.current.add(request);
       const response = await request.finally(() => draftSavesRef.current.delete(request));
-      draftIdsRef.current.add(response.draftId);
       setServerDraftId(response.draftId);
       setServerDraftVersion(response.version);
       setDraftStatus("saved");
@@ -533,8 +536,11 @@ export function useBoardEditPageController(forcedCategory?: string) {
       }
     }
 
+    let articleUpdated = false;
     try {
       setIsSubmitting(true);
+      draftDiscardingRef.current = true;
+      await Promise.allSettled([...draftSavesRef.current]);
       await apiClient.updateArticle(category, articleId, {
         titleKo,
         titleEn: isKoreanOnly ? "" : titleEn,
@@ -581,6 +587,11 @@ export function useBoardEditPageController(forcedCategory?: string) {
               ? null
               : eventDescriptionEn.trim()
             : undefined,
+      });
+      articleUpdated = true;
+      if (serverDraftId) draftIdsRef.current.add(serverDraftId);
+      await Promise.all([...draftIdsRef.current].map(id => apiClient.deleteArticleDraft(id))).catch(() => {
+        toast({ type: "warning", message: lang === "ko" ? "글은 수정되었지만 초안을 삭제하지 못했습니다." : "The article was updated, but its draft could not be removed." });
       });
       if (canConfigurePostSettings && selectedSurveyId) {
         let overwriteSchedule = false;
@@ -634,11 +645,6 @@ export function useBoardEditPageController(forcedCategory?: string) {
           connectedArticleId: null,
         });
       }
-      if (serverDraftId) {
-        await apiClient.deleteArticleDraft(serverDraftId).catch(() => undefined);
-        setServerDraftId(null);
-        setServerDraftVersion(undefined);
-      }
       toast({
         type: "success",
         message:
@@ -648,6 +654,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
       });
       backToArticle();
     } catch (err) {
+      if (!articleUpdated) draftDiscardingRef.current = false;
       console.error(err);
       toast({
         type: "error",

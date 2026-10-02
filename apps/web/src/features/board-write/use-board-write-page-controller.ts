@@ -884,8 +884,11 @@ export function useBoardWritePageController(forcedCategory?: string) {
       }
     }
 
+    let articlePublished = false;
     try {
       setIsSubmitting(true);
+      draftCompletedRef.current = true;
+      await draftSaveQueueRef.current;
       const article = await apiClient.createArticle(selectedCategory, {
         titleKo,
         titleEn: isKoreanOnly ? undefined : titleEn,
@@ -939,6 +942,13 @@ export function useBoardWritePageController(forcedCategory?: string) {
               : eventDescriptionEn.trim() || undefined
             : undefined,
       });
+      articlePublished = true;
+      if (localDraftStorageKey) localStorage.removeItem(localDraftStorageKey);
+      if (draftIdentityRef.current.id) {
+        await apiClient.deleteArticleDraft(draftIdentityRef.current.id).catch(() => {
+          toast({ type: "warning", message: lang === "ko" ? "글은 등록되었지만 초안을 삭제하지 못했습니다." : "The article was published, but its draft could not be removed." });
+        });
+      }
       if (canConfigurePostSettings && selectedSurveyId) {
         let overwriteSchedule = false;
         let overwriteAlwaysOpen = false;
@@ -982,12 +992,6 @@ export function useBoardWritePageController(forcedCategory?: string) {
               : undefined,
         });
       }
-      draftCompletedRef.current = true;
-      await draftSaveQueueRef.current;
-      if (localDraftStorageKey) localStorage.removeItem(localDraftStorageKey);
-      if (draftIdentityRef.current.id) {
-        await apiClient.deleteArticleDraft(draftIdentityRef.current.id).catch(() => undefined);
-      }
       toast({
         type: "success",
         message:
@@ -997,6 +1001,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
       });
       navigate(selectedCategory === "_EVENT" ? `/events/${article.articleId}` : `/board/${selectedCategory}/${article.articleId}`);
     } catch (error) {
+      if (!articlePublished) draftCompletedRef.current = false;
       console.error(error);
       toast({
         type: "error",

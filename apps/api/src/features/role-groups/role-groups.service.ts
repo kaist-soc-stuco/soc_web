@@ -246,6 +246,10 @@ export class RoleGroupsService {
 
     await this.assertRoleMutationAllowed(roleGroup, audit?.actorUserId);
 
+    if (roleGroup.isSystem && audit?.actorUserId === userId) {
+      throw new ForbiddenException("cannot_remove_own_system_role");
+    }
+
     await this.roleGroupsRepository.removeUserFromRoleGroup(roleGroupId, userId);
     await this.usersService.invalidatePermissionCache(userId);
     await this.auditLogService.record({
@@ -271,6 +275,11 @@ export class RoleGroupsService {
     await this.assertRoleMutationAllowed(roleGroup, audit?.actorUserId);
 
     const before = await this.roleGroupsRepository.listRoleGroupMembers(roleGroupId);
+    if (roleGroup.isSystem && audit?.actorUserId &&
+        before.some((member) => member.userId === audit.actorUserId) &&
+        !input.userIds.includes(audit.actorUserId)) {
+      throw new ForbiddenException("cannot_remove_own_system_role");
+    }
     const replaced = await this.roleGroupsRepository.replaceRoleGroupMembers(
       roleGroupId,
       input.userIds,

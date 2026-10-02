@@ -7,6 +7,7 @@ import { useLanguage } from "@/hooks/use-language";
 type ConfirmTone = "default" | "danger";
 
 type ConfirmOptions = {
+  size?: "compact" | "standard" | "wide";
   cancelLabel?: string;
   confirmLabel?: string;
   description?: ReactNode;
@@ -16,6 +17,7 @@ type ConfirmOptions = {
 };
 
 type ConfirmState = {
+  size?: "compact" | "standard" | "wide";
   cancelLabel: string;
   confirmLabel: string;
   description?: ReactNode;
@@ -39,6 +41,7 @@ export function useConfirmDialog() {
     resolverRef.current?.(false);
 
     setState({
+      size: options.size,
       cancelLabel:
         options.cancelLabel ?? (lang === "ko" ? "취소" : "Cancel"),
       confirmLabel:
@@ -70,7 +73,7 @@ export function useConfirmDialog() {
           showClose={state.tone !== "danger"}
           dividerless={state.tone === "danger"}
           title={state.title}
-          className="max-w-[25rem]"
+          size={state.size ?? "compact"}
           footer={
             <>
               <Button

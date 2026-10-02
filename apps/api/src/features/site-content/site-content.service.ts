@@ -21,7 +21,6 @@ const SINGLETON_CONTENT_BLOCK_TYPES = new Set<ContentBlockRecord["type"]>([
   "HERO",
   "LOGO",
   "TOP_BANNER",
-  "QUICK_LINK",
   "ORGANIZATION_CHART",
 ]);
 
@@ -33,8 +32,6 @@ const singletonConflictCode = (type: ContentBlockRecord["type"]): string => {
       return "logo_already_exists";
     case "TOP_BANNER":
       return "top_banner_already_exists";
-    case "QUICK_LINK":
-      return "quick_link_already_exists";
     case "ORGANIZATION_CHART":
       return "organization_chart_already_exists";
     default:

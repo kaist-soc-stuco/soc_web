@@ -24,7 +24,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
@@ -100,7 +100,7 @@ function BoardManagementPageContent() {
     setLoading(true);
     try {
       const response = await apiClient.getAdminBoards();
-      const visibleBoards = response.items.filter((board) => board.code !== "_EVENT");
+      const visibleBoards = response.items.filter((board) => board.code !== "_EVENT" && board.code.toLowerCase() !== "faq" && board.code !== "_FAQ");
       setBoards(visibleBoards);
       setSavedOrder(visibleBoards.map((board) => board.code));
       setLoadError(null);
@@ -214,7 +214,7 @@ function BoardManagementPageContent() {
     setSaving(true);
     try {
       const response = await apiClient.reorderBoards({ items: boards.map((board, index) => ({ code: board.code, sortOrder: index * 10 })) });
-      const visibleBoards = response.items.filter((board) => board.code !== "_EVENT");
+      const visibleBoards = response.items.filter((board) => board.code !== "_EVENT" && board.code.toLowerCase() !== "faq" && board.code !== "_FAQ");
       setBoards(visibleBoards);
       setSavedOrder(visibleBoards.map((board) => board.code));
       toast({ type: "success", message: "게시판 노출 순서를 저장했습니다." });
@@ -227,21 +227,21 @@ function BoardManagementPageContent() {
 
   return <AdminPageShell>
     {ConfirmDialog}
-    <AdminPageMain tableLayout>
-      <AdminPageHeader title="게시판 관리" actions={<Button type="button" onClick={startCreate}><Plus aria-hidden="true" /> 게시판 추가</Button>} />
+    <AdminPageMain className="!max-w-5xl">
+      <AdminPageHeader title="게시판 관리" actions={<Button type="button" onClick={startCreate}> 게시판 추가</Button>} />
       {loadError ? <ErrorState title={loadError} onRetry={() => void loadBoards()} /> : null}
 
       <AdminCard>
         <DndContext modifiers={[restrictListDrag]}
-          autoScroll={false}
+          autoScroll
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragCancel={handleDragCancel}
           onDragEnd={handleDragEnd}
         >
-          <AdminDataTable minWidth={780} isDragging={Boolean(activeBoardCode)} className={`admin-sortable-table ${loading && boards.length > 0 ? "opacity-60 transition-opacity" : ""}`}>
-            <colgroup><col style={{ width: 52 }} /><col /><col style={{ width: 280 }} /><col style={{ width: 100 }} /></colgroup>
+          <AdminDataTable minWidth={0} isDragging={Boolean(activeBoardCode)} className={`admin-sortable-table ${loading && boards.length > 0 ? "opacity-60 transition-opacity" : ""}`}>
+            <colgroup><col style={{ width: 36 }} /><col /><col style={{ width: "32%" }} /><col style={{ width: 80 }} /></colgroup>
             <AdminTableHeader><tr><AdminTableHead><span className="sr-only">순서</span></AdminTableHead><AdminTableHead>게시판</AdminTableHead><AdminTableHead>운영 설정</AdminTableHead><AdminTableHead>상태</AdminTableHead></tr></AdminTableHeader>
             <AdminTableBody>
               {loading && boards.length === 0 ? <tr><AdminTableCell colSpan={4} className="py-16 text-center">불러오는 중...</AdminTableCell></tr>
@@ -255,23 +255,23 @@ function BoardManagementPageContent() {
         </DndContext>
       </AdminCard>
 
-      {orderDirty ? <AdminStickyActionBar><p className="text-sm font-medium text-slate-700">변경한 게시판 노출 순서를 저장해 주세요.</p><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setBoards((current) => savedOrder.map((code) => current.find((board) => board.code === code)).filter((board): board is BoardSummary => Boolean(board)))} disabled={saving}><RotateCcw aria-hidden="true" /> 되돌리기</Button><Button type="button" onClick={() => void saveOrder()} disabled={saving}><Save aria-hidden="true" /> 순서 저장</Button></div></AdminStickyActionBar> : null}
+      {orderDirty ? <AdminStickyActionBar><p className="text-sm font-medium text-slate-700">변경한 게시판 노출 순서를 저장해 주세요.</p><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setBoards((current) => savedOrder.map((code) => current.find((board) => board.code === code)).filter((board): board is BoardSummary => Boolean(board)))} disabled={saving}> 되돌리기</Button><Button type="button" onClick={() => void saveOrder()} disabled={saving}> 순서 저장</Button></div></AdminStickyActionBar> : null}
     </AdminPageMain>
 
     <AdminDrawer
       open={formOpen}
       onClose={() => setFormOpen(false)}
-      title={editingCode ? "게시판 설정" : "새 게시판"}
+      title={editingCode ? "게시판 설정" : "게시판 추가"}
       width="max-w-2xl"
-      footer={<div className="flex items-center justify-between gap-2"><div>{editingCode ? <Button type="button" variant="ghost" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void removeBoard()} disabled={saving}><Trash2 aria-hidden="true" /> 게시판 삭제</Button> : null}</div><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setFormOpen(false)}>취소</Button><Button loading={saving} type="button" onClick={() => void saveBoard()} disabled={saving || !form.code.trim() || !form.nameKo.trim()}>{"저장"}</Button></div></div>}
+      footer={<div className="flex items-center justify-between gap-2"><div>{editingCode ? <Button type="button" variant="ghost" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void removeBoard()} disabled={saving}> 게시판 삭제</Button> : null}</div><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setFormOpen(false)}>취소</Button><Button loading={saving} type="button" onClick={() => void saveBoard()} disabled={saving || !form.code.trim() || !form.nameKo.trim()}>{editingCode ? "저장" : "추가"}</Button></div></div>}
     >
       <div className="space-y-8">
         <section className="space-y-4">
           <h3 className="text-sm font-semibold text-slate-900">기본 정보</h3>
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="md:col-span-2"><AdminFormField label="게시판 코드"><UiInput value={form.code} disabled={Boolean(editingCode)} onChange={(event) => setForm((current) => ({ ...current, code: event.currentTarget.value }))} placeholder="notice" /></AdminFormField></div>
-            <AdminFormField label="이름 (한글)"><UiInput value={form.nameKo} onChange={(event) => setForm((current) => ({ ...current, nameKo: event.currentTarget.value }))} /></AdminFormField>
-            <AdminFormField label="이름 (영문)"><UiInput value={form.nameEn ?? ""} onChange={(event) => setForm((current) => ({ ...current, nameEn: event.currentTarget.value }))} /></AdminFormField>
+            <div className="md:col-span-2"><AdminFormField label="게시판 코드"><UiInput value={form.code} disabled={Boolean(editingCode)} onChange={(event) => { const value = event.currentTarget.value; setForm((current) => ({ ...current, code: value })); }} placeholder="notice" /></AdminFormField></div>
+            <AdminFormField label="이름 (한글)"><UiInput value={form.nameKo} onChange={(event) => { const value = event.currentTarget.value; setForm((current) => ({ ...current, nameKo: value })); }} /></AdminFormField>
+            <AdminFormField label="이름 (영문)"><UiInput value={form.nameEn ?? ""} onChange={(event) => { const value = event.currentTarget.value; setForm((current) => ({ ...current, nameEn: value })); }} /></AdminFormField>
           </div>
           <Toggle label="공개 여부" checked={form.isActive} onChange={(checked) => setForm((current) => ({ ...current, isActive: checked }))} />
         </section>
@@ -340,7 +340,7 @@ function SortableBoardRow({ board, disabled, onOpen }: { board: BoardSummary; di
 
   return <tr ref={setNodeRef} style={style} aria-label={`${board.nameKo} 게시판 설정 열기`} role="button" className={cn("cursor-pointer transition-colors hover:bg-slate-50/60 focus-visible:bg-slate-50 focus-visible:outline-none", isDragging && "relative z-10 opacity-70")} onClick={() => onOpen(board)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(board); } }} tabIndex={0}>
     <AdminTableCell className="text-center"><button ref={setActivatorNodeRef} type="button" aria-label={`${board.nameKo} 순서 이동`} {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="admin-list-drag-handle"><GripVertical aria-hidden="true" className="size-4" /></button></AdminTableCell>
-    <AdminTableCell truncate><span className="admin-table-text-emphasis block truncate">{board.nameKo}</span><span className="admin-table-text mt-0.5 block truncate">{board.nameEn}</span></AdminTableCell>
+    <AdminTableCell truncate><span className="admin-table-text-emphasis">{board.nameKo}</span>{board.nameEn ? <span className="admin-table-text"> / {board.nameEn}</span> : null}</AdminTableCell>
     <AdminTableCell truncate>{[board.allowComment && "댓글", board.allowSecret && "비밀글", board.allowLike && "추천·스크랩"].filter(Boolean).join(" · ") || "추가 기능 없음"}</AdminTableCell>
     <AdminTableCell>{board.isActive ? <AdminStatusBadge tone="positive">활성</AdminStatusBadge> : <AdminStatusBadge>비활성</AdminStatusBadge>}</AdminTableCell>
   </tr>;

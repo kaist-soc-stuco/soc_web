@@ -306,7 +306,7 @@ function ShortcutHelpModal({
       open={open}
       onClose={onClose}
       title={isKorean ? "에디터 도움말" : "Editor help"}
-      className="max-w-5xl"
+      size="wide"
       bodyClassName="space-y-6"
     >
       <section className="space-y-3">

@@ -1,5 +1,5 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Download, FileSpreadsheet, MoreVertical, SquareCheck, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, Download, MoreVertical, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { stripRichText } from "@/components/ui/rich-text-content";
@@ -10,7 +10,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import { formatKoreanDateTime, isoToMs, nowMs } from "@soc/shared";
 import { Button } from "@/components/ui/button";
-import { ErrorState } from "@/components/ui/data-state";
+import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { UiInput } from "@/components/ui/form-control";
 import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -24,7 +24,7 @@ import { SurveyQuestionSummary } from "./survey-analytics-dashboard";
 const positiveInteger = (value: string | null) => Math.max(1, Math.min(1_000_000, Number.parseInt(value ?? "1", 10) || 1));
 
 /** Shares the editor's URL and leaves its draft state mounted while reading responses. */
-export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle, onSheet, onResponsesDeleted, sheetBusy = false }: { beforeToggle?: () => Promise<void>; onResponsesDeleted?: () => void; surveyId: string | null; onSheet?: () => Promise<void>; sheetBusy?: boolean }) {
+export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle, ensureSurvey, onSheet, onResponsesDeleted, sheetBusy = false }: { beforeToggle?: () => Promise<void>; ensureSurvey?: () => Promise<string>; onResponsesDeleted?: () => void; surveyId: string | null; onSheet?: () => Promise<void>; sheetBusy?: boolean }) {
   const { promptDownloadReason, DownloadReasonDialog } = useDownloadReasonDialog();
   const surveyId = requestedSurveyId ?? "";
   const { toast } = useToast();
@@ -37,8 +37,11 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
   const toggleNotifications = async () => {
     setMutating(true);
     try {
-      const result = await client.setSurveyEmailNotifications(surveyId, !subscription.data?.enabled);
-      queryClient.setQueryData(["survey-email-notifications", surveyId], result);
+      const id = surveyId || await ensureSurvey?.();
+      if (!id) throw new Error("Missing survey");
+      const current = subscription.data ?? await client.getSurveyEmailNotifications(id);
+      const result = await client.setSurveyEmailNotifications(id, !current.enabled);
+      queryClient.setQueryData(["survey-email-notifications", id], result);
     } catch { toast({type:"error",message:"이메일 알림 설정을 변경하지 못했습니다."}); }
     finally { setMutating(false); }
   };
@@ -124,11 +127,14 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
     if (!reason) return;
     setExporting(true);
     try {
-      const rows: string[][] = [["응답 일시", ...questions.map(q=>stripRichText(q.titleKo))]];
+      const id = surveyId || await ensureSurvey?.();
+      if (!id) throw new Error("Missing survey");
+      const exportQuestions = definition.data ? questions : (await client.getSurveyDetail(id)).sections.flatMap(section => section.questions);
+      const rows: string[][] = [["응답 일시", ...exportQuestions.map(q=>stripRichText(q.titleKo))]];
       let page = 1;
       while (true) {
-        const batch = await client.listResponsesWithAnswers(surveyId, {page, pageSize:100, sortOrder:"asc"});
-        for (const response of batch.items) rows.push([response.submittedAt ?? "", ...questions.map(q=>formatSurveyAnswer(response.answers.find(a=>a.questionId===q.id),q))]);
+        const batch = await client.listResponsesWithAnswers(id, {page, pageSize:100, sortOrder:"asc"});
+        for (const response of batch.items) rows.push([response.submittedAt ?? "", ...exportQuestions.map(q=>formatSurveyAnswer(response.answers.find(a=>a.questionId===q.id),q))]);
         if (page * 100 >= batch.total || !batch.items.length) break;
         page++;
       }
@@ -136,7 +142,7 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
         count: Math.max(0, rows.length - 1),
         kind: "survey_responses",
         reason,
-        targetId: surveyId,
+        targetId: id,
       });
       const cell = (value: string) => '"' + (/^[=+@\-\t\r]/.test(value) ? "'" : "") + value.replaceAll('"','""') + '"';
       const url=URL.createObjectURL(new Blob(["\uFEFF"+rows.map(row=>row.map(cell).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"}));
@@ -147,20 +153,20 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
   return <section aria-label="설문 응답" className="survey-responses-panel min-w-0 space-y-5">
       {DownloadReasonDialog}
     <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-      <div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-3xl font-normal tracking-tight sm:text-4xl">응답 {statistics.data?.totalResponses ?? 0}개</h2>
+      <div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-xl font-medium tracking-tight">응답 {statistics.data?.totalResponses ?? 0}개</h2>
 <div className="flex items-center gap-2">
- {onSheet && surveyId ? <Button variant="ghost" className="!font-medium text-brand-primary" onClick={()=>void onSheet()} disabled={sheetBusy}><FileSpreadsheet className="size-6 text-emerald-600" />Sheets에 연결</Button> : null}
+ {onSheet && surveyId ? <Button variant="ghost" className="!font-medium text-brand-primary" onClick={()=>void onSheet()} disabled={sheetBusy}>Google Sheets에 연결</Button> : null}
  <DropdownMenu.Root modal={false}><DropdownMenu.Trigger asChild><Button variant="ghost" size="icon" aria-label="응답 더보기"><MoreVertical className="size-4" /></Button></DropdownMenu.Trigger>
  <DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[100] w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
- <DropdownMenu.Item disabled={!surveyId || exporting} onSelect={()=>void exportCsv()} className="flex cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm outline-none focus:bg-slate-100"><Download className="size-4" />응답 다운로드(.csv)</DropdownMenu.Item>
- <DropdownMenu.CheckboxItem checked={subscription.data?.enabled ?? false} disabled={!surveyId || mutating || subscription.isPending || subscription.isError} onCheckedChange={()=>void toggleNotifications()} className="flex cursor-pointer items-center gap-3 rounded px-3 py-3 text-sm outline-none focus:bg-slate-100"><span className="size-4 shrink-0"><DropdownMenu.ItemIndicator><SquareCheck className="size-4" /></DropdownMenu.ItemIndicator></span>새로운 응답에 대한 이메일 알림 받기</DropdownMenu.CheckboxItem>
+ <DropdownMenu.Item disabled={(!surveyId && !ensureSurvey) || exporting} onSelect={()=>void exportCsv()} className="flex cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm outline-none focus:bg-slate-100"><Download className="size-4" />CSV 내보내기</DropdownMenu.Item>
+ <DropdownMenu.CheckboxItem checked={subscription.data?.enabled ?? false} disabled={(!surveyId && !ensureSurvey) || mutating || (Boolean(surveyId) && subscription.isPending)} onCheckedChange={()=>void toggleNotifications()} className="flex cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm outline-none data-[state=checked]:bg-emerald-50 data-[highlighted]:bg-slate-100 data-[state=checked]:data-[highlighted]:bg-emerald-50 data-[disabled]:opacity-40"><span className="size-4 shrink-0"><DropdownMenu.ItemIndicator><Check className="size-4 text-emerald-700" /></DropdownMenu.ItemIndicator></span>새로운 응답에 대한 이메일 알림 받기</DropdownMenu.CheckboxItem>
  <DropdownMenu.Separator className="my-1 border-t border-slate-200" />
  <DropdownMenu.Item disabled={!total || mutating} onSelect={()=>setDeleteOpen(true)} className="flex cursor-pointer items-center gap-3 rounded px-3 py-3 text-sm text-rose-600 outline-none focus:bg-rose-50"><Trash2 className="size-4" />모든 응답 삭제</DropdownMenu.Item>
  </DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
 </div>
 </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-        <p className="text-sm text-slate-500">{!definition.data?.isPublished ? "게시 후 응답을 받을 수 있습니다." : scheduleEnded ? "종료일이 지났습니다. 설정에서 기간을 연장해 주세요." : acceptingResponses ? "응답을 받고 있습니다." : "응답 접수가 마감되었습니다. 기존 응답은 유지됩니다."}</p>
+      <div className="flex flex-wrap items-center justify-end gap-3">
+
         <label className={`inline-flex items-center gap-3 text-sm font-medium ${canToggleReception ? "cursor-pointer" : "opacity-60"}`}>
           <UiInput type="checkbox" role="switch" aria-label="응답 받기" className="peer sr-only" checked={acceptingResponses} disabled={!canToggleReception} onChange={event => void toggleReception(event.target.checked)} />
           응답 받기
@@ -168,6 +174,7 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
         </label>
       </div>
       <SegmentedControl
+        variant="underline"
         ariaLabel="응답 보기 방식"
         role="tablist"
         value={view}
@@ -177,10 +184,10 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
           { value: "questions", label: "질문" },
           { value: "individual", label: "개별 보기" },
         ]}
-        className="mt-8"
+        className="mt-4"
       />
     </div>
-    <Modal open={deleteOpen} onClose={()=>{if(!mutating)setDeleteOpen(false);}} title="모든 응답 삭제" className="max-w-md" footer={<><Button variant="outline" disabled={mutating} onClick={()=>setDeleteOpen(false)}>취소</Button><Button variant="destructive" disabled={mutating} onClick={()=>void removeResponses()}>모든 응답 삭제</Button></>}>
+    <Modal open={deleteOpen} onClose={()=>{if(!mutating)setDeleteOpen(false);}} title="모든 응답 삭제" size="compact" footer={<><Button variant="outline" disabled={mutating} onClick={()=>setDeleteOpen(false)}>취소</Button><Button variant="destructive" disabled={mutating} onClick={()=>void removeResponses()}>모든 응답 삭제</Button></>}>
       <p>응답 {total}개를 모두 삭제하시겠습니까? 삭제한 응답은 복구할 수 없습니다.</p>
       {definition.data?.spreadsheetUrl && <p className="mt-3 text-sm text-slate-500">연결된 Sheets의 응답도 동기화됩니다.</p>}
     </Modal>
@@ -189,7 +196,7 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
       description="일시적인 네트워크 오류일 수 있습니다. 잠시 후 다시 시도해 주세요."
       onRetry={retryResponses}
       title="응답을 불러오지 못했습니다."
-    /> : pending && !hasResponseData ? null : total === 0 ? <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-500">아직 제출된 응답이 없습니다.</div> : <>
+    /> : pending && !hasResponseData ? null : total === 0 ? <EmptyState message="아직 제출된 응답이 없습니다." className="border-solid bg-white" /> : <>
       {contentView !== "individual" && statistics.data ? <>
         {contentView === "questions" && question ? <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
           <SelectDropdown
@@ -213,7 +220,7 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
           className="rounded-xl border border-slate-200 bg-white"
           description="다른 응답을 선택해 다시 확인해 주세요."
           title="선택한 응답을 찾을 수 없습니다."
-        /> : !response ? responseId && selected.isPending ? <div aria-busy="true" className="min-h-24" /> : <p role="status">이 번호에 응답이 없습니다. 이전 응답을 선택해 주세요.</p> : <>
+        /> : !response ? responseId && selected.isPending ? <div aria-busy="true" className="min-h-24" /> : <EmptyState message="이 번호에 응답이 없습니다." className="border-solid bg-white" /> : <>
           <div className="rounded-xl border border-slate-200 bg-white p-5"><h3 className="font-semibold">{response.user?.nameKo ?? "익명 응답"}</h3><p className="mt-1 text-sm text-slate-500">{response.submittedAt ? formatKoreanDateTime(response.submittedAt) : "미제출"} · 읽기 전용</p></div>
           {questions.map((item, index) => {
             const answer = response.answers.find((value) => value.questionId === item.id);

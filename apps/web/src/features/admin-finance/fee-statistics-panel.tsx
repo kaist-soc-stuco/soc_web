@@ -1,7 +1,7 @@
 import { nowDate } from "@soc/shared";
 import { useMemo, useState, useRef, useLayoutEffect } from "react";
 import type { StudentFeeStatsResponse } from "@soc/contracts";
-import { AdminCard } from "@/components/ui/admin-page";
+import { AdminCard, AdminEmptyState } from "@/components/ui/admin-page";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
 import { Button } from "@/components/ui/button";
@@ -68,7 +68,7 @@ export function FeeStatisticsPanel({ semester, semesterOptions, loading, onSemes
       </div>
       <div className="border-t border-slate-100 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-sm font-medium">수납 추이 <span className="ml-1 text-xs font-normal text-slate-500">{chart.unit} 단위</span></h3><SegmentedControl ariaLabel="수납 추이 표시" value={mode} onChange={setMode} options={[{value:"period",label:"기간별 금액"},{value:"cumulative",label:"누적 금액"}]} /></div>
-        <div className="min-h-[20rem]">{!stats ? <div className="min-h-[19rem]" /> : !totals?.paymentCount ? <p className="flex min-h-[19rem] items-center justify-center text-sm text-slate-500">선택한 기간에 수납 내역이 없습니다.</p> : <>
+        <div className="min-h-[20rem]">{!stats ? <div className="min-h-[19rem]" /> : !totals?.paymentCount ? <AdminEmptyState className="min-h-[19rem]" message="선택한 기간에 수납 내역이 없습니다." /> : <>
           <svg ref={chartRef} viewBox={`0 0 ${chartWidth} 222`} className={`mt-3 h-56 w-full ${loading ? "opacity-60" : ""}`} role="img" aria-label={`${mode === "period" ? "기간별" : "누적"} 수납 금액 추이`}>
             {[0,.5,1].map(ratio => <g key={ratio}><line x1="92" x2={chartWidth-15} y1={y(ceiling*ratio)} y2={y(ceiling*ratio)} stroke="#e2e8f0" /><text x="82" y={y(ceiling*ratio)+4} textAnchor="end" fontSize="12" fill="#64748b">{money(ceiling*ratio)}</text></g>)}
             {mode === "cumulative" ? <polyline fill="none" stroke="#047857" strokeWidth="2" points={chart.points.map((point,i)=>`${x(i)},${y(point.cumulative)}`).join(" ")} /> : null}

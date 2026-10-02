@@ -111,7 +111,7 @@ function ContentModerationPageContent() {
       <AdminPageMain>
         <AdminPageHeader title="게시글 관리" />
         <SegmentedControl
-          ariaLabel="숨김 콘텐츠 종류"
+          variant="underline" ariaLabel="숨김 콘텐츠 종류"
           className="mb-4 w-fit"
           value={view}
           onChange={(value) => { setView(value); setPage(1); setQuery(""); }}
@@ -122,7 +122,7 @@ function ContentModerationPageContent() {
         />
         <AdminTableCard
           toolbar={(
-            <div className="flex items-center justify-between gap-3 py-4">
+            <div className="flex items-center justify-between gap-3 py-2">
               <p className="text-sm font-normal text-app-text-secondary">숨김 {activeItems.length}건</p>
               <PageSearchField
                 ariaLabel="숨김 게시글 검색"
@@ -146,9 +146,9 @@ function ContentModerationPageContent() {
           ) : undefined}
         >
           {loading && items.length === 0 && comments.length === 0 ? <AdminLoadingState /> : view === "articles" ? (
-            <AdminDataTable minWidth={920} mobileMode="cards">
-              <colgroup><col style={{ width: 120 }} /><col /><col style={{ width: 140 }} /><col style={{ width: 300 }} /><col style={{ width: 170 }} /><col style={{ width: 92 }} /></colgroup>
-              <AdminTableHeader><tr><AdminTableHead>게시판</AdminTableHead><AdminTableHead>제목</AdminTableHead><AdminTableHead>작성자</AdminTableHead><AdminTableHead>숨김 사유</AdminTableHead><AdminTableHead>처리 일시</AdminTableHead><AdminTableHead className="text-center">작업</AdminTableHead></tr></AdminTableHeader>
+            <AdminDataTable minWidth={0} mobileMode="cards">
+              <colgroup><col style={{ width: "12%" }} /><col style={{ width: "26%" }} /><col style={{ width: "12%" }} /><col style={{ width: "22%" }} /><col style={{ width: "14%" }} /><col style={{ width: "14%" }} /></colgroup>
+              <AdminTableHeader><tr><AdminTableHead>게시판</AdminTableHead><AdminTableHead>제목</AdminTableHead><AdminTableHead>작성자</AdminTableHead><AdminTableHead>숨김 사유</AdminTableHead><AdminTableHead>처리 일시</AdminTableHead><AdminTableHead className="text-center"><span className="sr-only">작업</span></AdminTableHead></tr></AdminTableHeader>
               <AdminTableBody>
                 {pageItems.length === 0 ? <AdminTableEmpty colSpan={6}>숨긴 게시글이 없습니다.</AdminTableEmpty> : pageItems.map((article) => (
                   <tr key={`${article.boardCode}:${article.articleId}`}>
@@ -167,9 +167,9 @@ function ContentModerationPageContent() {
               </AdminTableBody>
             </AdminDataTable>
           ) : (
-            <AdminDataTable minWidth={920} mobileMode="cards">
-              <colgroup><col style={{ width: 120 }} /><col style={{ width: 260 }} /><col /><col style={{ width: 140 }} /><col style={{ width: 220 }} /><col style={{ width: 92 }} /></colgroup>
-              <AdminTableHeader><tr><AdminTableHead>게시판</AdminTableHead><AdminTableHead>게시글</AdminTableHead><AdminTableHead>댓글 내용</AdminTableHead><AdminTableHead>작성자</AdminTableHead><AdminTableHead>숨김 사유</AdminTableHead><AdminTableHead className="text-center">작업</AdminTableHead></tr></AdminTableHeader>
+            <AdminDataTable minWidth={0} mobileMode="cards">
+              <colgroup><col style={{ width: "12%" }} /><col style={{ width: "24%" }} /><col style={{ width: "26%" }} /><col style={{ width: "12%" }} /><col style={{ width: "12%" }} /><col style={{ width: "14%" }} /></colgroup>
+              <AdminTableHeader><tr><AdminTableHead>게시판</AdminTableHead><AdminTableHead>게시글</AdminTableHead><AdminTableHead>댓글 내용</AdminTableHead><AdminTableHead>작성자</AdminTableHead><AdminTableHead>숨김 사유</AdminTableHead><AdminTableHead className="text-center"><span className="sr-only">작업</span></AdminTableHead></tr></AdminTableHeader>
               <AdminTableBody>
                 {pageComments.length === 0 ? <AdminTableEmpty colSpan={6}>숨긴 댓글이 없습니다.</AdminTableEmpty> : pageComments.map((comment) => (
                   <tr key={comment.commentId}>

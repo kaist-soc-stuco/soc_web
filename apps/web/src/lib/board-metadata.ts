@@ -61,7 +61,7 @@ const BOARD_FALLBACK_METADATA: Record<
     descriptionKo: "전산학부의 다양한 소식을 확인하세요.",
     descriptionEn: "Get updates from the School of Computing.",
     labelEn: "Notice",
-    titleKo: "공지",
+    titleKo: "공지사항",
   },
   hoc: {
     descriptionKo: "Hall of Code 프로젝트 및 활동 내역을 확인하세요.",
@@ -165,7 +165,7 @@ export const getBoardLabelFromMetadata = (
   }
 
   return lang === "ko"
-    ? board.nameKo || code
+    ? (normalizeBoardCode(code) === "notice" && board.nameKo === "공지" ? "공지사항" : board.nameKo) || code
     : board.nameEn || fallback.labelEn || board.nameKo || code;
 };
 
@@ -180,7 +180,7 @@ export const getBoardTitleFromMetadata = (
   }
 
   if (lang === "ko") {
-    return board.nameKo || code;
+    return getBoardLabelFromMetadata(board, code, lang);
   }
 
   return board.nameEn || fallback.labelEn || board.nameKo || code;

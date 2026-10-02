@@ -48,7 +48,7 @@ export function MyPageSidebar({
   onMenuChange,
 }: SidebarProps) {
   return (
-    <aside className="hidden w-56 shrink-0 border border-slate-200 bg-white rounded-2xl p-4 shadow-[0_5px_20px_rgba(0,0,0,0.015)] md:block sticky top-6">
+    <aside className="hidden w-56 shrink-0 border border-slate-200 bg-white rounded-2xl p-4 md:block sticky top-6">
       <div className="flex items-center gap-2 px-2 pb-3 border-b border-slate-100 select-none">
         <User className="h-4.5 w-4.5 text-kaist-darkgreen" />
         <span className="text-[length:var(--ui-text-section-size)] font-bold text-slate-900">
@@ -66,7 +66,7 @@ export function MyPageSidebar({
               onClick={() => onMenuChange(item.id)}
               className={`min-h-11 w-full flex items-center justify-start gap-2.5 rounded-lg px-3.5 py-2.5 text-[length:var(--ui-text-body-sm-size)] font-semibold border-0 transition-colors cursor-pointer text-left ${
                 isActive
-                  ? "bg-emerald-50/70 text-kaist-darkgreen shadow-sm shadow-emerald-500/5"
+                  ? "bg-emerald-50/70 text-kaist-darkgreen"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
               }`}
             >
@@ -89,10 +89,10 @@ export function MyPageLoadingState({ lang }: { lang: string }) {
       aria-label={lang === "ko" ? "마이페이지 불러오는 중" : "Loading My Page"}
     >
       <div className="mb-1">
-        <Skeleton className="h-6 w-20" />
+        <Skeleton className="h-8 w-20 sm:h-9" />
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
+      <section className="rounded-xl border border-slate-200 bg-white p-6">
         <div className="flex items-center gap-3">
           <Skeleton className="h-8 w-36" />
           <Skeleton className="h-5 w-14 rounded-full" />
@@ -111,7 +111,7 @@ export function MyPageLoadingState({ lang }: { lang: string }) {
         {Array.from({ length: 4 }).map((_, index) => (
           <div
             key={index}
-            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_5px_15px_rgba(0,0,0,0.015)]"
+            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4"
           >
             <Skeleton className="h-9 w-9 rounded-lg" />
             <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -122,7 +122,7 @@ export function MyPageLoadingState({ lang }: { lang: string }) {
         ))}
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
+      <section className="rounded-xl border border-slate-200 bg-white p-6">
         <div className="mb-4 border-b border-slate-100 pb-3.5">
           <div className="flex items-center justify-between">
             <Skeleton className="h-5 w-24" />
@@ -143,7 +143,7 @@ interface UnavailableStateProps {
 
 export function MyPageUnavailableState({ authenticated, lang }: UnavailableStateProps) {
   return (
-    <div className="w-full rounded-xl border border-slate-200 bg-white p-6 text-center shadow-[0_10px_35px_rgba(15,23,42,0.05)] sm:p-8">
+    <div className="w-full rounded-xl border border-slate-200 bg-white p-6 text-center sm:p-8">
       <p className="text-xs font-semibold text-slate-500 leading-relaxed">
         {authenticated
           ? lang === "ko"
@@ -279,12 +279,12 @@ export function MyPageProfilePanel({
   return (
     <div className="flex flex-col gap-4 animate-in fade-in duration-300">
       <div className="mb-1.5 select-none">
-        <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+        <h1 className="text-[length:var(--ui-text-page-title-mobile-size)] font-bold leading-8 tracking-tight text-slate-900 sm:text-[length:var(--ui-text-page-title-size)] sm:leading-9">
           {lang === "ko" ? "내 정보" : "Profile"}
         </h1>
       </div>
 
-      <div className="grid grid-cols-1 gap-x-8 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.05)] sm:grid-cols-2 sm:p-5 select-text">
+      <div className="grid grid-cols-1 gap-x-8 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 sm:p-5 select-text">
         {profileRows.map(([label, value]) => (
           <div
             key={label}
@@ -403,12 +403,12 @@ export function MyPageActivityPanel({
   return (
     <div className="flex flex-col gap-4 animate-in fade-in duration-300">
       <div className="mb-1.5 select-none">
-        <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+        <h1 className="text-[length:var(--ui-text-page-title-mobile-size)] font-bold leading-8 tracking-tight text-slate-900 sm:text-[length:var(--ui-text-page-title-size)] sm:leading-9">
           {lang === "ko" ? "활동 내역" : "Activity"}
         </h1>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)] flex flex-col">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 flex flex-col">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div ref={activityTabsRef} data-more={moreTabs} className="activity-tab-strip scrollbar-hidden flex min-w-0 flex-1 gap-1 overflow-x-auto select-none">
           {tabs.map((tab) => {

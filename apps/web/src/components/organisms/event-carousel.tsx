@@ -171,7 +171,6 @@ function EventImage({ event }: { event: EventCardItem }) {
   );
 }
 
-const EVENT_DDAY_WINDOW_DAYS = 7;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 function localDayTimestamp(value: number) {
@@ -193,13 +192,17 @@ function getEventDdayLabel(startAt: string | null, endAt: string | null) {
 
   if (targetDay === null) return null;
   const dayDifference = Math.round((targetDay - today) / DAY_IN_MS);
-  if (dayDifference < 0 || dayDifference > EVENT_DDAY_WINDOW_DAYS) return null;
+  if (dayDifference < 0) return null;
   return dayDifference === 0 ? "D-Day" : `D-${dayDifference}`;
 }
 
-function EventDayBadge({ event }: { event: EventCardItem }) {
-  const label = getEventDdayLabel(event.startAt, event.endAt);
-  return label ? <span className="home-editorial-dday">{label}</span> : null;
+function EventDayBadge({ event, lang }: { event: EventCardItem; lang: string }) {
+  const label = event.eventState === "closed"
+    ? lang === "ko" ? "마감" : "Closed"
+    : event.eventState === "open"
+      ? lang === "ko" ? "진행 중" : "Ongoing"
+      : getEventDdayLabel(event.startAt, event.endAt);
+  return label ? <span className={`home-editorial-dday is-${event.eventState === "closed" ? "closed" : event.eventState === "open" ? "open" : "neutral"}`}>{label}</span> : null;
 }
 
 function getEventApplicationLabel(event: EventCardItem, lang: string) {
@@ -237,7 +240,7 @@ function EventApplicationBadge({ event, lang }: { event: EventCardItem; lang: st
   const label = getEventApplicationLabel(event, lang);
   return label ? (
     <span
-      className={`home-editorial-event-application ${isEventApplicationClosed(event) ? "is-closed" : ""}`}
+      className={`home-editorial-event-application ${isEventApplicationClosed(event) ? "is-closed" : event.linkedSurveyState === "open" ? "is-open" : ""}`}
     >
       {label}
     </span>
@@ -271,12 +274,12 @@ function EventCard({
     >
       <div className="home-portal-event-media">
         <EventImage event={event} />
-        <div className="pointer-events-none absolute left-4 top-4 z-10 flex max-w-[calc(100%-2rem)] flex-wrap gap-1.5">
-          <EventDayBadge event={event} />
-          <EventApplicationBadge event={event} lang={lang} />
-        </div>
       </div>
       <div className="home-portal-event-body break-keep">
+        <div className="home-portal-event-badges empty:hidden">
+          <EventDayBadge event={event} lang={lang} />
+          <EventApplicationBadge event={event} lang={lang} />
+        </div>
         <h3 className="line-clamp-2">{event.title}</h3>
         {event.description ? <p className="line-clamp-2">{event.description}</p> : null}
         <div className="home-portal-event-meta">

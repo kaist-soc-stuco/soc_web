@@ -80,7 +80,7 @@ export function PageHeader({
   titleId?: string;
 }) {
   return (
-    <section className={cn("mb-6 bg-[var(--ui-surface-canvas)]", className)} aria-labelledby={titleId}>
+    <section className={cn("mb-2 bg-[var(--ui-surface-canvas)]", className)} aria-labelledby={titleId}>
       <PageContainer
         className={cn(
           "flex flex-col gap-4 pb-4 pt-6 sm:flex-row sm:items-end sm:justify-between",
@@ -111,7 +111,7 @@ export function PageHeader({
 export function AdminPageTitle({ children, className, ...props }: ComponentProps<"h1">) {
   return (
     <h1
-      className={cn("text-[length:var(--ui-text-page-title-size)] font-bold leading-9 tracking-[-0.025em] text-slate-900", className)}
+      className={cn("text-[length:var(--ui-text-admin-title-size)] font-semibold leading-9 tracking-[-0.025em] text-slate-900", className)}
       {...props}
     >
       {children}
@@ -134,7 +134,7 @@ export function DataViewCard({ className, ...props }: ComponentProps<"section">)
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-[var(--ui-card-radius)] border border-slate-200 bg-white shadow-card",
+        "overflow-hidden rounded-[var(--ui-card-radius)] border border-slate-200 bg-white",
         className,
       )}
       data-ui="data-view-card"
@@ -200,7 +200,7 @@ export function PageTabs({
 const pageTabClassName =
   "interaction-link select-none !h-[var(--ui-page-tab-height)] !min-h-[var(--ui-page-tab-height)] !font-normal";
 const pageActionClassName =
-  "interaction-button select-none inline-flex h-[var(--ui-control-height)] shrink-0 items-center justify-center gap-1.5 rounded-[var(--ui-control-radius)] border px-3.5 text-[length:var(--ui-control-font-size)] font-semibold tracking-tight";
+  "interaction-button select-none inline-flex h-[var(--ui-control-height)] shrink-0 items-center justify-center gap-1.5 rounded-[var(--ui-control-radius)] border px-3.5 text-[length:var(--ui-control-font-size)] font-medium tracking-tight";
 
 function pageActionToneClassName(tone: "neutral" | "primary") {
   return tone === "primary"

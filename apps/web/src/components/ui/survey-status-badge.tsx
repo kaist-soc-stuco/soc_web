@@ -13,10 +13,10 @@ interface SurveyStatusBadgeProps {
 }
 
 const toneClassNames: Record<SurveyStatusTone, string> = {
-  beforeOpen: "border-amber-200 bg-amber-50 text-amber-700",
-  closed: "border-rose-200 bg-rose-50 text-rose-700",
-  draft: "border-slate-200 bg-slate-50 text-slate-600",
-  open: "border-brand-primary-border bg-brand-primary-light text-brand-primary",
+  beforeOpen: "border-slate-200 bg-white text-slate-600",
+  closed: "border-slate-200 bg-slate-200 text-slate-500",
+  draft: "border-slate-200 bg-white text-slate-600",
+  open: "border-[#cee4d8] bg-[#eaf4ee] text-[#176345]",
 };
 
 export function SurveyStatusBadge({
@@ -32,7 +32,7 @@ export function SurveyStatusBadge({
   return (
     <span
       className={cn(
-        "select-none inline-flex items-center justify-center rounded-md border font-semibold whitespace-nowrap",
+        "select-none inline-flex items-center justify-center rounded-full border font-medium whitespace-nowrap",
         size === "sm"
           ? "px-2 py-0.5 text-[length:var(--home-calendar-day-size)]"
           : "px-2.5 py-0.5 text-[length:var(--home-calendar-event-size)]",

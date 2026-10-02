@@ -554,9 +554,6 @@ export function SurveySettingsForm({
                   disabled={isOngoing}
                 />
               </AdminFormField>
-              <p className="text-xs font-normal leading-4 text-slate-400">
-                참여 대상은 하나만 선택할 수 있습니다.
-              </p>
             </section>
 
             <section className="space-y-3 border-t border-slate-100 pt-5" aria-labelledby="survey-response-settings">

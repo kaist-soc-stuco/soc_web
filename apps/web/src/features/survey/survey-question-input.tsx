@@ -6,7 +6,7 @@ import type {
   QuestionType,
   SurveyQuestionRecord,
 } from "@soc/contracts";
-import { CircleAlert, Check, FileText, Heart, Loader2, Plus, Star, ThumbsUp, UploadCloud, X } from "lucide-react";
+import { CircleAlert, Check, FileText, Heart, Loader2, Star, ThumbsUp, UploadCloud, X } from "lucide-react";
 
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -564,7 +564,6 @@ export function SurveyQuestionInput({
               disabled={disabled || uploading}
               className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-kaist-darkgreen transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Plus aria-hidden="true" className="size-3.5" />
               파일 추가
             </button>
           ) : null}

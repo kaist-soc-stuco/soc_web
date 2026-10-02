@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } = require("@nestjs/common");
@@ -32,6 +33,43 @@ const record = {
   valueEn: "School of Computing Student Council",
   valueKo: "전산학부 학생회",
 };
+
+test("quick links support multiple independently editable blocks", async () => {
+  const blocks = [];
+  const repository = {
+    listContentBlocks: async () => blocks,
+    createContentBlock: async (input) => {
+      const block = { ...input, contentBlockId: `link-${blocks.length}`, status: "DRAFT" };
+      blocks.push(block);
+      return block;
+    },
+    findContentBlockById: async (id) => blocks.find(block => block.contentBlockId === id),
+    updateContentBlock: async (id, input) => {
+      const index = blocks.findIndex(block => block.contentBlockId === id);
+      blocks[index] = { ...blocks[index], ...input };
+      return blocks[index];
+    },
+  };
+  const service = new SiteContentService(repository, { record: async () => {} });
+  const audit = { actorUserId: record.updatedBy };
+  const first = await service.createContentBlock({ type: "QUICK_LINK", titleKo: "학사 안내", linkUrl: "/life" }, audit);
+  const second = await service.createContentBlock({ type: "QUICK_LINK", titleKo: "문의하기", linkUrl: "/faq" }, audit);
+  const updated = await service.updateContentBlock(first.contentBlockId, { titleKo: "학사 정보" }, audit);
+  assert.equal(blocks.length, 2);
+  assert.equal(updated.titleKo, "학사 정보");
+  assert.equal(blocks[1].contentBlockId, second.contentBlockId);
+  assert.equal(blocks[1].titleKo, "문의하기");
+});
+
+test("image-only site settings still reject duplicate singleton blocks", async () => {
+  for (const type of ["HERO", "LOGO", "ORGANIZATION_CHART"]) {
+    const service = new SiteContentService({
+      listContentBlocks: async () => [{ contentBlockId: "existing", type }],
+      createContentBlock: async () => assert.fail("duplicate settings must not be created"),
+    }, { record: async () => {} });
+    await assert.rejects(service.createContentBlock({ type, titleKo: "설정", imageUrl: "asset:7" }, { actorUserId: record.updatedBy }), ConflictException);
+  }
+});
 
 test("site content contracts accept only finite keys and complete bilingual copy", () => {
   assert.equal(SITE_CONTENT_KEYS.length, 37);

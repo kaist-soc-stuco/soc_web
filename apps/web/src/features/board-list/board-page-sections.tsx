@@ -1,3 +1,4 @@
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { ArticleListTitle } from "@/components/ui/article-list-title";
 import { PromotionStatus } from "@/components/ui/promotion-period";
 import type { ReactNode } from "react";
@@ -23,8 +24,6 @@ import {
   DataViewFooter,
   DataViewToolbar,
   PageSearchField,
-  PageTabLink,
-  PageTabs,
   PageToolbar,
 } from "@/components/ui/page-layout";
 
@@ -76,29 +75,13 @@ export function BoardCategoryNavigation({
         title={lang === "ko" ? "게시판 분류" : "Board categories"}
         value={category ?? ""}
       />
-      <PageTabs
-        aria-label={lang === "ko" ? "게시판 분류" : "Board categories"}
-        variant="segmented"
-        className="clean-segmented-control hidden md:inline-flex"
-      >
-        <PageTabLink to="/board" active={!category}>
-          {lang === "ko" ? "전체" : "All"}
-        </PageTabLink>
-        {boards
-          .filter((board) => board.code !== "faq" && !isLegacyPublicBoardCode(board.code))
-          .map((board) => {
-            const isActive = category === board.code;
-            return (
-              <PageTabLink
-                key={board.code}
-                to={board.code === "faq" ? "/board/faq" : `/board/${board.code}`}
-                active={isActive}
-              >
-                {getBoardLabelFromMetadata(board, board.code, lang)}
-              </PageTabLink>
-            );
-          })}
-      </PageTabs>
+      <SegmentedControl
+        ariaLabel={lang === "ko" ? "게시판 분류" : "Board categories"}
+        className="hidden md:inline-flex"
+        value={category ?? ""}
+        options={categoryOptions}
+        onChange={value => navigate(value ? "/board/" + value : "/board")}
+      />
     </PageToolbar>
   );
 }
@@ -257,7 +240,7 @@ export function BoardArticleTable({
             )}
             {isNew ? (
               <span
-                className="h-[5px] w-[5px] shrink-0 rounded-full bg-rose-500"
+                className="h-[4px] w-[4px] shrink-0 rounded-full bg-rose-500"
               >
                 <span className="sr-only">{lang === "ko" ? "새 글" : "New post"}</span>
               </span>
@@ -288,10 +271,10 @@ export function BoardArticleTable({
 
   return (
     <PageContainer className="pb-8">
-      <DataViewCard aria-label={lang === "ko" ? "게시글 목록" : "Article list"}>
+      <DataViewCard className="board-article-table" aria-label={lang === "ko" ? "게시글 목록" : "Article list"}>
         <DataViewToolbar>{toolbar}</DataViewToolbar>
         <DataViewBody>
-        <div className={`hidden h-[var(--ui-table-head-height)] ${tableGridClass} items-center gap-3 border-b border-[var(--ui-border-subtle)] border-t-2 border-t-brand-primary bg-slate-50/70 px-6 text-[length:var(--ui-text-body-size)] font-medium tracking-tight text-slate-500 md:grid`}>
+        <div className={`hidden h-[var(--ui-table-head-height)] ${tableGridClass} items-center gap-3 border-b border-[var(--ui-border-subtle)] bg-slate-50/70 px-6 text-[length:var(--ui-text-body-size)] font-medium tracking-tight text-slate-500 md:grid`}>
           {!category ? (
             <div className="shrink-0 text-center">
               {lang === "ko" ? "분류" : "Category"}

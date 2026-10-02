@@ -54,14 +54,14 @@ export function AdminDrawer({
           width,
         )}
       >
-        <header className="flex min-h-16 items-center justify-between gap-4 px-4 sm:px-5">
+        <header className="flex min-h-16 items-center justify-between gap-4 px-6">
           <h2 id={titleId} className="min-w-0 break-words text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-[var(--ui-text-strong)]">{title}</h2>
           <IconButton aria-label={lang === "ko" ? "닫기" : "Close"} onClick={onClose}>
             <X aria-hidden="true" />
           </IconButton>
         </header>
-        <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-5">{children}</div>
-        {footer ? <footer className="px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-0 sm:px-5">{footer}</footer> : null}
+        <div className={cn("scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-6 pt-4", footer ? "pb-2" : "pb-6")}>{children}</div>
+        {footer ? <footer className="px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4">{footer}</footer> : null}
       </section>
     </div>,
     document.body,

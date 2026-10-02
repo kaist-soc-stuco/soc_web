@@ -99,6 +99,8 @@ function ToastCard({
   const [isLeaving, setIsLeaving] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const previousRevision = useRef(item.revision);
   const remaining = useRef(item.duration ?? 4500);
   const leaving = useRef(false);
   const exitTimer = useRef<number | undefined>(undefined);
@@ -124,13 +126,20 @@ function ToastCard({
     if (leaving.current) return;
     leaving.current = true;
     setIsLeaving(true);
-    exitTimer.current = window.setTimeout(() => onDismiss(item.id), 160);
+    exitTimer.current = window.setTimeout(() => onDismiss(item.id), 300);
   }, [item.id, onDismiss]);
 
   useEffect(() => () => window.clearTimeout(exitTimer.current), []);
 
   useEffect(() => {
     window.clearTimeout(exitTimer.current);
+    if (previousRevision.current !== item.revision && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      cardRef.current?.animate([
+        { transform: "translateX(0)" }, { transform: "translateX(-4px)" },
+        { transform: "translateX(3px)" }, { transform: "translateX(-2px)" }, { transform: "translateX(0)" },
+      ], { duration: 320, easing: "ease-out" });
+    }
+    previousRevision.current = item.revision;
     leaving.current = false;
     remaining.current = item.duration ?? 4500;
     setIsLeaving(false);
@@ -148,6 +157,7 @@ function ToastCard({
 
   return (
     <div
+      ref={cardRef}
       role="status"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}

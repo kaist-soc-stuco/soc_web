@@ -255,7 +255,7 @@ export function LoginCallbackPage() {
           }
           title={lang === "ko" ? "개인정보 수집 및 이용 동의" : "Consent to Collection and Use of Personal Information"}
           showClose={false}
-          className="max-w-lg"
+          size="standard"
           bodyClassName="space-y-3"
           footer={
             <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-end">

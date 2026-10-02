@@ -16,6 +16,7 @@ export function Modal({
   onClose,
   open,
   showClose = true,
+  size = "standard",
   title,
 }: {
   children?: ReactNode;
@@ -28,6 +29,7 @@ export function Modal({
   onClose: () => void;
   open: boolean;
   showClose?: boolean;
+  size?: "compact" | "standard" | "wide";
   title: ReactNode;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -64,7 +66,10 @@ export function Modal({
         tabIndex={-1}
         onKeyDown={handleOverlayKeyDown}
         className={cn(
-          "ui-modal__surface relative flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[var(--ui-border-subtle)] bg-[var(--card)] shadow-[0_16px_48px_rgba(15,23,42,0.14)] sm:max-h-[calc(100dvh-3rem)] ",
+          "ui-modal__surface relative flex max-h-[calc(100dvh-1rem)] w-full flex-col overflow-hidden rounded-xl border border-[var(--ui-border-subtle)] bg-[var(--card)] shadow-[0_16px_48px_rgba(15,23,42,0.14)] sm:max-h-[calc(100dvh-3rem)] ",
+          size === "compact" ? "max-w-[var(--ui-modal-width-compact)]"
+            : size === "wide" ? "max-w-[var(--ui-modal-width-wide)]"
+            : "max-w-[var(--ui-modal-width-standard)]",
           mobileFullscreen && "ui-modal__surface--mobile-fullscreen",
           className,
         )}
@@ -74,7 +79,7 @@ export function Modal({
             "ui-modal__header flex shrink-0 items-center justify-between gap-3 px-6 pt-6",
           )}
         >
-          <h2 id={titleId} className="min-w-0 break-words text-xl font-semibold leading-7 text-[var(--ui-text-strong)]">{title}</h2>
+          <h2 id={titleId} className="min-w-0 break-words text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-[var(--ui-text-strong)]">{title}</h2>
           <div className="flex shrink-0 items-center gap-1.5">
             {headerActions}
             {showClose ? (
@@ -84,7 +89,7 @@ export function Modal({
             ) : null}
           </div>
         </div>
-        {children ? <div className={cn("ui-modal__body scrollbar-hidden min-h-0 overflow-y-auto px-6 pb-6 pt-3 text-sm font-normal leading-6 text-neutral-600", bodyClassName)}>{children}</div> : null}
+        {children ? <div className={cn("ui-modal__body scrollbar-hidden min-h-0 overflow-y-auto px-6 pt-4 text-sm font-normal leading-6 text-slate-600", footer ? "pb-2" : "pb-6", bodyClassName)}>{children}</div> : null}
         {footer ? (
           <div
             className={cn(

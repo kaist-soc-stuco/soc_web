@@ -180,7 +180,7 @@ export function DateRangePicker({
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         aria-label={rangeLabel ? `${label}: ${rangeLabel}` : label}
-        className={`max-w-full gap-2 font-normal ${value.from || value.to ? "pr-10" : ""}`}
+        className={`ui-filter-trigger max-w-full gap-2 font-normal ${value.from || value.to ? "pr-10" : ""}`}
         onClick={() => {
           if (open) {
             close();

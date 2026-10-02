@@ -214,11 +214,11 @@ export function BoardDetailArticleCard({
         <Link
           to={`/survey/${article.survey.surveyId}`} target="_blank" rel="noopener noreferrer"
           aria-label={lang === "ko" ? `${surveyTitle} 설문조사 참여하기 (새 탭)` : `Take the ${surveyTitle} survey (opens in a new tab)`}
-          className="group mt-6 block rounded-xl border border-brand-primary-border bg-brand-primary-light/55 px-4 py-3.5 transition-colors duration-150 hover:bg-brand-primary-light/75 hover:border-brand-primary/45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+          className="group mt-6 block rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-4 transition-colors duration-150 hover:bg-slate-50 hover:border-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/80 bg-white text-brand-primary">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center text-slate-500">
                 <ClipboardCheck className="h-4.5 w-4.5" />
               </span>
               <div className="min-w-0">
@@ -228,13 +228,13 @@ export function BoardDetailArticleCard({
                 {surveyDescription && (
                   <RichTextContent
                     content={surveyDescription}
-                    className="mt-1 line-clamp-2 text-[length:var(--ui-text-body-sm-size)] font-normal leading-relaxed text-app-text-muted"
+                    className="mt-1 line-clamp-2 text-sm font-normal leading-relaxed text-app-text-muted"
                   />
                 )}
               </div>
             </div>
             <span
-              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand-primary px-3.5 py-1.5 text-xs font-bold text-white transition-colors duration-150 group-hover:bg-[#006b3e]"
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 min-h-9 rounded-md bg-brand-primary px-3.5 py-1.5 text-sm font-medium text-white transition-colors duration-150 group-hover:bg-[#006b3e]"
             >
               <span>{lang === "ko" ? "설문조사 참여하기" : "Take Survey"}</span>
               <ArrowUpRight aria-hidden="true" className="size-3.5" />

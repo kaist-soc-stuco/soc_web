@@ -45,8 +45,9 @@ function Button({
 }: ButtonProps) {
   const Comp = asChild ? Slot : 'button';
   const tooltip = props["data-tooltip"];
+  const resolvedClassName = className?.replace(/\bfont-semibold\b/g, 'font-medium');
 
-  return <Comp data-slot="button" data-variant={variant ?? "default"} key={variant ?? "default"} className={cn(buttonVariants({ variant, size, className }), loading !== undefined && !asChild && 'relative')} data-tooltip={tooltip} {...props} disabled={disabled || loading} aria-busy={loading || props['aria-busy']}>
+  return <Comp data-slot="button" data-variant={variant ?? "default"} data-size={size ?? "default"} key={variant ?? "default"} className={cn(buttonVariants({ variant, size, className: resolvedClassName }), loading !== undefined && !asChild && 'relative')} data-tooltip={tooltip} {...props} disabled={disabled || loading} aria-busy={loading || props['aria-busy']}>
     {asChild ? children : <>
       {loading !== undefined ? <span aria-hidden="true" className={cn('pointer-events-none absolute inset-0 flex items-center justify-center', !loading && 'invisible')}><Loader2 className="size-4 animate-spin motion-reduce:animate-none" /></span> : null}
       {loading !== undefined ? <span className={cn('inline-flex items-center justify-center [gap:inherit]', loading && 'opacity-0')}>{children}</span> : children}

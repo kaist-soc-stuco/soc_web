@@ -6,7 +6,6 @@ import type { VoteRecord } from "@soc/contracts";
 import { isoToMs, nowMs } from "@soc/shared";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
@@ -160,7 +159,7 @@ export function VoteListPage() {
         <PageHeader
           title={lang === "ko" ? "투표" : "Voting"}
           containerClassName="max-w-4xl"
-          actions={Permissions.has(session?.permission ?? 0, Permissions.MANAGE_VOTE) ? <Button asChild><Link to="/admin/votes/new"><Plus className="size-4" />{lang === "ko" ? "등록" : "Create"}</Link></Button> : undefined}
+          actions={Permissions.has(session?.permission ?? 0, Permissions.MANAGE_VOTE) ? <Button asChild><Link to="/admin/votes/new">{lang === "ko" ? "등록" : "Create"}</Link></Button> : undefined}
         />
         <PageContainer className="max-w-4xl pb-16">
           {loading ? (

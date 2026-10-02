@@ -24,23 +24,13 @@ import {
   msToIso,
   nowMs,
 } from "@soc/shared";
-import {
-  ArrowLeft,
-  CalendarClock,
-  ChevronDown,
-  ChevronRight,
-  History,
-  Plus,
-  Send,
-  Users,
-  X,
-} from "lucide-react";
+import { ArrowLeft, CalendarClock, ChevronDown, ChevronRight, Users, X } from "lucide-react";
 import { PopoverPanel } from "@/components/ui/popover-panel";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { RichTextEditor } from "@/components/organisms/rich-text-editor";
 import { RichTextContent } from "@/components/ui/rich-text-content";
-import { AdminEditorGuidance, AdminFormField, AdminPageShell, AdminPageHeader } from "@/components/ui/admin-page";
+import { AdminEmptyState, AdminEditorGuidance, AdminFormField, AdminPageShell, AdminPageHeader } from "@/components/ui/admin-page";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -166,10 +156,11 @@ function BulkEmailPageContent() {
   const skipNextDraftSaveRef = useRef(false);
 
   const [recipientType, setRecipientType] = useState<SendBulkEmailRequest["recipientType"]>(
-    "UNPAID_STUDENTS",
+    "ALL",
   );
   const [filters, setFilters] = useState<RecipientFilters>({});
   const [recipientMenuOpen, setRecipientMenuOpen] = useState(false);
+  const [recipientMenuAnchor, setRecipientMenuAnchor] = useState<{ left: number; top: number } | null>(null);
   const [recipientFilterGroup, setRecipientFilterGroup] = useState<string | null>(null);
   const [recipientCount, setRecipientCount] = useState<number | null>(null);
   const [recipientCountLoading, setRecipientCountLoading] = useState(false);
@@ -204,7 +195,7 @@ function BulkEmailPageContent() {
     setDraftIdentityKey(emailDraftStorageKey);
     setLoadedDraftIdentityKey(null);
     setDraftReady(false);
-    setRecipientType("UNPAID_STUDENTS");
+    setRecipientType("ALL");
     setFilters({});
     setSubject("");
     setContent("");
@@ -248,7 +239,7 @@ function BulkEmailPageContent() {
 
   useEffect(() => {
     if (!recipientMenuOpen) return;
-    const frame = requestAnimationFrame(() => recipientPanelRef.current?.querySelector<HTMLElement>("button, input")?.focus());
+    const frame = requestAnimationFrame(() => recipientPanelRef.current?.querySelector<HTMLElement>("button, input")?.focus({ preventScroll: true }));
     const closeOnOutside = (event: PointerEvent) => {
       if (!recipientPopoverRef.current?.contains(event.target as Node)) setRecipientMenuOpen(false);
     };
@@ -260,18 +251,27 @@ function BulkEmailPageContent() {
     const closeOnFocusOutside = (event: FocusEvent) => {
       if (!recipientPopoverRef.current?.contains(event.target as Node)) setRecipientMenuOpen(false);
     };
+    const closeOnViewportChange = () => setRecipientMenuOpen(false);
+    const closeOnPageScroll = (event: Event) => {
+      if (event.target instanceof Node && recipientPopoverRef.current?.contains(event.target)) return;
+      setRecipientMenuOpen(false);
+    };
+    window.addEventListener("resize", closeOnViewportChange);
+    window.addEventListener("scroll", closeOnPageScroll, true);
     document.addEventListener("pointerdown", closeOnOutside);
     document.addEventListener("keydown", closeOnEscape);
     document.addEventListener("focusin", closeOnFocusOutside);
     return () => {
       cancelAnimationFrame(frame);
+      window.removeEventListener("resize", closeOnViewportChange);
+      window.removeEventListener("scroll", closeOnPageScroll, true);
       document.removeEventListener("pointerdown", closeOnOutside);
       document.removeEventListener("keydown", closeOnEscape);
       document.removeEventListener("focusin", closeOnFocusOutside);
     };
   }, [recipientMenuOpen, recipientFilterGroup]);
   const selectedRecipientLabel =
-    RECIPIENT_TYPES.find((option) => option.value === recipientType)?.label ?? "수신자";
+    RECIPIENT_TYPES.find((option) => option.value === recipientType)?.label ?? "받는 사람";
   const previewVariables = {
     이름: currentUser?.nameKo || session?.nameKo || "",
     학번: currentUser?.studentNumber ?? "",
@@ -414,7 +414,7 @@ function BulkEmailPageContent() {
     } catch (error) {
       const missingId = error instanceof ApiClientHttpError ? error.code?.split("bulk_email_attachment_unavailable:")[1] : null;
       const missing = attachments.find(file => file.assetId === missingId);
-      setOperationError(missing ? `첨부파일 “${missing.filename}”을 사용할 수 없습니다. 제거한 뒤 다시 첨부해 주세요.` : "발송 전 수신자와 첨부파일을 확인하지 못했습니다.");
+      setOperationError(missing ? `첨부파일 “${missing.filename}”을 사용할 수 없습니다. 제거한 뒤 다시 첨부해 주세요.` : "발송 전 받는 사람과 첨부파일을 확인하지 못했습니다.");
     } finally {
       setSending(false);
     }
@@ -584,7 +584,7 @@ function BulkEmailPageContent() {
       value={editorMode}
       onChange={setEditorMode}
       className="email-composer-mode-tabs"
-      itemClassName="!h-8 !min-h-8 !rounded-md !px-3 !text-xs"
+      itemClassName="!h-8 !min-h-8 !px-3 !text-xs"
       options={[
         { value: "editor" as const, label: "에디터" },
         { value: "preview" as const, label: "미리보기" },
@@ -598,21 +598,13 @@ function BulkEmailPageContent() {
   }
 
   return (
-    <AdminPageShell className="email-composer-page min-h-screen !bg-slate-50">
-      <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-4 py-6 sm:px-5 md:px-8 xl:px-10">
-        <AdminPageHeader title="이메일 일괄발송" actions={
-          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-            <Button type="button" variant="outline" size="sm" onClick={openHistory}>
-              <History aria-hidden="true" />
-              발송 이력
-            </Button>
-            <Button form="bulk-email-compose" type="submit" size="sm" disabled={sending}>
-              <Send aria-hidden="true" />
-              검토 및 발송
-            </Button>
-          </div>
-        } />
-        <div className="email-composer-shell w-full overflow-hidden rounded-none border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
+    <AdminPageShell className="email-composer-page min-h-screen">
+      <main className="admin-page__main mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-5 md:px-8 xl:px-10">
+        <AdminPageHeader title="이메일 발송" />
+        <SegmentedControl variant="underline" role="tablist" ariaLabel="이메일 화면" value={historyOpen ? "history" : "compose"}
+          onChange={value => { if (value === "history") openHistory(); else setHistoryOpen(false); }}
+          options={[{ value: "compose", label: "작성" }, { value: "history", label: "발송 이력" }]} />
+        <div className="email-composer-shell w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-none" style={{ display: historyOpen ? "none" : undefined }}>
 
 
         <div className="p-4 pb-0 sm:p-5 sm:pb-0 md:hidden">
@@ -625,69 +617,72 @@ function BulkEmailPageContent() {
 
 
         <form id="bulk-email-compose" noValidate className="w-full" onSubmit={(event) => void handleReview(event)}>
-          <div className="email-composer-canvas bg-white p-4 sm:p-6 md:p-8">
-            <section className="border-b border-slate-100 pb-4" aria-label="수신자">
-              <div className="flex min-h-9 items-start gap-3">
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                  <span className="shrink-0 py-1.5 text-sm font-medium text-slate-600">수신자:</span>
-                  <RecipientToken label={selectedRecipientLabel} onRemove={() => setRecipientType("ALL")} />
+          <div className="email-composer-canvas bg-white">
+            <section className="border-b border-slate-100 px-4 py-2 sm:px-5" aria-label="받는 사람">
+              <div className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-2">
+                <div className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-2 sm:basis-auto">
+                  <span className="w-[4.5rem] shrink-0 py-1.5 text-sm font-medium text-slate-600">받는 사람</span>
+                  {recipientType !== "ALL" || activeFilterChips.length === 0 ? <RecipientToken label={selectedRecipientLabel} onRemove={recipientType === "ALL" ? undefined : () => setRecipientType("ALL")} /> : null}
                   {activeFilterChips.map((entry) => (
                     <RecipientToken key={entry.key} label={entry.label} onRemove={() => setFilters((previous) => ({ ...previous, [entry.key]: undefined }))} />
                   ))}
-                </div>
-                <div ref={recipientPopoverRef} className="relative shrink-0">
-                  <Button ref={recipientTriggerRef} type="button" variant="ghost" size="sm" className="text-slate-600"
-                    aria-expanded={recipientMenuOpen} aria-haspopup="dialog" aria-controls={recipientMenuOpen ? "recipient-filter-popover" : undefined}
-                    onClick={() => { setRecipientFilterGroup(null); setRecipientMenuOpen((open) => !open); }}>
-                    <Plus aria-hidden="true" />필터 추가<ChevronDown aria-hidden="true" />
-                  </Button>
-                  {recipientMenuOpen ? (
-                    <PopoverPanel id="recipient-filter-popover" role="dialog" aria-label="수신자 필터" className="right-0 !mt-2 w-60 max-w-[calc(100vw-2rem)] !rounded-lg p-1.5 !shadow-[0_2px_8px_rgb(15_23_42_/_0.08)]">
-                      <div ref={recipientPanelRef}>
-                        {recipientFilterGroup ? (
-                          <>
-                            <Button type="button" variant="ghost" size="sm" className="mb-1 w-full justify-start text-slate-700" onClick={() => setRecipientFilterGroup(null)}>
-                              <ArrowLeft aria-hidden="true" className="size-4" />{recipientFilterGroup}
+                  <div ref={recipientPopoverRef} className="relative shrink-0">
+                    <Button ref={recipientTriggerRef} type="button" variant="ghost" size="sm" className="text-slate-600"
+                      aria-expanded={recipientMenuOpen} aria-haspopup="dialog" aria-controls={recipientMenuOpen ? "recipient-filter-popover" : undefined}
+                      onClick={() => {
+                        if (!recipientMenuOpen) {
+                          const rect = recipientTriggerRef.current?.getBoundingClientRect();
+                          if (rect) setRecipientMenuAnchor({ left: Math.max(16, Math.min(rect.left, window.innerWidth - 208)), top: rect.bottom + 8 });
+                          setRecipientFilterGroup(null);
+                        }
+                        setRecipientMenuOpen((open) => !open);
+                      }}>
+                      필터 추가<ChevronDown aria-hidden="true" />
+                    </Button>
+                    {recipientMenuOpen && recipientMenuAnchor ? (
+                      <PopoverPanel id="recipient-filter-popover" role="dialog" aria-label="받는 사람 필터" className="!fixed !mt-0 w-48 max-w-[calc(100vw-2rem)] !overflow-y-auto !rounded-lg p-1.5 !shadow-[0_2px_8px_rgb(15_23_42_/_0.08)]"
+                        style={{ left: recipientMenuAnchor.left, top: recipientMenuAnchor.top, maxHeight: `calc(100dvh - ${recipientMenuAnchor.top + 16}px)` }}>
+                        <div ref={recipientPanelRef}>
+                          {recipientFilterGroup ? (
+                            <>
+                              <Button type="button" variant="ghost" size="sm" className="mb-1 w-full justify-start text-slate-700" onClick={() => setRecipientFilterGroup(null)}>
+                                <ArrowLeft aria-hidden="true" className="size-4" />{recipientFilterGroup}
+                              </Button>
+                              <div className="border-t border-slate-100 pt-1">
+                                {RECIPIENT_FILTER_GROUPS.find((group) => group.label === recipientFilterGroup)?.options.map((option) => (
+                                  <label key={option.label} className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-sm font-normal text-slate-700 hover:bg-slate-50">
+                                    <input type="checkbox" className="ui-checkbox" checked={option.kind === "filter" ? Boolean(filters[option.key]?.split(",").includes(option.value)) : recipientType === option.value}
+                                      onChange={() => handleRecipientMenuSelect(option)} />
+                                    {option.label}
+                                  </label>
+                                ))}
+                              </div>
+                            </>
+                          ) : RECIPIENT_FILTER_GROUPS.map((group) => (
+                            <Button key={group.label} type="button" variant="ghost" size="sm" className="w-full justify-between text-sm font-normal text-slate-700" onClick={() => setRecipientFilterGroup(group.label)}>
+                              {group.label}<ChevronRight aria-hidden="true" className="size-4 text-slate-400" />
                             </Button>
-                            <div className="border-t border-slate-100 pt-1">
-                              {RECIPIENT_FILTER_GROUPS.find((group) => group.label === recipientFilterGroup)?.options.map((option) => (
-                                <label key={option.label} className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-sm font-normal text-slate-700 hover:bg-slate-50">
-                                  <input type="checkbox" className="ui-checkbox" checked={option.kind === "filter" ? Boolean(filters[option.key]?.split(",").includes(option.value)) : recipientType === option.value}
-                                    onChange={() => handleRecipientMenuSelect(option)} />
-                                  {option.label}
-                                </label>
-                              ))}
-                            </div>
-                          </>
-                        ) : RECIPIENT_FILTER_GROUPS.map((group) => (
-                          <Button key={group.label} type="button" variant="ghost" size="sm" className="w-full justify-between text-sm font-normal text-slate-700" onClick={() => setRecipientFilterGroup(group.label)}>
-                            {group.label}<ChevronRight aria-hidden="true" className="size-4 text-slate-400" />
-                          </Button>
-                        ))}
-                      </div>
-                    </PopoverPanel>
-                  ) : null}
+                          ))}
+                        </div>
+                      </PopoverPanel>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-              <div className="mt-1 text-right text-xs font-normal text-slate-500" aria-live="polite">
-                수신자: {recipientCountLoading ? "계산 중…" : recipientCount === null ? "—" : `총 ${recipientCount}명`}
+                <div className="ml-auto shrink-0 text-xs font-normal text-slate-500 sm:min-w-32 sm:text-right" aria-live="polite" aria-busy={recipientCountLoading}>
+                  {recipientCount === null ? null : `발송 대상 ${recipientCount}명`}
+                </div>
               </div>
             </section>
 
-          <section ref={bodySectionRef} className="pb-8 pt-6 md:pt-7">
-            <UiInput
-              aria-label="메일 제목"
-              ref={subjectInputRef}
-              spellCheck={false}
-              value={subject}
-              onChange={(event) => setSubject(event.target.value)}
-              maxLength={255}
-              placeholder="제목을 입력하세요"
-              required
-              className="w-full min-w-0 !h-auto !rounded-none border-0 bg-transparent px-0 py-4 text-2xl font-bold leading-tight text-slate-800 shadow-none focus:border-0 focus:outline-none focus:ring-0 placeholder:text-slate-300 md:text-[length:var(--ui-text-page-title-size)]"
-            />
+            <section className="flex items-center gap-2 border-b border-slate-100 px-4 py-1 sm:px-5">
+              <label htmlFor="bulk-email-subject" className="w-[4.5rem] shrink-0 text-sm font-medium text-slate-600">제목</label>
+              <UiInput id="bulk-email-subject" aria-label="메일 제목" ref={subjectInputRef} spellCheck={false} value={subject}
+                onChange={event => setSubject(event.currentTarget.value)} maxLength={255} placeholder="제목을 입력하세요"
+                className="w-full min-w-0 !rounded-none !border-0 bg-transparent px-0 text-sm !font-normal !shadow-none focus:!ring-0" />
+            </section>
+          <section ref={bodySectionRef} className="min-w-0">
             {editorMode === "editor" ? (
-              <div className="mt-2 min-w-0 overflow-hidden">
+              <div className="min-w-0 overflow-hidden">
                 <RichTextEditor
                   className="email-composer-editor max-w-none"
                   content={content}
@@ -704,16 +699,16 @@ function BulkEmailPageContent() {
                   uploading={uploading}
                   variableLabel="변수 삽입"
                   variableOptions={[
-                    { label: "수신자 이름", token: "{{이름}}" },
-                    { label: "수신자 이메일", token: "{{이메일}}" },
-                    { label: "수신자 학번", token: "{{학번}}" },
+                    { label: "받는 사람 이름", token: "{{이름}}" },
+                    { label: "받는 사람 이메일", token: "{{이메일}}" },
+                    { label: "받는 사람 학번", token: "{{학번}}" },
                   ]}
                   toolbarSuffix={editorModeTabs}
                 />
               </div>
             ) : editorMode === "preview" ? (
               <>
-                <div className="email-composer-mode-toolbar mt-2 flex items-center justify-end border-y border-slate-100">
+                <div className="email-composer-mode-toolbar flex items-center justify-end border-y border-slate-100">
                   {editorModeTabs}
                 </div>
                 <div className="tiptap-container min-h-[400px] px-4 py-6 prose prose-slate sm:px-6">
@@ -726,7 +721,7 @@ function BulkEmailPageContent() {
               </>
             ) : (
               <>
-                <div className="email-composer-mode-toolbar mt-2 flex items-center justify-end border-y border-slate-100">
+                <div className="email-composer-mode-toolbar flex items-center justify-end border-y border-slate-100">
                   {editorModeTabs}
                 </div>
                 <UiTextarea
@@ -751,7 +746,7 @@ function BulkEmailPageContent() {
               disabled={uploading || attachments.length >= 10}
             />
             {attachments.length ? (
-              <ul className="mt-4 flex flex-wrap gap-2" aria-label="첨부파일">
+              <ul className="flex flex-wrap gap-2 px-4 py-3 sm:px-5" aria-label="첨부파일">
                 {attachments.map((attachment) => (
                   <li key={attachment.assetId} className="inline-flex max-w-full items-center gap-2 rounded-md bg-slate-100 px-2.5 py-1.5 text-xs font-normal text-slate-600">
                     <span className="max-w-[18rem] truncate">{attachment.filename}</span>
@@ -781,29 +776,23 @@ function BulkEmailPageContent() {
             ) : null}
           </section>
           </div>
+          <div className="flex items-center border-t border-slate-100 px-4 py-3 sm:px-5">
+            <Button type="submit" disabled={sending}>보내기</Button>
+          </div>
         </form>
         </div>
-      </main>
-
-      <Modal
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        title="발송 이력"
-        mobileFullscreen
-        className="max-w-2xl"
-        bodyClassName="space-y-5 px-4 py-5 sm:px-5"
-      >
+        {historyOpen ? <section className="min-h-80 rounded-2xl border border-slate-200 bg-white p-5" aria-label="발송 이력">
         {historyLoading ? (
           <p className="py-8 text-center text-sm font-normal text-slate-500">불러오는 중…</p>
         ) : historyError ? (
           <p className="py-8 text-center text-sm font-normal text-rose-600">{historyError}</p>
         ) : history.length === 0 ? (
-          <p className="py-8 text-center text-sm font-normal text-slate-500">발송 이력이 없습니다.</p>
+          <AdminEmptyState message="발송 이력이 없습니다." />
         ) : (
-          <ol className="scrollbar-hidden max-h-[min(60vh,36rem)] overflow-y-auto pr-2">
+          <ol className="divide-y divide-slate-100">
             {history.map((record) => (
-              <li key={record.id} className="flex gap-3 border-b border-slate-100 py-4 first:pt-0 last:border-b-0">
-                <span className="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />
+              <li key={record.id} className="flex gap-3 border-b border-slate-100 py-3 last:border-b-0">
+                <span className="mt-1.5 size-2 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="truncate text-sm font-medium text-slate-800">{record.subject || "제목 없음"}</p>
@@ -819,15 +808,19 @@ function BulkEmailPageContent() {
             ))}
           </ol>
         )}
-      </Modal>
+
+        </section> : null}
+      </main>
+
+
 
       <Modal
         open={reviewOpen}
         onClose={dismissReview}
-        title="메일 발송 전 최종 검토"
+        title="메일 발송 확인"
         mobileFullscreen
-        className="max-w-2xl"
-        bodyClassName="space-y-5 px-4 py-5 sm:px-5"
+        size="standard"
+        bodyClassName="space-y-5"
         footer={
           <div className="email-review-footer flex w-full flex-wrap items-center gap-2">
             <Button type="button" variant="outline" onClick={dismissReview} disabled={sending}>취소</Button>
@@ -840,11 +833,11 @@ function BulkEmailPageContent() {
 
             <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
               <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2">
-                <dt className="leading-6 text-slate-500">수신자</dt>
-                <dd className="min-w-0 leading-6 text-slate-800">{[selectedRecipientLabel, ...activeFilterEntries.map((entry) => entry.tokenLabel)].join(", ")} <span className="whitespace-nowrap font-semibold">· 총 {reviewPreview.recipientCount}명</span></dd>
+                <dt className="leading-6 text-slate-500">받는 사람</dt>
+                <dd className="min-w-0 leading-6 text-slate-800">{[...(recipientType !== "ALL" || activeFilterChips.length === 0 ? [selectedRecipientLabel] : []), ...activeFilterEntries.map((entry) => entry.tokenLabel)].join(", ")} <span className="whitespace-nowrap font-semibold">· 총 {reviewPreview.recipientCount}명</span></dd>
                 <dt className="leading-6 text-slate-500">발송 방식</dt><dd className="leading-6">{deliveryMode === "now" ? "즉시 발송" : "예약 발송"}</dd>
               </dl>
-              <div className="mt-3 max-h-28 overflow-y-auto border-t border-slate-200 pt-3 text-xs leading-6 text-slate-600" aria-label="수신자 명단">
+              <div className="mt-3 max-h-28 overflow-y-auto border-t border-slate-200 pt-3 text-xs leading-6 text-slate-600" aria-label="받는 사람 명단">
                 {reviewPreview.sample.map((sample) => <div key={sample.email} className="break-all">{sample.nameKo} &lt;{sample.email}&gt;</div>)}
                 {reviewPreview.recipientCount > reviewPreview.sample.length ? <p>외 {reviewPreview.recipientCount - reviewPreview.sample.length}명</p> : null}
               </div>
@@ -852,7 +845,7 @@ function BulkEmailPageContent() {
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white" aria-label="미리보기">
               <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-b border-slate-100 p-4 text-sm">
                 <dt className="text-slate-500">제목</dt><dd className="break-words font-medium">{previewSubject}</dd>
-                <dt className="text-slate-500">수신자</dt><dd className="break-all">{previewVariables.이름} &lt;{previewVariables.이메일}&gt;</dd>
+                <dt className="text-slate-500">받는 사람</dt><dd className="break-all">{previewVariables.이름} &lt;{previewVariables.이메일}&gt;</dd>
               </dl>
               <div className="max-h-72 overflow-y-auto p-4"><RichTextContent content={previewContent} className="text-sm leading-6 text-slate-700" /></div>
             </section>
@@ -879,14 +872,13 @@ function BulkEmailPageContent() {
   );
 }
 
-function RecipientToken({ label, onRemove }: { label: string; onRemove: () => void }) {
+function RecipientToken({ label, onRemove }: { label: string; onRemove?: () => void }) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-200/80 bg-slate-100 px-2.5 py-1.5 text-xs font-medium text-slate-700">
-      <span aria-hidden="true" className="text-[length:var(--ui-text-caption-size)] leading-none">🏷️</span>
+    <span className="inline-flex h-7 max-w-full items-center gap-1 rounded-full border border-slate-200/70 bg-slate-100 px-2.5 text-xs font-medium text-slate-700">
       <span className="max-w-[16rem] truncate">{label}</span>
-      <Button type="button" variant="ghost" size="icon" aria-label={`${label} 제거`} onClick={onRemove} className="min-h-11 min-w-11 rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700 sm:size-5 sm:min-h-0 sm:min-w-0">
+      {onRemove ? <Button type="button" variant="ghost" size="icon" aria-label={`${label} 제거`} onClick={onRemove} className="size-6 min-h-0 min-w-0 rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700">
         <X aria-hidden="true" />
-      </Button>
+      </Button> : null}
     </span>
   );
 }

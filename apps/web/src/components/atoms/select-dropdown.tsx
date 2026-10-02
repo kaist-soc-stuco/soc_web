@@ -274,6 +274,7 @@ export function SelectDropdown({
         id={id}
         type="button"
         variant="outline"
+        data-filter-trigger="true"
         disabled={disabled}
         autoFocus={autoFocus}
         onClick={() => !disabled && setOpen(!isOpen)}
@@ -370,7 +371,7 @@ export function SelectDropdown({
                         }}
                         className={`interaction-menu-item h-[var(--ui-menu-row-height)] w-full min-w-0 justify-between overflow-hidden rounded-md px-2.5 py-0 text-left text-[length:var(--ui-text-body-size)] ${
                           option.value === value
-                            ? "bg-slate-100 text-slate-700"
+                            ? "bg-brand-primary-light text-slate-700"
                             : "text-slate-700"
                         } ${optionClassName || ""}`}
                       >

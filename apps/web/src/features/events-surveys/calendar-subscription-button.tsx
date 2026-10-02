@@ -91,7 +91,7 @@ export function CalendarSubscriptionButton({
                 target="_blank"
               >
                 <Download aria-hidden="true" className="size-3.5" />
-                {lang === "ko" ? "일정 파일 다운로드 (.ics)" : "Download calendar (.ics)"}
+                {lang === "ko" ? "ICS 내보내기" : "Download calendar (.ics)"}
               </a>
 
             </div>

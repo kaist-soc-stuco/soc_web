@@ -11,6 +11,8 @@ interface ImageUploadFieldProps {
   alt: string;
   className?: string;
   compact?: boolean;
+  aspectRatio?: number;
+  metadata?: string;
   maxSizeBytes?: number;
   crop?: { width: number; height: number };
   disabled?: boolean;
@@ -29,6 +31,8 @@ export function ImageUploadField({
   alt,
   className,
   compact = false,
+  aspectRatio = 16 / 9,
+  metadata,
   crop,
   maxSizeBytes = 20_000_000,
   disabled = false,
@@ -70,7 +74,6 @@ export function ImageUploadField({
     } finally { selectingRef.current = false; setSelecting(false); setPendingPreview(null); setPreviewFailed(false); }
   };
   const blocked = disabled || selecting;
-  const formatHint = accept.split(",").map(value => value.trim().replace("image/", "").replace("*", ko ? "이미지" : "Images").toUpperCase()).join(", ");
   const previewUrl = pendingPreview ?? imageUrl;
   const hasPreview = Boolean(previewUrl && !previewFailed);
 
@@ -112,19 +115,24 @@ export function ImageUploadField({
       />
 
       <div
-        className={cn("relative overflow-hidden rounded-lg border border-dashed transition-colors", dragging ? "border-slate-600 bg-slate-100" : "border-slate-300 bg-slate-50/60", blocked && "opacity-60")}
+        className={cn("relative overflow-hidden rounded-xl border border-dashed transition-colors", dragging ? "border-slate-600 bg-slate-100" : "border-slate-300 bg-slate-50/60", blocked && "opacity-60")}
         onDragOver={event => { event.preventDefault(); if (!blocked) { event.dataTransfer.dropEffect = "copy"; setDragging(true); } }}
         onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
         onDrop={event => { event.preventDefault(); setDragging(false); if (!blocked) acceptFile(event.dataTransfer.files[0]); }}
       >
         <button type="button" disabled={blocked} aria-label={selectLabel} onClick={() => inputRef.current?.click()}
-          className="relative flex aspect-video w-full flex-col items-center justify-center gap-2 overflow-hidden p-4 text-slate-500 transition-colors hover:bg-slate-100/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand-primary disabled:cursor-not-allowed">
+          style={{ aspectRatio, minHeight: metadata && !hasPreview ? "9rem" : undefined }}
+          className="relative flex w-full flex-col items-center justify-center gap-2 overflow-hidden p-4 text-slate-500 transition-colors hover:bg-slate-100/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand-primary disabled:cursor-not-allowed">
           {hasPreview ? <img src={previewUrl} alt={alt} draggable={false} onError={() => setPreviewFailed(true)} className="absolute inset-0 size-full object-contain" /> : <>
             <ImagePlus aria-hidden="true" className="size-6 text-slate-400" />
             <span className={compact ? "text-xs font-medium" : "text-sm font-medium"}>{emptyText || (ko ? "이미지를 놓거나 클릭해서 선택" : "Drop an image or click to choose")}</span>
-            <span className="text-xs font-normal text-slate-400">{formatHint} · {maxSizeBytes / 1_000_000}MB {ko ? "이하" : "max"}</span>
+            <span className="text-xs font-normal tabular-nums text-slate-400">
+              {ko ? "최대 " : "Max "}<strong className="font-semibold">{maxSizeBytes / 1_000_000}MB</strong>
+              {metadata || crop ? <> · {ko ? "권장 " : "Recommended "}<strong className="font-semibold">{metadata ? metadata.replace(/^(권장|Recommended)\s*/i, "") : `${crop?.width} × ${crop?.height} px`}</strong></> : null}
+            </span>
           </>}
         </button>
+        {metadata && hasPreview ? <span className="pointer-events-none absolute bottom-2 right-3 rounded bg-white/85 px-1.5 py-0.5 text-xs font-normal tabular-nums text-slate-500">{metadata}</span> : null}
         {hasPreview && <Button type="button" variant="ghost" size="icon" disabled={blocked} onClick={() => { setFileError(null); onRemove(); }} aria-label={removeLabel} className="absolute right-2 top-2 size-8 rounded-md bg-white/80 text-slate-600 hover:bg-white hover:text-slate-900"><X aria-hidden="true" className="size-4" /></Button>}
       </div>
       {hasPreview && fileName ? <p className="truncate text-xs text-slate-500" title={fileName}>{fileName}</p> : null}

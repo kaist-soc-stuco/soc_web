@@ -37,7 +37,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { createPortal } from "react-dom";
-import { GripVertical, Mail, Phone, Plus, Sheet, Upload, X } from "lucide-react";
+import { GripVertical, Mail, Phone, ExternalLink, Upload, X } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -56,7 +56,7 @@ import { Permissions } from "@/lib/permissions";
 import { ExecutiveMemberModal, type ExecutiveMemberFormValues } from "./ExecutiveMemberModal";
 
 const CONTACT_LIST_PAGE_SIZE = 500;
-const CONTACT_ROW_GRID = "grid min-w-[1120px] grid-cols-[52px_180px_120px_120px_150px_140px_minmax(0,1fr)]";
+const CONTACT_ROW_GRID = "grid min-w-[880px] grid-cols-[36px_140px_110px_100px_120px_120px_minmax(0,1fr)]";
 
 export function ExecutiveDirectoryPage() {
   return <AuthGuard requirePermission={Permissions.MANAGE_CONTACTS}><ContactsPageContent /></AuthGuard>;
@@ -71,7 +71,7 @@ function sortContacts(items: ContactRecord[]) {
 function normalizeYear(value: number | null | undefined): number { return value ? (value < 100 ? 2000 + value : value) : 0; }
 
 function formatActivityYear(value: number | null): string {
-  if (!value) return "—";
+  if (!value) return "";
   return `${value < 100 ? 2000 + value : value}년`;
 }
 
@@ -387,24 +387,23 @@ function ContactsPageContent() {
         if (spreadsheetUrl) window.open(spreadsheetUrl, "_blank", "noopener,noreferrer");
       }}
     >
-      <Sheet className="size-4" aria-hidden="true" />
-      Google Sheets에서 보기 ↗
+      Google Sheets에서 보기<ExternalLink className="size-4" aria-hidden="true" />
     </Button>
   );
 
   const headerActions = <>
     {pageSpreadsheetLink}
     <Button type="button" variant="outline" onClick={openNewDepartmentModal}>부서 관리</Button>
-    <Button type="button" variant="outline" onClick={() => setImportGuideOpen(true)}><Upload aria-hidden="true" />불러오기</Button>
-    <Button type="button" onClick={openNewMemberModal}><Plus aria-hidden="true" />부원 추가</Button>
+    <Button type="button" variant="outline" onClick={() => setImportGuideOpen(true)}><Upload aria-hidden="true" />엑셀 가져오기</Button>
+    <Button type="button" onClick={openNewMemberModal}>부원 추가</Button>
   </>;
 
   return (
     <AdminPageShell>
-      <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
+      <main className="admin-page__main mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
         {ConfirmDialog}
         <AdminPageHeader title="집행위 연락망" actions={headerActions} />
-        <Modal open={importGuideOpen} onClose={() => setImportGuideOpen(false)} title="부원 명단 일괄 불러오기" className="max-w-lg" footer={<><Button variant="outline" onClick={() => setImportGuideOpen(false)}>취소</Button><Button onClick={() => {setImportGuideOpen(false);bulkFileInputRef.current?.click();}}>파일 선택</Button></>}>
+        <Modal open={importGuideOpen} onClose={() => setImportGuideOpen(false)} title="부원 명단 가져오기" size="standard" footer={<><Button variant="outline" onClick={() => setImportGuideOpen(false)}>취소</Button><Button onClick={() => {setImportGuideOpen(false);bulkFileInputRef.current?.click();}}>파일 선택</Button></>}>
           <div className="space-y-5 text-sm leading-6">
             <p>전용 양식에 명단을 작성한 뒤 XLSX 파일을 업로드해 주세요.</p>
             <section className="space-y-2"><h3 className="font-semibold">1. 양식 준비</h3><Button variant="outline" onClick={downloadContactTemplate}>양식 다운로드</Button><p className="text-slate-500">열 이름과 순서를 유지해 주세요.</p></section>
@@ -431,8 +430,8 @@ function ContactsPageContent() {
             <Modal
               open={bulkFileName !== null}
               onClose={() => clearBulkImport()}
-              title="연락망 불러오기"
-              className="max-w-3xl"
+              title="가져올 부원 확인"
+              size="wide"
               footer={<>
                 <Button type="button" variant="ghost" onClick={downloadContactTemplate} disabled={bulkImporting}>양식 내보내기</Button>
                 <Button type="button" variant="outline" onClick={() => clearBulkImport()} disabled={bulkImporting}>취소</Button>
@@ -443,18 +442,18 @@ function ContactsPageContent() {
                 <div><p className="text-sm font-semibold text-slate-800">{bulkFileName}</p><p className="mt-1 text-xs text-slate-500">정상 행 {bulkRows.length}개 · 오류 {bulkErrors.length}개</p></div>
                 <label className="inline-flex items-center gap-2 text-sm text-slate-700"><UiInput type="checkbox" checked={bulkReplaceExisting} onChange={(event) => setBulkReplaceExisting(event.currentTarget.checked)} className="size-4 accent-brand-primary" />기존 연락망 전체 교체</label>
                 {bulkErrors.length > 0 ? <ul className="space-y-1 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">{bulkErrors.slice(0, 8).map((message) => <li key={message}>{message}</li>)}{bulkErrors.length > 8 ? <li>외 {bulkErrors.length - 8}건</li> : null}</ul> : null}
-                {bulkRows.length > 0 && bulkErrors.length === 0 ? <div className="overflow-hidden rounded-lg border border-slate-100"><AdminDataTable minWidth={640}><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>직책</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>순서</AdminTableHead></tr></AdminTableHeader><AdminTableBody>{bulkRows.slice(0, 5).map((row, index) => <tr key={`${row.email}-${index}`}><AdminTableCell><span className="admin-table-text-emphasis">{row.nameKo}</span></AdminTableCell><AdminTableCell>{row.roleKo}</AdminTableCell><AdminTableCell>{row.email || "—"}</AdminTableCell><AdminTableCell>{row.sortOrder ?? "자동"}</AdminTableCell></tr>)}</AdminTableBody></AdminDataTable></div> : null}
+                {bulkRows.length > 0 && bulkErrors.length === 0 ? <div className="overflow-hidden rounded-lg border border-slate-100"><AdminDataTable minWidth={640}><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>직책</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>순서</AdminTableHead></tr></AdminTableHeader><AdminTableBody>{bulkRows.slice(0, 5).map((row, index) => <tr key={`${row.email}-${index}`}><AdminTableCell><span className="admin-table-text-emphasis">{row.nameKo}</span></AdminTableCell><AdminTableCell>{row.roleKo}</AdminTableCell><AdminTableCell>{row.email || ""}</AdminTableCell><AdminTableCell>{row.sortOrder ?? "자동"}</AdminTableCell></tr>)}</AdminTableBody></AdminDataTable></div> : null}
               </div>
             </Modal>
 
             <AdminTableCard className="overflow-visible">
-              <div className="border-b border-slate-100 p-4"><div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="admin-table-toolbar px-4 py-2"><div className="flex flex-wrap items-center justify-end gap-2">
                 <AdminSelectDropdown value={activityYearFilter} onChange={setActivityYearFilter} ariaLabel="연도 필터" className="w-32 shrink-0" options={[{ value: "", label: "전체 연도" }, ...activityYearOptions.map((year) => ({ value: String(year), label: formatActivityYear(year) }))]} />
-                <AdminSelectDropdown value={departmentFilter} onChange={setDepartmentFilter} ariaLabel="부서 필터" className="w-36 shrink-0" options={[{ value: "", label: "부서 전체" }, ...departments.filter((department) => department.isActive).map((department) => ({ value: department.nameKo, label: department.nameKo })), ...legacyDepartmentOptions.map((department) => ({ value: department, label: department }))]} />
+                <AdminSelectDropdown value={departmentFilter} onChange={setDepartmentFilter} ariaLabel="부서 필터" className="w-36 shrink-0" options={[{ value: "", label: "전체 부서" }, ...departments.filter((department) => department.isActive).map((department) => ({ value: department.nameKo, label: department.nameKo })), ...legacyDepartmentOptions.map((department) => ({ value: department, label: department }))]} />
                 <PageSearchField ariaLabel="연락망 통합 검색" className="w-full max-w-[20rem] flex-none" onChange={setQuery} onClear={() => setQuery("")} placeholder="이름·학번·직책·메일·전화번호 검색" value={query} />
               </div></div>
               <div className="min-w-0">
-                {loading && contacts.length === 0 ? <AdminLoadingState /> : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext modifiers={[restrictListDrag]} autoScroll={false} sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={handleDragCancel} onDragEnd={(event) => void handleDragEnd(event)}><AdminTableViewport className={activeContactId ? "admin-contacts-table-viewport admin-table-viewport--dragging" : "admin-contacts-table-viewport"}><div className="admin-contacts-table min-w-[1120px]"><div role="row" className={`admin-contacts-table__header ${CONTACT_ROW_GRID} bg-slate-50/70 text-left text-sm font-medium text-[var(--j-color-text-secondary)]`}><div role="columnheader" className="flex h-12 items-center justify-center"><span className="sr-only">순서</span></div><div role="columnheader" className="flex h-12 items-center pl-1 pr-5">이름</div><div role="columnheader" className="flex h-12 items-center px-5">학번</div><div role="columnheader" className="flex h-12 items-center px-5">연도</div><div role="columnheader" className="flex h-12 items-center px-5">부서</div><div role="columnheader" className="flex h-12 items-center px-5">직책</div><div role="columnheader" className="flex h-12 items-center px-5">연락처 정보</div></div><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}><div role="rowgroup">{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} activityYear={activityYearFilter} disabled={orderSaving} onEdit={openEditMemberModal} />)}</div></SortableContext></div></AdminTableViewport>{typeof document !== "undefined" ? createPortal(<DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>{activeContact ? <ContactDragPreview contact={activeContact} width={activeDragWidth} /> : null}</DragOverlay>, document.body) : null}</DndContext>}
+                {loading && contacts.length === 0 ? <AdminLoadingState /> : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext modifiers={[restrictListDrag]} autoScroll sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={handleDragCancel} onDragEnd={(event) => void handleDragEnd(event)}><AdminTableViewport className={activeContactId ? "admin-contacts-table-viewport admin-table-viewport--dragging" : "admin-contacts-table-viewport"}><div className="admin-contacts-table min-w-[880px]"><div role="row" className={`admin-contacts-table__header ${CONTACT_ROW_GRID} bg-white text-left text-xs font-medium text-[var(--j-color-text-secondary)]`}><div role="columnheader" className="flex h-12 items-center justify-center"><span className="sr-only">순서</span></div><div role="columnheader" className="flex h-12 items-center pl-1 pr-5">이름</div><div role="columnheader" className="flex h-12 items-center px-5">학번</div><div role="columnheader" className="flex h-12 items-center px-5">연도</div><div role="columnheader" className="flex h-12 items-center px-5">부서</div><div role="columnheader" className="flex h-12 items-center px-5">직책</div><div role="columnheader" className="flex h-12 items-center px-5">연락처 정보</div></div><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}><div role="rowgroup">{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} activityYear={activityYearFilter} disabled={orderSaving} onEdit={openEditMemberModal} />)}</div></SortableContext></div></AdminTableViewport>{typeof document !== "undefined" ? createPortal(<DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>{activeContact ? <ContactDragPreview contact={activeContact} width={activeDragWidth} /> : null}</DragOverlay>, document.body) : null}</DndContext>}
               </div>
               {orderSaving ? <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">표시 순서를 저장하는 중입니다...</p> : null}
             </AdminTableCard>
@@ -464,7 +463,7 @@ function ContactsPageContent() {
           open={departmentModalOpen}
           onClose={closeDepartmentModal}
           title="부서 관리"
-          className="max-w-md"
+          size="compact"
           footer={<><Button type="button" variant="outline" onClick={closeDepartmentModal} disabled={departmentSaving}>취소</Button><Button loading={departmentSaving} type="button" onClick={() => void handleDepartmentSave()} disabled={departmentSaving || !departmentForm.nameKo.trim()}>{"저장"}</Button></>}
         >
           <div className="space-y-4">
@@ -509,11 +508,11 @@ function ContactCells({ contact, activityYear = "" }: { contact: ContactRecord; 
   const years = [...new Set(activities.map((activity) => normalizeYear(activity.year)).filter(Boolean))];
   return <>
     <div role="cell" className="min-w-0 py-3 pl-1 pr-5"><div className="admin-table-text-emphasis truncate">{contact.nameKo}</div></div>
-    <div role="cell" className="min-w-0 truncate px-5 py-3 text-sm tabular-nums text-slate-700">{contact.studentNumber || "—"}</div>
-    <div role="cell" data-mobile-label="연도" className="px-5 py-3 text-sm tabular-nums text-slate-700">{years.map(formatActivityYear).join(", ") || "—"}</div>
-    <div role="cell" data-mobile-label="부서" className="min-w-0 px-5 py-3 text-sm text-slate-700">{[...new Set(activities.map((activity) => activity.departmentKo).filter(Boolean))].join(", ") || "—"}</div>
-    <div role="cell" data-mobile-label="직책" className="min-w-0 px-5 py-3 text-sm text-slate-700">{[...new Set(activities.map((activity) => activity.roleKo).filter(Boolean))].join(", ") || "—"}</div>
-    <div role="cell" className="min-w-0 space-y-1 px-5 py-3"><div className="admin-table-text flex min-w-0 items-center gap-1.5"><Mail className="size-3.5 shrink-0 text-slate-400" /><span className="truncate">{contact.email || "—"}</span></div><div className="admin-table-text flex min-w-0 items-center gap-1.5"><Phone className="size-3.5 shrink-0 text-slate-400" /><span className="truncate">{contact.phoneNumber || "—"}</span></div></div>
+    <div role="cell" className="min-w-0 truncate px-5 py-3 text-sm tabular-nums text-slate-700">{contact.studentNumber || ""}</div>
+    <div role="cell" data-mobile-label="연도" className="px-5 py-3 text-sm tabular-nums text-slate-700">{years.map(formatActivityYear).join(", ") || ""}</div>
+    <div role="cell" data-mobile-label="부서" className="min-w-0 px-5 py-3 text-sm text-slate-700">{[...new Set(activities.map((activity) => activity.departmentKo).filter(Boolean))].join(", ") || ""}</div>
+    <div role="cell" data-mobile-label="직책" className="min-w-0 px-5 py-3 text-sm text-slate-700">{[...new Set(activities.map((activity) => activity.roleKo).filter(Boolean))].join(", ") || ""}</div>
+    <div role="cell" className="min-w-0 space-y-1 px-5 py-3"><div className="admin-table-text flex min-w-0 items-center gap-1.5"><Mail className="size-3.5 shrink-0 text-slate-400" /><span className="truncate">{contact.email || ""}</span></div><div className="admin-table-text flex min-w-0 items-center gap-1.5"><Phone className="size-3.5 shrink-0 text-slate-400" /><span className="truncate">{contact.phoneNumber || ""}</span></div></div>
   </>;
 }
 
@@ -521,14 +520,14 @@ function SortableContactRow({ contact, activityYear, disabled, onEdit }: { conta
   const { attributes, isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ id: contact.id, disabled });
   const style: CSSProperties = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 200ms ease" };
   return <div ref={setNodeRef} style={style} role="row" className={`admin-contacts-table__row ${CONTACT_ROW_GRID} items-center ${isDragging ? "relative z-10 opacity-0" : "cursor-pointer transition-colors hover:bg-slate-50/60"}`} onClick={() => onEdit(contact)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onEdit(contact); } }} tabIndex={0}>
-    <div role="cell" className="flex min-h-16 items-center pl-5 pr-1"><button ref={setActivatorNodeRef} type="button" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="admin-list-drag-handle" aria-label={`${contact.nameKo} 표시 순서 변경`}><GripVertical aria-hidden="true" className="size-4" /></button></div>
+    <div role="cell" className="flex min-h-16 items-center pl-2 pr-1"><button ref={setActivatorNodeRef} type="button" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="admin-list-drag-handle" aria-label={`${contact.nameKo} 표시 순서 변경`}><GripVertical aria-hidden="true" className="size-4" /></button></div>
     <ContactCells contact={contact} activityYear={activityYear} />
   </div>;
 }
 
 function ContactDragPreview({ contact, width }: { contact: ContactRecord; width: number | null }) {
   return <div style={{ width: width ?? undefined }} className={`admin-contacts-table__row ${CONTACT_ROW_GRID} items-center relative z-50 select-none min-h-16 cursor-grabbing rounded-lg border border-slate-200 bg-white shadow-lg`}>
-    <div className="pl-5 pr-1"><span className="admin-list-drag-handle"><GripVertical aria-hidden="true" className="size-4" /></span></div>
+    <div className="pl-2 pr-1"><span className="admin-list-drag-handle"><GripVertical aria-hidden="true" className="size-4" /></span></div>
     <ContactCells contact={contact} />
   </div>;
 }

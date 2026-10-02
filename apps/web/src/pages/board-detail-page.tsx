@@ -97,7 +97,8 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
       <Modal
         open={hideDialogOpen}
         onClose={() => { if (!hideSubmitting) setHideDialogOpen(false); }}
-        title={lang === "ko" ? "숨기기" : "Hide"}
+        title={lang === "ko" ? "게시글 숨기기" : "Hide post"}
+        size="compact"
         footer={(
           <>
             <Button type="button" variant="outline" disabled={hideSubmitting} onClick={() => setHideDialogOpen(false)}>

@@ -324,7 +324,7 @@ function ImagePreview({
 
   return (
     <div className={`group relative w-fit max-w-full ${className}`}>
-      <div className="max-w-full overflow-hidden rounded-md border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
+      <div className="max-w-full overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50/60">
         <img
           src={resolveAssetUrl(value)}
           alt={`${label} 미리보기`}
@@ -337,7 +337,7 @@ function ImagePreview({
           aria-label={`${label} 삭제`}
           data-tooltip="파일 삭제"
           onClick={onRemove}
-          className="absolute -right-2 -top-2 inline-flex size-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 opacity-0 shadow-[0_2px_6px_rgba(15,23,42,0.18)] transition-opacity hover:bg-slate-50 hover:text-slate-800 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30 group-hover:opacity-100"
+          className="absolute right-2 top-2 inline-flex size-8 items-center justify-center rounded-md bg-white/80 text-slate-600 transition-colors hover:bg-white hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
         >
           <X aria-hidden="true" className="size-4" />
         </button>
@@ -852,9 +852,8 @@ export function QuestionInlineEditor({
   };
 
   const toggleAnswerValidation = (enabled: boolean) => {
-    set("answerValidationEnabled", enabled);
     if (enabled) {
-      updateConfig({
+      setForm(previous => ({ ...previous, answerValidationEnabled: true, config: { ...(previous.config ?? {}),
         validationType:
           form.config?.validationType ??
           (form.questionType === "multiple_choice" ? "checkbox_count" : "length"),
@@ -864,12 +863,11 @@ export function QuestionInlineEditor({
           (form.questionType === "multiple_choice" ? "min" : "min_length"),
         validationValue: form.config?.validationValue ?? 1,
         validationValueMax: form.config?.validationValueMax ?? 2,
-      });
+      } }));
       return;
     }
 
     if (!enabled) {
-      set("answerRegex", "");
       const nextConfig = { ...(form.config ?? {}) };
       delete nextConfig.validationErrorMessage;
       delete nextConfig.validationType;
@@ -877,7 +875,7 @@ export function QuestionInlineEditor({
       delete nextConfig.validationOperator;
       delete nextConfig.validationValue;
       delete nextConfig.validationValueMax;
-      set("config", Object.keys(nextConfig).length > 0 ? nextConfig : null);
+      setForm(previous => ({ ...previous, answerValidationEnabled: false, answerRegex: "", config: Object.keys(nextConfig).length > 0 ? nextConfig : null }));
     }
   };
 

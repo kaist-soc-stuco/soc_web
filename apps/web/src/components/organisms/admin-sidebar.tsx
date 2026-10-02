@@ -36,7 +36,7 @@ const ADMIN_MENU: AdminMenuItem[] = [
   { label: "과비 관리", labelEn: "Student fees", to: "/admin/finance", bits: [Permissions.MANAGE_FINANCE], icon: WalletCards },
   { label: "설문조사 관리", labelEn: "Surveys", to: "/admin/surveys", bits: [Permissions.MANAGE_SURVEY], icon: ClipboardList },
   { label: "투표 관리", labelEn: "Votes", to: "/admin/votes", bits: [Permissions.MANAGE_VOTE], icon: Vote },
-  { label: "이메일 일괄 발송", labelEn: "Bulk email", to: "/admin/emails", bits: [Permissions.SEND_BULK_EMAIL], icon: Mail },
+  { label: "이메일 발송", labelEn: "Email", to: "/admin/emails", bits: [Permissions.SEND_BULK_EMAIL], icon: Mail },
   { label: "연락망", labelEn: "Contacts", to: "/admin/contacts", bits: [Permissions.MANAGE_CONTACTS], icon: ContactRound },
   { label: "운영 로그", labelEn: "Audit logs", to: "/admin/audit-logs", bits: [Permissions.VIEW_AUDIT_LOG], icon: ScrollText },
   { label: "게시판 관리", labelEn: "Boards", to: "/admin/boards", bits: [Permissions.MANAGE_BOARDS], icon: LayoutList },
@@ -80,6 +80,6 @@ export function AdminSidebar() {
   ];
   return <nav className="space-y-5 px-3 py-5" aria-label="관리자 메뉴">{groups.map(group => {
     const items = visibleItems.filter(item => group.paths.includes(item.to.split("/").pop()!));
-    return items.length ? <section key={group.title}><h2 className="mb-2 px-3 text-xs font-semibold text-slate-400">{group.title}</h2>{items.map(item => { const Icon = item.icon; return <Link key={item.to} to={item.to} className={`flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm ${location.pathname.startsWith(item.to) ? "bg-emerald-50 font-semibold text-brand-primary" : "text-slate-600 hover:bg-slate-50"}`}><Icon className="size-4" />{lang === "ko" ? item.label : item.labelEn}</Link>; })}</section> : null;
+    return items.length ? <section key={group.title}><h2 className="mb-2 px-3 text-xs font-semibold text-slate-400">{group.title}</h2>{items.map(item => { const Icon = item.icon; return <Link key={item.to} to={item.to} className={`flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm ${location.pathname.startsWith(item.to) ? "bg-slate-100 font-semibold text-slate-600" : "text-slate-600 hover:bg-slate-50"}`}><Icon className="size-4" strokeWidth={1.5} />{lang === "ko" ? item.label : item.labelEn}</Link>; })}</section> : null;
   })}</nav>;
 }

@@ -1,5 +1,4 @@
 import { ArrowUpRight } from "lucide-react";
-import { useState } from "react";
 
 import {
   resolveContentBlockText,
@@ -10,7 +9,6 @@ import { useLanguage } from "@/hooks/use-language";
 import { resolveAssetUrl } from "@/lib/asset-url";
 
 export function Hero() {
-  const [imageLoaded, setImageLoaded] = useState(false);
   const { lang } = useLanguage();
   const hero = usePublicContentBlocksByType("HERO")[0];
   const quickLinks = usePublicContentBlocksByType("QUICK_LINK");
@@ -33,10 +31,7 @@ export function Hero() {
         alt=""
         aria-hidden="true"
         loading="eager"
-        onLoad={() => setImageLoaded(true)}
-        className={`home-hero-background absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-700 ${
-          imageLoaded ? "opacity-100" : ""
-        }`}
+        className="home-hero-background absolute inset-0 h-full w-full object-cover"
       />
       <div className="home-hero-overlay absolute inset-0" />
 

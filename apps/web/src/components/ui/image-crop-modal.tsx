@@ -195,7 +195,7 @@ export function ImageCropModal({
       onClose={() => { if (!processingRef.current) onCancel(); }}
       showClose={!processing}
       title={ko ? "이미지 자르기" : "Crop image"}
-      className="max-w-3xl"
+      size="wide"
       bodyClassName="space-y-4"
       footer={(
         <>

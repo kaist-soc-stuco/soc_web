@@ -34,10 +34,11 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
             : tone === "navigation"
               ? "bg-transparent shadow-none hover:bg-slate-100 hover:text-slate-900"
               : tone === "table-action"
-                ? "border-0 bg-transparent text-slate-400 shadow-none hover:border-0 hover:bg-slate-50 hover:text-slate-600"
+                ? "admin-row-action border-0 bg-transparent text-slate-400 shadow-none hover:border-0 hover:bg-slate-50 hover:text-slate-600"
               : "border border-transparent bg-transparent hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900",
           className,
         )}
+        data-tone={tone}
         data-tooltip={tooltip}
         {...props}
       />

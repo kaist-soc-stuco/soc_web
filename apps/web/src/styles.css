@@ -12,7 +12,7 @@
   --card-foreground: #17211c;
   --popover: #ffffff;
   --popover-foreground: #17211c;
-  --primary: #006e3f;
+  --primary: #007f49;
   --primary-foreground: #ffffff;
   --secondary: #eef3ef;
   --secondary-foreground: #35433b;
@@ -52,8 +52,8 @@
   --app-text-body: var(--ui-text-body);
   --app-text-muted: var(--ui-text-muted);
   --app-card-border: var(--ui-border-subtle);
-  --app-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04);
-  --app-shadow-card-hover: 0 2px 4px rgba(16, 24, 40, 0.06);
+  --app-shadow-card: none;
+  --app-shadow-card-hover: none;
   --app-shadow-elevated: 0 8px 24px rgba(16, 24, 40, 0.1);
 }
 
@@ -302,9 +302,9 @@
     gap: 3px;
     overflow-x: auto;
     border: 1px solid #e7ebf0;
-    border-radius: 11px;
-    background: #f7f9fc;
-    box-shadow: inset 0 1px 1px rgb(15 23 42 / 2%);
+    border-radius: 8px;
+    background: #f6f7f9;
+    box-shadow: none;
     scrollbar-width: none;
   }
 
@@ -319,7 +319,7 @@
     align-items: center;
     justify-content: center;
     border: 0;
-    border-radius: 7px;
+    border-radius: 5px;
     color: #526174 !important;
     background: transparent !important;
     font-size: 0.875rem;
@@ -334,17 +334,16 @@
       transform 120ms ease;
   }
 
-  .filter-chips :is(button, a):hover {
+  .filter-chips:not(.ui-segmented-control) :is(button, a):hover {
     color: #25364a !important;
     background: #eef3f7 !important;
   }
 
-  .filter-chips :is(button, a).is-active {
-    color: #075f4a !important;
+  .filter-chips:not(.ui-segmented-control) :is(button, a).is-active {
+    color: #172033 !important;
     background: #ffffff !important;
-    box-shadow:
-      0 1px 2px rgb(15 23 42 / 8%),
-      0 0 0 1px rgb(15 23 42 / 4%);
+    font-weight: 500 !important;
+    box-shadow: 0 0 0 1px #e2e8f0;
     transform: none;
   }
 
@@ -462,7 +461,7 @@
     font-weight: 400;
   }
 
-  .filter-chips.clean-segmented-control :is(button, a).is-active {
+  .filter-chips.clean-segmented-control:not(.ui-segmented-control) :is(button, a).is-active {
     color: var(--ui-brand) !important;
     background: #fff !important;
     box-shadow: 0 1px 2px rgb(15 23 42 / 7%);
@@ -772,7 +771,7 @@
   }
 
   .toast-exit {
-    animation: toast-exit 160ms ease-in both;
+    animation: toast-exit 300ms cubic-bezier(.4,0,.2,1) both;
     pointer-events: none;
   }
 
@@ -1388,10 +1387,6 @@
     background: #ecfdf5;
   }
 
-  .home-notice-entry:hover h3,
-  .home-schedule-entry:hover h3 {
-    color: var(--kaist-darkgreen-main);
-  }
 
   .home-editorial-placeholder {
     border-top: 1px solid #dedfdf;
@@ -1556,7 +1551,7 @@
   .home-event-card:hover {
     border-color: var(--app-primary-border);
     box-shadow: var(--app-shadow-card-hover);
-    transform: translate3d(0, -0.125rem, 0);
+    transform: none;
   }
 
   .home-event-art {
@@ -2918,6 +2913,7 @@
     overflow-wrap: anywhere;
   }
 
+
   .about-pledge-status {
     display: inline-flex;
     min-height: 1.5rem;
@@ -3232,7 +3228,7 @@
 /* Admin surfaces share one quiet canvas and one table rhythm. Individual
    screens can still choose their own columns, but not a new visual language. */
 .admin-page {
-  background: #f7f9fc;
+  background: #f6f7f9;
 }
 
 .admin-page__main {
@@ -3245,15 +3241,15 @@
 }
 
 .admin-page thead {
-  background: #fbfcfd;
+  background: transparent;
   color: #344054;
 }
 
 .admin-page thead th {
   height: var(--ui-table-head-height);
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
-  font-size: 0.875rem;
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.25rem;
   vertical-align: middle;
@@ -3534,11 +3530,9 @@
   }
 }
 
-/* A transformed sortable row must not turn its table viewport into a second
-   scroll surface while it is being dragged. The drag overlay remains visible
-   outside the clipped table surface. */
+/* Sorting keeps the same scroll surface so items remain reachable. */
 .admin-table-viewport--dragging {
-  overflow: clip !important;
+  overflow: auto !important;
 }
 
 /* Contact rows are short cards, not a fixed-height list. Keep the horizontal
@@ -3546,6 +3540,10 @@
    vertical scroll track when only one or two people are present. */
 .admin-contacts-table-viewport {
   overflow-y: clip !important;
+}
+
+.admin-contacts-table-viewport.admin-table-viewport--dragging {
+  overflow-y: auto !important;
 }
 
 .roadmap-course-card {
@@ -3631,7 +3629,7 @@
 }
 
 .email-composer-canvas {
-  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+  box-shadow: none;
 }
 
 .email-composer-editor {
@@ -3695,11 +3693,11 @@
 .email-composer-mode-tabs {
   box-sizing: border-box;
   flex: 0 0 auto;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid #e7ebf0;
-  border-radius: 10px;
-  background: #f7f9fc;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background: #f8fafc;
   box-shadow: none;
   overflow: visible;
 }
@@ -3707,7 +3705,7 @@
 .email-composer-mode-tabs :is(button, a) {
   min-width: 4rem;
   min-height: var(--ui-control-height-dense);
-  border-radius: 7px;
+  border-radius: 5px;
   font-size: 0.75rem;
   line-height: 1rem;
 }
@@ -4269,8 +4267,8 @@
 
 /* A toolbar wrapper contributes no second inset; table cells and controls share 20px. */
 .admin-table-card { --admin-table-inset: 1.25rem; }
-.admin-table-card > .border-b { padding-inline: var(--admin-table-inset); }
-.admin-table-card > .border-b:has(> .admin-toolbar) { padding-inline: 0; }
+.admin-table-card > :is(.border-b, .admin-table-toolbar) { padding-inline: var(--admin-table-inset); border-bottom:0; }
+.admin-table-card > :is(.border-b, .admin-table-toolbar):has(> .admin-toolbar) { padding-inline: 0; }
 .admin-table-card .admin-toolbar { padding-inline: var(--admin-table-inset); }
 .admin-table-card .admin-data-table tr > :first-child { padding-left: var(--admin-table-inset); }
 .admin-table-card .admin-data-table tr > :last-child { padding-right: var(--admin-table-inset); }
@@ -4284,7 +4282,7 @@ html { scrollbar-gutter: stable; }
 .admin-list-drag-handle { display: inline-flex; width: 28px; height: 28px; flex-shrink: 0; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #94a3b8; cursor: grab; touch-action: none; }
 .admin-list-drag-handle:hover { color: #64748b; background: #f1f5f9; }
 .admin-list-drag-handle:active { cursor: grabbing; }
-.admin-sortable-table tr > :first-child { width: 52px; padding-left: 20px; padding-right: 4px; }
+.admin-sortable-table tr > :first-child { width: 2.25rem; padding-inline: 0.25rem; }
 .admin-sortable-table tr > :nth-child(2) { padding-left: 4px; }
 
 .email-composer-editor > .rich-text-toolbar { box-sizing: border-box; width: 100%; height: 3.5rem; min-height: 3.5rem; padding: .375rem 1rem; overflow: hidden; flex-wrap: nowrap; }
@@ -4836,7 +4834,7 @@ button[data-tooltip]:focus-visible::after {
 .admin-vote-editor { max-width:76rem !important; }
 .admin-page, .admin-page__main, .admin-table-card { min-width:0; }
 .admin-table-card { max-width:100%; }
-.admin-table-card:has(.ui-pagination) .admin-table-viewport { max-height:none !important; height:auto !important; overflow-y:hidden; }
+.admin-table-card:has(.ui-pagination) .admin-table-viewport { max-height:calc(100dvh - 16rem); overflow-y:auto; }
 .admin-table-viewport { max-width:100%; }
 .admin-table-viewport table { width:100%; }
 
@@ -4977,7 +4975,7 @@ input[type="search"]:focus-visible,
 .site-header-inline-search[data-open="true"]:focus-within { box-shadow: var(--app-focus-ring); }
 .interaction-control input[type="search"], .site-header-inline-search input[type="search"] { box-shadow: none; }
 .ui-select-dropdown-menu .interaction-menu-item[aria-selected="true"],
-.ui-select-dropdown-menu .interaction-menu-item[aria-selected="true"]:hover { background-color: #f1f5f9; color: #334155; }
+.ui-select-dropdown-menu .interaction-menu-item[aria-selected="true"]:hover { background-color: var(--app-primary-light); color: #334155; }
 
 .home-heading-link svg, .home-hero-quick-link svg { transition: transform 180ms ease; }
 .home-heading-link:hover svg, .home-hero-quick-link:hover svg { transform: translate(2px, -2px); }
@@ -4987,3 +4985,185 @@ input[type="search"]:focus-visible,
 
 .interaction-control input[type="search"]:hover { box-shadow: none; }
 .interaction-control input[type="search"]::-webkit-search-cancel-button { appearance: none; }
+
+/* Event metadata belongs with the title; only the translucent scrap control overlays the image. */
+.home-portal-event-badges {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-bottom: 0.375rem;
+}
+.home-portal-event-badges :is(.home-editorial-dday, .home-editorial-event-application, .home-portal-event-badge) {
+  display: inline-flex;
+  min-height: 1.375rem;
+  align-items: center;
+  border: 1px solid #dfe5e8;
+  border-radius: 999px;
+  padding: 0.125rem 0.5rem;
+  color: #52606d;
+  background: rgb(255 255 255 / 0.9);
+  font-size: var(--ui-text-caption-size);
+  line-height: 1;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.home-portal-event-badges .is-open {
+  border-color: #cee4d8;
+  color: #176345;
+  background: #eaf4ee;
+}
+.home-portal-event-badges .is-closed {
+  border-color: #e2e8f0;
+  color: #64748b;
+  background: #e2e8f0;
+}
+.event-card-scrap {
+  width: 2rem;
+  height: 2rem;
+  min-height: 2rem;
+  border: 1px solid rgb(255 255 255 / 0.5);
+  border-radius: 50%;
+  padding: 0;
+  color: #94a3b8;
+  background: rgb(255 255 255 / 0.24);
+  box-shadow: 0 1px 6px rgb(15 23 42 / 0.08);
+  backdrop-filter: blur(8px);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.event-card-scrap:not(:disabled):hover {
+  color: #64748b;
+  background: rgb(255 255 255 / 0.42);
+}
+.event-card-scrap[aria-pressed="true"] { color: #fbbf24; }
+.event-card-scrap[aria-pressed="true"]:not(:disabled):hover { color: #f59e0b; }
+.event-card-scrap svg { color: inherit; stroke-width: 1.5; }
+
+/* Administrative screen switches are visually separate from data filters. */
+.ui-view-tabs { display:flex; width:100%; gap:1.25rem; overflow-x:auto; border-bottom:1px solid #e2e8f0; scrollbar-width:none; }
+.ui-view-tabs::-webkit-scrollbar { display:none; }
+.ui-view-tabs > button { min-height:2.5rem !important; height:2.5rem !important; border:0; border-bottom:3px solid transparent; border-radius:0; padding:0 0.5rem 0.375rem; background:transparent; color:#64748b; font-size:1.0625rem !important; font-weight:500 !important; box-shadow:none; }
+.ui-view-tabs > button:hover { color:#334155; background:transparent; }
+.ui-view-tabs > button.is-active { color:#172033; border-bottom-color:#172033; font-weight:500 !important; background:transparent; }
+.interaction-button[data-variant="default"], .interaction-primary { background-color:#007f49; border-color:#007f49; border-radius:0.625rem; font-size:0.9375rem; font-weight:500; }
+.interaction-button[data-variant="default"]:not(:disabled):hover, .interaction-primary:not(:disabled):hover { background-color:#007443; border-color:#007443; }
+.admin-page { background-color:#f6f7f9; }
+
+.about-pledge-status { background:#f1f5f9; color:#64748b; border-color:#e2e8f0; }
+.about-pledge-status.is-completed { background:#eaf4ee; color:#176345; border-color:#cee4d8; }
+.about-pledge-status.is-in-progress { background:#edf2f7; color:#475f78; border-color:#dbe3ed; }
+.about-pledge-item.is-completed, .about-pledge-item.is-in-progress { background:#fff; border-color:#e2e8f0; }
+
+/* Quiet secondary actions; date and filter triggers keep their input treatment. */
+.interaction-button[data-variant="outline"]:not(.ui-filter-trigger):not([data-filter-trigger]),
+.ui-icon-button[data-tone="outline"] {
+  border-color: transparent;
+  background-color: rgba(18, 32, 53, 0.05);
+  color: rgba(28, 31, 39, 0.77);
+  box-shadow: none;
+}
+.interaction-button[data-variant="outline"]:not(.ui-filter-trigger):not([data-filter-trigger]):not(:disabled):hover,
+.ui-icon-button[data-tone="outline"]:not(:disabled):hover { background-color: rgba(18, 32, 53, 0.09); }
+.admin-page thead th :is(button, span) { font-size: inherit; }
+.admin-page thead { background-color: white; }
+
+.admin-card__header { border-bottom: 0; }
+@media (min-width: 64rem) {
+  .admin-data-table__body tr { height: var(--ui-table-row-min-height); }
+  .admin-page tbody :is(.admin-row-action button, button.admin-row-action, button[data-size="icon"]) {
+    width: 2rem;
+    min-width: 2rem;
+    height: 2rem;
+    min-height: 2rem;
+    padding: 0;
+  }
+}
+@media (min-width: 64rem) and (hover: hover) and (pointer: fine) {
+  .admin-page :is(tr, [role="row"]) :is(.admin-row-action, button[data-size="icon"]) { opacity: 0; transition: opacity 120ms ease; }
+  .admin-page :is(tr, [role="row"]):is(:hover, :focus-within) :is(.admin-row-action, button[data-size="icon"]),
+  .admin-page .admin-row-action[aria-expanded="true"] { opacity: 1; }
+}
+.email-composer-page { background-color: #f6f7f9; }
+.email-composer-shell .email-composer-editor .tiptap-container { min-height: max(22rem, calc(100svh - 27rem)); }
+.email-composer-shell .email-composer-editor .tiptap { min-height: max(19rem, calc(100svh - 31rem)); }
+
+.interaction-button:is(.ui-filter-trigger, [data-filter-trigger]) { background-color: white; color: #344054; }
+
+/* Admin controls: page tabs sit above quieter section tabs. */
+.admin-page { --ui-control-height:2.25rem; --ui-control-height-compact:2.25rem; }
+.admin-page .interaction-button:is([data-variant="outline"], [data-variant="secondary"]):not(.ui-filter-trigger):not([data-filter-trigger]) { font-size:0.9375rem; font-weight:500; }
+.admin-page :is(.admin-toolbar, .admin-table-toolbar, .admin-card__header) :is(.interaction-button, .ui-input, input[type="search"], [data-filter-trigger]) { height:2.25rem; min-height:2.25rem; }
+.admin-page :is(.admin-card, .survey-responses-panel) .ui-view-tabs, .ui-modal .ui-view-tabs { --ui-view-tab-weight:500; }
+.admin-page :is(.admin-card, .survey-responses-panel) .ui-view-tabs > button, .ui-modal .ui-view-tabs > button { font-size:0.875rem !important; font-weight:500 !important; }
+.ui-view-tabs { flex-shrink:0; }
+.ui-segmented-control { position:relative; }
+.ui-segmented-control > button { position:relative; z-index:1; transition:font-weight 160ms ease,color 160ms ease; }
+.ui-segmented-control > button:hover { --ui-segmented-weight:600; background:transparent !important; font-weight:500 !important; }
+.ui-segmented-control.filter-chips > button.is-active { --ui-segmented-weight:600; background:transparent !important; box-shadow:none; font-weight:600 !important; }
+.ui-segmented-indicator { position:absolute; left:0; top:4px; background:white; border-radius:5px; box-shadow:0 0 0 1px #e2e8f0; pointer-events:none; transition:transform 220ms cubic-bezier(.25,.8,.25,1),width 220ms ease,height 220ms ease; }
+.admin-page .admin-table-card > :is(.border-b, .admin-table-toolbar, .admin-card__header) { border-bottom:0; }
+.admin-table-footer { flex-shrink:0; }
+.admin-page .ui-pagination { width:100%; }
+.admin-page .admin-table-card > .border-t { padding-block:0.5rem; }
+.admin-page .admin-sortable-table tr > :first-child { width:2.25rem; padding-inline:0.25rem; }
+.admin-page .admin-contacts-table__header { background:white; font-size:0.75rem; }
+.admin-contacts-table__header > [role="columnheader"] { height:2.25rem; }
+.admin-contacts-table__row { border-bottom:1px solid #f1f5f9; }
+.admin-contacts-table__row > [role="cell"] { padding-block:0.375rem; }
+.admin-contacts-table__row > [role="cell"]:first-child { min-height:3.25rem; }
+.admin-table-viewport thead { background:white; }
+.admin-page thead th[colspan] { padding-block:0; }
+.user-management-table .admin-data-table tr > :last-child { padding-inline:0.25rem; }
+.user-management-table .admin-data-table tr > :nth-child(4) { overflow:hidden; text-overflow:ellipsis; }
+.admin-page .admin-data-table tr > :last-child button[data-tooltip]::after { left:auto; right:0; transform:none; }
+.admin-table-empty { font-size:0.875rem; font-weight:400; }
+.admin-data-table td:has(> .admin-table-empty) { padding-block:1rem; }
+@media(min-width:48rem) {
+ .admin-page .ui-segmented-control { padding:3px; --ui-page-tab-height:1.75rem; }
+ .admin-page .ui-segmented-control > button { height:1.75rem !important; min-height:1.75rem !important; }
+ .admin-page .ui-segmented-indicator { top:3px; }
+ .admin-page__main--table .admin-table-viewport { max-height:none; }
+ .admin-page__main--table .admin-table-card > [aria-busy] { display:flex; flex-direction:column; flex:1; min-height:0 !important; overflow:hidden; }
+ .admin-page__main--table .admin-table-card > :not(.admin-table-viewport):not([aria-busy]) { flex-shrink:0; }
+}
+@media(max-width:47.999rem) { .admin-page { --ui-control-height:2.75rem; } }
+@media(prefers-reduced-motion:reduce) { .ui-segmented-indicator,.ui-segmented-control > button { transition:none; } }
+
+/* Compact controls belong to data surfaces; page actions retain their height. */
+[data-ui="data-view-card"] { --ui-control-height:2.125rem; --ui-control-height-compact:2.125rem; --ui-control-font-size:0.875rem; }
+[data-ui="data-view-card"] .interaction-button { font-size:0.875rem; }
+.email-composer-shell { --ui-control-height:2.125rem; --ui-control-height-compact:2.125rem; --ui-control-font-size:0.875rem; }
+.email-composer-shell .interaction-button:not([data-size="icon"]) { height:2.125rem; min-height:2.125rem; font-size:0.875rem; }
+.admin-page :is(.admin-card,.admin-table-card) { --ui-control-height:2.125rem; --ui-control-height-compact:2.125rem; --ui-control-font-size:0.875rem; --ui-pagination-control-size:2.125rem; }
+.admin-page :is(.admin-card,.admin-table-card) :is(.interaction-button:not([data-size="icon"]),.ui-input,[data-filter-trigger],.ui-filter-trigger,input[type="search"]) { height:2.125rem; min-height:2.125rem; font-size:0.875rem; }
+.admin-page :is(.admin-card,.admin-table-card) .interaction-button:is([data-variant="default"],[data-variant="outline"],[data-variant="secondary"]) { font-size:0.875rem; font-weight:500; }
+.admin-page :is(.admin-card,.admin-table-card) :is([data-ui="page-search"],.page-search-field,.ui-search-field) { height:2.125rem; min-height:2.125rem; }
+.admin-page .ui-pagination { margin:0 !important; }
+.admin-table-card { gap:0; padding-bottom:0; }
+.admin-table-footer { min-height:0; padding-block:.5rem; }
+.ui-view-tabs { position:relative; }
+.ui-view-tabs:has(> .ui-view-tab-indicator) > button.is-active { border-bottom-color:transparent; }
+.ui-view-tab-indicator { position:absolute; bottom:0; left:0; background:#172033; pointer-events:none; transition:transform 240ms cubic-bezier(.25,.8,.25,1),width 240ms ease; }
+.admin-site-content__list button:focus-visible { font-weight:500 !important; }
+.event-survey-card.is-closed .home-portal-event-body { opacity:.7; }
+.event-survey-card .home-portal-event-body { display:flex; flex:1; flex-direction:column; }
+.event-survey-card .home-portal-event-meta { margin-top:auto; padding-top:.875rem; }
+.event-card-scrap svg { transition:none !important; }
+.board-article-table [role="columnheader"] { border-top:0; }
+.home-notice-entry,.home-schedule-entry { position:relative; transition:background-color 180ms ease; }
+.home-notice-entry::after,.home-schedule-entry::after { content:""; position:absolute; inset-inline:0; bottom:0; height:1px; background:#66a98a; opacity:0; transform:scaleX(.96); transition:opacity 180ms ease,transform 180ms ease; }
+.home-notice-entry:hover,.home-schedule-entry:hover { background:#f3faf6; }
+.home-notice-entry:hover::after,.home-schedule-entry:hover::after { opacity:1; transform:scaleX(1); }
+.home-notice-entry:hover h3,.home-schedule-entry:hover h3 { color:#202623; }
+.home-notice-entry-pinned { background:transparent; }
+.home-notice-entry-pinned:hover { background:#f3faf6; }
+.home-route-loading { min-height:18.75rem; background:#203c33 url('/hero_background_1.jpg') center/cover; }
+@layer utilities { button.font-semibold,button.\!font-semibold { font-weight:500 !important; } }
+@media(min-width:48rem) {
+ .admin-page__main--table > :is(.admin-card,.admin-table-card) { flex:0 1 auto; max-height:100%; }
+ .admin-page__main--table .admin-table-viewport { flex:0 1 auto; }
+ .admin-page__main--table .admin-table-card > [aria-busy] { flex:0 1 auto; }
+}
+@media(prefers-reduced-motion:reduce) { .ui-view-tab-indicator,.home-notice-entry::after,.home-schedule-entry::after { transition:none; } }

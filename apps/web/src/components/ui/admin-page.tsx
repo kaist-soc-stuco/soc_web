@@ -13,7 +13,7 @@ interface AdminPageShellProps extends ComponentProps<"div"> {
 
 export function AdminPageShell({ children, className, ...props }: AdminPageShellProps) {
   return (
-    <div className={cn("admin-page min-h-full max-w-full overflow-x-clip bg-[#f7f9fc] text-[#172033]", className)} {...props}>
+    <div className={cn("admin-page min-h-full max-w-full overflow-x-clip bg-white text-[#172033]", className)} {...props}>
       {children}
     </div>
   );
@@ -41,14 +41,14 @@ interface AdminPageHeaderProps {
 
 export function AdminPageHeader({ actions, eyebrow, title, center }: AdminPageHeaderProps) {
   return (
-    <header className={cn("admin-page__header flex flex-col gap-4 border-b border-slate-200/80 pb-5 md:flex-row md:items-center md:justify-between", center && "!grid grid-cols-1 items-center md:grid-cols-[minmax(0,1fr)_auto]")}>
+    <header className={cn("admin-page__header flex flex-col gap-4 md:flex-row md:items-center md:justify-between", center && "!grid grid-cols-1 items-center md:grid-cols-[minmax(0,1fr)_auto]")}>
       <div className="min-w-0">
         {eyebrow ? (
           <div className="mb-1.5 flex items-center gap-2 text-[length:var(--ui-text-caption-size)] font-semibold uppercase tracking-[0.14em] text-brand-primary">
             {eyebrow}
           </div>
         ) : null}
-        <AdminPageTitle className="break-words text-[length:var(--ui-text-page-title-mobile-size)] leading-8 md:text-[length:var(--ui-text-page-title-size)] md:leading-9">
+        <AdminPageTitle className="break-words text-[length:var(--ui-text-admin-title-mobile-size)] leading-8 md:text-[length:var(--ui-text-admin-title-size)] md:leading-9">
           {title}
         </AdminPageTitle>
       </div>
@@ -70,7 +70,7 @@ export function AdminCard({ className, ...props }: ComponentProps<"section">) {
   return (
     <section
       className={cn(
-        "admin-card min-w-0 max-w-full overflow-hidden rounded-xl border border-[#e5eaf0] bg-white shadow-none",
+        "admin-card min-w-0 max-w-full overflow-hidden rounded-2xl border border-[#e5eaf0] bg-white shadow-none",
         className,
       )}
       {...props}
@@ -98,15 +98,15 @@ export function AdminTableCard({
   return (
     <section
       className={cn(
-        "admin-table-card overflow-hidden rounded-xl border border-[#e5eaf0] bg-white shadow-none",
+        "admin-table-card min-w-0 max-w-full overflow-hidden rounded-2xl border border-[#e5eaf0] bg-white shadow-none",
         className,
       )}
       {...props}
     >
-      {toolbar ? <div className="border-b border-slate-100">{toolbar}</div> : null}
+      {toolbar ? <div className="admin-table-toolbar">{toolbar}</div> : null}
       {children}
       {pagination ? (
-        <div className="flex min-h-16 items-center border-t border-slate-100 bg-white px-4 py-3 sm:px-5 [&_.ui-pagination]:m-0">
+        <div className="admin-table-footer flex min-h-12 items-center border-t border-slate-100 bg-white px-4 py-2 sm:px-5 [&_.ui-pagination]:m-0 [&_.ui-pagination]:w-full">
           {pagination}
         </div>
       ) : null}
@@ -118,7 +118,7 @@ export function AdminCardHeader({ className, ...props }: ComponentProps<"div">) 
   return (
     <div
       className={cn(
-        "flex min-h-14 flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5 md:items-center",
+        "admin-card__header flex min-h-12 flex-wrap items-start justify-between gap-3 px-4 py-2 sm:px-5 md:items-center",
         className,
       )}
       {...props}
@@ -130,7 +130,7 @@ export function AdminToolbar({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "admin-toolbar flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[#e5eaf0] bg-white px-3 py-3 sm:px-4 md:items-center",
+        "admin-toolbar flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[#e5eaf0] bg-white px-3 py-2 sm:px-4 md:items-center",
         className,
       )}
       {...props}

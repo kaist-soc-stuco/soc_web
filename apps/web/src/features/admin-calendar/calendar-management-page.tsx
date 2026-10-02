@@ -17,14 +17,7 @@ import {
   msToIso,
   nowMs,
 } from "@soc/shared";
-import {
-  CalendarDays,
-  Download,
-  FileUp,
-  Plus,
-  RefreshCw,
-  Save,
-} from "lucide-react";
+import { CalendarDays, Download, Upload, RefreshCw } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import {
@@ -58,7 +51,6 @@ import { Permissions } from "@/lib/permissions";
 
 const QUERY_KEY = ["admin", "calendar-events"] as const;
 type SourceFilter = "all" | "ARTICLE" | "MANUAL" | "KAIST_ACADEMIC";
-type CategoryFilter = "all" | CalendarEventCategory;
 type VisibilityFilter = "all" | "visible" | "hidden";
 type CategoryDraft = CalendarEventCategory;
 
@@ -173,7 +165,6 @@ function CalendarManagementContent() {
   const openedQueryEventRef = useRef<string | null>(null);
   const [query, setQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -196,7 +187,6 @@ function CalendarManagementContent() {
     const normalized = query.trim().toLocaleLowerCase();
     return events
       .filter((event) => sourceFilter === "all" || event.sourceType === sourceFilter)
-      .filter((event) => categoryFilter === "all" || event.category === categoryFilter)
       .filter((event) => visibilityFilter === "all" || (visibilityFilter === "hidden") === event.isHiddenByAdmin)
       .filter((event) => {
         const eventStart = isoToDate(event.startAt).getTime();
@@ -212,7 +202,7 @@ function CalendarManagementContent() {
         const direction = sortDirection === "asc" ? 1 : -1;
         return a.startAt.localeCompare(b.startAt) * direction || a.titleKo.localeCompare(b.titleKo, "ko") * direction;
       });
-  }, [categoryFilter, dateFrom, dateTo, events, query, sortDirection, sourceFilter, visibilityFilter]);
+  }, [dateFrom, dateTo, events, query, sortDirection, sourceFilter, visibilityFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredEvents.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -329,7 +319,7 @@ function CalendarManagementContent() {
       await refresh();
       toast({
         type: "success",
-        message: `KAIST 일정 갱신 완료 · 추가 ${result.insertedCount} · 수정 ${result.updatedCount}`,
+        message: `학사일정 동기화 완료 · 추가 ${result.insertedCount} · 수정 ${result.updatedCount}`,
       });
     } catch {
       toast({ type: "error", message: "KAIST 일정을 갱신하지 못했습니다." });
@@ -367,7 +357,7 @@ function CalendarManagementContent() {
 
   return (
     <AdminPageShell>
-      <AdminPageMain className="admin-calendar-management">
+      <AdminPageMain tableLayout className="admin-calendar-management !max-w-6xl">
         <AdminPageHeader
           title="일정 관리"
           actions={(
@@ -384,23 +374,23 @@ function CalendarManagementContent() {
                 }}
               />
               <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-                <FileUp className="size-4" aria-hidden="true" />
-                ICS 불러오기
+                <Upload className="size-4" aria-hidden="true" />
+                ICS 가져오기
               </Button>
               <Button variant="outline" onClick={() => void exportIcs()}>
                 <Download className="size-4" aria-hidden="true" />
-                내보내기
+                ICS 내보내기
               </Button>
               <Button variant="outline" disabled={syncing !== null} onClick={() => void syncKaistCalendar()}>
                 <RefreshCw className={`size-4 ${syncing === "kaist" ? "animate-spin" : ""}`} aria-hidden="true" />
-                KAIST 일정 갱신
+                학사일정 동기화
               </Button>
               <Button variant="outline" disabled={syncing !== null} onClick={() => void syncGoogleCalendar()}>
                 <RefreshCw className={`size-4 ${syncing === "google" ? "animate-spin" : ""}`} aria-hidden="true" />
                 구글 캘린더 동기화
               </Button>
               <Button onClick={openCreate}>
-                <Plus className="size-4" aria-hidden="true" />
+
                 일정 추가
               </Button>
             </>
@@ -409,7 +399,7 @@ function CalendarManagementContent() {
 
         <AdminTableCard
           toolbar={(
-            <div className="py-4">
+            <div className="py-2">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <SegmentedControl<SourceFilter>
@@ -418,26 +408,14 @@ function CalendarManagementContent() {
                     onChange={(value) => { setSourceFilter(value); setPage(1); }}
                     options={[
                       { value: "all", label: "전체" },
-                      { value: "ARTICLE", label: "행사 게시글" },
+                      { value: "ARTICLE", label: "행사" },
                       { value: "MANUAL", label: "학생회 일정" },
-                      { value: "KAIST_ACADEMIC", label: "KAIST 학사일정" },
+                      { value: "KAIST_ACADEMIC", label: "학사일정" },
                     ]}
                   />
-                  <DateRangePicker presetType="future" align="start" value={{ from: dateFrom, to: dateTo }} onChange={({ from, to }) => { setDateFrom(from); setDateTo(to); setPage(1); }} />
                 </div>
                 <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto">
-                  <AdminSelectDropdown
-                    ariaLabel="일정 분류"
-                    value={categoryFilter}
-                    onChange={(value) => { setCategoryFilter(value as CategoryFilter); setPage(1); }}
-                    options={[
-                      { value: "all", label: "전체 분류" },
-                      { value: "EVENT", label: "행사" },
-                      { value: "ACADEMIC", label: "학사일정" },
-                      { value: "HOLIDAY", label: "공휴일" },
-                    ]}
-                    className="w-32"
-                  />
+                  <DateRangePicker presetType="future" align="end" value={{ from: dateFrom, to: dateTo }} onChange={({ from, to }) => { setDateFrom(from); setDateTo(to); setPage(1); }} />
                   <AdminSelectDropdown
                     ariaLabel="노출 상태"
                     value={visibilityFilter}
@@ -474,7 +452,7 @@ function CalendarManagementContent() {
           {!eventsQuery.data && eventsQuery.isPending ? null : eventsQuery.isError ? (
             <div className="px-5 py-16 text-center text-sm font-normal text-rose-600">일정을 불러오지 못했습니다.</div>
           ) : (
-            <AdminDataTable minWidth={760} mobileMode="cards">
+            <AdminDataTable minWidth={0} mobileMode="cards">
               <colgroup>
                 <col />
                 <col style={{ width: 120 }} />
@@ -528,8 +506,8 @@ function CalendarManagementContent() {
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setDrawerOpen(false)} disabled={saving}>취소</Button>
             <Button loading={saving} type="submit" form="calendar-management-form" disabled={saving}>
-              <Save className="size-4" aria-hidden="true" />
-              {"저장"}
+
+              {editingEvent ? "저장" : "추가"}
             </Button>
           </div>
         )}
@@ -567,10 +545,10 @@ function CalendarManagementContent() {
               </div>
             ) : null}
             <AdminFormField label="국문 제목">
-              <UiInput required value={draft.titleKo} disabled={editingEvent?.isReadOnly} onChange={(event) => setDraft((current) => ({ ...current, titleKo: event.currentTarget.value }))} />
+              <UiInput required value={draft.titleKo} disabled={editingEvent?.isReadOnly} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, titleKo: value })); }} />
             </AdminFormField>
             <AdminFormField label="영문 제목">
-              <UiInput value={draft.titleEn} disabled={editingEvent?.isReadOnly} placeholder={editingEvent?.isReadOnly ? "등록된 영문 제목이 없습니다" : "영문 제목 입력 (선택)"} onChange={(event) => setDraft((current) => ({ ...current, titleEn: event.currentTarget.value }))} />
+              <UiInput value={draft.titleEn} disabled={editingEvent?.isReadOnly} placeholder={editingEvent?.isReadOnly ? "등록된 영문 제목이 없습니다" : "영문 제목 입력 (선택)"} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, titleEn: value })); }} />
             </AdminFormField>
             {!editingEvent?.isReadOnly ? (
               <>
@@ -596,7 +574,7 @@ function CalendarManagementContent() {
                     <UiInput
                       type="checkbox"
                       checked={draft.isAlways}
-                      onChange={(event) => setDraft((current) => ({ ...current, isAlways: event.currentTarget.checked }))}
+                      onChange={(event) => { const checked = event.currentTarget.checked; setDraft((current) => ({ ...current, isAlways: checked })); }}
                       className="size-4 accent-[#007a4d]"
                     />
                     상시
@@ -605,17 +583,17 @@ function CalendarManagementContent() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <AdminFormField label="시작">
-                    <UiInput required type={draft.isAllDay ? "date" : "datetime-local"} disabled={draft.isAlways} value={draft.startAt} onChange={(event) => setDraft((current) => ({ ...current, startAt: event.currentTarget.value }))} />
+                    <UiInput required type={draft.isAllDay ? "date" : "datetime-local"} disabled={draft.isAlways} value={draft.startAt} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, startAt: value })); }} />
                   </AdminFormField>
                   <AdminFormField label="종료">
-                    <UiInput required type={draft.isAllDay ? "date" : "datetime-local"} disabled={draft.isAlways} value={draft.endAt} onChange={(event) => setDraft((current) => ({ ...current, endAt: event.currentTarget.value }))} />
+                    <UiInput required type={draft.isAllDay ? "date" : "datetime-local"} disabled={draft.isAlways} value={draft.endAt} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, endAt: value })); }} />
                   </AdminFormField>
                 </div>
                 <AdminFormField label="장소">
-                  <UiInput value={draft.location} onChange={(event) => setDraft((current) => ({ ...current, location: event.currentTarget.value }))} />
+                  <UiInput value={draft.location} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, location: value })); }} />
                 </AdminFormField>
                 <AdminFormField label="설명">
-                  <UiTextarea rows={4} value={draft.descriptionKo} onChange={(event) => setDraft((current) => ({ ...current, descriptionKo: event.currentTarget.value }))} />
+                  <UiTextarea rows={4} value={draft.descriptionKo} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, descriptionKo: value })); }} />
                 </AdminFormField>
               </>
             ) : (

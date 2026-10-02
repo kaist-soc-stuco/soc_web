@@ -315,17 +315,17 @@ export function SurveyListPage() {
             title="설문조사 관리"
             actions={
               <Button onClick={() => navigate("/admin/surveys/new")} className="gap-1.5 bg-brand-primary text-sm font-semibold text-white hover:bg-brand-primary/90">
-                <span aria-hidden="true">+</span>
-                새 설문조사
+                                새 설문조사
               </Button>
             }
           />
 
-          <SegmentedControl ariaLabel="설문 업무" value={surveyGroup} onChange={(value) => { setSurveyGroup(value); setCurrentPage(1); }} options={[{ value: "general", label: "일반 설문" }, { value: "operational", label: "상시 설문" }]} />
+          <SegmentedControl variant="underline" role="tablist" ariaLabel="설문 업무" value={surveyGroup} onChange={(value) => { setSurveyGroup(value); setCurrentPage(1); }} options={[{ value: "general", label: "일반 설문" }, { value: "operational", label: "상시 설문" }]} />
           {/* Inline filters use the shared search and select controls. */}
           <AdminTableCard className="overflow-visible">
-            <div className="border-b border-slate-100 p-5">
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="border-b border-slate-100 px-5 py-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <DateRangePicker presetType="future" align="end" value={dateRange} onChange={range => { setDateRange(range); setCurrentPage(1); }} />
               <AdminSelectDropdown
                 ariaLabel="설문 상태"
                 value={statusFilter}
@@ -341,10 +341,9 @@ export function SurveyListPage() {
                 }}
                 className="w-28 shrink-0"
               />
-              <DateRangePicker presetType="future" align="start" value={dateRange} onChange={range => { setDateRange(range); setCurrentPage(1); }} />
               <PageSearchField
                 ariaLabel="설문 검색"
-                className="ml-auto w-full sm:w-72"
+                className="w-full sm:w-72"
                 onChange={(value) => {
                   setSearchQuery(value);
                   setCurrentPage(1);
@@ -369,14 +368,14 @@ export function SurveyListPage() {
             ) : null}
 
             {!showInitialLoading && filteredSurveys.length > 0 ? (
-              <AdminDataTable minWidth={1304} mobileMode="cards">
+              <AdminDataTable minWidth={0} mobileMode="cards">
                 <colgroup>
-                  <col style={{ width: 360 }} />
-                  <col style={{ width: 110 }} />
-                  <col style={{ width: 120 }} />
-                  <col style={{ width: 230 }} />
-                  <col style={{ width: 190 }} />
-                  <col style={{ width: 184 }} />
+                  <col style={{ width: "32%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "23%" }} />
+                  <col style={{ width: "16%" }} />
+                  <col style={{ width: "10%" }} />
                 </colgroup>
                 <AdminTableHeader>
                   <tr>
@@ -406,7 +405,7 @@ export function SurveyListPage() {
                     >
                       최근 수정
                     </AdminSortableHead>
-                    <AdminTableHead className="text-center">작업</AdminTableHead>
+                    <AdminTableHead className="text-center"><span className="sr-only">작업</span></AdminTableHead>
                   </tr>
                 </AdminTableHeader>
                 <AdminTableBody>

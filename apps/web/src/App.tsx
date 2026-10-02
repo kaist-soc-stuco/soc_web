@@ -369,7 +369,7 @@ function PublicLayout() {
     <div className="public-site-layout flex min-h-screen flex-col">
       <Header variant={pathname === "/" ? "home" : "default"} />
       <div className="public-site-content flex flex-1 flex-col">
-        <Suspense fallback={isArticleDetail ? <ArticleLoading /> : <div className="flex-1" aria-busy="true" />}>
+        <Suspense fallback={isArticleDetail ? <ArticleLoading /> : <div className={pathname === "/" ? "home-route-loading flex-1" : "flex-1"} aria-busy="true" />}>
           <Outlet />
         </Suspense>
       </div>

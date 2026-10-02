@@ -177,7 +177,7 @@ export function ExecutiveMemberModal({
     <AdminDrawer
       open={open}
       onClose={onClose}
-      title={contact ? "집행부원 정보 수정" : "새 집행부원 등록"}
+      title={contact ? "부원 정보 편집" : "부원 추가"}
       width="max-w-2xl"
       footer={
         <div className="flex items-center justify-between gap-3">
@@ -189,13 +189,13 @@ export function ExecutiveMemberModal({
               disabled={saving}
               className="rounded-lg border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
             >
-              <Trash2 aria-hidden="true" className="size-4" />
+
               부원 삭제
             </Button>
           ) : <span />}
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>취소</Button>
-            <Button loading={saving} type="submit" form={formId} disabled={saving}>{"저장"}</Button>
+            <Button loading={saving} type="submit" form={formId} disabled={saving}>{contact ? "저장" : "추가"}</Button>
           </div>
         </div>
       }

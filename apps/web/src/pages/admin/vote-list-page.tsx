@@ -3,7 +3,6 @@ import { overlapsDateRange } from "@/lib/date-range-filter";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { createApiClient } from "@soc/api-client";
 import type { VoteRecord } from "@soc/contracts";
-import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -12,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import {
   AdminDataTable, AdminTableBody, AdminTableCell, AdminTableHead, AdminTableHeader, AdminTableEmpty,
 } from "@/components/ui/admin-data-table";
-import { AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
+import { AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard, AdminSearchField } from "@/components/ui/admin-page";
+import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { VoteStatusBadge } from "@/components/ui/vote-status-badge";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { formatNumericDateRange } from "@/lib/date-display";
@@ -29,22 +29,31 @@ export function VoteListPage() {
   const [dateRange, setDateRange] = useState<DateRange>({ from: "", to: "" });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
   useEffect(() => { void client.listAdminVotes().then(setVotes).finally(() => setLoading(false)); }, [client]);
-  const filteredVotes = votes.filter(vote => overlapsDateRange(vote.startsAt, vote.endsAt, dateRange));
+  const filteredVotes = votes.filter(vote => overlapsDateRange(vote.startsAt, vote.endsAt, dateRange) &&
+    (status === "all" || vote.status === status) &&
+    stripRichText(`${vote.titleKo} ${vote.titleEn ?? ""}`).toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const totalPages = Math.max(1, Math.ceil(filteredVotes.length / pageSize));
-  const visible = filteredVotes.slice((page - 1) * pageSize, page * pageSize);
-  const rangeStart = visible.length > 0 ? (page - 1) * pageSize + 1 : 0;
+  const safePage = Math.min(page, totalPages);
+  const visible = filteredVotes.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const rangeStart = visible.length > 0 ? (safePage - 1) * pageSize + 1 : 0;
   const rangeEnd = visible.length > 0 ? rangeStart + visible.length - 1 : 0;
 
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_VOTE}>
       <AdminPageShell>
-        <AdminPageMain>
-          <AdminPageHeader title="투표 관리" actions={<Button asChild><Link to="/admin/votes/new"><Plus />새 투표</Link></Button>} />
-          <AdminTableCard toolbar={<div className="py-4"><DateRangePicker presetType="future" align="start" value={dateRange} onChange={range => { setDateRange(range); setPage(1); }} /></div>} pagination={(
+        <AdminPageMain className="!max-w-6xl">
+          <AdminPageHeader title="투표 관리" actions={<Button asChild><Link to="/admin/votes/new">투표 추가</Link></Button>} />
+          <AdminTableCard toolbar={<div className="flex flex-wrap items-center justify-end gap-2 py-1">
+            <DateRangePicker presetType="future" align="end" value={dateRange} onChange={range => { setDateRange(range); setPage(1); }} />
+            <AdminSelectDropdown ariaLabel="투표 상태" value={status} onChange={value => { setStatus(value); setPage(1); }} options={[{ value: "all", label: "전체 상태" }, { value: "DRAFT", label: "임시저장" }, { value: "PUBLISHED", label: "게시됨" }, { value: "CLOSED", label: "마감" }, { value: "TALLIED", label: "종료" }]} className="w-32" />
+            <AdminSearchField aria-label="투표 검색" placeholder="제목 검색" value={search} onValueChange={value => { setSearch(value); setPage(1); }} className="w-full sm:w-56" />
+          </div>} pagination={(
             <Pagination
               className="m-0 w-full"
-              currentPage={page}
+              currentPage={safePage}
               onPageChange={setPage}
               pageSizeControl={(
                 <PageSizeSelect
@@ -59,7 +68,7 @@ export function VoteListPage() {
               totalPages={totalPages}
             />
           )}>
-            <AdminDataTable minWidth="56rem" mobileMode="cards">
+            <AdminDataTable minWidth={0} mobileMode="cards">
               <AdminTableHeader><tr><AdminTableHead className="w-[42%]">투표</AdminTableHead><AdminTableHead className="w-28">상태</AdminTableHead><AdminTableHead>기간</AdminTableHead><AdminTableHead className="w-32">참여</AdminTableHead></tr></AdminTableHeader>
               <AdminTableBody>
                 {loading ? <AdminTableEmpty colSpan={4}>불러오는 중...</AdminTableEmpty> : visible.length === 0 ? <AdminTableEmpty colSpan={4}>등록된 투표가 없습니다.</AdminTableEmpty> : visible.map((vote) => (

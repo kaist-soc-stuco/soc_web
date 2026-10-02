@@ -286,7 +286,7 @@ export function UserManagementPage() {
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_USERS}>
       <AdminPageShell>
-        <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
+        <main className="admin-page__main admin-page__main--table mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
           <AdminPageHeader title="유저 관리" />
 
           <AdminTableCard className="user-management-table" aria-busy={loading}>
@@ -336,14 +336,14 @@ export function UserManagementPage() {
             ) : (data?.items ?? []).length === 0 ? (
               <AdminEmptyState message="조건에 맞는 사용자가 없습니다." />
             ) : (
-              <AdminDataTable minWidth={1120} mobileMode="cards">
+              <AdminDataTable minWidth={0} mobileMode="cards">
                 <colgroup>
-                  <col style={{ width: 240 }} />
-                  <col style={{ width: 290 }} />
-                  <col style={{ width: 230 }} />
-                  <col style={{ width: 165 }} />
-                  <col style={{ width: 150 }} />
-                  <col style={{ width: 72 }} />
+                  <col style={{ width: "29%" }} />
+                  <col style={{ width: "29%" }} />
+                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "6%" }} />
                 </colgroup>
                 <AdminTableHeader>
                   <tr>
@@ -364,7 +364,7 @@ export function UserManagementPage() {
                     >
                       최근 접속
                     </AdminSortableHead>
-                    <AdminTableHead className="text-center">작업</AdminTableHead>
+                    <AdminTableHead className="text-center"><span className="sr-only">작업</span></AdminTableHead>
                   </tr>
                 </AdminTableHeader>
                 <AdminTableBody>
@@ -400,10 +400,10 @@ export function UserManagementPage() {
                         <AdminTableCell data-mobile-label="전공" className="py-3">
                           {major ? <div className="mt-0.5 truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]">{major}</div> : null}
                         </AdminTableCell>
-                        <AdminTableCell data-mobile-label="동의 시각" className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
+                        <AdminTableCell truncate data-mobile-label="동의 시각" className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
                           {user.privacyConsentAt ? formatShortDateTime(user.privacyConsentAt) : ""}
                         </AdminTableCell>
-                        <AdminTableCell data-mobile-label="최근 접속" className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
+                        <AdminTableCell truncate data-mobile-label="최근 접속" className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
                           <time dateTime={user.lastLoginAt ?? undefined} title={formatShortDateTime(user.lastLoginAt)}>
                             {formatRelativeTime(user.lastLoginAt)}
                           </time>
@@ -420,7 +420,7 @@ export function UserManagementPage() {
                               event.stopPropagation();
                               void handleToggleActive(user);
                             }}
-                            className="size-8 rounded-md border-0 bg-transparent text-slate-400 hover:border-0 hover:bg-slate-100 hover:text-slate-600"
+                            className="admin-row-action size-8 rounded-md border-0 bg-transparent text-slate-400 hover:border-0 hover:bg-slate-100 hover:text-slate-600"
                           >
                             {user.isActive ? <UserRoundX className="size-4" aria-hidden="true" /> : <UserRoundCheck className="size-4" aria-hidden="true" />}
                           </Button>
@@ -492,7 +492,7 @@ export function UserManagementPage() {
               setPostingSuspensionReason("");
             }
           }}
-          title="게시 작성 제한"
+          title="글·댓글 작성 제한"
           footer={(
             <>
               <Button

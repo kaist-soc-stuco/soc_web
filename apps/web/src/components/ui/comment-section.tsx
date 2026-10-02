@@ -332,8 +332,8 @@ function CommentRow({
               {(lang === "en" ? comment.author.nameEn || comment.author.name : comment.author.name)}
             </span>
             {comment.isOfficial ? (
-              <span className="shrink-0 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[length:var(--ui-text-caption-size)] font-normal text-emerald-700">
-                {lang === "ko" ? "공식 답변" : "Official response"}
+              <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-transparent px-1.5 py-0.5 text-[length:var(--ui-text-caption-size)] font-normal text-emerald-700">
+                <svg aria-hidden="true" className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m5 12 4 4 10-10" /></svg>{lang === "ko" ? "공식 답변" : "Official response"}
               </span>
             ) : null}
             {comment.status === "HIDDEN" ? (
@@ -428,7 +428,7 @@ function CommentRow({
             }}
             title={lang === "ko" ? "댓글을 삭제할까요?" : "Delete this comment?"}
             showClose={false}
-            className="max-w-[25rem]"
+            size="standard"
             footer={(
               <>
                 <Button
@@ -450,6 +450,7 @@ function CommentRow({
               </>
             )}
           >
+            <blockquote className="mb-4 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-4 text-sm font-normal leading-6 text-slate-700">{comment.content}</blockquote>
             <p className="text-sm font-normal leading-6 text-neutral-600">
               {lang === "ko" ? "삭제한 댓글은 복구할 수 없습니다." : "Deleted comments cannot be restored."}
             </p>
@@ -465,7 +466,7 @@ function CommentRow({
             }}
             title={lang === "ko" ? "댓글 숨기기" : "Hide comment"}
             showClose={false}
-            className="max-w-[25rem]"
+            size="compact"
             footer={(
               <>
                 <Button

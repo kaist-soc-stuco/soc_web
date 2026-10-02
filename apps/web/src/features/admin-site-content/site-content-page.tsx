@@ -7,16 +7,17 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type D
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { GripVertical, ImageUp, LayoutTemplate, Link2, Loader2, Plus, Trash2, X } from "lucide-react";
+import { GripVertical, Link2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
-import { AdminCard, AdminCardHeader, AdminEditorGuidance, AdminFormField, AdminLoadingState, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSectionTitle, AdminStickyActionBar, AdminToolbarGroup } from "@/components/ui/admin-page";
+import { AdminCard, AdminCardHeader, AdminEmptyState, AdminEditorGuidance, AdminFormField, AdminLoadingState, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSectionTitle } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UiInput, UiTextarea } from "@/components/ui/form-control";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { ImageCropModal } from "@/components/ui/image-crop-modal";
 import { IconButton } from "@/components/ui/icon-button";
 import { Modal } from "@/components/ui/modal";
@@ -44,11 +45,11 @@ interface BlockDraft {
 const CONTENT_BLOCK_QUERY_KEY = ["admin", "content-blocks"] as const;
 
 const categoryMeta: Record<ContentCategory, { createLabel: string; createType: ContentBlockType; label: string; singleton: boolean; types: ContentBlockType[] }> = {
-  NOTICE: { createLabel: "등록", createType: "TOP_BANNER", label: "띠배너", singleton: true, types: ["TOP_BANNER"] },
-  HERO: { createLabel: "등록", createType: "HERO", label: "홈 히어로", singleton: true, types: ["HERO"] },
-  QUICK_LINK: { createLabel: "등록", createType: "QUICK_LINK", label: "퀵링크", singleton: true, types: ["QUICK_LINK"] },
-  LOGO: { createLabel: "등록", createType: "LOGO", label: "로고", singleton: true, types: ["LOGO"] },
-  ORGANIZATION: { createLabel: "등록", createType: "ORGANIZATION_CHART", label: "조직도", singleton: true, types: ["ORGANIZATION_CHART"] },
+  NOTICE: { createLabel: "띠배너 설정", createType: "TOP_BANNER", label: "띠배너", singleton: true, types: ["TOP_BANNER"] },
+  HERO: { createLabel: "홈 히어로 설정", createType: "HERO", label: "홈 히어로", singleton: true, types: ["HERO"] },
+  QUICK_LINK: { createLabel: "퀵링크 추가", createType: "QUICK_LINK", label: "퀵링크", singleton: false, types: ["QUICK_LINK"] },
+  LOGO: { createLabel: "로고 설정", createType: "LOGO", label: "로고", singleton: true, types: ["LOGO"] },
+  ORGANIZATION: { createLabel: "조직도 설정", createType: "ORGANIZATION_CHART", label: "조직도", singleton: true, types: ["ORGANIZATION_CHART"] },
   PLEDGE: { createLabel: "공약 추가", createType: "PLEDGE", label: "공약", singleton: false, types: ["PLEDGE"] },
 };
 
@@ -136,7 +137,7 @@ const normalizeDraft = (draft: BlockDraft): CreateContentBlockRequest => ({
 });
 
 const formatDateTime = (value: string | null) => value
-  ? new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(isoToDate(value))
+  ? new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(isoToDate(value))
   : "제한 없음";
 
 const effectiveStatus = (block: ContentBlockRecord): ContentBlockStatus => block.status;
@@ -180,6 +181,7 @@ function SiteContentPageContent() {
     const categoryBlocks = blocks.filter((block) => categoryMeta[category].types.includes(block.type));
     if (!categoryBlocks.length) {
       setSelectedId(null);
+      setDraft((current) => current.type === categoryMeta[category].createType ? current : draftForCategory(category));
       return;
     }
     if (!selectedId || !categoryBlocks.some((block) => block.contentBlockId === selectedId)) {
@@ -196,7 +198,7 @@ function SiteContentPageContent() {
     [blocks, category],
   );
 
-  const isDirty = Boolean(selectedBlock && JSON.stringify(normalizeDraft(draft)) !== JSON.stringify(normalizeDraft(draftFromBlock(selectedBlock))));
+  const isDirty = JSON.stringify(normalizeDraft(draft)) !== JSON.stringify(normalizeDraft(selectedBlock ? draftFromBlock(selectedBlock) : draftForCategory(category)));
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: CONTENT_BLOCK_QUERY_KEY });
@@ -314,13 +316,17 @@ function SiteContentPageContent() {
   };
 
   const applyBlock = async () => {
-    if (!selectedBlock) return;
+    if (!draft.titleKo.trim()) return;
     setSaving(true);
     setError(null);
     try {
-      await apiClient.updateContentBlock(selectedBlock.contentBlockId, normalizeDraft(draft) as UpdateContentBlockRequest);
-      await apiClient.publishContentBlock(selectedBlock.contentBlockId);
+      const block = selectedBlock ?? await apiClient.createContentBlock(normalizeDraft(draft));
+      setSelectedId(block.contentBlockId);
+      if (!selectedBlock) await refresh();
+      if (selectedBlock) await apiClient.updateContentBlock(block.contentBlockId, normalizeDraft(draft) as UpdateContentBlockRequest);
+      await apiClient.publishContentBlock(block.contentBlockId);
       await refresh();
+      toast({ type: "success", message: "설정을 저장했습니다." });
     } catch {
       setError("변경 사항을 적용하지 못했습니다.");
     } finally {
@@ -333,7 +339,7 @@ function SiteContentPageContent() {
     const approved = await confirm({
       title: "콘텐츠 삭제",
       description: <>정말 <strong className="font-semibold text-slate-900">“{selectedBlock.titleKo}”</strong> 콘텐츠를 완전히 삭제할까요?</>,
-      warning: "(삭제된 콘텐츠는 영구히 복구할 수 없습니다.)",
+      warning: "삭제한 항목은 복구할 수 없습니다.",
       confirmLabel: "삭제하기",
       tone: "danger",
     });
@@ -350,48 +356,46 @@ function SiteContentPageContent() {
     }
   };
 
-  const canCreateCategory = (!categoryMeta[category].singleton || filteredBlocks.length === 0);
 
   return <AdminPageShell>
     {ConfirmDialog}
-    <AdminPageMain className="admin-site-content max-w-[var(--ui-admin-page-max-width)]">
-      <AdminPageHeader
-        title="사이트 설정"
-        actions={canCreateCategory ? <Button type="button" onClick={() => { setCreateDraft(draftForCategory(category)); setCreateOpen(true); }}><Plus aria-hidden="true" /> {categoryMeta[category].createLabel}</Button> : <span aria-hidden="true" className="h-[var(--ui-control-height)]" />}
-      />
+    <AdminPageMain className="admin-site-content !max-w-6xl">
+      <AdminPageHeader title="사이트 설정" />
 
       <AdminEditorGuidance>
-        <p>복잡한 콘텐츠 편집과 정렬은 데스크톱에서 계속하는 것을 권장합니다. 모바일에서 입력 중이라면 저장하기 전 페이지를 이동하지 마세요.</p>
+        <p>복잡한 콘텐츠 편집과 정렬은 데스크톱에서 계속하는 것을 권장합니다. 모바일에서 입력 중이라면 저장 전 페이지를 이동하지 마세요.</p>
       </AdminEditorGuidance>
 
 
-      <SegmentedControl
-        ariaLabel="사이트 설정 영역"
-        value={category}
-        onChange={(value) => void changeCategory(value as ContentCategory)}
-        className="clean-segmented-control w-fit max-w-full overflow-x-auto"
-        options={Object.entries(categoryMeta).map(([value, meta]) => ({ value, label: meta.label, disabled: imageUploading || saving }))}
-      />
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
+        <SegmentedControl
+          variant="underline" role="tablist"
+          ariaLabel="사이트 설정 영역"
+          value={category}
+          onChange={(value) => void changeCategory(value as ContentCategory)}
+          className="min-w-0 flex-1"
+          options={Object.entries(categoryMeta).map(([value, meta]) => ({ value, label: meta.label, disabled: imageUploading || saving }))}
+        />
+        {!categoryMeta[category].singleton ? <Button type="button" onClick={() => { setCreateDraft(draftForCategory(category)); setCreateOpen(true); }}>{categoryMeta[category].createLabel}</Button> : null}
+      </div>
 
       <div className={cn("grid min-h-[42rem] content-start gap-4 [overflow-anchor:none]", !categoryMeta[category].singleton && "xl:grid-cols-[280px_minmax(0,1fr)]")}>
         {!categoryMeta[category].singleton ? <AdminCard className="admin-site-content__list self-start xl:sticky xl:top-6">
-          <AdminCardHeader><div><AdminSectionTitle>{categoryMeta[category].label}</AdminSectionTitle><AdminMetaText>{filteredBlocks.length}개 표시</AdminMetaText></div></AdminCardHeader>
+          <AdminCardHeader className="!min-h-9 !pb-0"><AdminMetaText>{filteredBlocks.length}개 표시</AdminMetaText></AdminCardHeader>
           <div className="scrollbar-hidden max-h-none overflow-y-visible p-2 sm:max-h-[680px] sm:overflow-y-auto">
             {blocksQuery.isLoading && !blocksQuery.data ? <AdminLoadingState className="min-h-24 px-2 py-6" />
-              : filteredBlocks.length === 0 ? <div className="px-4 py-16 text-center"><LayoutTemplate aria-hidden="true" className="mx-auto mb-3 size-8 text-slate-300" /><p className="text-sm font-medium text-slate-600">조건에 맞는 콘텐츠가 없습니다.</p></div>
-              : <DndContext modifiers={[restrictListDrag]} autoScroll={false} sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleDragEnd(event)}><SortableContext items={filteredBlocks.map((block) => block.contentBlockId)} strategy={verticalListSortingStrategy}><div className="grid gap-1">{filteredBlocks.map((block) => <SortableContentBlockItem key={block.contentBlockId} block={block} selected={block.contentBlockId === selectedId} disabled={isDirty || saving || orderSaving} sortable={!categoryMeta[category].singleton} onSelect={() => void selectBlock(block)} />)}</div></SortableContext></DndContext>}
+              : filteredBlocks.length === 0 ? <AdminEmptyState message="조건에 맞는 콘텐츠가 없습니다." />
+              : <DndContext modifiers={[restrictListDrag]} autoScroll sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleDragEnd(event)}><SortableContext items={filteredBlocks.map((block) => block.contentBlockId)} strategy={verticalListSortingStrategy}><div className="grid gap-1">{filteredBlocks.map((block) => <SortableContentBlockItem key={block.contentBlockId} block={block} selected={block.contentBlockId === selectedId} disabled={isDirty || saving || orderSaving} sortable={!categoryMeta[category].singleton} onSelect={() => void selectBlock(block)} />)}</div></SortableContext></DndContext>}
             {orderSaving ? <p className="px-3 pb-3 pt-2 text-xs font-normal text-[#344054]">노출 순서를 저장하는 중입니다.</p> : null}
           </div>
         </AdminCard> : null}
 
-        {selectedBlock ? <div className="admin-site-content__editor min-w-0 space-y-4">
+        {selectedBlock || categoryMeta[category].singleton ? <div className="admin-site-content__editor min-w-0 space-y-4">
           <AdminCard>
-            <AdminCardHeader className="min-h-[72px] px-5 py-4">
-              <div className="min-w-0"><AdminSectionTitle className="truncate !text-lg !font-semibold">{categoryMeta[category].singleton ? categoryMeta[category].label : selectedBlock.titleKo}</AdminSectionTitle>{!categoryMeta[category].singleton ? <p className="mt-1 text-xs text-slate-500">{categoryMeta[category].label}</p> : null}</div>
-              {!categoryMeta[category].singleton ? <AdminToolbarGroup>
-                <Button type="button" variant="ghost" size="sm" className="text-slate-500 hover:bg-rose-50 hover:text-rose-600" onClick={() => void deleteBlock()} disabled={saving}><Trash2 aria-hidden="true" /> 삭제</Button>
-              </AdminToolbarGroup> : null}
-            </AdminCardHeader>
+            {!categoryMeta[category].singleton ? <AdminCardHeader>
+              <AdminSectionTitle className="truncate !text-base !font-semibold">{selectedBlock?.titleKo}</AdminSectionTitle>
+              <Button type="button" variant="ghost" size="sm" className="text-slate-500 hover:bg-rose-50 hover:text-rose-600" onClick={() => void deleteBlock()} disabled={saving}>삭제</Button>
+            </AdminCardHeader> : null}
             <div className="grid gap-5 p-4 sm:p-5">
               {!isImageOnlyType(draft.type) ? <div className="grid gap-4 lg:grid-cols-2">
                 <AdminFormField label="한국어 제목"><UiInput value={draft.titleKo} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, titleKo: value })); }} /></AdminFormField>
@@ -402,20 +406,19 @@ function SiteContentPageContent() {
               </div> : null}
               <div className="grid gap-4">
                 {!isImageOnlyType(draft.type) && draft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={draft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
-                {isImageOnlyType(draft.type) ? <ContentImageInput spec={getImageSpec(draft.type)!} previewBorderless={draft.type === "ORGANIZATION_CHART"} value={imagePreview?.target === "draft" && imagePreview.field === "ko" ? imagePreview.url : draft.imageUrl} secondaryValue={draft.type === "ORGANIZATION_CHART" ? (imagePreview?.target === "draft" && imagePreview.field === "en" ? imagePreview.url : draft.imageUrlEn) : undefined} secondaryLabel={draft.type === "ORGANIZATION_CHART" ? "영문 조직도" : undefined} uploading={imageUploading} onSelect={(file) => requestImageCrop("draft", draft.type, file)} onSecondarySelect={(file) => requestImageCrop("draft", draft.type, file, "en")} onRemove={() => setDraft((current) => ({ ...current, imageUrl: "" }))} onSecondaryRemove={() => setDraft((current) => ({ ...current, imageUrlEn: "" }))} /> : null}
+                {isImageOnlyType(draft.type) ? <ContentImageInput spec={getImageSpec(draft.type)!} value={imagePreview?.target === "draft" && imagePreview.field === "ko" ? imagePreview.url : draft.imageUrl} secondaryValue={draft.type === "ORGANIZATION_CHART" ? (imagePreview?.target === "draft" && imagePreview.field === "en" ? imagePreview.url : draft.imageUrlEn) : undefined} secondaryLabel={draft.type === "ORGANIZATION_CHART" ? "영문 조직도" : undefined} uploading={imageUploading} onSelect={(file) => requestImageCrop("draft", draft.type, file)} onSecondarySelect={(file) => requestImageCrop("draft", draft.type, file, "en")} onRemove={() => setDraft((current) => ({ ...current, imageUrl: "" }))} onSecondaryRemove={() => setDraft((current) => ({ ...current, imageUrlEn: "" }))} /> : null}
               </div>
             </div>
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4">
+              <span className="text-xs text-slate-500">{selectedBlock ? `마지막 수정 ${formatDateTime(selectedBlock.updatedAt)}` : ""}</span>
+              <Button loading={saving} type="button" onClick={() => void applyBlock()} disabled={saving || imageUploading || !isDirty || !draft.titleKo.trim() || (isImageOnlyType(draft.type) && !draft.imageUrl.trim())}>저장</Button>
+            </div>
           </AdminCard>
-
-          <AdminStickyActionBar className="admin-site-content__action-bar">
-            <div><p className="text-sm font-medium text-slate-800">{isDirty ? "저장하지 않은 변경 사항이 있습니다." : `마지막 수정 ${formatDateTime(selectedBlock.updatedAt)}`}</p></div>
-            <AdminToolbarGroup><Button type="button" variant="outline" onClick={() => setDraft(draftFromBlock(selectedBlock))} disabled={!isDirty || saving}>되돌리기</Button><Button loading={saving} type="button" onClick={() => void applyBlock()} disabled={saving || imageUploading || (!isDirty && selectedBlock.status === "PUBLISHED") || !draft.titleKo.trim()}>{"변경 적용"}</Button></AdminToolbarGroup>
-          </AdminStickyActionBar>
-        </div> : <AdminCard className="grid min-h-[420px] place-items-center p-8 text-center"><div><LayoutTemplate aria-hidden="true" className="mx-auto mb-3 size-9 text-slate-300" /><p className="text-sm font-medium text-slate-700">관리할 콘텐츠를 선택하거나 새로 만드세요.</p></div></AdminCard>}
+        </div> : <AdminCard className="grid min-h-[420px] place-items-center"><AdminEmptyState message="관리할 콘텐츠를 선택하거나 새로 만드세요." /></AdminCard>}
       </div>
     </AdminPageMain>
 
-    <Modal open={createOpen} onClose={() => { if (!imageUploading && !saving) setCreateOpen(false); }} title={categoryMeta[category].createLabel} mobileFullscreen className="max-w-xl" bodyClassName="space-y-4 px-4 py-5 sm:px-5" footer={<><Button type="button" variant="outline" disabled={imageUploading || saving} onClick={() => setCreateOpen(false)}>취소</Button><Button loading={saving} type="button" onClick={() => void createBlock()} disabled={saving || imageUploading || !createDraft.titleKo.trim() || (isImageOnlyType(createDraft.type) && !createDraft.imageUrl.trim())}>{"등록"}</Button></>}>
+    <Modal open={createOpen} onClose={() => { if (!imageUploading && !saving) setCreateOpen(false); }} title={categoryMeta[category].createLabel} mobileFullscreen size="standard" bodyClassName="space-y-4" footer={<><Button type="button" variant="outline" disabled={imageUploading || saving} onClick={() => setCreateOpen(false)}>취소</Button><Button loading={saving} type="button" onClick={() => void createBlock()} disabled={saving || imageUploading || !createDraft.titleKo.trim() || (isImageOnlyType(createDraft.type) && !createDraft.imageUrl.trim())}>{"추가"}</Button></>}>
       <div className="grid gap-4">
         {!isImageOnlyType(createDraft.type) ? <AdminFormField label="한국어 제목"><UiInput value={createDraft.titleKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleKo: value })); }} placeholder="공개 화면에 표시할 제목" /></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) ? <AdminFormField label="영문 제목"><UiInput value={createDraft.titleEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleEn: value })); }} /></AdminFormField> : null}
@@ -423,49 +426,32 @@ function SiteContentPageContent() {
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "QUICK_LINK" ? <AdminFormField label="영문 본문"><UiTextarea className="min-h-24" value={createDraft.bodyEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, bodyEn: value })); }} /></AdminFormField> : null}
         {createDraft.type === "PLEDGE" ? <AdminFormField label="이행 상태"><AdminSelectDropdown ariaLabel="이행 상태" value={createDraft.pledgeStatus ?? "PLANNED"} options={pledgeStatusOptions} onChange={(value) => setCreateDraft((current) => ({ ...current, pledgeStatus: value as BlockDraft["pledgeStatus"] }))} /></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={createDraft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
-        {isImageOnlyType(createDraft.type) ? <ContentImageInput spec={getImageSpec(createDraft.type)!} previewBorderless={createDraft.type === "ORGANIZATION_CHART"} value={imagePreview?.target === "create" && imagePreview.field === "ko" ? imagePreview.url : createDraft.imageUrl} secondaryValue={createDraft.type === "ORGANIZATION_CHART" ? (imagePreview?.target === "create" && imagePreview.field === "en" ? imagePreview.url : createDraft.imageUrlEn) : undefined} secondaryLabel={createDraft.type === "ORGANIZATION_CHART" ? "영문 조직도" : undefined} uploading={imageUploading} onSelect={(file) => requestImageCrop("create", createDraft.type, file)} onSecondarySelect={(file) => requestImageCrop("create", createDraft.type, file, "en")} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} onSecondaryRemove={() => setCreateDraft((current) => ({ ...current, imageUrlEn: "" }))} /> : null}
+        {isImageOnlyType(createDraft.type) ? <ContentImageInput spec={getImageSpec(createDraft.type)!} value={imagePreview?.target === "create" && imagePreview.field === "ko" ? imagePreview.url : createDraft.imageUrl} secondaryValue={createDraft.type === "ORGANIZATION_CHART" ? (imagePreview?.target === "create" && imagePreview.field === "en" ? imagePreview.url : createDraft.imageUrlEn) : undefined} secondaryLabel={createDraft.type === "ORGANIZATION_CHART" ? "영문 조직도" : undefined} uploading={imageUploading} onSelect={(file) => requestImageCrop("create", createDraft.type, file)} onSecondarySelect={(file) => requestImageCrop("create", createDraft.type, file, "en")} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} onSecondaryRemove={() => setCreateDraft((current) => ({ ...current, imageUrlEn: "" }))} /> : null}
       </div>
     </Modal>
     {cropRequest ? <ImageCropModal aspectRatio={getImageSpec(cropRequest.type)!.width / getImageSpec(cropRequest.type)!.height} file={cropRequest.file} outputHeight={getImageSpec(cropRequest.type)!.height} outputWidth={getImageSpec(cropRequest.type)!.width} onCancel={() => setCropRequest(null)} onComplete={applyCroppedImage} /> : null}
   </AdminPageShell>;
 }
 
-function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onSelect, previewBorderless = false, secondaryLabel, secondaryValue, spec, uploading, value }: {
+function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onSelect, secondaryLabel, secondaryValue, spec, uploading, value }: {
   onRemove: () => void;
   onSecondaryRemove?: () => void;
   onSecondarySelect?: (file: File) => void;
   onSelect: (file: File) => void;
-  previewBorderless?: boolean;
   secondaryLabel?: string;
   secondaryValue?: string;
   spec: { height: number; label: string; width: number };
   uploading: boolean;
   value: string;
 }) {
-  const [failedPreviews, setFailedPreviews] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    setFailedPreviews({});
-  }, [secondaryValue, value]);
-
-  const renderSlot = (key: string, label: string | null, slotValue: string, select: (file: File) => void, remove: (() => void) | undefined) => {
-    const previewUrl = slotValue && !failedPreviews[key] ? resolveAssetUrl(slotValue) : null;
-
-    return (
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2"><p className="text-sm font-medium text-slate-700">{label ?? spec.label}</p><span className="text-xs font-normal text-slate-400">권장 {spec.width.toLocaleString()} × {spec.height.toLocaleString()} px</span></div>
-        <div className="group/image relative overflow-hidden rounded-lg border border-dashed border-slate-200 bg-slate-50" style={{ aspectRatio: `${spec.width} / ${spec.height}` }}>
-          {previewUrl ? <img src={previewUrl} alt="" className="absolute inset-0 size-full object-contain" onError={() => setFailedPreviews((current) => ({ ...current, [key]: true }))} /> : null}
-          <label className={cn("absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-2 bg-slate-900/40 text-white transition-opacity focus-within:opacity-100", previewUrl ? "opacity-0 hover:opacity-100" : "bg-slate-50 text-slate-500 hover:bg-slate-100/70", uploading && "pointer-events-none")}>
-            {uploading ? <Loader2 aria-hidden="true" className="size-6 animate-spin motion-reduce:animate-none" /> : <ImageUp aria-hidden="true" className="size-6" />}{previewUrl ? "이미지 변경" : "이미지를 업로드해주세요."}
-            {!previewUrl && failedPreviews[key] ? <span className="text-xs text-rose-600">이미지를 불러오지 못했습니다.</span> : null}
-            <input aria-label={`${label ?? spec.label} 업로드`} type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) select(file); }} />
-          </label>
-          {slotValue && remove ? <Button type="button" variant="ghost" size="icon" aria-label={`${label ?? spec.label} 제거`} data-tooltip={`${label ?? spec.label} 제거`} className="absolute right-2 top-2 !border-0 !bg-transparent text-slate-600 shadow-none hover:!bg-slate-100/90 hover:text-rose-600" onClick={remove} disabled={uploading}><X aria-hidden="true" className="size-4" /></Button> : null}
-        </div>
-      </div>
-    );
-  };
+  const renderSlot = (key: string, label: string | null, slotValue: string, select: (file: File) => void, remove: (() => void) | undefined) => (
+    <div key={key} className="space-y-2">
+      <p className="text-sm font-medium text-slate-700">{label ?? spec.label}</p>
+      <ImageUploadField alt={(label ?? spec.label) + " 미리보기"} accept="image/*" aspectRatio={spec.width / spec.height}
+        metadata={"권장 " + spec.width + " × " + spec.height + " px"} imageUrl={slotValue ? resolveAssetUrl(slotValue) : undefined} disabled={uploading}
+        selectLabel={(label ?? spec.label) + " 업로드"} removeLabel={(label ?? spec.label) + " 제거"} onSelect={select} onRemove={() => remove?.()} />
+    </div>
+  );
 
   const hasSecondary = Boolean(secondaryLabel && onSecondarySelect);
   return <div className="space-y-4">
@@ -479,10 +465,10 @@ function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onS
 function SortableContentBlockItem({ block, disabled, onSelect, selected, sortable }: { block: ContentBlockRecord; disabled: boolean; onSelect: () => void; selected: boolean; sortable: boolean }) {
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: block.contentBlockId, disabled: disabled || !sortable });
   const style: CSSProperties = { transform: CSS.Translate.toString(transform), transition };
-  return <div ref={setNodeRef} style={style} className={cn("group flex min-w-0 w-full select-none items-stretch overflow-hidden rounded-lg", selected ? "bg-emerald-50" : "hover:bg-slate-50", isDragging && "z-10 opacity-40")}>
+  return <div ref={setNodeRef} style={style} className={cn("group flex min-w-0 w-full select-none items-stretch overflow-hidden rounded-lg", selected ? "bg-slate-100 font-medium" : "hover:bg-slate-50", isDragging && "z-10 opacity-40")}>
     {sortable ? <button type="button" {...attributes} {...listeners} disabled={disabled} className="admin-list-drag-handle self-center ml-1 mr-1 disabled:cursor-default disabled:opacity-30" aria-label={`${block.titleKo} 노출 순서 변경`}><GripVertical aria-hidden="true" className="size-4" /></button> : null}
-    <button type="button" onClick={onSelect} className={cn("min-w-0 flex-1 overflow-hidden pl-0 pr-2 py-3 text-left", sortable ? "rounded-none" : "rounded-lg")}>
-      <span className="flex min-w-0 items-center justify-between gap-3"><span className="min-w-0 flex-1 truncate text-sm font-normal text-[#172033]">{block.titleKo}</span></span>
+    <button type="button" onClick={onSelect} className={cn("min-w-0 flex-1 overflow-hidden pl-0 pr-2 py-3 text-left", selected && "!font-medium", sortable ? "rounded-none" : "rounded-lg")}>
+      <span className="flex min-w-0 items-center justify-between gap-3"><span className="min-w-0 flex-1 truncate text-sm text-[#172033]">{block.titleKo}</span></span>
     </button>
 
   </div>;

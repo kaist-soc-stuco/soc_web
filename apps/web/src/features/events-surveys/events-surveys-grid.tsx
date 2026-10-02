@@ -75,32 +75,21 @@ function getStatusText(item: UnifiedItem, lang: string) {
 
 interface CardBadge {
   label: string;
-  className: string;
+  tone: "open" | "closed" | "neutral";
 }
 
-const DEFAULT_CARD_BADGE_CLASS =
-  "border-white/30 bg-slate-950/35 text-white";
-const OPEN_CARD_BADGE_CLASS =
-  "border-brand-primary/70 bg-brand-primary/90 text-white";
-
 function getCardBadges(item: UnifiedItem, lang: string): CardBadge[] {
-  const statusBadge: CardBadge = {
-    label: getStatusText(item, lang),
-    className:
-      item.computedState === "open"
-        ? OPEN_CARD_BADGE_CLASS
-        : DEFAULT_CARD_BADGE_CLASS,
-  };
+  const applicationClosed = isApplicationFull(item) || item.linkedSurveyState === "closed";
   const badges: CardBadge[] = [
-    statusBadge,
+    {
+      label: getStatusText(item, lang),
+      tone: item.computedState === "open" ? "open" : item.computedState === "closed" ? "closed" : "neutral",
+    },
     {
       label: getApplicationText(item, lang) ?? "",
-      className: DEFAULT_CARD_BADGE_CLASS,
+      tone: applicationClosed ? "closed" : item.linkedSurveyState === "open" ? "open" : "neutral",
     },
-    {
-      label: getAudienceText(item, lang),
-      className: DEFAULT_CARD_BADGE_CLASS,
-    },
+    { label: getAudienceText(item, lang), tone: "neutral" },
   ];
 
   return badges
@@ -255,8 +244,8 @@ export function EventsSurveysGrid({
             key={item.id}
             className={
               isHomeEventCard
-                ? `home-portal-event-card select-none group ${closed ? "opacity-50" : ""}`
-                : `interaction-card select-none group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-elevated ${closed ? "border-slate-200 opacity-50" : "border-gray-200"}`
+                ? `event-survey-card home-portal-event-card select-none group${closed ? " is-closed" : ""}`
+                : `event-survey-card${closed ? " is-closed" : ""} interaction-card select-none group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-elevated ${closed ? "border-slate-200" : "border-gray-200"}`
             }
           >
             <div
@@ -269,26 +258,12 @@ export function EventsSurveysGrid({
               <Link
                 aria-label={title}
                 to={href} target={item.kind === "EVENT" ? undefined : "_blank"} rel="noopener noreferrer"
-                className="absolute inset-0 block"
+                className={`absolute inset-0 block ${closed ? "opacity-65" : ""}`}
               >
                 <CardMedia imageUrl={item.imageUrl} isSurvey={isSurvey} />
               </Link>
-              {badges.length > 0 ? (
-                <div
-                  className={`pointer-events-none absolute z-10 flex flex-wrap gap-1.5 ${isHomeEventCard ? "left-4 top-4 max-w-[calc(100%-2rem)]" : "left-3 top-3 max-w-[calc(100%-4.5rem)]"}`}
-                >
-                  {badges.map((badge) => (
-                    <span
-                      key={badge.label}
-                      className={`rounded-full border px-2.5 py-1 text-[length:var(--ui-text-caption-size)] font-medium leading-none shadow-sm backdrop-blur-md ${badge.className}`}
-                    >
-                      {badge.label}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
               {canEngage ? (
-                <div className="absolute right-3 top-3 z-20 rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm transition-colors hover:bg-slate-100">
+                <div className="absolute right-3 top-3 z-20">
                   <ArticleEngagementActions
                     allowLike={false}
                     compact
@@ -297,6 +272,7 @@ export function EventsSurveysGrid({
                     likeCount={item.likeCount ?? 0}
                     scrapCount={item.scrapCount ?? 0}
                     scrapIconOnly
+                    scrapClassName="event-card-scrap"
                     submitting={submitting}
                     viewerHasLiked={item.viewerHasLiked ?? false}
                     viewerHasScrapped={item.viewerHasScrapped ?? false}
@@ -309,6 +285,15 @@ export function EventsSurveysGrid({
             </div>
 
             <div className="home-portal-event-body break-keep">
+              {badges.length > 0 ? (
+                <div className="home-portal-event-badges">
+                  {badges.map((badge) => (
+                    <span key={badge.label} className={`home-portal-event-badge is-${badge.tone}`}>
+                      {badge.label}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               <Link aria-label={title} to={href} target={item.kind === "EVENT" ? undefined : "_blank"} rel="noopener noreferrer" className="min-w-0">
                 <h3 className="line-clamp-2">{title}</h3>
                 {desc ? <p className="line-clamp-2">{desc}</p> : null}

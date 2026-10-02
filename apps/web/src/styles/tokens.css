@@ -23,14 +23,17 @@
   --ui-page-tab-height: 2.125rem;
   --ui-page-tab-height-mobile: var(--ui-touch-target-min);
   --ui-pagination-control-size: var(--ui-control-height-compact);
-  --ui-table-head-height: 3rem;
-  --ui-table-row-min-height: 3.5rem;
+  --ui-table-head-height: 2.25rem;
+  --ui-table-row-min-height: 2.75rem;
   --ui-card-radius: 0.75rem;
   --ui-panel-radius: 1rem;
+  --ui-modal-width-compact: 25rem;
+  --ui-modal-width-standard: 40rem;
+  --ui-modal-width-wide: 55rem;
   --ui-page-max-width: 88rem;
-  --ui-admin-page-max-width: 90rem;
+  --ui-admin-page-max-width: 84rem;
   --ui-admin-editor-max-width: 72rem;
-  --ui-article-max-width: 65rem;
+  --ui-article-max-width: 56rem;
   --ui-legal-max-width: 75rem;
   --ui-about-max-width: 61.25rem;
   --ui-space-page-x-narrow: 1rem;
@@ -70,8 +73,10 @@
   --ui-text-body-size: 0.875rem;
   --ui-text-section-size: 0.9375rem;
   --ui-text-title-sm-size: 1.125rem;
-  --ui-text-page-title-mobile-size: 1.75rem;
-  --ui-text-page-title-size: 1.875rem;
+  --ui-text-page-title-mobile-size: 1.5rem;
+  --ui-text-page-title-size: 1.75rem;
+  --ui-text-admin-title-size: 1.625rem;
+  --ui-text-admin-title-mobile-size: 1.375rem;
   --ui-text-logo-mark-size: 0.4375rem;
 
   /* A visible, but intentionally softer, keyboard focus ring. */

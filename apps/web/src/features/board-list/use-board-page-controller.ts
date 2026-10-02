@@ -1,3 +1,4 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
@@ -57,18 +58,6 @@ export function useBoardPageController() {
   const [currentPage, setCurrentPageState] = useState(() =>
     parsePageParam(searchParams.get("page")),
   );
-  const [articles, setArticles] = useState<ArticleListItem[]>([]);
-  // Keep the table schema aligned with the rows currently on screen while a
-  // category request is in flight. The route/category navigation may update
-  // immediately, but the table switches columns only with the new response.
-  const [renderedCategory, setRenderedCategory] = useState<string | undefined>(
-    () => category,
-  );
-  const [isArticleLoading, setIsArticleLoading] = useState(true);
-  const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
-  const [articleError, setArticleError] = useState<string | null>(null);
-  const [articleRetryKey, setArticleRetryKey] = useState(0);
-  const [totalCount, setTotalCount] = useState(0);
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
   const navigate = useNavigate();
@@ -93,6 +82,30 @@ export function useBoardPageController() {
   const isBoardNotFound = Boolean(
     category && boardCatalogSource === "server" && !currentBoard,
   );
+
+  const queryClient = useQueryClient();
+  const articleQueryKey = ["board-articles", session?.userId ?? "guest", category ?? "all", currentPage, postsPerPage, searchQuery, searchCriteria] as const;
+  const articleQuery = useQuery({
+    queryKey: articleQueryKey,
+    queryFn: async () => {
+      const data = category
+        ? await apiClient.getArticles(category, { page: currentPage, limit: postsPerPage, q: searchQuery })
+        : await apiClient.getAllArticles({ page: currentPage, limit: postsPerPage, q: searchQuery, searchBy: searchCriteria, sortBy: "latest", sortDirection: "desc" });
+      const items = [...data.items];
+      if (!category) items.sort(comparePinnedArticles);
+      return { ...data, items, renderedCategory: category };
+    },
+    placeholderData: (previous, previousQuery) => previousQuery?.queryKey[1] === (session?.userId ?? "guest") ? previous : undefined,
+  });
+  const articles = articleQuery.data?.items ?? [];
+  const totalCount = articleQuery.data?.total ?? 0;
+  const renderedCategory = articleQuery.data ? articleQuery.data.renderedCategory : category;
+  const isArticleLoading = articleQuery.isFetching;
+  const hasCompletedInitialLoad = !articleQuery.isPending;
+  const articleError = articleQuery.isError && !articleQuery.data ? "failed" : null;
+  const setArticles = (update: (items: ArticleListItem[]) => ArticleListItem[]) => {
+    queryClient.setQueryData<NonNullable<typeof articleQuery.data>>(articleQueryKey, current => current ? { ...current, items: update(current.items) } : current);
+  };
 
   const totalPages = Math.ceil(totalCount / postsPerPage);
 
@@ -154,69 +167,6 @@ export function useBoardPageController() {
     setCurrentPageState(parsePageParam(searchParams.get("page")));
     setPostsPerPageState(parsePageSizeParam(searchParams.get("limit")));
   }, [searchParams]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setIsArticleLoading(true);
-    setArticleError(null);
-
-    const queryParam = searchQuery;
-    const fetchPromise = category
-      ? apiClient.getArticles(category, {
-          page: currentPage,
-          limit: postsPerPage,
-          q: queryParam,
-        })
-      : apiClient.getAllArticles({
-          limit: postsPerPage,
-          page: currentPage,
-          q: searchQuery,
-          searchBy: searchCriteria,
-          sortBy: "latest",
-          sortDirection: "desc",
-        });
-
-    fetchPromise
-      .then((data) => {
-        if (cancelled) return;
-        const items = [...data.items];
-
-        if (!category) {
-          items.sort((a, b) => comparePinnedArticles(a, b));
-        }
-
-        setArticles(items);
-        setTotalCount(data.total);
-        setRenderedCategory(category);
-      })
-      .catch((error) => {
-        console.error("Failed to load board articles:", error);
-        if (!cancelled) {
-          setArticles([]);
-          setTotalCount(0);
-          setRenderedCategory(category);
-          setArticleError("failed");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsArticleLoading(false);
-          setHasCompletedInitialLoad(true);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    apiClient,
-    category,
-    currentPage,
-    articleRetryKey,
-    searchQuery,
-    searchCriteria,
-    postsPerPage,
-  ]);
 
   useEffect(() => {
     setSearchCriteria("title_content");
@@ -393,7 +343,7 @@ export function useBoardPageController() {
     engagementSubmitting,
     isBoardNotFound,
     isArticleLoading,
-    retryArticles: () => setArticleRetryKey((current) => current + 1),
+    retryArticles: () => void articleQuery.refetch(),
     showInitialSkeleton: isArticleLoading && !hasCompletedInitialLoad,
     lang,
     postsPerPage,

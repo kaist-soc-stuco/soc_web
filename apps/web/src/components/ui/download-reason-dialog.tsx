@@ -24,7 +24,7 @@ export function useDownloadReasonDialog() {
     if (value.length < 2 || value.length > 200) { setInvalid(true); return; }
     close(value);
   };
-  const DownloadReasonDialog = <Modal open={open} onClose={() => close(null)} title="다운로드 사유" className="max-w-md" footer={<><Button variant="outline" onClick={() => close(null)}>취소</Button><Button onClick={submit}>다운로드</Button></>}>
+  const DownloadReasonDialog = <Modal open={open} onClose={() => close(null)} title="다운로드 사유" size="compact" footer={<><Button variant="outline" onClick={() => close(null)}>취소</Button><Button onClick={submit}>다운로드</Button></>}>
     <form onSubmit={event => { event.preventDefault(); submit(); }} className="space-y-3">
       <label htmlFor="download-reason" className="block text-sm text-slate-600">개인정보를 내려받는 사유를 입력해 주세요.</label>
       <UiInput autoFocus id="download-reason" value={reason} maxLength={200} aria-invalid={invalid} aria-describedby="download-reason-help" onChange={event => { setReason(event.target.value); setInvalid(false); }} />

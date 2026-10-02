@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ interface SegmentedControlProps<T extends string> {
   options: readonly SegmentedControlOption<T>[];
   role?: "group" | "tablist";
   value: T;
+  variant?: "pill" | "underline";
 }
 
 export function SegmentedControl<T extends string>({
@@ -27,13 +28,31 @@ export function SegmentedControl<T extends string>({
   options,
   role = "group",
   value,
+  variant = "pill",
 }: SegmentedControlProps<T>) {
   const isTablist = role === "tablist";
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [indicator, setIndicator] = useState<{ left: number; width: number; height: number } | null>(null);
+  useLayoutEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    const measure = () => {
+      const active = root.querySelector<HTMLButtonElement>("button.is-active");
+      const next = active ? { left: active.offsetLeft, width: active.offsetWidth, height: active.offsetHeight } : null;
+      setIndicator(previous => previous?.left === next?.left && previous?.width === next?.width && previous?.height === next?.height ? previous : next);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    Array.from(root.querySelectorAll("button")).forEach(button => observer.observe(button));
+    return () => observer.disconnect();
+  }, [options, value, variant]);
 
   return (
     <div
+      ref={containerRef}
       aria-label={ariaLabel}
-      className={cn("ui-segmented-control filter-chips", className)}
+      className={cn(variant === "underline" ? "ui-view-tabs" : "ui-segmented-control filter-chips", className)}
       role={role}
       onKeyDown={isTablist ? event => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -46,6 +65,7 @@ export function SegmentedControl<T extends string>({
         tabs[next].focus(); tabs[next].click();
       } : undefined}
     >
+      {indicator ? <span aria-hidden="true" className={variant === "pill" ? "ui-segmented-indicator" : "ui-view-tab-indicator"} style={{ transform: `translateX(${indicator.left}px)`, width: indicator.width, height: variant === "pill" ? indicator.height : 3 }} /> : null}
       {options.map((option) => {
         const active = option.value === value;
 
@@ -62,7 +82,8 @@ export function SegmentedControl<T extends string>({
             role={isTablist ? "tab" : undefined}
             tabIndex={isTablist ? (active || (!options.some(item => item.value === value && !item.disabled) && option === options.find(item => !item.disabled)) ? 0 : -1) : undefined}
             className={cn(
-              "!h-[var(--ui-page-tab-height)] !min-h-[var(--ui-page-tab-height)] !font-normal",
+              "!h-[var(--ui-page-tab-height)] !min-h-[var(--ui-page-tab-height)]",
+              variant === "underline" ? "![font-weight:var(--ui-view-tab-weight,500)]" : "![font-weight:var(--ui-segmented-weight,500)]",
               itemClassName,
               active && "is-active",
             )}

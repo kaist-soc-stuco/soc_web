@@ -6,6 +6,8 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
+import { AdminTableEmpty } from "@/components/ui/admin-data-table";
+import { AdminEmptyState } from "@/components/ui/admin-page";
 import { Pagination, PageSizeSelect } from "@/components/ui/pagination";
 import { IconButton } from "@/components/ui/icon-button";
 import { CreateVoteSchema } from "@soc/contracts";
@@ -17,7 +19,7 @@ import type { AdminUserRecord, CreateVoteRequest, VoteDetailResponse, VoteItemTy
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, Copy, Undo2, Redo2, Link2, Eye, MoreVertical, Download, Upload, GripVertical, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Copy, Undo2, Redo2, Link2, Eye, MoreVertical, Download, Upload, GripVertical, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode, type SetStateAction } from "react";
 import { useBlocker, useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx";
@@ -412,7 +414,7 @@ export function VoteEditorPage() {
       <AdminPageShell><AdminPageMain className="admin-vote-editor !max-w-[76rem] !pt-0">
         <div className="admin-vote-editor__header sticky top-0 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-6 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
           <AdminPageHeader
-            center={<SegmentedControl ariaLabel="투표 편집 영역" role="tablist" className="w-fit" value={editorTab} onChange={setEditorTab} options={[{value:"questions",label:"안건"},{value:"voters",label:"선거인명부"},{value:"settings",label:"설정"},{value:"operations",label:"진행·개표"}]} />}
+            center={<SegmentedControl variant="underline" ariaLabel="투표 편집 영역" role="tablist" className="w-fit" value={editorTab} onChange={setEditorTab} options={[{value:"questions",label:"안건"},{value:"voters",label:"선거인명부"},{value:"settings",label:"설정"},{value:"operations",label:"진행·개표"}]} />}
             title={<span className="flex min-w-0 items-center gap-2"><IconButton tone="navigation" aria-label="투표 목록으로" className="shrink-0" onClick={() => navigate("/admin/votes")}><ArrowLeft className="size-5" /></IconButton><span className="min-w-0 break-words">{stripRichText(draft.titleKo) || "제목 없는 투표"}</span></span>}
             actions={<div className="survey-editor-header-actions flex flex-wrap items-center gap-2">
             <IconButton aria-label="실행 취소" data-tooltip="실행 취소" disabled={!editable || !history.current.length} onClick={() => restore("undo")}><Undo2 className="size-4" /></IconButton>
@@ -437,7 +439,7 @@ export function VoteEditorPage() {
           <div className="space-y-5 p-5">
             {vote?.status === "CLOSED" && <p className="text-sm text-slate-600">투표가 마감되었습니다. 상단의 ‘개표’를 누르면 결과를 집계합니다.</p>}
             {vote ? <VoteProgress vote={vote} /> : <p className="text-sm text-slate-500">투표를 저장하면 진행 현황을 확인할 수 있습니다.</p>}
-            {results ? <div className="flex gap-2"><Button variant="outline" disabled={exporting} aria-busy={exporting} onClick={()=>void exportResults()}>결과 엑셀 다운로드</Button><Button variant="outline" onClick={()=>window.print()}>인쇄</Button></div> : null}
+            {results ? <div className="flex gap-2"><Button variant="outline" disabled={exporting} aria-busy={exporting} onClick={()=>void exportResults()}><Download className="size-4" />결과 엑셀 내보내기</Button><Button variant="outline" onClick={()=>window.print()}>인쇄</Button></div> : null}
             {results ? <div className="space-y-6 border-t border-slate-100 pt-5"><h2 className="font-semibold">{stripRichText(vote?.titleKo)} 개표 결과</h2><p className="text-sm">총 {results.totalBallots}명 참여</p>{results.items.map(item => <section key={item.itemId} className="space-y-3"><h3 className="font-medium">{stripRichText(item.titleKo)}</h3>{item.options.map(option => <div key={option.optionId}><div className="mb-1 flex justify-between gap-3 text-sm"><span>{option.labelKo}</span><span>{option.count}표 ({option.percentage.toFixed(1)}%)</span></div><div className="h-3 rounded-full bg-slate-100"><div className={`h-full rounded-full ${option.count > 0 && option.count === Math.max(...item.options.map(value => value.count)) ? "bg-emerald-500" : "bg-emerald-500"}`} style={{ width: `${Math.min(100, option.percentage)}%` }} /></div></div>)}</section>)}</div> : null}
           </div>
         </AdminCard> : null}
@@ -516,7 +518,7 @@ export function VoteEditorPage() {
           {editable ? (
             <div className="mt-4 flex justify-end">
               <Button onClick={() => { const item = newItem(); setDraft({ ...draft, items: [...draft.items, item] }); setSelectedAgenda(String(item.id)); }}>
-                <Plus className="size-4" />
+
                 안건 추가
               </Button>
             </div>
@@ -527,10 +529,10 @@ export function VoteEditorPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5">
             <UiInput className="w-full max-w-xs md:ml-auto" placeholder="학번 또는 이름 검색" value={voterQuery} onChange={e=>{setVoterQuery(e.target.value);setRosterPage(1);}} />
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" disabled={exporting} aria-busy={exporting} onClick={() => void exportRoster()}><Download />내보내기</Button>
+              <Button variant="outline" disabled={exporting} aria-busy={exporting} onClick={() => void exportRoster()}><Download />엑셀 내보내기</Button>
               {rosterEditable ? <>
-                <Button variant="outline" onClick={() => setUploadDialogOpen(true)}><Upload className="size-4" />엑셀 업로드</Button>
-                <Button variant="outline" onClick={()=>setAddingVoter(true)}><UserPlus />수동 추가</Button>
+                <Button variant="outline" onClick={() => setUploadDialogOpen(true)}><Upload className="size-4" />엑셀 가져오기</Button>
+                <Button variant="outline" onClick={()=>setAddingVoter(true)}>수동 추가</Button>
               </> : null}
             </div>
           </div>
@@ -541,7 +543,7 @@ export function VoteEditorPage() {
               </thead>
               <tbody>
                 {visibleVoters.length === 0 ? (
-                  <tr><td colSpan={rosterEditable ? 5 : 4} className="px-5 py-16 text-center text-sm font-normal text-slate-400">{effectiveVoters.length === 0 ? "등록된 선거인명부가 없습니다." : "검색 결과가 없습니다."}</td></tr>
+                  <AdminTableEmpty colSpan={rosterEditable ? 5 : 4}>{effectiveVoters.length === 0 ? "등록된 선거인명부가 없습니다." : "검색 결과가 없습니다."}</AdminTableEmpty>
                 ) : visibleVoters.slice((rosterPage-1)*rosterPageSize,rosterPage*rosterPageSize).map(voter=><tr key={voter.userId} className="border-t border-slate-100">
                   <td className="px-5 py-3">{voter.studentNumber}</td>
                   <td className="px-5 py-3">{voter.nameKo}</td>
@@ -557,17 +559,17 @@ export function VoteEditorPage() {
           </div> : null}
         </AdminCard> : null}
 
-        <Modal open={uploadDialogOpen && rosterEditable} onClose={() => { if (!importingRoster) setUploadDialogOpen(false); }} title="선거인명부 업로드" className="max-w-md"
+        <Modal open={uploadDialogOpen && rosterEditable} onClose={() => { if (!importingRoster) setUploadDialogOpen(false); }} title="선거인명부 가져오기" size="compact"
         footer={<><Button variant="outline" disabled={importingRoster} onClick={() => setUploadDialogOpen(false)}>취소</Button><Button loading={importingRoster} disabled={importingRoster} onClick={() => rosterFileRef.current?.click()}><Upload className="size-4" />{"파일 선택"}</Button></>}>
         <p className="text-sm leading-6 text-slate-600">양식의 학번 열을 작성한 뒤 엑셀 파일을 업로드해 주세요.</p>
-        <Button variant="outline" className="mt-4" onClick={() => { const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([["학번"]]), "선거인명부"); XLSX.writeFile(book, "선거인명부_양식.xlsx"); }}><Download className="size-4" />양식 다운로드</Button>
+        <Button variant="outline" className="mt-4" onClick={() => { const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([["학번"]]), "선거인명부"); XLSX.writeFile(book, "선거인명부_양식.xlsx"); }}><Download className="size-4" />엑셀 양식 받기</Button>
         <input ref={rosterFileRef} className="hidden" type="file" accept=".xlsx,.xls" disabled={importingRoster} onChange={event => void importXlsx(event)} />
       </Modal>
       <Modal
           open={addingVoter && rosterEditable}
           onClose={closeCandidateModal}
           title="선거인 수동 추가"
-          className="max-w-xl"
+          size="standard"
           bodyClassName="space-y-4"
           footer={<div className="flex w-full items-center justify-between gap-3"><span className="text-sm text-slate-500" aria-live="polite">{selectedCandidates.length}명 선택</span><div className="flex gap-2"><Button variant="outline" disabled={addingCandidates} onClick={closeCandidateModal}>취소</Button><Button loading={addingCandidates} disabled={!selectedCandidates.length || addingCandidates} onClick={() => void addCandidates()}>명부에 추가</Button></div></div>}
         >
@@ -590,7 +592,7 @@ export function VoteEditorPage() {
                 <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{candidate.nameKo}</span><span className="mt-0.5 block text-xs text-slate-500">{candidate.stdNo || "학번 없음"}</span></span>
                 {existing ? <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs">등록됨</span> : null}
               </label>;
-            })}</div> : <p className="flex min-h-40 items-center justify-center px-5 text-center text-sm text-slate-500" role="status">{searchedCandidates ? "검색 결과가 없습니다. 다른 이름이나 학번으로 검색해 보세요." : "이름이나 학번으로 회원을 검색하세요."}</p>}
+            })}</div> : <AdminEmptyState className="min-h-40 px-5" role="status" message={searchedCandidates ? "검색 결과가 없습니다." : "이름이나 학번으로 회원을 검색하세요."} />}
           </div>
         </Modal>
 

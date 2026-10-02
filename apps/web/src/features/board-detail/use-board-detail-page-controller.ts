@@ -313,6 +313,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
           : "(Deleted posts cannot be restored.)",
       title:
         lang === "ko" ? "게시글 삭제" : "Delete post",
+      size: "standard",
       tone: "danger",
     });
     if (!confirmed) return;
