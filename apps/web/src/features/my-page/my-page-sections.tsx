@@ -277,7 +277,7 @@ export function MyPageProfilePanel({
   ] as const;
 
   return (
-    <div className="flex flex-col gap-4 animate-in fade-in duration-300">
+    <div className="flex flex-col gap-4">
       <div className="mb-1.5 select-none">
         <h1 className="text-[length:var(--ui-text-page-title-mobile-size)] font-bold leading-8 tracking-tight text-slate-900 sm:text-[length:var(--ui-text-page-title-size)] sm:leading-9">
           {lang === "ko" ? "내 정보" : "Profile"}
@@ -401,7 +401,7 @@ export function MyPageActivityPanel({
   useEffect(() => { if (!loading) lastCollection.current = collection; }, [collection, loading]);
 
   return (
-    <div className="flex flex-col gap-4 animate-in fade-in duration-300">
+    <div className="flex flex-col gap-4">
       <div className="mb-1.5 select-none">
         <h1 className="text-[length:var(--ui-text-page-title-mobile-size)] font-bold leading-8 tracking-tight text-slate-900 sm:text-[length:var(--ui-text-page-title-size)] sm:leading-9">
           {lang === "ko" ? "활동 내역" : "Activity"}
@@ -409,7 +409,7 @@ export function MyPageActivityPanel({
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 flex flex-col">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="mypage-activity-toolbar mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
           <div ref={activityTabsRef} data-more={moreTabs} className="activity-tab-strip scrollbar-hidden flex min-w-0 flex-1 gap-1 overflow-x-auto select-none">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -418,7 +418,7 @@ export function MyPageActivityPanel({
                 key={tab.id}
                 aria-pressed={isActive}
                 onClick={() => onTabChange(tab.id)}
-                className={`relative flex min-h-11 shrink-0 items-center justify-center border-0 bg-transparent px-2.5 pb-2 text-[length:var(--ui-text-body-sm-size)] font-normal cursor-pointer transition-colors ${
+                className={`relative !h-9 !min-h-9 shrink-0 items-center justify-center border-0 bg-transparent px-2.5 pb-2 text-[length:var(--ui-text-body-sm-size)] font-normal cursor-pointer transition-colors ${
                   isActive
                     ? "text-kaist-darkgreen"
                     : "text-slate-400 hover:text-kaist-darkgreen"

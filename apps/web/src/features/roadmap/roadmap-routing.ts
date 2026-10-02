@@ -170,10 +170,14 @@ export function routeConnection(source: Card, target: Card, cards: Card[]) {
   return { sourceSide, targetSide, points };
 }
 
-export function roundedPath(points: Point[]) {
+export function roundedPath(points: Point[], junctions: ReadonlySet<string> = new Set()) {
   let path = `M ${points[0].x} ${points[0].y}`;
   for (let i = 1; i < points.length - 1; i++) {
     const a = points[i-1], b = points[i], c = points[i+1];
+    if (junctions.has(`${b.x},${b.y}`)) {
+      path += ` L ${b.x} ${b.y}`;
+      continue;
+    }
     const before = Math.hypot(b.x-a.x,b.y-a.y), after = Math.hypot(c.x-b.x,c.y-b.y);
     const r = Math.min(CORNER_RADIUS, before/2, after/2);
     const p = {x:b.x+(a.x-b.x)*r/before,y:b.y+(a.y-b.y)*r/before};
@@ -182,4 +186,54 @@ export function roundedPath(points: Point[]) {
   }
   const end = points[points.length-1];
   return `${path} L ${end.x} ${end.y}`;
+}
+
+// Draw a shared bus only once, including partially overlapping and reversed routes.
+export function uniqueRoutePaths(routes: Point[][]): Point[][][] {
+  const occupied = new Map<string, [number, number][]>();
+  return routes.map((points) => {
+    const paths: Point[][] = [];
+    let path: Point[] = [];
+    const flush = () => {
+      if (path.length > 1) paths.push(path);
+      path = [];
+    };
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1], b = points[i];
+      const horizontal = a.y === b.y;
+      const start = horizontal ? a.x : a.y;
+      const end = horizontal ? b.x : b.y;
+      if (start === end) continue;
+      const key = `${horizontal ? "h" : "v"}:${horizontal ? a.y : a.x}`;
+      const intervals = occupied.get(key) ?? [];
+      let uncovered: [number, number][] = [[Math.min(start, end), Math.max(start, end)]];
+      for (const [low, high] of intervals) {
+        uncovered = uncovered.flatMap(([from, to]) => {
+          if (high <= from || low >= to) return [[from, to]];
+          const remaining: [number, number][] = [];
+          if (low > from) remaining.push([from, low]);
+          if (high < to) remaining.push([high, to]);
+          return remaining;
+        });
+      }
+      occupied.set(key, [...intervals, [Math.min(start, end), Math.max(start, end)]]);
+      if (start > end) uncovered.reverse();
+      for (const interval of uncovered) {
+        const from = start < end ? interval[0] : interval[1];
+        const to = start < end ? interval[1] : interval[0];
+        const p = horizontal ? { x: from, y: a.y } : { x: a.x, y: from };
+        const q = horizontal ? { x: to, y: a.y } : { x: a.x, y: to };
+        const last = path[path.length - 1];
+        if (!last || last.x !== p.x || last.y !== p.y) {
+          flush();
+          path.push(p);
+        }
+        path.push(q);
+      }
+      const last = path[path.length - 1];
+      if (!last || last.x !== b.x || last.y !== b.y) flush();
+    }
+    flush();
+    return paths;
+  });
 }

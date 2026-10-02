@@ -1,6 +1,7 @@
+import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type {
@@ -49,7 +50,6 @@ import { downloadBlob } from "@/lib/download-blob";
 import { formatNumericDateRange } from "@/lib/date-display";
 import { Permissions } from "@/lib/permissions";
 
-const QUERY_KEY = ["admin", "calendar-events"] as const;
 type SourceFilter = "all" | "ARTICLE" | "MANUAL" | "KAIST_ACADEMIC";
 type VisibilityFilter = "all" | "visible" | "hidden";
 type CategoryDraft = CalendarEventCategory;
@@ -177,8 +177,8 @@ function CalendarManagementContent() {
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState<"kaist" | "google" | null>(null);
 
-  const eventsQuery = useQuery({
-    queryKey: QUERY_KEY,
+  const eventsQuery = useAdminListQuery({
+    resource: "calendar-events",
     queryFn: () => apiClient.getManagedCalendarEvents(),
   });
   const events = eventsQuery.data?.items ?? [];
@@ -215,7 +215,7 @@ function CalendarManagementContent() {
 
   const refresh = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+      eventsQuery.refetch(),
       queryClient.invalidateQueries({ queryKey: ["events-surveys", "calendar-events"] }),
       queryClient.invalidateQueries({ queryKey: ["calendar", "events"] }),
     ]);
@@ -397,7 +397,7 @@ function CalendarManagementContent() {
           )}
         />
 
-        <AdminTableCard
+        <AdminTableCard refreshing={eventsQuery.isFetching && !!eventsQuery.data}
           toolbar={(
             <div className="py-2">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -449,7 +449,7 @@ function CalendarManagementContent() {
             />
           )}
         >
-          {!eventsQuery.data && eventsQuery.isPending ? null : eventsQuery.isError ? (
+          {!eventsQuery.data && eventsQuery.isPending ? null : eventsQuery.isError && !eventsQuery.data ? (
             <div className="px-5 py-16 text-center text-sm font-normal text-rose-600">일정을 불러오지 못했습니다.</div>
           ) : (
             <AdminDataTable minWidth={0} mobileMode="cards">

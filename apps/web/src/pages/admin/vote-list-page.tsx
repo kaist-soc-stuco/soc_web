@@ -1,9 +1,9 @@
+import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
 import { overlapsDateRange } from "@/lib/date-range-filter";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { createApiClient } from "@soc/api-client";
-import type { VoteRecord } from "@soc/contracts";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
@@ -24,14 +24,14 @@ const PAGE_SIZE = 20;
 export function VoteListPage() {
   const navigate = useNavigate();
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
-  const [votes, setVotes] = useState<VoteRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const votesQuery = useAdminListQuery({ resource: "votes", queryFn: () => client.listAdminVotes() });
+  const votes = votesQuery.data ?? [];
+  const loading = votesQuery.isPending;
   const [dateRange, setDateRange] = useState<DateRange>({ from: "", to: "" });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
-  useEffect(() => { void client.listAdminVotes().then(setVotes).finally(() => setLoading(false)); }, [client]);
   const filteredVotes = votes.filter(vote => overlapsDateRange(vote.startsAt, vote.endsAt, dateRange) &&
     (status === "all" || vote.status === status) &&
     stripRichText(`${vote.titleKo} ${vote.titleEn ?? ""}`).toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
@@ -46,7 +46,7 @@ export function VoteListPage() {
       <AdminPageShell>
         <AdminPageMain className="!max-w-6xl">
           <AdminPageHeader title="투표 관리" actions={<Button asChild><Link to="/admin/votes/new">투표 추가</Link></Button>} />
-          <AdminTableCard toolbar={<div className="flex flex-wrap items-center justify-end gap-2 py-1">
+          <AdminTableCard refreshing={votesQuery.isFetching && !!votesQuery.data} toolbar={<div className="flex flex-wrap items-center justify-end gap-2 py-1">
             <DateRangePicker presetType="future" align="end" value={dateRange} onChange={range => { setDateRange(range); setPage(1); }} />
             <AdminSelectDropdown ariaLabel="투표 상태" value={status} onChange={value => { setStatus(value); setPage(1); }} options={[{ value: "all", label: "전체 상태" }, { value: "DRAFT", label: "임시저장" }, { value: "PUBLISHED", label: "게시됨" }, { value: "CLOSED", label: "마감" }, { value: "TALLIED", label: "종료" }]} className="w-32" />
             <AdminSearchField aria-label="투표 검색" placeholder="제목 검색" value={search} onValueChange={value => { setSearch(value); setPage(1); }} className="w-full sm:w-56" />
@@ -71,7 +71,7 @@ export function VoteListPage() {
             <AdminDataTable minWidth={0} mobileMode="cards">
               <AdminTableHeader><tr><AdminTableHead className="w-[42%]">투표</AdminTableHead><AdminTableHead className="w-28">상태</AdminTableHead><AdminTableHead>기간</AdminTableHead><AdminTableHead className="w-32">참여</AdminTableHead></tr></AdminTableHeader>
               <AdminTableBody>
-                {loading ? <AdminTableEmpty colSpan={4}>불러오는 중...</AdminTableEmpty> : visible.length === 0 ? <AdminTableEmpty colSpan={4}>등록된 투표가 없습니다.</AdminTableEmpty> : visible.map((vote) => (
+                {votesQuery.isError && !votesQuery.data ? <AdminTableEmpty colSpan={4}>투표 목록을 불러오지 못했습니다.</AdminTableEmpty> : loading ? <AdminTableEmpty colSpan={4}>불러오는 중...</AdminTableEmpty> : visible.length === 0 ? <AdminTableEmpty colSpan={4}>등록된 투표가 없습니다.</AdminTableEmpty> : visible.map((vote) => (
                   <tr
                     key={vote.id}
                     className="cursor-pointer border-t border-slate-100 transition-colors hover:bg-slate-50/70 focus:bg-slate-50/70 focus:outline-none"

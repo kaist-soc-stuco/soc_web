@@ -48,11 +48,18 @@ import {
 } from "./roadmap-offerings";
 
 import "@xyflow/react/dist/style.css";
-import { routeConnection, roundedPath, type Point } from "./roadmap-routing";
+import { routeConnection, roundedPath, uniqueRoutePaths, type Point } from "./roadmap-routing";
 
 function RoutedEdge(props: EdgeProps) {
   const points = props.data?.points as Point[] | undefined;
-  return points ? <BaseEdge id={props.id} path={roundedPath(points)} markerEnd={props.markerEnd} style={props.style} interactionWidth={0} /> : null;
+  const paths = props.data?.paths as Point[][] | undefined;
+  const junctions = new Set((props.data?.junctions as string[] | undefined) ?? []);
+  if (!points) return null;
+  const end = points[points.length - 1];
+  return <>{(paths ?? [points]).map((path, index) => {
+    const last = path[path.length - 1];
+    return <BaseEdge key={index} id={`${props.id}-${index}`} path={roundedPath(path, junctions)} markerEnd={last.x === end.x && last.y === end.y ? props.markerEnd : undefined} style={props.style} interactionWidth={0} />;
+  })}</>;
 }
 const edgeTypes = { smoothstep: RoutedEdge };
 
@@ -559,8 +566,8 @@ export function RoadmapGraph({
   );
 
   const edges = useMemo<Edge[]>(
-    () =>
-      roadmapRelations.flatMap((relation) => {
+    () => {
+      const result: Edge[] = roadmapRelations.flatMap((relation) => {
         const selectedInstance = layout.nodes.find((node) => node.id === selectedInstanceId && node.type === "course" && node.data.course.code === activeCourseCode);
         const nodeFor = (code: string) => {
           if (code === activeCourseCode && selectedInstance) return selectedInstance.id;
@@ -614,7 +621,20 @@ export function RoadmapGraph({
                 : `Recommended sequence from ${relation.source} to ${relation.target}`,
           },
         ];
-      }),
+      });
+      for (const color of ["#d97706", "#0284c7"]) {
+        const group = result.filter((edge) => edge.style?.stroke === color);
+        const paths = uniqueRoutePaths(group.map((edge) => edge.data!.points as Point[]));
+        const pointCounts = new Map<string, number>();
+        paths.flat(2).forEach(point => {
+          const key = `${point.x},${point.y}`;
+          pointCounts.set(key, (pointCounts.get(key) ?? 0) + 1);
+        });
+        const junctions = [...pointCounts].filter(([, count]) => count > 1).map(([key]) => key);
+        group.forEach((edge, index) => { edge.data = { ...edge.data, paths: paths[index], junctions }; });
+      }
+      return result;
+    },
     [activeCourseCode, lang, layout, roadmapRelations, selectedInstanceId],
   );
 
@@ -699,6 +719,7 @@ export function RoadmapGraph({
     <>
       <div className="lg:hidden">
         <TextInput
+          className="!font-normal"
               type="search"
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}
@@ -788,6 +809,7 @@ export function RoadmapGraph({
         <div className="relative z-20 mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:max-w-sm">
             <TextInput
+              className="!font-normal"
               type="search"
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}

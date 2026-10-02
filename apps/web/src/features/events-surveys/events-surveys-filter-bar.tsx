@@ -40,7 +40,7 @@ export function EventsSurveysFilterBar({
   stateFilter,
 }: EventsSurveysFilterBarProps) {
   return (
-    <div className="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-3 md:flex-row md:items-center md:justify-between">
+    <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       <div className="min-w-0 max-w-full overflow-x-auto">
         <SegmentedControl
           ariaLabel={lang === "ko" ? "행사 상태" : "Event status"}

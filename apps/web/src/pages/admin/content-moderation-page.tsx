@@ -1,3 +1,4 @@
+import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { createApiClient } from "@soc/api-client";
 import type { HiddenArticleItem, HiddenCommentItem } from "@soc/contracts";
 import { isoToDate } from "@soc/shared";
@@ -39,35 +40,33 @@ export function ContentModerationPage() {
 function ContentModerationPageContent() {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { toast } = useToast();
-  const [boardNames, setBoardNames] = useState<Record<string, string>>({});
-  const [items, setItems] = useState<HiddenArticleItem[]>([]);
-  const [comments, setComments] = useState<HiddenCommentItem[]>([]);
+
   const [view, setView] = useState<"articles" | "comments">("articles");
-  const [loading, setLoading] = useState(true);
+
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [restoringId, setRestoringId] = useState<string | null>(null);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const boards = await apiClient.getBoards();
-      setBoardNames(Object.fromEntries(boards.items.map(board => [board.code, board.nameKo])));
-      const [responses, hiddenComments] = await Promise.all([
-        Promise.all(boards.items.map((board) => apiClient.getHiddenArticles(board.code))),
-        apiClient.getHiddenComments(),
-      ]);
-      setItems(responses.flatMap((response) => response.items).sort((a, b) => b.hiddenAt.localeCompare(a.hiddenAt)));
-      setComments(hiddenComments.items.sort((a, b) => b.hiddenAt.localeCompare(a.hiddenAt)));
-    } catch {
-      toast({ type: "error", message: "숨김 게시글 목록을 불러오지 못했습니다." });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { void load(); }, []);
+  const moderationQuery = useAdminListQuery({ resource: "moderation", queryFn: async () => {
+    const boards = await apiClient.getBoards();
+    const [responses, hiddenComments] = await Promise.all([
+      Promise.all(boards.items.map(board => apiClient.getHiddenArticles(board.code))),
+      apiClient.getHiddenComments(),
+    ]);
+    return {
+      boardNames: Object.fromEntries(boards.items.map(board => [board.code, board.nameKo])),
+      items: responses.flatMap(response => response.items).sort((a, b) => b.hiddenAt.localeCompare(a.hiddenAt)),
+      comments: hiddenComments.items.sort((a, b) => b.hiddenAt.localeCompare(a.hiddenAt)),
+    };
+  } });
+  const boardNames = moderationQuery.data?.boardNames ?? {};
+  const items = moderationQuery.data?.items ?? [];
+  const comments = moderationQuery.data?.comments ?? [];
+  const loading = moderationQuery.isPending;
+  useEffect(() => {
+    if (moderationQuery.isError) toast({ type: "error", message: "숨김 게시글 목록을 불러오지 못했습니다." });
+  }, [moderationQuery.isError, toast]);
 
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const filtered = items.filter((item) => !normalizedQuery || [item.titleKo, item.authorName, item.hiddenReason, boardNames[item.boardCode] ?? ""].some((value) => value.toLocaleLowerCase().includes(normalizedQuery)));
@@ -84,7 +83,7 @@ function ContentModerationPageContent() {
     setRestoringId(article.articleId);
     try {
       await apiClient.restoreArticle(article.boardCode, article.articleId);
-      setItems((current) => current.filter((item) => item.articleId !== article.articleId));
+      moderationQuery.setData(current => ({ ...current, items: current.items.filter(item => item.articleId !== article.articleId) }));
       toast({ type: "success", message: "게시글을 복구했습니다." });
     } catch {
       toast({ type: "error", message: "게시글을 복구하지 못했습니다." });
@@ -97,7 +96,7 @@ function ContentModerationPageContent() {
     setRestoringId(`comment:${comment.commentId}`);
     try {
       await apiClient.restoreComment(comment.boardCode, comment.articleId, comment.commentId);
-      setComments((current) => current.filter((item) => item.commentId !== comment.commentId));
+      moderationQuery.setData(current => ({ ...current, comments: current.comments.filter(item => item.commentId !== comment.commentId) }));
       toast({ type: "success", message: "댓글을 복구했습니다." });
     } catch {
       toast({ type: "error", message: "댓글을 복구하지 못했습니다." });
@@ -120,7 +119,7 @@ function ContentModerationPageContent() {
             { value: "comments", label: `댓글 ${comments.length}` },
           ]}
         />
-        <AdminTableCard
+        <AdminTableCard refreshing={moderationQuery.isFetching && !!moderationQuery.data}
           toolbar={(
             <div className="flex items-center justify-between gap-3 py-2">
               <p className="text-sm font-normal text-app-text-secondary">숨김 {activeItems.length}건</p>

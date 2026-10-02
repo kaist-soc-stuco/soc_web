@@ -1,3 +1,4 @@
+import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
 import { overlapsDateRange } from "@/lib/date-range-filter";
 import { stripRichText } from "@/components/ui/rich-text-content";
@@ -107,9 +108,6 @@ function formatRelativeTime(dateIso: string | null) {
 
 export function SurveyListPage() {
   const navigate = useNavigate();
-  const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [duplicating, setDuplicating] = useState<string | null>(null);
 
@@ -134,27 +132,12 @@ export function SurveyListPage() {
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
   const { toast } = useToast();
-  const showInitialLoading = loading && surveys.length === 0;
-
-  const fetchSurveys = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      const data = await client.listSurveys();
-      setSurveys(data);
-    } catch {
-      setError("설문조사 목록을 불러오지 못했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (sessionLoading || !hasSurveyManagePermission(session?.permission)) {
-      return;
-    }
-    fetchSurveys();
-  }, [client, session, sessionLoading]);
+  const surveysQuery = useAdminListQuery({ resource: "surveys", queryFn: () => client.listSurveys(), enabled: !sessionLoading && hasSurveyManagePermission(session?.permission) });
+  const surveys = surveysQuery.data ?? [];
+  const setSurveys = surveysQuery.setData;
+  const showInitialLoading = surveysQuery.isPending;
+  const error = surveysQuery.isError ? "설문조사 목록을 불러오지 못했습니다." : null;
+  const fetchSurveys = async () => { await surveysQuery.refetch(); };
 
   useEffect(() => {
     if (!activeRowDropdown) return;
@@ -322,7 +305,7 @@ export function SurveyListPage() {
 
           <SegmentedControl variant="underline" role="tablist" ariaLabel="설문 업무" value={surveyGroup} onChange={(value) => { setSurveyGroup(value); setCurrentPage(1); }} options={[{ value: "general", label: "일반 설문" }, { value: "operational", label: "상시 설문" }]} />
           {/* Inline filters use the shared search and select controls. */}
-          <AdminTableCard className="overflow-visible">
+          <AdminTableCard refreshing={surveysQuery.isFetching && !!surveysQuery.data} className="overflow-visible">
             <div className="border-b border-slate-100 px-5 py-2">
             <div className="flex flex-wrap items-center justify-end gap-2">
               <DateRangePicker presetType="future" align="end" value={dateRange} onChange={range => { setDateRange(range); setCurrentPage(1); }} />
@@ -359,7 +342,7 @@ export function SurveyListPage() {
           </div>
 
           <div className="flex min-w-0 flex-col overflow-visible">
-            {error ? <AdminErrorState message={error} onRetry={() => void fetchSurveys()} /> : null}
+            {error && !surveysQuery.data ? <AdminErrorState message={error} onRetry={() => void fetchSurveys()} /> : null}
 
             {showInitialLoading ? <AdminLoadingState /> : null}
 

@@ -1,3 +1,4 @@
+import { ListRefreshIndicator } from "@/components/ui/list-refresh-indicator";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { ArticleListTitle } from "@/components/ui/article-list-title";
 import { PromotionStatus } from "@/components/ui/promotion-period";
@@ -8,7 +9,6 @@ import { Paperclip } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
-import { MobileSectionSelector } from "@/components/ui/mobile-section-selector";
 import {
   getBoardLabelFromMetadata,
   isLegacyPublicBoardCode,
@@ -60,24 +60,11 @@ export function BoardCategoryNavigation({
 
   return (
     <PageToolbar>
-      <MobileSectionSelector
-        ariaLabel={lang === "ko" ? "게시판 분류 선택" : "Select board category"}
-        closeLabel={lang === "ko" ? "게시판 분류 닫기" : "Close board categories"}
-        onChange={(value) => {
-          const nextPath = value
-            ? value === "faq"
-              ? "/board/faq"
-              : `/board/${value}`
-            : "/board";
-          navigate(nextPath);
-        }}
-        options={categoryOptions}
-        title={lang === "ko" ? "게시판 분류" : "Board categories"}
-        value={category ?? ""}
-      />
       <SegmentedControl
+        variant="underline"
         ariaLabel={lang === "ko" ? "게시판 분류" : "Board categories"}
-        className="hidden md:inline-flex"
+        className="board-category-tabs min-w-0"
+        itemClassName="shrink-0"
         value={category ?? ""}
         options={categoryOptions}
         onChange={value => navigate(value ? "/board/" + value : "/board")}
@@ -195,7 +182,7 @@ export function BoardArticleTable({
         ? "익명"
         : "Anonymous"
       : (lang === "en" ? post.author.nameEn || post.author.name : post.author.name);
-  const tableGridClass = `board-table-grid ${category ? "" : "board-table-grid--all"}`;
+  const tableGridClass = "board-table-grid board-table-grid--all";
   const renderArticleRow = (post: ArticleListItem, pinned = false) => {
     const isNew =
       isoToMs(post.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
@@ -219,9 +206,10 @@ export function BoardArticleTable({
                 {getBoardLabelFromMetadata(postBoard, postCategory, lang)}
               </span>
             </div>
-          ) : null}
+          ) : <div className="hidden md:block" aria-hidden="true" />}
           <div className={`flex min-w-0 items-center gap-2 text-left text-[length:var(--ui-text-section-size)] leading-5 tracking-tight text-app-text-strong md:pl-1 ${pinned ? "font-semibold" : "font-medium"}`}>
             {postCategory === "promotions" && <PromotionStatus start={post.eventStartDate} end={post.eventEndDate} lang={lang} />}
+            {pinned ? <span aria-label={lang === "ko" ? "고정 공지" : "Pinned notice"} className="shrink-0 text-sm">📌</span> : null}
             <ArticleListTitle>{lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}</ArticleListTitle>
             {post.commentCount > 0 ? (
               <span
@@ -272,14 +260,14 @@ export function BoardArticleTable({
   return (
     <PageContainer className="pb-8">
       <DataViewCard className="board-article-table" aria-label={lang === "ko" ? "게시글 목록" : "Article list"}>
-        <DataViewToolbar>{toolbar}</DataViewToolbar>
+        <DataViewToolbar className="board-list-toolbar relative">{toolbar}<ListRefreshIndicator refreshing={isLoading && !showInitialSkeleton} className="absolute right-5 top-1/2 -translate-y-1/2" /></DataViewToolbar>
         <DataViewBody>
         <div className={`hidden h-[var(--ui-table-head-height)] ${tableGridClass} items-center gap-3 border-b border-[var(--ui-border-subtle)] bg-slate-50/70 px-6 text-[length:var(--ui-text-body-size)] font-medium tracking-tight text-slate-500 md:grid`}>
           {!category ? (
             <div className="shrink-0 text-center">
               {lang === "ko" ? "분류" : "Category"}
             </div>
-          ) : null}
+          ) : <div aria-hidden="true" />}
           <div className="min-w-0 text-left md:pl-1">
             {lang === "ko" ? "제목" : "Title"}
           </div>
@@ -296,9 +284,7 @@ export function BoardArticleTable({
 
         <div className="relative min-h-48">
           <div
-            className={`transition-opacity duration-150 ${
-              isLoading && articles.length > 0 ? "opacity-70" : "opacity-100"
-            }`}
+            aria-busy={isLoading}
           >
             {articleError ? (
               <ErrorState
@@ -327,7 +313,7 @@ export function BoardArticleTable({
           </div>
 
           {showInitialSkeleton && articles.length === 0 ? (
-            <BoardTableSkeleton columns={category ? 4 : 5} />
+            <BoardTableSkeleton columns={5} />
           ) : null}
         </div>
         </DataViewBody>

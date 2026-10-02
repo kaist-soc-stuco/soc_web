@@ -101,7 +101,7 @@ export function SurveyResponseForm({
               if (section.id === survey.sections[0]?.id || (!sectionTitle && !sectionDescription)) return null;
 
               return (
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.035)]">
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-none">
                   {sectionTitle ? (
                     <div className="bg-brand-primary px-5 py-3.5 text-white">
                       <h2 className="break-words text-base font-normal leading-6">

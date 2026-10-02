@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Save, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { msToIso, nowMs } from "@soc/shared";
 
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { TextInput } from "@/components/ui/text-input";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { getDraftStorageKey } from "@/lib/draft-storage";
 
@@ -105,6 +106,7 @@ export function ArticleTemplateControl({
   const [loadedStorageKey, setLoadedStorageKey] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [templateName, setTemplateName] = useState("");
 
   useEffect(() => {
     setTemplates(readTemplates(storageKey));
@@ -119,13 +121,13 @@ export function ArticleTemplateControl({
 
   const saveTemplate = () => {
     if (!storageKey || loadedStorageKey !== storageKey) return;
-    const name = snapshot.titleKo.trim();
+    const name = templateName.trim();
     const description = firstBodyLine(snapshot.contentKo);
     if (!name || !description) {
       setError(
         lang === "ko"
-          ? "국문 제목과 본문을 입력해 주세요."
-          : "Enter a Korean title and content.",
+          ? "템플릿 이름과 본문을 입력해 주세요."
+          : "Enter a template name and content.",
       );
       return;
     }
@@ -145,6 +147,7 @@ export function ArticleTemplateControl({
     setTemplates(next);
     writeTemplates(storageKey, next);
     setError(null);
+    setTemplateName("");
   };
 
   const deleteTemplate = (templateId: string) => {
@@ -162,32 +165,36 @@ export function ArticleTemplateControl({
         className="h-8 text-sm !font-medium"
         onClick={() => {
           setError(null);
+          setTemplateName(snapshot.titleKo.trim());
           setOpen(true);
         }}
       >
 
-        {lang === "ko" ? "템플릿" : "Templates"}
+        {lang === "ko" ? "템플릿 관리" : "Manage templates"}
       </Button>
 
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={lang === "ko" ? "템플릿" : "Templates"}
-        headerActions={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-[var(--ui-control-height)] !font-medium"
-            onClick={saveTemplate}
-          >
-
-            {lang === "ko" ? "저장" : "Save"}
-          </Button>
-        }
+        title={lang === "ko" ? "템플릿 관리" : "Manage templates"}
         size="standard"
       >
         <div className="space-y-5">
+          <section className="space-y-3 border-b border-slate-100 pb-5">
+            <h3 className="text-sm font-medium text-slate-800">{lang === "ko" ? "새 템플릿 생성" : "Create a template"}</h3>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <TextInput
+                aria-label={lang === "ko" ? "템플릿 이름" : "Template name"}
+                placeholder={lang === "ko" ? "템플릿 이름" : "Template name"}
+                value={templateName}
+                onChange={(event) => setTemplateName(event.currentTarget.value)}
+                containerClassName="flex-1"
+              />
+              <Button type="button" onClick={saveTemplate} className="shrink-0">
+                {lang === "ko" ? "현재 글 저장" : "Save current post"}
+              </Button>
+            </div>
+          </section>
           {error ? (
             <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-normal text-rose-700" role="alert">
               {error}

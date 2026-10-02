@@ -1,3 +1,5 @@
+import { ListRefreshIndicator } from "@/components/ui/list-refresh-indicator";
+import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type { PermissionRecord, RoleGroupCandidateListResponse, RoleGroupMemberRecord, RoleGroupRecord } from "@soc/contracts";
 import { useQueryClient } from "@tanstack/react-query";
@@ -84,13 +86,14 @@ export function PermissionPage() {
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const { confirm, ConfirmDialog } = useConfirmDialog();
-  const [roles, setRoles] = useState<RoleGroupRecord[]>([]);
-  const [permissions, setPermissions] = useState<PermissionRecord[]>([]);
-  const [members, setMembers] = useState<RoleGroupMemberRecord[]>([]);
+  const rolesQuery = useAdminListQuery({ resource: "roles", queryFn: () => client.listRoleGroups() });
+  const permissionsQuery = useAdminListQuery({ resource: "permissions", queryFn: () => client.listPermissions() });
+  const roles = rolesQuery.data ?? [];
+  const setRoles = rolesQuery.setData;
+  const permissions = (permissionsQuery.data ?? []).filter(permission => permission.isActive);
   const [draft, setDraft] = useState<RoleDraft>(emptyRoleDraft());
   const [roleQuery, setRoleQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [membersLoading, setMembersLoading] = useState(false);
+  const loading = rolesQuery.isPending || permissionsQuery.isPending;
   const [saving, setSaving] = useState(false);
   const [failedDraft, setFailedDraft] = useState<RoleDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -132,50 +135,23 @@ export function PermissionPage() {
     setSearchParams({ role: String(roleId), tab }, { replace: true });
   }, [selectedTab, setSearchParams]);
 
-  const loadBase = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [nextRoles, nextPermissions] = await Promise.all([client.listRoleGroups(), client.listPermissions()]);
-      setRoles(nextRoles);
-      setPermissions(nextPermissions.filter((permission) => permission.isActive));
-      const requestedId = Number(searchParams.get("role"));
-      const nextSelected = nextRoles.find((role) => role.roleGroupId === requestedId) ?? nextRoles[0] ?? null;
-      if (nextSelected) {
-        setDraft(draftFromRole(nextSelected));
-        if (requestedId !== nextSelected.roleGroupId) setSelection(nextSelected.roleGroupId);
-      }
-    } catch (loadError) {
-      setError(displayError(loadError, "역할과 권한 정보를 불러오지 못했습니다."));
-    } finally {
-      setLoading(false);
-    }
-  }, [client, searchParams, setSelection]);
-
-  const loadMembers = useCallback(async (roleId: number) => {
-    setMembersLoading(true);
-    setError(null);
-    try {
-      setMembers(await client.listRoleGroupMembers(roleId));
-    } catch (loadError) {
-      setError(displayError(loadError, "구성원 정보를 불러오지 못했습니다."));
-      setMembers([]);
-    } finally {
-      setMembersLoading(false);
-    }
-  }, [client]);
-
-  useEffect(() => { void loadBase(); }, []);
+  const membersQuery = useAdminListQuery({
+    resource: `role-members:${selectedRoleId}`,
+    enabled: !!selectedRoleId && selectedTab === "members",
+    queryFn: () => client.listRoleGroupMembers(selectedRoleId!),
+  });
+  const members = membersQuery.data ?? [];
+  const setMembers = membersQuery.setData;
+  const membersLoading = membersQuery.isFetching;
+  useEffect(() => {
+    if (rolesQuery.isError || permissionsQuery.isError || membersQuery.isError) setError("권한 정보를 불러오지 못했습니다.");
+  }, [rolesQuery.isError, permissionsQuery.isError, membersQuery.isError]);
   useEffect(() => {
     if (!selectedRole) return;
     setDraft(draftFromRole(selectedRole));
     setEditingField(null);
     setFailedDraft(null);
   }, [selectedRole?.roleGroupId]);
-  useEffect(() => {
-    if (!selectedRole || selectedTab !== "members") return;
-    void loadMembers(selectedRole.roleGroupId);
-  }, [selectedRole?.roleGroupId, selectedTab]);
 
   const selectRole = async (role: RoleGroupRecord) => {
     if (role.roleGroupId === selectedRoleId) return;
@@ -422,7 +398,7 @@ export function PermissionPage() {
                   {canEditRole ? <Button type="button" size="sm" variant="outline" className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void deleteRole()}> 역할 삭제</Button> : null}
                 </div>
               </AdminCardHeader>
-              <div className="px-5"><SegmentedControl variant="underline" ariaLabel="역할 상세 탭" role="tablist" value={selectedTab} onChange={(tab) => setSelection(selectedRole.roleGroupId, tab)} className="clean-segmented-control w-full" options={[{ value: "members", label: `구성원 (${selectedRole.userCount})` }, { value: "permissions", label: `권한 설정 (${draft.permissionIds.length})` }]} /></div>
+              <div className="relative px-5 pr-9"><ListRefreshIndicator refreshing={membersLoading && !!membersQuery.data} className="absolute right-3 top-1/2 -translate-y-1/2" /><SegmentedControl variant="underline" ariaLabel="역할 상세 탭" role="tablist" value={selectedTab} onChange={(tab) => setSelection(selectedRole.roleGroupId, tab)} className="clean-segmented-control w-full" options={[{ value: "members", label: `구성원 (${selectedRole.userCount})` }, { value: "permissions", label: `권한 설정 (${draft.permissionIds.length})` }]} /></div>
 
               {selectedTab === "permissions" ? <div className="p-5">
                 <div className="grid items-start gap-4 xl:grid-cols-2">{groupedPermissions.map((group) => {
@@ -441,10 +417,10 @@ export function PermissionPage() {
                   </section>;
                 })}</div>
               </div> : <div className="min-w-0">
-                <div className="flex items-center justify-between gap-3 px-5 py-2"><span className="text-sm font-normal text-[#344054]">총 {members.length}명</span><Button type="button" variant="outline" size="sm" disabled={!canManageMembers} onClick={() => void openMemberEditor()}>구성원 추가</Button></div>
-                <div className={cn("transition-opacity duration-150", membersLoading ? "opacity-60" : "opacity-100")} aria-busy={membersLoading}>
+                <div className="flex items-center justify-between gap-3 px-5 py-2"><span className="text-sm font-normal text-[#344054]">총 {membersQuery.data ? members.length : selectedRole.userCount}명</span><Button type="button" variant="outline" size="sm" disabled={!canManageMembers} onClick={() => void openMemberEditor()}>구성원 추가</Button></div>
+                <div aria-busy={membersLoading}>
                 <AdminDataTable minWidth={0} viewportClassName="!overflow-visible"><colgroup><col style={{ width: "28%" }} /><col style={{ width: "16%" }} /><col style={{ width: "30%" }} /><col style={{ width: "18%" }} /><col style={{ width: "8%" }} /></colgroup><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>학번</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>부여일</AdminTableHead><AdminTableHead className="text-right"><span className="sr-only">작업</span></AdminTableHead></tr></AdminTableHeader><AdminTableBody>
-                  {members.length === 0 ? <AdminTableEmpty colSpan={5}>이 역할에 지정된 구성원이 없습니다.</AdminTableEmpty>
+                  {membersQuery.isPending ? <tr>{Array.from({ length: 5 }).map((_, index) => <AdminTableCell key={index}><Skeleton className="h-4 w-16" /></AdminTableCell>)}</tr> : members.length === 0 ? <AdminTableEmpty colSpan={5}>이 역할에 지정된 구성원이 없습니다.</AdminTableEmpty>
                     : members.map((member) => <tr key={member.userId}><AdminTableCell truncate className="admin-table-text-emphasis">{member.nameKo}</AdminTableCell><AdminTableCell truncate>{member.stdNo ?? member.kaistUid}</AdminTableCell><AdminTableCell truncate>{member.email}</AdminTableCell><AdminTableCell truncate>{formatDate(member.grantedAt)}</AdminTableCell><AdminTableCell className="text-right"><Button type="button" variant="ghost" size="icon" aria-label={`${member.nameKo} 제외`} data-tooltip="구성원 제외" className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => void removeMember(member.userId)} disabled={candidateSaving || !canManageMembers}><Trash2 aria-hidden="true" className="size-4" /></Button></AdminTableCell></tr>)}
                 </AdminTableBody></AdminDataTable>
                 </div>

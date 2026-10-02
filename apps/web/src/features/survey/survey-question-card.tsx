@@ -43,11 +43,11 @@ export function SurveyQuestionCard({ question, value, onChange, lang, error: que
           }
         }
       }}
-      className={`group scroll-mt-24 rounded-lg border bg-white px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.035)] transition-[border-color,box-shadow] ${
+      className={`group scroll-mt-24 rounded-lg border bg-white px-5 py-4 shadow-none transition-[border-color,box-shadow] ${
         error
           ? "border-red-500 hover:border-red-500"
           : "border-slate-200 hover:border-kaist-darkgreen/20"
-      } hover:shadow-[0_2px_5px_rgba(15,23,42,0.045)]`}
+      } shadow-none`}
     >
       <div className="mb-3.5">
         <div id={titleId} className="block min-w-0 text-[length:var(--ui-text-section-size)] font-normal leading-6 text-slate-950">

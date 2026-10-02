@@ -1,5 +1,6 @@
+import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { createApiClient } from "@soc/api-client";
-import type { AdminUserListResponse, AdminUserRecord, UserPostingSuspensionResponse } from "@soc/contracts";
+import type { AdminUserRecord, UserPostingSuspensionResponse } from "@soc/contracts";
 import { isoToDate, nowMs } from "@soc/shared";
 import { Ban, UserRoundCheck, UserRoundX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -67,8 +68,6 @@ export function UserManagementPage() {
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
   const { toast } = useToast();
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
-  const [data, setData] = useState<AdminUserListResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
@@ -77,7 +76,6 @@ export function UserManagementPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
-  const [refreshVersion, setRefreshVersion] = useState(0);
   const [selectedUser, setSelectedUser] = useState<AdminUserRecord | null>(null);
   const [deactivationTarget, setDeactivationTarget] = useState<AdminUserRecord | null>(null);
   const [deactivationReason, setDeactivationReason] = useState("");
@@ -117,49 +115,17 @@ export function UserManagementPage() {
     };
   }, [client, selectedUser]);
 
+  const usersQuery = useAdminListQuery({
+    resource: "users",
+    params: { currentPage, pageSize, query, sortBy, sortDirection, statusFilter },
+    enabled: !sessionLoading && canManageUsers,
+    queryFn: () => client.listAdminUsers({ page: currentPage, pageSize, q: query, sortBy, sortDirection, status: statusFilter === "all" ? undefined : statusFilter }),
+  });
+  const data = usersQuery.data;
+  const loading = usersQuery.isFetching;
   useEffect(() => {
-    if (sessionLoading || !canManageUsers) return;
-
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    client
-      .listAdminUsers({
-        page: currentPage,
-        pageSize,
-        q: query,
-        sortBy,
-        sortDirection,
-        status: statusFilter === "all" ? undefined : statusFilter,
-      })
-      .then((response) => {
-        if (!cancelled) setData(response);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setError("사용자 목록을 불러오지 못했습니다.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    canManageUsers,
-    client,
-    currentPage,
-    pageSize,
-    query,
-    refreshVersion,
-    sessionLoading,
-    sortBy,
-    sortDirection,
-    statusFilter,
-  ]);
+    setError(usersQuery.isError ? "사용자 목록을 불러오지 못했습니다." : null);
+  }, [usersQuery.isError]);
 
   const totalCount = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -202,7 +168,7 @@ export function UserManagementPage() {
         isActive: !user.isActive,
       });
       setSelectedUser((current) => current?.userId === user.userId ? { ...current, isActive: result.isActive } : current);
-      if (result.isActive !== user.isActive) setRefreshVersion((version) => version + 1);
+      if (result.isActive !== user.isActive) void usersQuery.refetch();
     } catch {
       toast({ type: "error", message: "유저 상태를 변경하지 못했습니다." });
     } finally {
@@ -221,7 +187,7 @@ export function UserManagementPage() {
         reason: deactivationReason.trim(),
       });
       setSelectedUser((current) => current?.userId === user.userId ? { ...current, isActive: result.isActive } : current);
-      setRefreshVersion((version) => version + 1);
+      void usersQuery.refetch();
       setDeactivationTarget(null);
       setDeactivationReason("");
     } catch {
@@ -289,7 +255,7 @@ export function UserManagementPage() {
         <main className="admin-page__main admin-page__main--table mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
           <AdminPageHeader title="유저 관리" />
 
-          <AdminTableCard className="user-management-table" aria-busy={loading}>
+          <AdminTableCard refreshing={loading && !!data} className="user-management-table" aria-busy={loading}>
             <AdminCardHeader className="items-center gap-4">
               <div className="flex flex-wrap items-center gap-2">
                 <SegmentedControl<UserStatusFilter>

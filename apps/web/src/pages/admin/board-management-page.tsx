@@ -1,3 +1,4 @@
+import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { restrictListDrag } from "@/lib/drag-bounds";
 import { createApiClient } from "@soc/api-client";
 import {
@@ -31,7 +32,7 @@ import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableEmpty, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
 import { AdminDrawer } from "@/components/ui/admin-drawer";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
-import { AdminCard, AdminFormField, AdminPageHeader, AdminPageMain, AdminPageShell, AdminStickyActionBar } from "@/components/ui/admin-page";
+import { AdminTableCard, AdminFormField, AdminPageHeader, AdminPageMain, AdminPageShell, AdminStickyActionBar } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { ErrorState } from "@/components/ui/data-state";
 import { useToast } from "@/components/ui/toast";
@@ -83,35 +84,34 @@ function BoardManagementPageContent() {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-  const [boards, setBoards] = useState<BoardSummary[]>([]);
-  const [savedOrder, setSavedOrder] = useState<string[]>([]);
+  const boardsQuery = useAdminListQuery({ resource: "boards", queryFn: async () => {
+    const response = await apiClient.getAdminBoards();
+    return response.items.filter(board => board.code !== "_EVENT" && board.code.toLowerCase() !== "faq" && board.code !== "_FAQ");
+  } });
+  const [boards, setBoards] = useState<BoardSummary[]>(() => boardsQuery.data ?? []);
+  const [savedOrder, setSavedOrder] = useState<string[]>(() => (boardsQuery.data ?? []).map(board => board.code));
   const [form, setForm] = useState<BoardFormValues>(createEmptyForm());
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [activeBoardCode, setActiveBoardCode] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const loading = boardsQuery.isPending;
   const [saving, setSaving] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadError = boardsQuery.isError ? "게시판 목록을 불러오지 못했습니다." : null;
 
   const orderDirty = boards.map((board) => board.code).join("|") !== savedOrder.join("|");
 
 
   const loadBoards = async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.getAdminBoards();
-      const visibleBoards = response.items.filter((board) => board.code !== "_EVENT" && board.code.toLowerCase() !== "faq" && board.code !== "_FAQ");
-      setBoards(visibleBoards);
-      setSavedOrder(visibleBoards.map((board) => board.code));
-      setLoadError(null);
-    } catch {
-      setLoadError("게시판 목록을 불러오지 못했습니다.");
-    } finally {
-      setLoading(false);
-    }
+    const { data: nextBoards } = await boardsQuery.refetch();
+    if (!nextBoards) return;
+    setBoards(nextBoards);
+    setSavedOrder(nextBoards.map(board => board.code));
   };
-
-  useEffect(() => { void loadBoards(); }, []);
+  useEffect(() => {
+    if (!boardsQuery.data || orderDirty) return;
+    setBoards(boardsQuery.data);
+    setSavedOrder(boardsQuery.data.map(board => board.code));
+  }, [boardsQuery.data]);
 
   const startCreate = () => {
     setEditingCode(null);
@@ -215,6 +215,7 @@ function BoardManagementPageContent() {
     try {
       const response = await apiClient.reorderBoards({ items: boards.map((board, index) => ({ code: board.code, sortOrder: index * 10 })) });
       const visibleBoards = response.items.filter((board) => board.code !== "_EVENT" && board.code.toLowerCase() !== "faq" && board.code !== "_FAQ");
+      boardsQuery.setData(visibleBoards);
       setBoards(visibleBoards);
       setSavedOrder(visibleBoards.map((board) => board.code));
       toast({ type: "success", message: "게시판 노출 순서를 저장했습니다." });
@@ -231,7 +232,7 @@ function BoardManagementPageContent() {
       <AdminPageHeader title="게시판 관리" actions={<Button type="button" onClick={startCreate}> 게시판 추가</Button>} />
       {loadError ? <ErrorState title={loadError} onRetry={() => void loadBoards()} /> : null}
 
-      <AdminCard>
+      <AdminTableCard refreshing={boardsQuery.isFetching && !!boardsQuery.data}>
         <DndContext modifiers={[restrictListDrag]}
           autoScroll
           sensors={sensors}
@@ -253,7 +254,7 @@ function BoardManagementPageContent() {
           </AdminDataTable>
 
         </DndContext>
-      </AdminCard>
+      </AdminTableCard>
 
       {orderDirty ? <AdminStickyActionBar><p className="text-sm font-medium text-slate-700">변경한 게시판 노출 순서를 저장해 주세요.</p><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setBoards((current) => savedOrder.map((code) => current.find((board) => board.code === code)).filter((board): board is BoardSummary => Boolean(board)))} disabled={saving}> 되돌리기</Button><Button type="button" onClick={() => void saveOrder()} disabled={saving}> 순서 저장</Button></div></AdminStickyActionBar> : null}
     </AdminPageMain>

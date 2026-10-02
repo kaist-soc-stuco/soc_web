@@ -5,7 +5,7 @@ import type {
   ArticleAssetItem,
   ArticleEngagementKind,
 } from "@soc/contracts";
-import { ArrowUpRight, Check, ChevronLeft, ChevronRight, ClipboardCheck, Edit2, EllipsisVertical, Eye, EyeOff, Share2, Trash2 } from "lucide-react";
+import { ArrowUpRight, Check, ChevronUp, ChevronDown, ClipboardCheck, Edit2, EllipsisVertical, Eye, EyeOff, Share2, Trash2 } from "lucide-react";
 import { isoToDate } from "@soc/shared";
 import { Link } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -308,49 +308,32 @@ export function BoardDetailAdjacentNav({
   prevArticle?: AdjacentArticle | null;
   toBase: string;
 }) {
-  if (!prevArticle && !nextArticle) return null;
-
-  const renderLink = (article: AdjacentArticle, direction: "prev" | "next") => {
+  const renderRow = (article: AdjacentArticle | null | undefined, direction: "prev" | "next") => {
     const label = lang === "ko" ? (direction === "prev" ? "이전글" : "다음글") : direction === "prev" ? "Previous" : "Next";
-    return (
-      <Link
-        key={direction}
-        to={`${toBase}/${article.articleId}`}
-        className="group flex min-w-0 items-center gap-3 bg-white px-4 py-3.5 text-slate-500 transition-colors hover:bg-slate-50"
-      >
-        {direction === "prev" ? (
-          <ChevronLeft className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
-        ) : null}
-        <span className="min-w-0 flex-1">
-          <span className="block text-[0.6875rem] font-medium leading-4 text-slate-400">{label}</span>
-          <span className="mt-0.5 block line-clamp-2 break-words text-sm font-medium leading-5 text-slate-700 group-hover:text-slate-900">
-            {lang === "ko" ? article.titleKo : article.titleEn || article.titleKo}
-          </span>
-        </span>
-        {direction === "next" ? (
-          <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
-        ) : null}
+    const content = <>
+      <span className="flex shrink-0 items-center gap-2 border-r border-slate-200 pr-4 text-sm font-medium text-slate-700 sm:pr-6">
+        {direction === "prev" ? <ChevronUp className="size-4" aria-hidden="true" /> : <ChevronDown className="size-4" aria-hidden="true" />}
+        {label}
+      </span>
+      <span className={`min-w-0 truncate text-sm font-normal ${article ? "text-slate-800" : "text-slate-400"}`}>
+        {article ? (lang === "ko" ? article.titleKo : article.titleEn || article.titleKo) : (lang === "ko" ? `${label}이 없습니다.` : `No ${direction === "prev" ? "previous" : "next"} post.`)}
+      </span>
+    </>;
+    const className = "grid min-h-14 min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-4 px-4 py-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-6 sm:px-6";
+    return article ? (
+      <Link key={direction} to={`${toBase}/${article.articleId}`} className={`${className} transition-colors hover:bg-slate-50`}>
+        {content}
       </Link>
-    );
+    ) : <div key={direction} className={className}>{content}</div>;
   };
 
   return (
     <nav
       aria-label={lang === "ko" ? "게시글 이동" : "Post navigation"}
-      className="grid w-full divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-slate-200 shadow-[0_2px_8px_rgb(15_23_42_/_0.03)] sm:grid-cols-2 sm:divide-x sm:divide-y-0"
+      className="w-full divide-y divide-slate-200 border-y border-slate-200"
     >
-      {prevArticle ? renderLink(prevArticle, "prev") : (
-        <span className="flex min-h-[4.5rem] items-center gap-3 bg-white px-4 py-3.5 text-slate-300">
-          <ChevronLeft className="size-4 shrink-0" aria-hidden="true" />
-          <span className="text-xs font-normal">{lang === "ko" ? "이전글 없음" : "No previous post"}</span>
-        </span>
-      )}
-      {nextArticle ? renderLink(nextArticle, "next") : (
-        <span className="flex min-h-[4.5rem] items-center justify-end gap-3 bg-white px-4 py-3.5 text-slate-300">
-          <span className="text-xs font-normal">{lang === "ko" ? "다음글 없음" : "No next post"}</span>
-          <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
-        </span>
-      )}
+      {renderRow(prevArticle, "prev")}
+      {renderRow(nextArticle, "next")}
     </nav>
   );
 }

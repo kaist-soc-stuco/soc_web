@@ -245,7 +245,7 @@ export function EventsSurveysGrid({
             className={
               isHomeEventCard
                 ? `event-survey-card home-portal-event-card select-none group${closed ? " is-closed" : ""}`
-                : `event-survey-card${closed ? " is-closed" : ""} interaction-card select-none group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-elevated ${closed ? "border-slate-200" : "border-gray-200"}`
+                : `event-survey-card${closed ? " is-closed" : ""} interaction-card select-none group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-none transition-[transform,border-color] duration-180 ease-out hover:-translate-y-0.5 ${closed ? "border-slate-200" : "border-gray-200"}`
             }
           >
             <div
@@ -258,7 +258,7 @@ export function EventsSurveysGrid({
               <Link
                 aria-label={title}
                 to={href} target={item.kind === "EVENT" ? undefined : "_blank"} rel="noopener noreferrer"
-                className={`absolute inset-0 block ${closed ? "opacity-65" : ""}`}
+                className={`absolute inset-0 block ${closed ? "grayscale opacity-60" : ""}`}
               >
                 <CardMedia imageUrl={item.imageUrl} isSurvey={isSurvey} />
               </Link>

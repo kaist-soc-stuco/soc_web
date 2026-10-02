@@ -32,14 +32,14 @@ export function SegmentedControl<T extends string>({
 }: SegmentedControlProps<T>) {
   const isTablist = role === "tablist";
   const containerRef = useRef<HTMLDivElement>(null);
-  const [indicator, setIndicator] = useState<{ left: number; width: number; height: number } | null>(null);
+  const [indicator, setIndicator] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   useLayoutEffect(() => {
     const root = containerRef.current;
     if (!root) return;
     const measure = () => {
       const active = root.querySelector<HTMLButtonElement>("button.is-active");
-      const next = active ? { left: active.offsetLeft, width: active.offsetWidth, height: active.offsetHeight } : null;
-      setIndicator(previous => previous?.left === next?.left && previous?.width === next?.width && previous?.height === next?.height ? previous : next);
+      const next = active ? { left: active.offsetLeft, top: active.offsetTop, width: active.offsetWidth, height: active.offsetHeight } : null;
+      setIndicator(previous => previous?.left === next?.left && previous?.top === next?.top && previous?.width === next?.width && previous?.height === next?.height ? previous : next);
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -65,7 +65,7 @@ export function SegmentedControl<T extends string>({
         tabs[next].focus(); tabs[next].click();
       } : undefined}
     >
-      {indicator ? <span aria-hidden="true" className={variant === "pill" ? "ui-segmented-indicator" : "ui-view-tab-indicator"} style={{ transform: `translateX(${indicator.left}px)`, width: indicator.width, height: variant === "pill" ? indicator.height : 3 }} /> : null}
+      {indicator ? <span aria-hidden="true" className={variant === "pill" ? "ui-segmented-indicator" : "ui-view-tab-indicator"} style={{ transform: `translateX(${indicator.left}px)`, top: variant === "pill" ? indicator.top : undefined, width: indicator.width, height: variant === "pill" ? indicator.height : undefined }} /> : null}
       {options.map((option) => {
         const active = option.value === value;
 

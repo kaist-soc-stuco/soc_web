@@ -1,3 +1,4 @@
+import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type {
   AdminRoadmapOfferingListResponse,
@@ -12,7 +13,7 @@ import type {
 } from "@soc/contracts";
 import { isoToDate, nowIso } from "@soc/shared";
 import { Save, Trash2, Upload, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
@@ -133,13 +134,6 @@ function RoadmapManagementPageContent() {
   const { toast } = useToast();
   const [importGuideOpen, setImportGuideOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [data, setData] = useState<AdminRoadmapOfferingListResponse>({
-    courses: [],
-    items: [],
-    relations: [],
-    terms: [],
-  });
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>("courses");
   const [search, setSearch] = useState("");
   const [selectedTerm, setSelectedTerm] = useState("");
@@ -152,28 +146,20 @@ function RoadmapManagementPageContent() {
   const [importPreview, setImportPreview] = useState<RoadmapImportPreviewResponse | null>(null);
   const [importing, setImporting] = useState(false);
 
-  const loadRoadmap = useCallback(async () => {
-    try {
-      const response = await apiClient.getAdminRoadmapOfferings();
-      setData(response);
-      const currentTerm = getCurrentRoadmapTerm();
-      setSelectedTerm((current) =>
-        current && response.terms.some((term) => term.term === current)
-          ? current
-          : response.terms.some((term) => term.term === currentTerm)
-            ? currentTerm
-            : response.terms[0]?.term ?? "",
-      );
-    } catch {
-      toast({ type: "error", message: "로드맵 정보를 불러오지 못했습니다." });
-    } finally {
-      setLoading(false);
-    }
-  }, [apiClient, toast]);
-
+  const roadmapQuery = useAdminListQuery({ resource: "roadmap", queryFn: () => apiClient.getAdminRoadmapOfferings() });
+  const data = roadmapQuery.data ?? { courses: [], items: [], relations: [], terms: [] };
+  const loading = roadmapQuery.isPending;
+  const loadRoadmap = async () => { await roadmapQuery.refetch(); };
   useEffect(() => {
-    void loadRoadmap();
-  }, [loadRoadmap]);
+    if (!roadmapQuery.data) return;
+    const terms = roadmapQuery.data.terms;
+    const currentTerm = getCurrentRoadmapTerm();
+    setSelectedTerm(current => current && terms.some(term => term.term === current)
+      ? current : terms.some(term => term.term === currentTerm) ? currentTerm : terms[0]?.term ?? "");
+  }, [roadmapQuery.data]);
+  useEffect(() => {
+    if (roadmapQuery.isError) toast({ type: "error", message: "로드맵 정보를 불러오지 못했습니다." });
+  }, [roadmapQuery.isError, toast]);
 
   useEffect(() => {
     setPage(1);
@@ -295,7 +281,7 @@ function RoadmapManagementPageContent() {
         </AdminEditorGuidance>
 
         <SegmentedControl variant="underline" role="tablist" ariaLabel="로드맵 관리 탭" value={activeTab} onChange={setActiveTab} options={[{ value: "courses", label: "전체 교과목" }, { value: "offerings", label: "학기별 개설 관리" }]} />
-        <AdminTableCard
+        <AdminTableCard refreshing={roadmapQuery.isFetching && !!roadmapQuery.data}
           toolbar={
             <AdminToolbar className="rounded-none border-0">
               <AdminToolbarGroup className="ml-auto w-full justify-end sm:flex-1 sm:flex-nowrap">

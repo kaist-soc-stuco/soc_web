@@ -3,6 +3,7 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
+import { ListRefreshIndicator } from "@/components/ui/list-refresh-indicator";
 import { UiInput } from "@/components/ui/form-control";
 import { AdminPageTitle } from "@/components/ui/page-layout";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,7 @@ export function AdminCard({ className, ...props }: ComponentProps<"section">) {
 interface AdminTableCardProps extends ComponentProps<"section"> {
   pagination?: ReactNode;
   toolbar?: ReactNode;
+  refreshing?: boolean;
 }
 
 /**
@@ -93,17 +95,20 @@ export function AdminTableCard({
   className,
   pagination,
   toolbar,
+  refreshing,
   ...props
 }: AdminTableCardProps) {
   return (
     <section
       className={cn(
-        "admin-table-card min-w-0 max-w-full overflow-hidden rounded-2xl border border-[#e5eaf0] bg-white shadow-none",
+        "admin-table-card relative min-w-0 max-w-full overflow-hidden rounded-2xl border border-[#e5eaf0] bg-white shadow-none",
         className,
       )}
+      data-refreshable={refreshing !== undefined || undefined}
       {...props}
     >
-      {toolbar ? <div className="admin-table-toolbar">{toolbar}</div> : null}
+      {toolbar ? <div className="admin-table-toolbar relative">{toolbar}{refreshing !== undefined ? <ListRefreshIndicator refreshing={refreshing} className="absolute right-5 top-1/2 -translate-y-1/2" /> : null}</div> : null}
+      {!toolbar && refreshing ? <ListRefreshIndicator refreshing className="absolute right-5 top-4 z-10" /> : null}
       {children}
       {pagination ? (
         <div className="admin-table-footer flex min-h-12 items-center border-t border-slate-100 bg-white px-4 py-2 sm:px-5 [&_.ui-pagination]:m-0 [&_.ui-pagination]:w-full">

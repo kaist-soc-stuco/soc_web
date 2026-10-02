@@ -1,10 +1,11 @@
+import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useToast } from "@/components/ui/toast";
 import { createApiClient } from "@soc/api-client";
 import type { AuditLogEventKind, AuditLogRecord } from "@soc/contracts";
 import { isoToDate, nowIso } from "@soc/shared";
 import { Activity, ArrowDown, Download, FileJson } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
@@ -144,9 +145,6 @@ export function AuditLogPage() {
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const canViewAuditLogs = Permissions.has(session?.permission ?? 0, Permissions.VIEW_AUDIT_LOG);
-  const [data, setData] = useState<{ items: AuditLogRecord[]; page: number; pageSize: number; total: number } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [targetType, setTargetType] = useState("");
@@ -158,42 +156,21 @@ export function AuditLogPage() {
   const [pageSize, setPageSize] = useState(20);
   const [selectedLog, setSelectedLog] = useState<AuditLogRecord | null>(null);
 
-  const logRequest = useRef(0);
-  const loadLogs = useCallback(async () => {
-    const request = ++logRequest.current;
-    if (sessionLoading || !canViewAuditLogs) return;
-    setLoading(true);
-    try {
-      const response = await client.listAuditLogs({
-        page: currentPage,
-        pageSize,
-        q: query,
-        sortBy,
-        sortDirection,
-        targetType: targetType || undefined,
-        dateFrom,
-        dateTo,
-      });
-      if (request !== logRequest.current) return;
-      setData(response);
-      setError(null);
-    } catch (err) {
-      if (request === logRequest.current) setError("운영 로그를 불러오지 못했습니다.");
-    } finally {
-      if (request === logRequest.current) setLoading(false);
-    }
-  }, [canViewAuditLogs, client, currentPage, dateFrom, dateTo, pageSize, query, sessionLoading, sortBy, sortDirection, targetType]);
-
-  useEffect(() => {
-    void loadLogs();
-    return () => { logRequest.current++; };
-  }, [loadLogs]);
+  const logsQuery = useAdminListQuery({
+    resource: "audit-logs",
+    params: { currentPage, pageSize, query, sortBy, sortDirection, targetType, dateFrom, dateTo },
+    enabled: !sessionLoading && canViewAuditLogs,
+    queryFn: () => client.listAuditLogs({ page: currentPage, pageSize, q: query, sortBy, sortDirection, targetType: targetType || undefined, dateFrom, dateTo }),
+  });
+  const data = logsQuery.data;
+  const loading = logsQuery.isFetching;
+  const error = logsQuery.isError ? "운영 로그를 불러오지 못했습니다." : null;
 
   const totalCount = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const rangeStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const rangeEnd = Math.min(totalCount, currentPage * pageSize);
-  const refreshing = loading && data !== null;
+  const refreshing = loading && !!data;
 
   const updatePageFilter = (setter: (value: string) => void, value: string) => {
     setter(value);
@@ -242,7 +219,7 @@ export function AuditLogPage() {
             actions={<Button type="button" disabled={exporting} aria-busy={exporting} onClick={() => void handleExport()}><Download aria-hidden="true" className="size-4" />내보내기</Button>}
           />
 
-          <AdminTableCard className="overflow-visible">
+          <AdminTableCard refreshing={refreshing} className="overflow-visible">
             <div className="admin-table-toolbar flex flex-wrap items-center justify-end gap-2 px-5 py-2">
               <span className="mr-auto text-sm font-normal text-slate-500">{data ? `총 ${totalCount}건` : ""}</span>
               <div className="flex flex-wrap items-center gap-2">
@@ -261,8 +238,8 @@ export function AuditLogPage() {
 
 
 
-            <div aria-busy={loading} style={data === null && loading ? { minHeight: 320 } : undefined} className={refreshing ? "opacity-60 transition-opacity duration-150" : "transition-opacity duration-150"}>
-              {error && data === null ? <div className="p-6"><EmptyState message={error} /></div> : data && data.items.length > 0 ? (
+            <div aria-busy={loading} style={!data && loading ? { minHeight: 320 } : undefined} >
+              {error && !data ? <div className="p-6"><EmptyState message={error} /></div> : data && data.items.length > 0 ? (
                 <AdminDataTable minWidth={0} mobileMode="cards">
                   <colgroup><col style={{ width: "18%" }} /><col style={{ width: "13%" }} /><col style={{ width: "23%" }} /><col style={{ width: "28%" }} /><col style={{ width: "18%" }} /></colgroup>
                   <AdminTableHeader>

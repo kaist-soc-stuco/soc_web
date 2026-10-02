@@ -253,7 +253,7 @@ export function EventsSurveysCalendarGrid({
         <div className="grid grid-cols-7 border-b border-slate-200 text-center text-[length:var(--ui-text-caption-size)] font-semibold text-slate-400">
           {weekHeaders.map((header, index) => (
             <div
-              className={`py-1 ${index === 0 ? "text-rose-500" : ""} ${
+              className={`flex min-h-6 items-center justify-center ${index === 0 ? "text-rose-500" : ""} ${
                 index === weekHeaders.length - 1 ? "text-sky-600" : ""
               }`}
               key={header}
@@ -330,7 +330,6 @@ export function EventsSurveysCalendarGrid({
                 className={`relative !z-auto !transform-none !shadow-none flex h-full min-h-0 min-w-0 flex-col overflow-visible border-b border-r border-slate-100 px-1.5 py-1 text-left focus:outline-none focus-visible:outline-none focus-visible:ring-0 ${selected ? "bg-slate-100" : "bg-white hover:bg-slate-50/80"}`}
                 key={toDateKey(cell.date)}
                 onClick={() => onSelectedDateChange(cell.date)}
-                title={holidayName || undefined}
                 type="button"
               >
                 <span
@@ -375,8 +374,8 @@ export function EventsSurveysCalendarGrid({
                       : null;
                     const segmentWidthClass =
                       isEnd || isWeekEnd
-                        ? "ml-0.5 w-[calc(100%-0.25rem)]"
-                        : "ml-0.5 w-[calc(100%+0.75rem)]";
+                        ? "-ml-1 w-[calc(100%+0.5rem)]"
+                        : "-ml-1 w-[calc(100%+0.8125rem)]";
 
                     return (
                       <span
@@ -385,7 +384,7 @@ export function EventsSurveysCalendarGrid({
                       >
                         <span
                           aria-label={`${titleText}, ${formatCalendarEventRange(event, lang)}`}
-                          className={`group relative ${labelSegment ? "z-30" : "z-10"} flex h-5 min-h-5 items-center overflow-visible rounded-md px-2 py-0.5 text-[length:var(--ui-text-micro-size)] font-medium leading-4 transition-[background-color,box-shadow] ${cell.isCurrentMonth ? "" : "opacity-40"} focus:outline-none focus-visible:outline-none ${segmentWidthClass} ${
+                          className={`group relative ${labelSegment ? "z-30" : "z-10"} flex h-5 min-h-5 items-center overflow-visible rounded-md px-2 py-0.5 text-[length:var(--ui-text-micro-size)] font-normal leading-4 transition-[background-color] ${cell.isCurrentMonth ? "" : "opacity-40"} focus:outline-none focus-visible:outline-none ${segmentWidthClass} ${
                             isStart || cellIndex % 7 === 0 ? "rounded-l-md" : "rounded-l-none"
                           } ${isEnd || isWeekEnd ? "rounded-r-md" : "rounded-r-none"} ${
                             eventStyle.bg
@@ -410,7 +409,7 @@ export function EventsSurveysCalendarGrid({
                               className="pointer-events-none absolute inset-y-0 flex min-w-0 items-center justify-center overflow-hidden px-2"
                               style={{
                                 left: `calc(-${labelSegment.offsetDays * 100}%)`,
-                                width: `calc(${labelSegment.dayCount * 100}% - 1rem)`,
+                                width: `calc(${labelSegment.dayCount * 100}% - 0.5rem)`,
                               } satisfies CSSProperties}
                             >
                               <span className="hidden min-w-0 max-w-full truncate whitespace-nowrap md:block">

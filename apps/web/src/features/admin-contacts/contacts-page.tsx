@@ -1,3 +1,4 @@
+import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { restrictListDrag } from "@/lib/drag-bounds";
 import {
   useCallback,
@@ -83,10 +84,15 @@ function ContactsPageContent() {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-  const [contacts, setContacts] = useState<ContactRecord[]>([]);
+  const contactsQuery = useAdminListQuery({ resource: "contacts", queryFn: async () => { const response = await apiClient.getManagedContacts({ page: 1, pageSize: CONTACT_LIST_PAGE_SIZE }); return sortContacts(response.items); } });
+  const contacts = contactsQuery.data ?? [];
+  const setContacts = contactsQuery.setData;
   const [departments, setDepartments] = useState<ContactDepartmentRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const loading = contactsQuery.isPending;
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (contactsQuery.isError) setError("연락망 정보를 불러오는 데 실패했습니다.");
+  }, [contactsQuery.isError]);
   const [query, setQuery] = useState("");
   const [activityYearFilter, setActivityYearFilter] = useState("2026");
   const [departmentFilter, setDepartmentFilter] = useState("");
@@ -109,17 +115,7 @@ function ContactsPageContent() {
   const [departmentForm, setDepartmentForm] = useState({ nameKo: "" });
   const [departmentSaving, setDepartmentSaving] = useState(false);
 
-  const loadContacts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.getManagedContacts({ page: 1, pageSize: CONTACT_LIST_PAGE_SIZE });
-      setContacts(sortContacts(response.items));
-    } catch {
-      setError("연락망 정보를 불러오는 데 실패했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }, [apiClient]);
+  const loadContacts = async () => { await contactsQuery.refetch(); };
 
   const loadDepartments = useCallback(async () => {
     try {
@@ -140,8 +136,8 @@ function ContactsPageContent() {
   }, [apiClient]);
 
   useEffect(() => {
-    void Promise.all([loadContacts(), loadDepartments(), loadSpreadsheet()]);
-  }, [loadContacts, loadDepartments, loadSpreadsheet]);
+    void Promise.all([loadDepartments(), loadSpreadsheet()]);
+  }, [loadDepartments, loadSpreadsheet]);
 
   const activityYearOptions = useMemo(
     () => Array.from(new Set([2026, ...contacts.flatMap((contact) => contact.activities?.length ? contact.activities.map((activity) => activity.year) : [contact.cohort]).filter((year): year is number => year !== null).map(normalizeYear)]))
@@ -446,7 +442,7 @@ function ContactsPageContent() {
               </div>
             </Modal>
 
-            <AdminTableCard className="overflow-visible">
+            <AdminTableCard refreshing={contactsQuery.isFetching && !!contactsQuery.data} className="overflow-visible">
               <div className="admin-table-toolbar px-4 py-2"><div className="flex flex-wrap items-center justify-end gap-2">
                 <AdminSelectDropdown value={activityYearFilter} onChange={setActivityYearFilter} ariaLabel="연도 필터" className="w-32 shrink-0" options={[{ value: "", label: "전체 연도" }, ...activityYearOptions.map((year) => ({ value: String(year), label: formatActivityYear(year) }))]} />
                 <AdminSelectDropdown value={departmentFilter} onChange={setDepartmentFilter} ariaLabel="부서 필터" className="w-36 shrink-0" options={[{ value: "", label: "전체 부서" }, ...departments.filter((department) => department.isActive).map((department) => ({ value: department.nameKo, label: department.nameKo })), ...legacyDepartmentOptions.map((department) => ({ value: department, label: department }))]} />

@@ -20,10 +20,7 @@ import { PublicOperationalContent } from '@/features/site-content/public-operati
 import { ChannelTalkProvider } from '@/features/channel-talk/channel-talk-provider';
 import { BoardPage } from '@/pages/board-page';
 import { FaqPage } from '@/pages/faq-page';
-
-const HomePage = lazy(() =>
-  import('@/pages/home-page').then((module) => ({ default: module.HomePage })),
-);
+import { HomePage } from '@/pages/home-page';
 const LoginCallbackPage = lazy(() =>
   import('@/pages/login-callback-page').then((module) => ({ default: module.LoginCallbackPage })),
 );
@@ -369,7 +366,7 @@ function PublicLayout() {
     <div className="public-site-layout flex min-h-screen flex-col">
       <Header variant={pathname === "/" ? "home" : "default"} />
       <div className="public-site-content flex flex-1 flex-col">
-        <Suspense fallback={isArticleDetail ? <ArticleLoading /> : <div className={pathname === "/" ? "home-route-loading flex-1" : "flex-1"} aria-busy="true" />}>
+        <Suspense fallback={isArticleDetail ? <ArticleLoading /> : <div className="flex-1" aria-busy="true" />}>
           <Outlet />
         </Suspense>
       </div>

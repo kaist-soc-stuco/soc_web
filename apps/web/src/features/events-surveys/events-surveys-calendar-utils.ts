@@ -69,7 +69,7 @@ export function getCalendarEventStyles(
 ) {
   if (category === "HOLIDAY") {
     return {
-      bg: "bg-rose-100 text-black hover:bg-rose-200",
+      bg: "bg-rose-200/70 text-black hover:bg-rose-200",
       hoverBg: "bg-rose-200",
       bullet: "bg-rose-400",
       label: lang === "ko" ? "공휴일" : "Public holiday",
@@ -86,7 +86,7 @@ export function getCalendarEventStyles(
 
   if (sourceType === "MANUAL") {
     return {
-      bg: "bg-brand-primary/15 text-black hover:bg-brand-primary/25",
+      bg: "bg-brand-primary/20 text-black hover:bg-brand-primary/25",
       hoverBg: "bg-brand-primary/25",
       bullet: "bg-brand-primary",
       label: lang === "ko" ? "학생회 일정" : "Council Schedule",
@@ -94,13 +94,13 @@ export function getCalendarEventStyles(
   }
 
   if (sourceType === "VOTE") {
-    return { bg: "bg-sky-100 text-black hover:bg-sky-200", hoverBg: "bg-sky-200", bullet: "bg-sky-500", label: lang === "ko" ? "투표" : "Vote" };
+    return { bg: "bg-sky-200/75 text-black hover:bg-sky-200", hoverBg: "bg-sky-200", bullet: "bg-sky-500", label: lang === "ko" ? "투표" : "Vote" };
   }
 
   switch (kind) {
     case "EVENT":
       return {
-        bg: "bg-brand-primary/15 text-black hover:bg-brand-primary/25",
+        bg: "bg-brand-primary/20 text-black hover:bg-brand-primary/25",
         hoverBg: "bg-brand-primary/25",
         bullet: "bg-brand-primary",
         label: lang === "ko" ? "행사" : "Event",
@@ -108,7 +108,7 @@ export function getCalendarEventStyles(
     case "SURVEY":
     default:
       return {
-        bg: "bg-sky-100 text-black hover:bg-sky-200",
+        bg: "bg-sky-200/75 text-black hover:bg-sky-200",
         hoverBg: "bg-sky-200",
         bullet: "bg-sky-500",
         label: lang === "ko" ? "설문" : "Survey",

@@ -1,3 +1,4 @@
+import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { restrictListDrag } from "@/lib/drag-bounds";
 import type { ArticleListItem } from "@soc/contracts";
 import { createApiClient } from "@soc/api-client";
@@ -19,7 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import {
@@ -79,29 +80,20 @@ function FaqManagementPageContent() {
   );
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
   const { toast } = useToast();
-  const [items, setItems] = useState<ArticleListItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const faqQuery = useAdminListQuery({ resource: "faq", queryFn: async () => { const response = await apiClient.getArticles("faq", { page: 1, limit: 100 }); return [...response.items].sort(compareFaqOrder); } });
+  const items = faqQuery.data ?? [];
+  const setItems = faqQuery.setData;
+  const loading = faqQuery.isPending;
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ArticleListItem | null>(null);
   const [activeFaqId, setActiveFaqId] = useState<string | null>(null);
   const [form, setForm] = useState<FaqForm>(emptyForm);
 
-  const loadItems = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.getArticles("faq", { page: 1, limit: 100 });
-      setItems([...response.items].sort(compareFaqOrder));
-    } catch {
-      toast({ type: "error", message: "FAQ 목록을 불러오지 못했습니다." });
-    } finally {
-      setLoading(false);
-    }
-  }, [apiClient, toast]);
-
+  const loadItems = async () => { await faqQuery.refetch(); };
   useEffect(() => {
-    void loadItems();
-  }, [loadItems]);
+    if (faqQuery.isError) toast({ type: "error", message: "FAQ 목록을 불러오지 못했습니다." });
+  }, [faqQuery.isError, toast]);
 
   const openCreate = () => {
     setEditingItem(null);
@@ -211,7 +203,7 @@ function FaqManagementPageContent() {
             </Button>
           )}
         />
-        <AdminTableCard className="min-w-0">
+        <AdminTableCard refreshing={faqQuery.isFetching && !!faqQuery.data} className="min-w-0">
           {loading && items.length === 0 ? <AdminLoadingState /> : (
             <DndContext modifiers={[restrictListDrag]}
               autoScroll
@@ -288,7 +280,7 @@ function FaqManagementPageContent() {
           </label>
           <label className="grid gap-1.5 text-xs font-normal text-slate-600">
             답변 (영문)
-            <UiTextarea autoResize={false} spellCheck={false} rows={8} value={form.contentEn} onChange={(event) => { const value = event.currentTarget.value; setForm((current) => ({ ...current, contentEn: value })); }} />
+            <UiTextarea autoResize={false} spellCheck={false} rows={10} value={form.contentEn} onChange={(event) => { const value = event.currentTarget.value; setForm((current) => ({ ...current, contentEn: value })); }} />
           </label>
         </div>
       </AdminDrawer>
@@ -314,7 +306,7 @@ function SortableFaqRow({
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: item.articleId, disabled });
   return (
-    <tr ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition: transition ?? "transform 180ms ease" }} className={cn("group cursor-pointer transition-colors hover:bg-slate-50/60", isDragging && "relative z-10 opacity-70")} tabIndex={disabled ? -1 : 0} onClick={() => { if (!disabled) onEdit(item); }} onKeyDown={(event) => { if (event.target === event.currentTarget && !disabled && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onEdit(item); } }}>
+    <tr ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition: transition ?? "transform 180ms ease" }} className={cn("faq-management-row group cursor-pointer transition-colors hover:bg-slate-50/60", isDragging && "relative z-10 opacity-70")} tabIndex={disabled ? -1 : 0} onClick={() => { if (!disabled) onEdit(item); }} onKeyDown={(event) => { if (event.target === event.currentTarget && !disabled && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onEdit(item); } }}>
       <AdminTableCell className="text-center">
         <button ref={setActivatorNodeRef} type="button" aria-label="FAQ 순서 이동" onClick={(event) => event.stopPropagation()} {...attributes} {...listeners} className="admin-list-drag-handle">
           <GripVertical className="size-4" aria-hidden="true" />

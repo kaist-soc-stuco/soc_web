@@ -99,7 +99,7 @@ export function CommentSection({
     });
 
   return (
-    <section className="flex w-full flex-col rounded-xl border border-slate-200 bg-white px-4 py-5 shadow-[0_8px_28px_rgba(15,23,42,0.04)] min-[360px]:px-5 min-[640px]:px-6 md:px-[52px] md:py-[24px]">
+    <section className="flex w-full flex-col rounded-xl border border-slate-200 bg-white px-4 py-5 shadow-none min-[360px]:px-5 min-[640px]:px-6 md:px-[52px] md:py-[24px]">
       <div className="flex items-center justify-between">
         <h2 className="text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-slate-800">
           <span>{lang === "ko" ? "댓글" : "Comments"}</span>

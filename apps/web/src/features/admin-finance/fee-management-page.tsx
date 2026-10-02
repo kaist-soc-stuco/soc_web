@@ -1,3 +1,4 @@
+import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { type DateRange } from "@/components/ui/date-range-picker";
 import { useToast } from "@/components/ui/toast";
 import { randomId } from "@/lib/random-id";
@@ -110,10 +111,7 @@ export function FeeManagementPage() {
   const [feePolicy, setFeePolicy] = useState<StudentFeePolicy>({ effectiveSemester: "2026-1", amount: 45000, coverageSemesters: 6 });
   const [policyReady, setPolicyReady] = useState(false);
   const [policyAmount, setPolicyAmount] = useState("45000");
-  const [feeData, setFeeData] = useState<StudentFeeListResponse | null>(null);
   const [studentCache, setStudentCache] = useState<Record<string, StudentFeeRow>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const [operationError, setOperationError] = useState<string | null>(null);
   const [policyLoadError, setPolicyLoadError] = useState<string | null>(null);
@@ -220,6 +218,16 @@ export function FeeManagementPage() {
       paymentCount: detail.history.length,
     };
   }, [detail, referenceSemester]);
+  const feesQuery = useAdminListQuery({
+    resource: "fees",
+    params: { statusFilter, currentPage, pageSize, sortBy, sortDirection, query, referenceSemester },
+    enabled: !sessionLoading && Permissions.has(session?.permission ?? 0, Permissions.MANAGE_FINANCE),
+    queryFn: () => apiClient.listStudentsByFeeStatus({ status: statusFilter === "ALL" ? undefined : statusFilter, page: currentPage, pageSize, sortBy, sortDirection, query, referenceSemester }),
+  });
+  const feeData = feesQuery.data;
+  const loading = feesQuery.isFetching;
+  const error = feesQuery.isError ? "과비 데이터를 불러오지 못했습니다." : null;
+
   const students = feeData?.students ?? [];
   const selectedStudents = useMemo(
     () => Array.from(selectedUserIds).map((id) => studentCache[id]).filter(Boolean),
@@ -229,40 +237,19 @@ export function FeeManagementPage() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const rangeStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const rangeEnd = Math.min(totalCount, currentPage * pageSize);
-  const initialLoading = feeData === null && (loading || sessionLoading);
+  const initialLoading = !feeData && (loading || sessionLoading);
   const currentVisibleSelected = students.filter((student) => selectedUserIds.has(student.userId)).length;
   const allVisibleSelected = students.length > 0 && currentVisibleSelected === students.length;
 
-  const loadData = useCallback(async () => {
-    if (sessionLoading || !Permissions.has(session?.permission ?? 0, Permissions.MANAGE_FINANCE)) return;
-    setLoading(true);
-    try {
-      const data = await apiClient.listStudentsByFeeStatus({
-        status: statusFilter === "ALL" ? undefined : statusFilter,
-        page: currentPage,
-        pageSize,
-        sortBy,
-        sortDirection,
-        query,
-        referenceSemester,
-      });
-      setFeeData(data);
-      setStudentCache((current) => {
-        const next = { ...current };
-        data.students.forEach((student) => { next[student.userId] = student; });
-        return next;
-      });
-      setError(null);
-    } catch (err) {
-      setError("과비 데이터를 불러오지 못했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }, [apiClient, currentPage, pageSize, query, referenceSemester, session, sessionLoading, sortBy, sortDirection, statusFilter]);
-
+  const loadData = async () => { await feesQuery.refetch(); };
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    if (!feeData) return;
+    setStudentCache(current => {
+      const next = { ...current };
+      feeData.students.forEach(student => { next[student.userId] = student; });
+      return next;
+    });
+  }, [feeData]);
 
   useEffect(() => {
     if (
@@ -609,8 +596,8 @@ export function FeeManagementPage() {
               onSemesterChange={setStatsSemester}
               stats={stats}
             />
-          ) : <AdminTableCard className="overflow-visible">
-            <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-2 xl:flex-row xl:items-center xl:justify-between">
+          ) : <AdminTableCard refreshing={loading && !!feeData} className="overflow-visible">
+            <div className="admin-table-toolbar flex flex-col gap-3 border-b border-slate-100 px-4 py-2 xl:flex-row xl:items-center xl:justify-between">
               <SegmentedControl
                 ariaLabel="납부 상태"
                 value={statusFilter}
@@ -631,7 +618,7 @@ export function FeeManagementPage() {
             </div>
 
             <div className="min-w-0">
-              <div className={loading && !initialLoading ? "opacity-60 transition-opacity duration-150" : "transition-opacity duration-150"}>
+              <div >
                 {initialLoading ? <AdminLoadingState /> : students.length === 0 ? <EmptyState message="등록된 학생이 없습니다." className="border-0 py-20" /> : (
                   <AdminDataTable minWidth={680}>
                     <colgroup><col className="w-12" /><col className="w-44" /><col className="w-28" /><col /><col className="w-28" /><col className="w-24" /><col className="w-32" /></colgroup>

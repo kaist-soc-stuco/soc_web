@@ -32,14 +32,14 @@ export function NoticeBoard() {
       <header className="home-section-heading">
         <h2 id="home-notices-title">
           <Link to="/board/notice" className="home-heading-link">
-            {lang === "ko" ? "공지사항" : "Notices"}
+            {lang === "ko" ? "공지" : "Notices"}
             <ArrowUpRight aria-hidden="true" />
           </Link>
         </h2>
       </header>
       {noticesQuery.isPending ? (
         <p className="home-editorial-placeholder" role="status">
-          {lang === "ko" ? "공지사항을 불러오는 중입니다." : "Loading notices…"}
+          {lang === "ko" ? "공지를 불러오는 중입니다." : "Loading notices…"}
         </p>
       ) : noticesQuery.isError ? (
         <div className="home-data-error" role="alert">
@@ -79,7 +79,7 @@ export function NoticeBoard() {
         </ul>
       ) : (
         <p className="home-editorial-placeholder">
-          {lang === "ko" ? "등록된 공지사항이 없습니다." : "No notices available."}
+          {lang === "ko" ? "등록된 공지가 없습니다." : "No notices available."}
         </p>
       )}
     </section>

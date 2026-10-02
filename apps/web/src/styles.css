@@ -1335,7 +1335,7 @@
     display: flex;
     min-height: 3.75rem;
     align-items: center;
-    padding: 0.75rem 0.5rem;
+    padding: 0.75rem 0.875rem;
   }
 
   .home-notice-entry > div {
@@ -1363,7 +1363,7 @@
     min-height: 3.75rem;
     align-items: center;
     gap: 0.875rem;
-    padding: 0.75rem 0.5rem;
+    padding: 0.75rem 0.875rem;
   }
 
   .home-schedule-entry > time {
@@ -4270,6 +4270,12 @@
 .admin-table-card > :is(.border-b, .admin-table-toolbar) { padding-inline: var(--admin-table-inset); border-bottom:0; }
 .admin-table-card > :is(.border-b, .admin-table-toolbar):has(> .admin-toolbar) { padding-inline: 0; }
 .admin-table-card .admin-toolbar { padding-inline: var(--admin-table-inset); }
+/* Reserve the spinner's 16px slot and an 8px gap at every breakpoint.
+   This follows the shared toolbar inset rules so nested toolbars cannot reset it. */
+.admin-table-card[data-refreshable="true"] > :is(.admin-card__header, .admin-table-toolbar),
+.board-article-table > .board-list-toolbar {
+  padding-right: 2.75rem;
+}
 .admin-table-card .admin-data-table tr > :first-child { padding-left: var(--admin-table-inset); }
 .admin-table-card .admin-data-table tr > :last-child { padding-right: var(--admin-table-inset); }
 @keyframes survey-expand { from { opacity: .6; transform: translateY(-.35rem) scaleY(.97); } to { opacity: 1; transform: none; } }
@@ -5031,14 +5037,11 @@ input[type="search"]:focus-visible,
   background: rgb(255 255 255 / 0.24);
   box-shadow: 0 1px 6px rgb(15 23 42 / 0.08);
   backdrop-filter: blur(8px);
-  transition: background-color 150ms ease, color 150ms ease;
+  transition: background-color 150ms ease;
 }
-.event-card-scrap:not(:disabled):hover {
-  color: #64748b;
-  background: rgb(255 255 255 / 0.42);
-}
-.event-card-scrap[aria-pressed="true"] { color: #fbbf24; }
-.event-card-scrap[aria-pressed="true"]:not(:disabled):hover { color: #f59e0b; }
+.event-card-scrap:not(:disabled):hover { color:#0f172a; background:#fff; border-color:#fff; }
+.event-card-scrap[aria-pressed="true"] { color:#fbbf24; background:#fff; border-color:#fff; }
+.event-card-scrap[aria-pressed="true"]:not(:disabled):hover { color:#fbbf24; }
 .event-card-scrap svg { color: inherit; stroke-width: 1.5; }
 
 /* Administrative screen switches are visually separate from data filters. */
@@ -5099,8 +5102,8 @@ input[type="search"]:focus-visible,
 .admin-page :is(.admin-card, .survey-responses-panel) .ui-view-tabs > button, .ui-modal .ui-view-tabs > button { font-size:0.875rem !important; font-weight:500 !important; }
 .ui-view-tabs { flex-shrink:0; }
 .ui-segmented-control { position:relative; }
-.ui-segmented-control > button { position:relative; z-index:1; transition:font-weight 160ms ease,color 160ms ease; }
-.ui-segmented-control > button:hover { --ui-segmented-weight:600; background:transparent !important; font-weight:500 !important; }
+.ui-segmented-control > button { position:relative; z-index:1; text-shadow:0 0 0 transparent; transition:color 160ms ease,text-shadow 160ms ease; }
+.ui-segmented-control > button:is(:hover,:focus-visible) { color:#25364a !important; background:transparent !important; text-shadow:0.15px 0 currentColor,-0.15px 0 currentColor; }
 .ui-segmented-control.filter-chips > button.is-active { --ui-segmented-weight:600; background:transparent !important; box-shadow:none; font-weight:600 !important; }
 .ui-segmented-indicator { position:absolute; left:0; top:4px; background:white; border-radius:5px; box-shadow:0 0 0 1px #e2e8f0; pointer-events:none; transition:transform 220ms cubic-bezier(.25,.8,.25,1),width 220ms ease,height 220ms ease; }
 .admin-page .admin-table-card > :is(.border-b, .admin-table-toolbar, .admin-card__header) { border-bottom:0; }
@@ -5145,7 +5148,7 @@ input[type="search"]:focus-visible,
 .admin-table-footer { min-height:0; padding-block:.5rem; }
 .ui-view-tabs { position:relative; }
 .ui-view-tabs:has(> .ui-view-tab-indicator) > button.is-active { border-bottom-color:transparent; }
-.ui-view-tab-indicator { position:absolute; bottom:0; left:0; background:#172033; pointer-events:none; transition:transform 240ms cubic-bezier(.25,.8,.25,1),width 240ms ease; }
+.ui-view-tab-indicator { position:absolute; bottom:0; left:0; height:3px; background:#172033; pointer-events:none; transition:transform 240ms cubic-bezier(.25,.8,.25,1),width 240ms ease; }
 .admin-site-content__list button:focus-visible { font-weight:500 !important; }
 .event-survey-card.is-closed .home-portal-event-body { opacity:.7; }
 .event-survey-card .home-portal-event-body { display:flex; flex:1; flex-direction:column; }
@@ -5159,7 +5162,6 @@ input[type="search"]:focus-visible,
 .home-notice-entry:hover h3,.home-schedule-entry:hover h3 { color:#202623; }
 .home-notice-entry-pinned { background:transparent; }
 .home-notice-entry-pinned:hover { background:#f3faf6; }
-.home-route-loading { min-height:18.75rem; background:#203c33 url('/hero_background_1.jpg') center/cover; }
 @layer utilities { button.font-semibold,button.\!font-semibold { font-weight:500 !important; } }
 @media(min-width:48rem) {
  .admin-page__main--table > :is(.admin-card,.admin-table-card) { flex:0 1 auto; max-height:100%; }
@@ -5167,3 +5169,15 @@ input[type="search"]:focus-visible,
  .admin-page__main--table .admin-table-card > [aria-busy] { flex:0 1 auto; }
 }
 @media(prefers-reduced-motion:reduce) { .ui-view-tab-indicator,.home-notice-entry::after,.home-schedule-entry::after { transition:none; } }
+
+/* Persistent feedback for open action popovers. */
+.interaction-button:is([data-state="open"],[aria-haspopup="menu"][aria-expanded="true"]),.ui-icon-button:is([data-state="open"],[aria-expanded="true"]) { background-color:#eef1f4; color:#334155; }
+.interaction-button[data-variant="outline"][aria-expanded="true"]:not([data-filter-trigger]) { background-color:rgba(18,32,53,.09); color:#1e293b; }
+.interaction-button:is([data-variant="outline"],[data-variant="secondary"]) svg { opacity:.72; }
+.about-section-nav { border-bottom-width:2px; }
+.mypage-activity-toolbar :is(input,.ui-input,.interaction-control,.interaction-button) { height:2.25rem; min-height:2.25rem; }
+@media(min-width:64rem) and (hover:hover) and (pointer:fine) {
+ .admin-page .faq-management-row:focus-within:not(:hover):not(:focus-visible):not(:has(:focus-visible)) .admin-row-action,
+ .admin-page .faq-management-row:focus-within:not(:hover):not(:focus-visible):not(:has(:focus-visible)) button[data-size="icon"] { opacity:0; }
+ .admin-page .faq-management-row:has(.admin-row-action :focus-visible) .admin-row-action { opacity:1; }
+}

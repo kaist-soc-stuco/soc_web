@@ -46,6 +46,7 @@ type HeaderNavItem = {
 export function Header({ variant = "default" }: HeaderProps) {
   const headerRef = useRef<HTMLElement>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [indicatorHoverIndex, setIndicatorHoverIndex] = useState<number | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTriggerRef = useRef<HTMLButtonElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
@@ -195,7 +196,7 @@ export function Header({ variant = "default" }: HeaderProps) {
 
   const navClickClosed = useRef<number | null>(null);
   const closeNavigation = () => {
-    navClickClosed.current = hoveredIndex;
+    navClickClosed.current = indicatorHoverIndex;
     closePopovers();
   };
   const closePopovers = () => {
@@ -454,7 +455,7 @@ export function Header({ variant = "default" }: HeaderProps) {
   };
 
   const activeNavIndex = navItems.findIndex(isNavItemActive);
-  const indicatorIndex = hoveredIndex ?? activeNavIndex;
+  const indicatorIndex = indicatorHoverIndex ?? activeNavIndex;
   const indicatorOffset = Array.from(
     { length: Math.max(0, indicatorIndex) },
     () => "var(--ui-nav-column-width)",
@@ -474,7 +475,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             }`
           : "sticky top-0 z-50 shrink-0 border-b border-[var(--ui-menu-divider)] bg-white"
       }
-      onMouseLeave={() => { navClickClosed.current = null; setHoveredIndex(null); }}
+      onMouseLeave={() => { navClickClosed.current = null; setHoveredIndex(null); setIndicatorHoverIndex(null); }}
     >
       <div className="flex h-[var(--ui-header-height)] w-full items-stretch justify-between">
         <div className="flex items-stretch">
@@ -489,12 +490,13 @@ export function Header({ variant = "default" }: HeaderProps) {
               const item = (event.target as HTMLElement).closest<HTMLElement>("[data-nav-index]");
               if (!item) return;
               const index = Number(item.dataset.navIndex);
+              if (Number.isInteger(index)) setIndicatorHoverIndex(index);
               if (Number.isInteger(index) && navClickClosed.current !== index) {
                 navClickClosed.current = null;
                 setHoveredIndex(index);
               }
             }}
-            onMouseLeave={() => { navClickClosed.current = null; setHoveredIndex(null); }}
+            onMouseLeave={() => { navClickClosed.current = null; setHoveredIndex(null); setIndicatorHoverIndex(null); }}
           >
             {navItems.map((item, index) => {
               const active = isNavItemActive(item);
@@ -503,11 +505,12 @@ export function Header({ variant = "default" }: HeaderProps) {
                   key={item.label}
                   data-nav-index={index}
                   className="group relative flex h-full items-stretch"
-                  onMouseEnter={() => { if (navClickClosed.current !== index) { navClickClosed.current = null; setHoveredIndex(index); } }}
-                  onFocus={() => setHoveredIndex(index)}
+                  onMouseEnter={() => { setIndicatorHoverIndex(index); if (navClickClosed.current !== index) { navClickClosed.current = null; setHoveredIndex(index); } }}
+                  onFocus={() => { setHoveredIndex(index); setIndicatorHoverIndex(index); }}
                   onBlur={(event) => {
                     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
                       setHoveredIndex(null);
+                      if (!event.currentTarget.matches(":hover")) setIndicatorHoverIndex(null);
                     }
                   }}
                 >
@@ -554,7 +557,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                         ? "visible pointer-events-auto translate-y-0 opacity-100"
                         : "invisible pointer-events-none translate-y-0 opacity-0"
                     }`}
-                    onMouseEnter={() => { if (navClickClosed.current !== index) { navClickClosed.current = null; setHoveredIndex(index); } }}
+                    onMouseEnter={() => { setIndicatorHoverIndex(index); if (navClickClosed.current !== index) { navClickClosed.current = null; setHoveredIndex(index); } }}
                   >
                     <ul>
                       {item.megaItems.map((child) => {
@@ -620,7 +623,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                 disabled={searchOpen}
                 aria-expanded={searchOpen} aria-controls="site-header-search-input"
                 onClick={() => {
-                  setSearchOpen(true); setHoveredIndex(null);
+                  setSearchOpen(true); setHoveredIndex(null); setIndicatorHoverIndex(null);
                   setDropdownOpen(false); setNotificationOpen(false); setMobileMenuOpen(false);
                 }}
                 className={variant === "home" && !searchOpen ? "home-header-icon" : undefined}>

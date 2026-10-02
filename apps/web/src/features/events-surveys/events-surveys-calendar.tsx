@@ -76,8 +76,8 @@ export function EventsSurveysCalendar({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-4">
-        <div className="flex h-full min-w-0 flex-col rounded-lg border border-card-border-subtle bg-white p-4 sm:p-5 lg:col-span-3">
-          <div className="calendar-header mb-1 grid min-w-0 grid-cols-1 items-center gap-1.5 border-b border-slate-200 pb-2 select-none sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+        <div className="flex h-full min-w-0 flex-col rounded-lg border border-card-border-subtle bg-white px-4 py-3 sm:px-5 sm:py-3 lg:col-span-3">
+          <div className="calendar-header mb-1 grid min-w-0 grid-cols-1 items-center gap-1.5 border-b border-slate-200 pb-1 select-none sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
             <div
               className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--ui-text-caption-size)] font-semibold text-slate-500"
               aria-label={lang === "ko" ? "캘린더 공급원 안내" : "Calendar sources"}
@@ -145,11 +145,6 @@ export function EventsSurveysCalendar({
           >
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
               <h3 className="text-sm font-semibold text-slate-800">{selectedDateStr}</h3>
-              <span className="text-xs font-medium text-slate-500">
-                {lang === "ko"
-                  ? `${selectedDayEvents.length}개의 일정`
-                  : `${selectedDayEvents.length} event${selectedDayEvents.length === 1 ? "" : "s"}`}
-              </span>
             </div>
             <p className="mt-1 line-clamp-2 break-words text-xs font-medium leading-relaxed text-slate-600">
               {selectedDayEvents.length > 0
