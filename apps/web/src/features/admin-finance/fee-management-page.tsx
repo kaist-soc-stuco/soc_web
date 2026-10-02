@@ -596,7 +596,7 @@ export function FeeManagementPage() {
               onSemesterChange={setStatsSemester}
               stats={stats}
             />
-          ) : <AdminTableCard refreshing={loading && !!feeData} className="overflow-visible">
+          ) : <AdminTableCard refreshing={loading} className="overflow-visible">
             <div className="admin-table-toolbar flex flex-col gap-3 border-b border-slate-100 px-4 py-2 xl:flex-row xl:items-center xl:justify-between">
               <SegmentedControl
                 ariaLabel="납부 상태"

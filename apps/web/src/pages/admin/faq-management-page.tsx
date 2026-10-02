@@ -203,7 +203,7 @@ function FaqManagementPageContent() {
             </Button>
           )}
         />
-        <AdminTableCard refreshing={faqQuery.isFetching && !!faqQuery.data} className="min-w-0">
+        <AdminTableCard refreshing={faqQuery.isFetching} className="min-w-0">
           {loading && items.length === 0 ? <AdminLoadingState /> : (
             <DndContext modifiers={[restrictListDrag]}
               autoScroll

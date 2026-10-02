@@ -232,7 +232,7 @@ function BoardManagementPageContent() {
       <AdminPageHeader title="게시판 관리" actions={<Button type="button" onClick={startCreate}> 게시판 추가</Button>} />
       {loadError ? <ErrorState title={loadError} onRetry={() => void loadBoards()} /> : null}
 
-      <AdminTableCard refreshing={boardsQuery.isFetching && !!boardsQuery.data}>
+      <AdminTableCard refreshing={boardsQuery.isFetching}>
         <DndContext modifiers={[restrictListDrag]}
           autoScroll
           sensors={sensors}

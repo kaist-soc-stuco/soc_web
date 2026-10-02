@@ -305,7 +305,7 @@ export function SurveyListPage() {
 
           <SegmentedControl variant="underline" role="tablist" ariaLabel="설문 업무" value={surveyGroup} onChange={(value) => { setSurveyGroup(value); setCurrentPage(1); }} options={[{ value: "general", label: "일반 설문" }, { value: "operational", label: "상시 설문" }]} />
           {/* Inline filters use the shared search and select controls. */}
-          <AdminTableCard refreshing={surveysQuery.isFetching && !!surveysQuery.data} className="overflow-visible">
+          <AdminTableCard refreshing={surveysQuery.isFetching} className="overflow-visible">
             <div className="border-b border-slate-100 px-5 py-2">
             <div className="flex flex-wrap items-center justify-end gap-2">
               <DateRangePicker presetType="future" align="end" value={dateRange} onChange={range => { setDateRange(range); setCurrentPage(1); }} />

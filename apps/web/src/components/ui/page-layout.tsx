@@ -1,11 +1,12 @@
 import type { ComponentProps, ReactNode } from "react";
 import { useRef } from "react";
-import { ChevronRight, Search, X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { UiInput } from "@/components/ui/form-control";
 import { IconButton } from "@/components/ui/icon-button";
+import { SearchFieldIcon } from "@/components/ui/search-field-icon";
 import { cn } from "@/lib/utils";
 
 export function PageShell({ className, ...props }: ComponentProps<"div">) {
@@ -282,6 +283,7 @@ export function PageSearchField({
   onClear,
   placeholder,
   value,
+  loading,
 }: {
   ariaLabel: string;
   className?: string;
@@ -289,14 +291,12 @@ export function PageSearchField({
   onClear: () => void;
   placeholder: string;
   value: string;
+  loading?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className={cn("group relative min-w-0 flex-1 lg:w-80 lg:flex-none", className)}>
-      <Search
-        aria-hidden="true"
-        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-primary"
-      />
+      <SearchFieldIcon loading={loading} className="group-focus-within:text-brand-primary" />
       <UiInput
         ref={inputRef}
         type="search"

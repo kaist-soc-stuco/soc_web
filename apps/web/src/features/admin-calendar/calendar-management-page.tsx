@@ -33,6 +33,7 @@ import {
 import { AdminDrawer } from "@/components/ui/admin-drawer";
 import {
   AdminFormField,
+  AdminLoadingState,
   AdminPageHeader,
   AdminPageMain,
   AdminPageShell,
@@ -397,7 +398,7 @@ function CalendarManagementContent() {
           )}
         />
 
-        <AdminTableCard refreshing={eventsQuery.isFetching && !!eventsQuery.data}
+        <AdminTableCard refreshing={eventsQuery.isFetching}
           toolbar={(
             <div className="py-2">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -449,7 +450,7 @@ function CalendarManagementContent() {
             />
           )}
         >
-          {!eventsQuery.data && eventsQuery.isPending ? null : eventsQuery.isError && !eventsQuery.data ? (
+          {!eventsQuery.data && eventsQuery.isPending ? <AdminLoadingState /> : eventsQuery.isError && !eventsQuery.data ? (
             <div className="px-5 py-16 text-center text-sm font-normal text-rose-600">일정을 불러오지 못했습니다.</div>
           ) : (
             <AdminDataTable minWidth={0} mobileMode="cards">

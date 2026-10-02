@@ -1,4 +1,3 @@
-import { ListRefreshIndicator } from "@/components/ui/list-refresh-indicator";
 import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type { PermissionRecord, RoleGroupCandidateListResponse, RoleGroupMemberRecord, RoleGroupRecord } from "@soc/contracts";
@@ -348,7 +347,7 @@ export function PermissionPage() {
               <AdminCardHeader>
                 <div className="flex items-baseline gap-2"><AdminSectionTitle>역할</AdminSectionTitle><AdminMetaText>전체 {roles.length}개</AdminMetaText></div>
               </AdminCardHeader>
-              <div className="border-b border-slate-100 p-3"><AdminSearchField aria-label="역할 검색" placeholder="역할 검색" value={roleQuery} onValueChange={setRoleQuery} /></div>
+              <div className="border-b border-slate-100 p-3"><AdminSearchField loading={rolesQuery.isFetching} aria-label="역할 검색" placeholder="역할 검색" value={roleQuery} onValueChange={setRoleQuery} /></div>
               <div className="scrollbar-hidden max-h-[560px] overflow-y-auto p-2">
                 {loading && roles.length === 0 ? <AdminLoadingState className="min-h-24 px-2 py-6" />
                   : filteredRoles.length === 0 ? <AdminEmptyState message="검색 결과가 없습니다." />
@@ -398,7 +397,7 @@ export function PermissionPage() {
                   {canEditRole ? <Button type="button" size="sm" variant="outline" className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void deleteRole()}> 역할 삭제</Button> : null}
                 </div>
               </AdminCardHeader>
-              <div className="relative px-5 pr-9"><ListRefreshIndicator refreshing={membersLoading && !!membersQuery.data} className="absolute right-3 top-1/2 -translate-y-1/2" /><SegmentedControl variant="underline" ariaLabel="역할 상세 탭" role="tablist" value={selectedTab} onChange={(tab) => setSelection(selectedRole.roleGroupId, tab)} className="clean-segmented-control w-full" options={[{ value: "members", label: `구성원 (${selectedRole.userCount})` }, { value: "permissions", label: `권한 설정 (${draft.permissionIds.length})` }]} /></div>
+              <div className="px-5"><SegmentedControl variant="underline" ariaLabel="역할 상세 탭" role="tablist" value={selectedTab} onChange={(tab) => setSelection(selectedRole.roleGroupId, tab)} className="clean-segmented-control w-full" options={[{ value: "members", label: `구성원 (${selectedRole.userCount})` }, { value: "permissions", label: `권한 설정 (${draft.permissionIds.length})` }]} /></div>
 
               {selectedTab === "permissions" ? <div className="p-5">
                 <div className="grid items-start gap-4 xl:grid-cols-2">{groupedPermissions.map((group) => {

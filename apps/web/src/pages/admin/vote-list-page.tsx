@@ -46,7 +46,7 @@ export function VoteListPage() {
       <AdminPageShell>
         <AdminPageMain className="!max-w-6xl">
           <AdminPageHeader title="투표 관리" actions={<Button asChild><Link to="/admin/votes/new">투표 추가</Link></Button>} />
-          <AdminTableCard refreshing={votesQuery.isFetching && !!votesQuery.data} toolbar={<div className="flex flex-wrap items-center justify-end gap-2 py-1">
+          <AdminTableCard refreshing={votesQuery.isFetching} toolbar={<div className="flex flex-wrap items-center justify-end gap-2 py-1">
             <DateRangePicker presetType="future" align="end" value={dateRange} onChange={range => { setDateRange(range); setPage(1); }} />
             <AdminSelectDropdown ariaLabel="투표 상태" value={status} onChange={value => { setStatus(value); setPage(1); }} options={[{ value: "all", label: "전체 상태" }, { value: "DRAFT", label: "임시저장" }, { value: "PUBLISHED", label: "게시됨" }, { value: "CLOSED", label: "마감" }, { value: "TALLIED", label: "종료" }]} className="w-32" />
             <AdminSearchField aria-label="투표 검색" placeholder="제목 검색" value={search} onValueChange={value => { setSearch(value); setPage(1); }} className="w-full sm:w-56" />

@@ -170,7 +170,7 @@ export function AuditLogPage() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const rangeStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const rangeEnd = Math.min(totalCount, currentPage * pageSize);
-  const refreshing = loading && !!data;
+  const refreshing = loading;
 
   const updatePageFilter = (setter: (value: string) => void, value: string) => {
     setter(value);
@@ -238,7 +238,7 @@ export function AuditLogPage() {
 
 
 
-            <div aria-busy={loading} style={!data && loading ? { minHeight: 320 } : undefined} >
+            <div aria-busy={loading} >
               {error && !data ? <div className="p-6"><EmptyState message={error} /></div> : data && data.items.length > 0 ? (
                 <AdminDataTable minWidth={0} mobileMode="cards">
                   <colgroup><col style={{ width: "18%" }} /><col style={{ width: "13%" }} /><col style={{ width: "23%" }} /><col style={{ width: "28%" }} /><col style={{ width: "18%" }} /></colgroup>

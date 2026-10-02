@@ -281,7 +281,7 @@ function RoadmapManagementPageContent() {
         </AdminEditorGuidance>
 
         <SegmentedControl variant="underline" role="tablist" ariaLabel="로드맵 관리 탭" value={activeTab} onChange={setActiveTab} options={[{ value: "courses", label: "전체 교과목" }, { value: "offerings", label: "학기별 개설 관리" }]} />
-        <AdminTableCard refreshing={roadmapQuery.isFetching && !!roadmapQuery.data}
+        <AdminTableCard refreshing={roadmapQuery.isFetching}
           toolbar={
             <AdminToolbar className="rounded-none border-0">
               <AdminToolbarGroup className="ml-auto w-full justify-end sm:flex-1 sm:flex-nowrap">

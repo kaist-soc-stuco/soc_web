@@ -119,7 +119,7 @@ function ContentModerationPageContent() {
             { value: "comments", label: `댓글 ${comments.length}` },
           ]}
         />
-        <AdminTableCard refreshing={moderationQuery.isFetching && !!moderationQuery.data}
+        <AdminTableCard refreshing={moderationQuery.isFetching}
           toolbar={(
             <div className="flex items-center justify-between gap-3 py-2">
               <p className="text-sm font-normal text-app-text-secondary">숨김 {activeItems.length}건</p>

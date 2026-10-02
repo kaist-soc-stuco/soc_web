@@ -255,7 +255,7 @@ export function UserManagementPage() {
         <main className="admin-page__main admin-page__main--table mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
           <AdminPageHeader title="유저 관리" />
 
-          <AdminTableCard refreshing={loading && !!data} className="user-management-table" aria-busy={loading}>
+          <AdminTableCard refreshing={loading} className="user-management-table" aria-busy={loading}>
             <AdminCardHeader className="items-center gap-4">
               <div className="flex flex-wrap items-center gap-2">
                 <SegmentedControl<UserStatusFilter>

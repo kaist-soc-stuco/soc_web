@@ -1,4 +1,4 @@
-import { ListRefreshIndicator } from "@/components/ui/list-refresh-indicator";
+import { SearchLoadingContext } from "@/lib/search-loading-context";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { ArticleListTitle } from "@/components/ui/article-list-title";
 import { PromotionStatus } from "@/components/ui/promotion-period";
@@ -182,7 +182,7 @@ export function BoardArticleTable({
         ? "익명"
         : "Anonymous"
       : (lang === "en" ? post.author.nameEn || post.author.name : post.author.name);
-  const tableGridClass = "board-table-grid board-table-grid--all";
+  const tableGridClass = `board-table-grid ${category ? "" : "board-table-grid--all"}`;
   const renderArticleRow = (post: ArticleListItem, pinned = false) => {
     const isNew =
       isoToMs(post.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
@@ -201,13 +201,13 @@ export function BoardArticleTable({
           className={`grid min-w-0 w-full grid-cols-1 gap-1.5 md:items-center md:gap-3 ${tableGridClass}`}
         >
           {!category ? (
-            <div className="flex shrink-0 justify-start text-left md:justify-center md:text-center">
+            <div className="flex shrink-0 justify-start text-left">
               <span className={`text-[length:var(--ui-text-caption-size)] font-medium select-none ${pinned ? "text-kaist-darkgreen" : "text-slate-500"}`}>
                 {getBoardLabelFromMetadata(postBoard, postCategory, lang)}
               </span>
             </div>
-          ) : <div className="hidden md:block" aria-hidden="true" />}
-          <div className={`flex min-w-0 items-center gap-2 text-left text-[length:var(--ui-text-section-size)] leading-5 tracking-tight text-app-text-strong md:pl-1 ${pinned ? "font-semibold" : "font-medium"}`}>
+          ) : null}
+          <div className={`flex min-w-0 items-center gap-2 text-left text-[length:var(--ui-text-section-size)] leading-5 tracking-tight text-app-text-strong ${pinned ? "font-semibold" : "font-medium"}`}>
             {postCategory === "promotions" && <PromotionStatus start={post.eventStartDate} end={post.eventEndDate} lang={lang} />}
             {pinned ? <span aria-label={lang === "ko" ? "고정 공지" : "Pinned notice"} className="shrink-0 text-sm">📌</span> : null}
             <ArticleListTitle>{lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}</ArticleListTitle>
@@ -260,15 +260,17 @@ export function BoardArticleTable({
   return (
     <PageContainer className="pb-8">
       <DataViewCard className="board-article-table" aria-label={lang === "ko" ? "게시글 목록" : "Article list"}>
-        <DataViewToolbar className="board-list-toolbar relative">{toolbar}<ListRefreshIndicator refreshing={isLoading && !showInitialSkeleton} className="absolute right-5 top-1/2 -translate-y-1/2" /></DataViewToolbar>
+        <SearchLoadingContext.Provider value={isLoading}>
+          <DataViewToolbar>{toolbar}</DataViewToolbar>
+        </SearchLoadingContext.Provider>
         <DataViewBody>
         <div className={`hidden h-[var(--ui-table-head-height)] ${tableGridClass} items-center gap-3 border-b border-[var(--ui-border-subtle)] bg-slate-50/70 px-6 text-[length:var(--ui-text-body-size)] font-medium tracking-tight text-slate-500 md:grid`}>
           {!category ? (
-            <div className="shrink-0 text-center">
+            <div className="shrink-0 text-left">
               {lang === "ko" ? "분류" : "Category"}
             </div>
-          ) : <div aria-hidden="true" />}
-          <div className="min-w-0 text-left md:pl-1">
+          ) : null}
+          <div className="min-w-0 text-left">
             {lang === "ko" ? "제목" : "Title"}
           </div>
           <div className="hidden shrink-0 text-center md:block">
@@ -313,7 +315,7 @@ export function BoardArticleTable({
           </div>
 
           {showInitialSkeleton && articles.length === 0 ? (
-            <BoardTableSkeleton columns={5} />
+            <BoardTableSkeleton columns={category ? 4 : 5} />
           ) : null}
         </div>
         </DataViewBody>

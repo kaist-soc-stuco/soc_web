@@ -1,9 +1,9 @@
-import { Search } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
-import { ListRefreshIndicator } from "@/components/ui/list-refresh-indicator";
+import { SearchFieldIcon } from "@/components/ui/search-field-icon";
+import { SearchLoadingContext } from "@/lib/search-loading-context";
 import { UiInput } from "@/components/ui/form-control";
 import { AdminPageTitle } from "@/components/ui/page-layout";
 import { cn } from "@/lib/utils";
@@ -99,16 +99,15 @@ export function AdminTableCard({
   ...props
 }: AdminTableCardProps) {
   return (
+    <SearchLoadingContext.Provider value={Boolean(refreshing)}>
     <section
       className={cn(
         "admin-table-card relative min-w-0 max-w-full overflow-hidden rounded-2xl border border-[#e5eaf0] bg-white shadow-none",
         className,
       )}
-      data-refreshable={refreshing !== undefined || undefined}
       {...props}
     >
-      {toolbar ? <div className="admin-table-toolbar relative">{toolbar}{refreshing !== undefined ? <ListRefreshIndicator refreshing={refreshing} className="absolute right-5 top-1/2 -translate-y-1/2" /> : null}</div> : null}
-      {!toolbar && refreshing ? <ListRefreshIndicator refreshing className="absolute right-5 top-4 z-10" /> : null}
+      {toolbar ? <div className="admin-table-toolbar">{toolbar}</div> : null}
       {children}
       {pagination ? (
         <div className="admin-table-footer flex min-h-12 items-center border-t border-slate-100 bg-white px-4 py-2 sm:px-5 [&_.ui-pagination]:m-0 [&_.ui-pagination]:w-full">
@@ -116,6 +115,7 @@ export function AdminTableCard({
         </div>
       ) : null}
     </section>
+    </SearchLoadingContext.Provider>
   );
 }
 
@@ -155,19 +155,18 @@ export function AdminToolbarGroup({ className, ...props }: ComponentProps<"div">
 interface AdminSearchFieldProps
   extends Omit<ComponentProps<"input">, "onChange" | "type"> {
   onValueChange?: (value: string) => void;
+  loading?: boolean;
 }
 
 export function AdminSearchField({
   className,
   onValueChange,
+  loading,
   ...props
 }: AdminSearchFieldProps) {
   return (
     <label className={cn("relative block min-w-0", className)}>
-      <Search
-        aria-hidden="true"
-        className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
-      />
+      <SearchFieldIcon loading={loading} />
       <UiInput
         type="search"
         className="w-full pl-9 pr-3"
@@ -254,7 +253,7 @@ export function AdminEmptyState({ message, className, ...props }: ComponentProps
   return (
     <EmptyState
       message={message}
-      className={cn("rounded-none border-0 bg-transparent py-16 text-slate-400", className)}
+      className={cn("admin-empty-state rounded-none border-0 bg-transparent py-16 text-slate-400", className)}
       {...props}
     />
   );
@@ -265,7 +264,7 @@ export function AdminLoadingState({ message = "불러오는 중…", className, 
     <div
       role="status"
       aria-live="polite"
-      className={cn("flex min-h-32 items-center justify-center gap-2 px-4 py-8 text-sm font-normal text-slate-400", className)}
+      className={cn("admin-loading-state flex min-h-32 items-center justify-center gap-2 px-4 py-8 text-sm font-normal text-slate-400", className)}
       {...props}
     >
       <span aria-hidden="true" className="size-4 animate-spin rounded-full border-2 border-slate-200 border-t-brand-primary" />
