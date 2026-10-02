@@ -1,6 +1,7 @@
 name: Quality
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
@@ -38,9 +39,13 @@ jobs:
       TZ: Asia/Seoul
       DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
       ASSET_QUOTA_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
+      CALENDAR_SYNC_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
+      CONTACT_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
+      FEEDBACK_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
       FEE_CONCURRENCY_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
       GOOGLE_QUEUE_FENCING_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
       NODE_ENV: test
+      PERMISSION_ASSET_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
       POSTGRES_DB: soc_web_test
       POSTGRES_HOST: localhost
       POSTGRES_PASSWORD: soc_test
@@ -49,10 +54,13 @@ jobs:
       SURVEY_CONCURRENCY_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
       SURVEY_HISTORY_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
       VOTE_CONCURRENCY_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
+      VOTE_EDITOR_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
 
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Install pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
@@ -84,13 +92,11 @@ jobs:
   security:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      security-events: write
-
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Install pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
@@ -123,7 +129,7 @@ jobs:
           vuln-type: os,library
           exit-code: '1'
 
-      - name: Secret history scan
+      - name: Scan current commit for secrets
         run: >-
           docker run --rm
           --volume "${{ github.workspace }}:/repo:ro"

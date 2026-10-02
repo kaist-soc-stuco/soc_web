@@ -21,8 +21,10 @@ const sheetJsIntegrity =
 
 requireText(lockfile.includes(`specifier: ${sheetJsUrl}`), "SheetJS specifier drifted");
 requireText(lockfile.includes(`version: ${sheetJsUrl}`), "SheetJS lock version drifted");
-requireText(lockfile.includes(`integrity: ${sheetJsIntegrity}`), "SheetJS tarball integrity is missing or changed");
-requireText(lockfile.includes("version: 0.20.3"), "SheetJS locked version is not 0.20.3");
+const sheetJsEntry = lockfile.split(`  xlsx@${sheetJsUrl}:`)[1]?.split(/\r?\n\r?\n/)[0] ?? "";
+requireText(sheetJsEntry.includes(`integrity: ${sheetJsIntegrity}`), "SheetJS tarball integrity is missing or changed");
+requireText(sheetJsEntry.includes(`tarball: ${sheetJsUrl}`), "SheetJS tarball URL drifted");
+requireText(sheetJsEntry.includes("version: 0.20.3"), "SheetJS locked version is not 0.20.3");
 requireText(!/xlsx@(?:\d|\^|~)/.test(lockfile), "registry xlsx resolution detected");
 
 for (const relativePath of ["apps/api/Dockerfile.prod", "apps/web/Dockerfile.prod"]) {

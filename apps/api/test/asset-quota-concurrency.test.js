@@ -153,6 +153,7 @@ test(
       uploadedBy: USER_ID,
     });
     const client = await pool.connect();
+    let cleanupPromise;
     let committedReference = false;
     try {
       await client.query("BEGIN");
@@ -161,15 +162,20 @@ test(
         [assetId],
       );
 
-      const cleanupPromise = repository.deleteUnlinkedAsset(assetId);
+      cleanupPromise = repository.deleteUnlinkedAsset(assetId);
+      // Poll outside the writer transaction: pg_stat_activity snapshots are
+      // cached until transaction end, so the first observation can stay stale.
+      const { rows: [{ pid: writerPid }] } = await client.query("SELECT pg_backend_pid() AS pid");
       const deadline = Date.now() + 5_000;
       let waiting = false;
       while (Date.now() < deadline) {
-        const lockState = await client.query(
+        const lockState = await pool.query(
           `SELECT count(*)::int AS count
            FROM pg_stat_activity
            WHERE wait_event_type = 'Lock'
+             AND $1 = ANY(pg_blocking_pids(pid))
              AND query ILIKE '%for update%'`,
+          [writerPid],
         );
         if (lockState.rows[0].count > 0) {
           waiting = true;
@@ -197,6 +203,7 @@ test(
     } finally {
       if (!committedReference) await client.query("ROLLBACK");
       client.release();
+      await cleanupPromise;
       await db
         .delete(schema.contentBlocks)
         .where(eq(schema.contentBlocks.createdBy, USER_ID));
