@@ -224,6 +224,7 @@ export class ArticleRepository {
         articleId: articles.articleId,
         boardId: articles.boardId,
         titleKo: articles.titleKo,
+        faqCategory: articles.faqCategory,
         titleEn: articles.titleEn,
         contentKo: articles.contentKo,
         contentEn: articles.contentEn,
@@ -288,6 +289,7 @@ export class ArticleRepository {
         articleId: String(row.articleId),
         boardId: row.boardId,
         titleKo: row.titleKo,
+        faqCategory: row.faqCategory,
         titleEn: row.titleEn ?? undefined,
         status: row.status as ArticleListItem["status"],
         visibilityScope:
@@ -644,6 +646,7 @@ export class ArticleRepository {
         articleId: articles.articleId,
         boardId: articles.boardId,
         titleKo: articles.titleKo,
+        faqCategory: articles.faqCategory,
         titleEn: articles.titleEn,
         contentKo: articles.contentKo,
         contentEn: articles.contentEn,
@@ -775,6 +778,7 @@ export class ArticleRepository {
       articleId: String(row[0].articleId),
       boardId: row[0].boardId,
       titleKo: row[0].titleKo,
+      faqCategory: row[0].faqCategory,
       titleEn: row[0].titleEn ?? undefined,
       contentKo: row[0].contentKo,
       contentEn: row[0].contentEn ?? undefined,
@@ -911,6 +915,7 @@ export class ArticleRepository {
           boardId: input.boardId,
           authorUserId: input.authorUserId,
           titleKo: input.payload.titleKo,
+          faqCategory: input.payload.faqCategory ?? null,
           titleEn: input.payload.titleEn ?? null,
           contentKo: input.payload.contentKo,
           contentEn: input.payload.contentEn ?? null,
@@ -1066,6 +1071,7 @@ export class ArticleRepository {
       isAnonymous?: boolean;
       allowComment?: boolean;
       updatedAt: Date;
+      faqCategory?: "account" | "fees" | "events-surveys" | "other";
       eventStartDate?: Date | null;
       eventEndDate?: Date | null;
       eventLocation?: string | null;
@@ -1078,6 +1084,9 @@ export class ArticleRepository {
 
     if (payload.titleKo !== undefined) {
       updateSet.titleKo = payload.titleKo;
+    }
+    if (payload.faqCategory !== undefined) {
+      updateSet.faqCategory = payload.faqCategory;
     }
 
     if (payload.titleEn !== undefined) {

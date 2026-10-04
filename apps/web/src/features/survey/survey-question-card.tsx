@@ -43,14 +43,14 @@ export function SurveyQuestionCard({ question, value, onChange, lang, error: que
           }
         }
       }}
-      className={`group scroll-mt-24 rounded-lg border bg-white px-5 py-4 shadow-none transition-[border-color,box-shadow] ${
+      className={`survey-response-question group scroll-mt-24 rounded-lg border bg-white px-5 py-4 shadow-none transition-[border-color,box-shadow] ${
         error
           ? "border-red-500 hover:border-red-500"
           : "border-slate-200 hover:border-kaist-darkgreen/20"
       } shadow-none`}
     >
-      <div className="mb-3.5">
-        <div id={titleId} className="block min-w-0 text-[length:var(--ui-text-section-size)] font-normal leading-6 text-slate-950">
+      <div className="survey-question-heading mb-3.5">
+        <div id={titleId} className="survey-question-title block min-w-0 text-[length:var(--ui-text-section-size)] font-normal leading-6 text-slate-950">
           <span className="min-h-6 break-words leading-6">
             <RichTextContent inline content={getLocalizedText(lang, question.titleKo, question.titleEn)} />
             {question.isRequired && (
@@ -61,8 +61,8 @@ export function SurveyQuestionCard({ question, value, onChange, lang, error: que
           </span>
         </div>
       </div>
-      {question.descriptionKo || question.descriptionEn ? <div id={descriptionId}><RichTextContent content={getLocalizedText(lang, question.descriptionKo, question.descriptionEn)} className="mb-3 text-sm leading-6" /></div> : null}
-      {hint ? <p id={hintId} className="mb-3 text-sm text-slate-500">{hint}</p> : null}
+      {question.descriptionKo || question.descriptionEn ? <div id={descriptionId}><RichTextContent content={getLocalizedText(lang, question.descriptionKo, question.descriptionEn)} className="survey-question-description mb-3 text-sm leading-6" /></div> : null}
+      {hint ? <p id={hintId} className="survey-question-description mb-3 text-sm text-slate-500">{hint}</p> : null}
       {questionImage ? (
         <img
           src={resolveAssetUrl(questionImage)}

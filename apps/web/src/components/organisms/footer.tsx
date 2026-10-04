@@ -28,10 +28,11 @@ export function Footer() {
               kaist.helloworld@gmail.com
             </a>
           </div>
-          <span className="home-footer-copyright">Copyright © KAIST SoC Student Council. All rights reserved.</span>
+          <span className="home-footer-copyright"><span className="hidden md:inline">Copyright © KAIST SoC Student Council. All rights reserved.</span><span className="md:hidden">© KAIST SoC Student Council</span></span>
         </div>
 
         <nav className="home-footer-meta select-none" aria-label={lang === "ko" ? "법적 고지" : "Legal information"}>
+          <div className="home-footer-legal">
           <Link to="/terms" className="rounded-sm transition-colors hover:text-brand-primary">
             {lang === "ko" ? "이용약관" : "Terms"}
           </Link>
@@ -39,6 +40,8 @@ export function Footer() {
           <Link to="/privacy" className="rounded-sm font-semibold transition-colors hover:text-brand-primary">
             {lang === "ko" ? "개인정보처리방침" : "Privacy"}
           </Link>
+          </div>
+          <div className="home-footer-social-links">
           <a
             href={OFFICIAL_INSTAGRAM_URL}
             target="_blank"
@@ -66,6 +69,7 @@ export function Footer() {
           >
             <Facebook aria-hidden="true" />
           </a>
+          </div>
         </nav>
       </div>
     </footer>

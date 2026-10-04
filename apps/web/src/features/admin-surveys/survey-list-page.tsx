@@ -305,7 +305,15 @@ export function SurveyListPage() {
 
           <SegmentedControl variant="underline" role="tablist" ariaLabel="설문 업무" value={surveyGroup} onChange={(value) => { setSurveyGroup(value); setCurrentPage(1); }} options={[{ value: "general", label: "일반 설문" }, { value: "operational", label: "상시 설문" }]} />
           {/* Inline filters use the shared search and select controls. */}
-          <AdminTableCard refreshing={surveysQuery.isFetching} className="overflow-visible">
+          <AdminTableCard refreshing={surveysQuery.isFetching} pagination={
+            <Pagination
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+              pageSizeControl={<PageSizeSelect value={pageSize} onChange={(size) => { setPageSize(size); setCurrentPage(1); }} />}
+              range={`총 ${filteredSurveys.length}건 중 ${rangeStart}-${rangeEnd}`}
+              totalPages={totalPages}
+            />
+          }>
             <div className="border-b border-slate-100 px-5 py-2">
             <div className="flex flex-wrap items-center justify-end gap-2">
               <DateRangePicker presetType="future" align="end" value={dateRange} onChange={range => { setDateRange(range); setCurrentPage(1); }} />
@@ -314,7 +322,7 @@ export function SurveyListPage() {
                 value={statusFilter}
                 options={[
                   { value: "all", label: "전체 상태" },
-                  { value: "open", label: "진행중" },
+                  { value: "open", label: "진행 중" },
                   { value: "closed", label: "마감" },
                   { value: "draft", label: "임시저장" },
                 ]}
@@ -326,7 +334,7 @@ export function SurveyListPage() {
               />
               <PageSearchField
                 ariaLabel="설문 검색"
-                className="w-full sm:w-72"
+                className="w-full flex-none sm:w-72"
                 onChange={(value) => {
                   setSearchQuery(value);
                   setCurrentPage(1);
@@ -505,25 +513,6 @@ export function SurveyListPage() {
               </>,
               document.body,
             )}
-
-            <div className="flex items-center justify-center border-t border-slate-100 bg-slate-50/10 px-5 py-3.5 select-none">
-              <Pagination
-                className="m-0 w-full"
-                currentPage={currentPage}
-                onPageChange={setCurrentPage}
-                pageSizeControl={
-                  <PageSizeSelect
-                    value={pageSize}
-                    onChange={(size) => {
-                      setPageSize(size);
-                      setCurrentPage(1);
-                    }}
-                  />
-                }
-                range={<span className="text-sm font-normal text-[#344054]">총 {filteredSurveys.length}건 중 {rangeStart}-{rangeEnd}</span>}
-                totalPages={totalPages}
-              />
-            </div>
 
           </div>
           </AdminTableCard>

@@ -228,7 +228,7 @@ export function AuditLogPage() {
               </div>
               <PageSearchField
                 ariaLabel="운영 로그 검색"
-                className="w-full sm:w-72"
+                className="w-full flex-none sm:w-72"
                 onChange={(value) => updatePageFilter(setQuery, value)}
                 onClear={() => updatePageFilter(setQuery, "")}
                 placeholder="담당자, 대상, 액션 검색"

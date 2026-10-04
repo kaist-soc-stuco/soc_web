@@ -408,7 +408,7 @@ export function EventCarousel() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mobileQuery = window.matchMedia("(max-width: 639px)");
+    const mobileQuery = window.matchMedia("(width < 768px)");
     const tabletQuery = window.matchMedia("(max-width: 1023px)");
     const update = () => {
       setIsMobile(mobileQuery.matches);
@@ -431,7 +431,9 @@ export function EventCarousel() {
     return result;
   }, [localizedEvents, pageSize]);
   const totalPages = pages.length;
-  const pageGap = isMobile ? 0 : 24;
+  const pageGap = isMobile ? 16 : 24;
+  const hasMobilePeek = isMobile && totalPages > 1;
+  const pageWidth = hasMobilePeek ? Math.max(0, viewportWidth - 72) : viewportWidth;
 
   useEffect(() => setCurrentPage(0), [pageSize, localizedEvents.length]);
   useEffect(() => {
@@ -508,7 +510,7 @@ export function EventCarousel() {
     const threshold = Math.max(36, (viewportWidth || 360) * 0.08);
     const didMove = dragMovedRef.current;
     if (didMove && Math.abs(delta) >= threshold) {
-      const movedPages = Math.max(1, Math.round(Math.abs(delta) / Math.max(1, viewportWidth + pageGap)));
+      const movedPages = Math.max(1, Math.round(Math.abs(delta) / Math.max(1, pageWidth + pageGap)));
       const direction = delta < 0 ? 1 : -1;
       setCurrentPage((page) => Math.max(0, Math.min(totalPages - 1, page + direction * movedPages)));
     }
@@ -574,7 +576,16 @@ export function EventCarousel() {
         <div className="group relative">
               <div
                 ref={viewportRef}
-                className={`touch-pan-y select-none overflow-hidden ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+                className={`home-carousel-viewport touch-pan-y select-none overflow-hidden ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+                data-mobile-peek={hasMobilePeek || undefined}
+                role="region"
+                aria-label={lang === "ko" ? "행사 목록" : "Event carousel"}
+                tabIndex={0}
+                onKeyDown={event => {
+                  if (event.target !== event.currentTarget || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+                  event.preventDefault();
+                  setCurrentPage(page => Math.max(0, Math.min(totalPages - 1, page + (event.key === "ArrowRight" ? 1 : -1))));
+                }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={finishPointerDrag}
@@ -589,13 +600,13 @@ export function EventCarousel() {
               >
                 <div
                   className={`home-carousel-track flex ${isDragging ? "home-carousel-track-dragging" : ""}`}
-                  style={{ transform: `translate3d(${-currentPage * (viewportWidth + pageGap) + dragOffset}px, 0, 0)` }}
+                  style={{ transform: `translate3d(${-currentPage * (pageWidth + pageGap) + dragOffset}px, 0, 0)` }}
                 >
                   {pages.map((page, pageIndex) => (
                     <div
                       key={pageIndex}
-                      className="grid flex-shrink-0 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-                      style={{ width: viewportWidth ? `${viewportWidth}px` : "100%", marginRight: pageIndex < pages.length - 1 ? `${pageGap}px` : undefined }}
+                      className="home-carousel-page grid flex-shrink-0 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                      style={{ width: pageWidth ? `${pageWidth}px` : "100%", marginRight: pageIndex < pages.length - 1 ? `${pageGap}px` : undefined }}
                     >
                       {page.map((event, eventIndex) => (
                         <EventCard
@@ -612,18 +623,23 @@ export function EventCarousel() {
               </div>
 
               {totalPages > 1 && currentPage > 0 ? (
-                <IconButton size="lg" tone="navigation" onClick={() => setCurrentPage((page) => Math.max(0, page - 1))} className="home-events-navigation left-2 !rounded-full" aria-label={lang === "ko" ? "이전 행사" : "Previous events"}>
+                <IconButton size="lg" tone="navigation" onClick={() => setCurrentPage((page) => Math.max(0, page - 1))} className="home-events-navigation left-2 !rounded-full !hidden md:!flex" aria-label={lang === "ko" ? "이전 행사" : "Previous events"}>
                   <ChevronLeft aria-hidden="true" className="size-5" />
                 </IconButton>
               ) : null}
               {totalPages > 1 && currentPage < totalPages - 1 ? (
-                <IconButton size="lg" tone="navigation" onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))} className="home-events-navigation right-2 !rounded-full" aria-label={lang === "ko" ? "다음 행사" : "Next events"}>
+                <IconButton size="lg" tone="navigation" onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))} className="home-events-navigation right-2 !rounded-full !hidden md:!flex" aria-label={lang === "ko" ? "다음 행사" : "Next events"}>
                   <ChevronRight aria-hidden="true" className="size-5" />
                 </IconButton>
               ) : null}
 
               {totalPages > 1 ? (
-                <div className="mt-4 flex justify-center gap-1" aria-label={lang === "ko" ? "행사 페이지" : "Event pages"}>
+                <>
+                <div className="mobile-carousel-pagination md:hidden" role="status" aria-live="polite">
+                  <span className="sr-only">{lang === "ko" ? `행사 ${currentPage + 1}/${totalPages}페이지` : `Event page ${currentPage + 1} of ${totalPages}`}</span>
+                  {pages.map((_, index) => <span key={index} aria-hidden="true" className={index === currentPage ? "is-current" : undefined} />)}
+                </div>
+                <div className="mt-4 hidden justify-center gap-1 md:flex" aria-label={lang === "ko" ? "행사 페이지" : "Event pages"}>
                   {pages.map((_, index) => (
                     <Button
                       key={index}
@@ -641,6 +657,7 @@ export function EventCarousel() {
                     </Button>
                   ))}
                 </div>
+                </>
               ) : null}
         </div>
       )}

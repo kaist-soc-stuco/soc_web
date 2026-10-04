@@ -275,7 +275,7 @@ export function UserManagementPage() {
               </div>
               <PageSearchField
                 ariaLabel="사용자 검색"
-                className="w-full md:w-72 lg:w-80"
+                className="w-full flex-none md:w-72 lg:w-80"
                 onChange={(value) => {
                   setQuery(value);
                   setCurrentPage(1);

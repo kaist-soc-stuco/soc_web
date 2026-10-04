@@ -491,6 +491,7 @@ export class ArticleService {
     }
 
     const sanitizedPayload: ArticleUpdateRequest = {};
+    if (payload.faqCategory !== undefined) sanitizedPayload.faqCategory = payload.faqCategory;
     if (payload.titleKo !== undefined) sanitizedPayload.titleKo = payload.titleKo;
     if (payload.titleEn !== undefined) sanitizedPayload.titleEn = payload.titleEn;
     if (payload.contentKo !== undefined) {
@@ -547,6 +548,7 @@ export class ArticleService {
       payload: {
         titleKo: payload.titleKo,
         titleEn: payload.titleEn,
+        faqCategory: payload.faqCategory,
         contentKo,
         contentEn,
         visibilityScope: "PUBLIC",

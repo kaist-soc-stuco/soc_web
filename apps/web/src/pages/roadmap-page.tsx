@@ -1,4 +1,7 @@
 import { ExternalLink } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { AdminActionMenuPanel } from "@/components/ui/admin-action-menu";
 import { useSearchParams } from "react-router-dom";
 
 import { normalizeRoadmapCourseCode } from "@soc/contracts";
@@ -25,19 +28,31 @@ export function RoadmapPage() {
     const next = new URLSearchParams(searchParams);
     if (courseCode) next.set("course", courseCode);
     else next.delete("course");
-    setSearchParams(next, { replace: true });
+    setSearchParams(next, { replace: true, state: { preserveScroll: window.matchMedia("(max-width: 767px)").matches } });
   };
 
   return (
-    <PageShell className="overflow-x-hidden">
+    <PageShell className="mobile-white-page overflow-x-hidden">
 
       <PageMain>
         <PageHeader
           title={title}
           titleId="roadmap-page-title"
-          containerClassName="max-w-[100rem]"
+          containerClassName="mobile-roadmap-heading max-w-[100rem]"
           actions={
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+            <>
+            <div className="md:hidden">
+              <DropdownMenu.Root modal={false}>
+                <DropdownMenu.Trigger asChild><Button variant="ghost" className="min-h-11">{lang === "ko" ? "참고 자료" : "Resources"}</Button></DropdownMenu.Trigger>
+                <DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[var(--ui-layer-popover)] outline-none">
+                  <AdminActionMenuPanel className="!w-52">
+                    <DropdownMenu.Item asChild><a className="flex min-h-11 items-center justify-between gap-2 rounded-md px-3 text-sm text-slate-700 outline-none data-[highlighted]:bg-slate-50" href={ROADMAP_SOURCE.url} target="_blank" rel="noreferrer">{lang === "ko" ? "원본 로드맵" : "Source roadmap"}<ExternalLink className="size-4" /></a></DropdownMenu.Item>
+                    <DropdownMenu.Item asChild><a className="flex min-h-11 items-center justify-between gap-2 rounded-md px-3 text-sm text-slate-700 outline-none data-[highlighted]:bg-slate-50" href="https://bulletin.kaist.ac.kr/" target="_blank" rel="noreferrer">{lang === "ko" ? "KAIST 학사요람" : "Academic Bulletin"}<ExternalLink className="size-4" /></a></DropdownMenu.Item>
+                  </AdminActionMenuPanel>
+                </DropdownMenu.Content></DropdownMenu.Portal>
+              </DropdownMenu.Root>
+            </div>
+            <div className="hidden flex-wrap items-center gap-x-5 gap-y-1 md:flex">
             <a
               href={ROADMAP_SOURCE.url}
               target="_blank"
@@ -51,6 +66,7 @@ export function RoadmapPage() {
               {lang === "ko" ? "KAIST 학사요람" : "KAIST Academic Bulletin"}<ExternalLink aria-hidden="true" className="size-3.5" />
             </a>
             </div>
+            </>
           }
         />
 

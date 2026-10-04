@@ -5,9 +5,13 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { useOverlayBehavior } from "@/components/ui/use-overlay-behavior";
+import { SheetHandle } from "@/components/ui/sheet-handle";
 
 interface FilterSheetProps {
   children: ReactNode;
+  className?: string;
+  bodyClassName?: string;
+  footer?: ReactNode;
   closeLabel?: string;
   onClose: () => void;
   open: boolean;
@@ -16,6 +20,9 @@ interface FilterSheetProps {
 
 export function FilterSheet({
   children,
+  className = "",
+  bodyClassName = "",
+  footer,
   closeLabel = "필터 닫기",
   onClose,
   open,
@@ -48,19 +55,21 @@ export function FilterSheet({
         role="dialog"
         tabIndex={-1}
         onKeyDown={handleOverlayKeyDown}
-        className="scrollbar-hidden absolute inset-x-0 bottom-0 flex max-h-[min(82dvh,42rem)] flex-col overflow-hidden rounded-t-[18px] bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 shadow-elevated sm:inset-y-0 sm:inset-x-auto sm:right-0 sm:max-w-md sm:rounded-none sm:border-l sm:border-slate-200 sm:pt-5"
+        className={`scrollbar-hidden absolute inset-x-0 bottom-0 flex max-h-[min(82dvh,42rem)] flex-col overflow-hidden rounded-t-[18px] bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 shadow-elevated sm:inset-y-0 sm:inset-x-auto sm:right-0 sm:max-w-md sm:rounded-none sm:border-l sm:border-slate-200 sm:pt-5 ${className}`}
       >
-        <div className="mb-5 flex shrink-0 items-center justify-between gap-3">
+        <SheetHandle onClose={onClose} />
+        <div className="filter-sheet-header mb-5 flex shrink-0 items-center justify-between gap-3">
           <h2 id={titleId} className="min-w-0 break-words text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-app-text-strong">
             {title}
           </h2>
-          <IconButton tone="navigation" aria-label={closeLabel} onClick={onClose}>
+          <IconButton tone="navigation" aria-label={closeLabel} data-initial-focus={className.includes("mobile-filter-sheet") ? true : undefined} onClick={onClose}>
             <X aria-hidden="true" />
           </IconButton>
         </div>
-        <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto">
+        <div className={`scrollbar-hidden min-h-0 flex-1 overflow-y-auto ${bodyClassName}`}>
           {children}
         </div>
+        {footer && <div className="mobile-filter-footer shrink-0">{footer}</div>}
       </section>
     </div>,
     document.body,

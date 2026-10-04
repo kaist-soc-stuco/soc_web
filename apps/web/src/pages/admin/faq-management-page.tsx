@@ -1,6 +1,7 @@
 import { useAdminListQuery } from "@/hooks/use-admin-list-query";
 import { restrictListDrag } from "@/lib/drag-bounds";
 import type { ArticleListItem } from "@soc/contracts";
+import { FAQ_CATEGORIES, resolveFaqCategory, type FaqCategory } from "@soc/contracts";
 import { createApiClient } from "@soc/api-client";
 import {
   closestCenter,
@@ -41,7 +42,7 @@ import {
 import { AdminDrawer } from "@/components/ui/admin-drawer";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
-import { UiInput, UiTextarea } from "@/components/ui/form-control";
+import { UiInput, UiTextarea, UiSelect } from "@/components/ui/form-control";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -49,6 +50,7 @@ import { Permissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 type FaqForm = {
+  faqCategory: FaqCategory;
   titleKo: string;
   titleEn: string;
   contentKo: string;
@@ -56,6 +58,7 @@ type FaqForm = {
 };
 
 const emptyForm: FaqForm = {
+  faqCategory: "other",
   titleKo: "",
   titleEn: "",
   contentKo: "",
@@ -104,6 +107,7 @@ function FaqManagementPageContent() {
   const openEdit = (item: ArticleListItem) => {
     setEditingItem(item);
     setForm({
+      faqCategory: resolveFaqCategory(item),
       titleKo: item.titleKo,
       titleEn: item.titleEn ?? "",
       contentKo: item.snippetKo ?? "",
@@ -118,6 +122,7 @@ function FaqManagementPageContent() {
     try {
       if (editingItem) {
         await apiClient.updateFaqArticle(editingItem.articleId, {
+          faqCategory: form.faqCategory,
           titleKo: form.titleKo.trim(),
           titleEn: form.titleEn.trim() || undefined,
           contentKo: form.contentKo,
@@ -125,6 +130,7 @@ function FaqManagementPageContent() {
         });
       } else {
         await apiClient.createFaqArticle({
+          faqCategory: form.faqCategory,
           titleKo: form.titleKo.trim(),
           titleEn: form.titleEn.trim() || undefined,
           contentKo: form.contentKo,
@@ -213,7 +219,7 @@ function FaqManagementPageContent() {
               onDragCancel={() => setActiveFaqId(null)}
               onDragEnd={(event) => void handleDragEnd(event)}
             >
-              <AdminDataTable className="admin-sortable-table" minWidth={0} isDragging={Boolean(activeFaqId)}>
+              <AdminDataTable className="admin-sortable-table admin-sortable-list" minWidth={0} isDragging={Boolean(activeFaqId)}>
                 <colgroup>
                   <col style={{ width: 36 }} />
                   <col />
@@ -266,6 +272,12 @@ function FaqManagementPageContent() {
         )}
       >
         <div className="space-y-5">
+          <label className="grid gap-1.5 text-xs font-normal text-slate-600">
+            카테고리
+            <UiSelect className="w-full" value={form.faqCategory} onChange={(event) => { const value = event.currentTarget.value as FaqCategory; setForm((current) => ({ ...current, faqCategory: value })); }}>
+              {FAQ_CATEGORIES.map((category) => <option key={category.key} value={category.key}>{category.titleKo}</option>)}
+            </UiSelect>
+          </label>
           <label className="grid gap-1.5 text-xs font-normal text-slate-600">
             질문
             <UiInput spellCheck={false} value={form.titleKo} onChange={(event) => { const value = event.currentTarget.value; setForm((current) => ({ ...current, titleKo: value })); }} />

@@ -434,7 +434,7 @@ function CalendarManagementContent() {
                     onChange={(value) => { setQuery(value); setPage(1); }}
                     onClear={() => { setQuery(""); setPage(1); }}
                     placeholder="제목·장소 검색"
-                    className="w-full sm:w-72"
+                    className="w-full flex-none sm:w-72"
                   />
                 </div>
               </div>

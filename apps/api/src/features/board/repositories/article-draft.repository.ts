@@ -55,6 +55,7 @@ const mapRow = (row: DraftSelectRow): ArticleDraftRecord => {
     targetArticleId:
       row.targetArticleId === null ? null : String(row.targetArticleId),
     titleKo: row.titleKo,
+    faqCategory: payload.faqCategory as ArticleDraftRecord["faqCategory"],
     titleEn: row.titleEn,
     contentKo: row.contentKo,
     contentEn: row.contentEn,

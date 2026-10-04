@@ -6,7 +6,7 @@ import type {
   ArticleDraftSaveRequest,
   SurveyRecord,
 } from "@soc/contracts";
-import { normalizeBoardCode } from "@soc/contracts";
+import { normalizeBoardCode, resolveFaqCategory, type FaqCategory } from "@soc/contracts";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { useCurrentSession } from "@/hooks/use-current-session";
@@ -62,6 +62,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
   );
 
   const [titleKo, setTitleKo] = useState("");
+  const [faqCategory, setFaqCategory] = useState<FaqCategory>("other");
   const [titleEn, setTitleEn] = useState("");
   const [contentKo, setContentKo] = useState("");
   const [contentEn, setContentEn] = useState("");
@@ -117,6 +118,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
       .getArticle(category, articleId)
       .then((res) => {
         setTitleKo(res.titleKo);
+        setFaqCategory(resolveFaqCategory(res));
         setTitleEn(res.titleEn || "");
         setContentKo(res.contentKo);
         setContentEn(res.contentEn || "");
@@ -208,6 +210,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
   }, [canConfigurePostSettings]);
 
   const buildDraftPayload = () => ({
+    faqCategory: category === "faq" ? faqCategory : undefined,
     boardCode: category,
     targetArticleId: articleId ?? null,
     titleKo,
@@ -318,6 +321,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
   }, [
     loading,
     articleId,
+    faqCategory,
     titleKo,
     titleEn,
     contentKo,
@@ -352,6 +356,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     };
   }, [
     titleKo,
+    faqCategory,
     titleEn,
     contentKo,
     contentEn,
@@ -542,6 +547,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
       draftDiscardingRef.current = true;
       await Promise.allSettled([...draftSavesRef.current]);
       await apiClient.updateArticle(category, articleId, {
+        faqCategory: category === "faq" ? faqCategory : undefined,
         titleKo,
         titleEn: isKoreanOnly ? "" : titleEn,
         contentKo,
@@ -670,6 +676,8 @@ export function useBoardEditPageController(forcedCategory?: string) {
 
   return {
     ConfirmDialog,
+    faqCategory,
+    setFaqCategory,
     articleId,
     assets,
     allowComment,

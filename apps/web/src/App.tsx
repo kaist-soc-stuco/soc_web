@@ -1,5 +1,6 @@
 import { ArticleLoading } from "@/components/ui/article-loading";
 import { Header } from "@/components/organisms/header";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { RouteScrollRestoration } from "@/components/organisms/route-scroll-restoration";
 import { createApiClient } from '@soc/api-client';
 import { nowMs } from '@soc/shared';
@@ -360,13 +361,14 @@ function PreventImageGhostDrag() {
 
 function PublicLayout() {
   const { pathname } = useLocation();
+  const isMobile = useMediaQuery("(width < 768px)");
   const articleRoute = /^\/board\/[^/]+\/[^/]+\/?$/.test(pathname) || /^\/events\/[^/]+\/?$/.test(pathname);
   const isArticleDetail = articleRoute && !/\/(write|new|edit)\/?$/.test(pathname);
   return (
-    <div className="public-site-layout flex min-h-screen flex-col">
+    <div className={`public-site-layout flex min-h-screen flex-col ${isArticleDetail ? "public-article-detail-layout" : ""}`}>
       <Header variant={pathname === "/" ? "home" : "default"} />
       <div className="public-site-content flex flex-1 flex-col">
-        <Suspense fallback={isArticleDetail ? <ArticleLoading /> : <div className="flex-1" aria-busy="true" />}>
+        <Suspense key={isMobile ? pathname : undefined} fallback={isArticleDetail ? <ArticleLoading /> : <div className="flex-1" aria-busy="true" />}>
           <Outlet />
         </Suspense>
       </div>

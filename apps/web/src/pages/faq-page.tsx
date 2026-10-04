@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { createApiClient } from "@soc/api-client";
+import { FAQ_CATEGORIES, resolveFaqCategory } from "@soc/contracts";
 import { useQuery } from "@tanstack/react-query";
 
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
@@ -16,6 +17,9 @@ import {
   PageShell,
 } from "@/components/ui/page-layout";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { FilterSheet } from "@/components/ui/filter-sheet";
+import { MobileFilterActions, MobileFilterButton } from "@/components/ui/mobile-filter-controls";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useLanguage } from "@/hooks/use-language";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
@@ -24,59 +28,7 @@ import { canWriteBoardFromMetadata } from "@/lib/board-metadata";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 
-const FAQ_SECTIONS = [
-  {
-    key: "account",
-    titleKo: "계정·이용",
-    titleEn: "Account & access",
-    titles: new Set([
-      "KAIST 계정으로 어떻게 로그인하나요?",
-      "게시글·댓글 작성 권한은 어떻게 되나요?",
-      "프로필 정보가 잘못 표시되면 어떻게 하나요?",
-      "계정 비활성화 안내가 표시되면 어떻게 하나요?",
-    ]),
-  },
-  {
-    key: "fees",
-    titleKo: "과비 납부",
-    titleEn: "Student fees",
-    titles: new Set([
-      "과비는 어떻게 납부하나요?",
-      "제 과비 납부 여부는 어디서 확인하나요?",
-      "과비를 환급받을 수 있나요?",
-    ]),
-  },
-  {
-    key: "events-surveys",
-    titleKo: "행사·설문",
-    titleEn: "Events & surveys",
-    titles: new Set([
-      "행사·일정은 어디서 확인하나요?",
-      "행사는 어떻게 신청하나요?",
-      "행사 신청을 수정하거나 취소하려면 어떻게 하나요?",
-      "설문이나 투표에 참여할 수 없다고 표시되는 이유는 무엇인가요?",
-    ]),
-  },
-  {
-    key: "other",
-    titleKo: "기타",
-    titleEn: "Other",
-    titles: new Set([
-      "학생회에 사업이나 정책을 건의하려면 어떻게 하나요?",
-      "비밀 건의사항과 공식 답변은 누가 볼 수 있나요?",
-      "댓글이나 공식 답변 알림은 어디서 확인하나요?",
-      "사이트 오류는 어떻게 신고하나요?",
-      "행사나 동아리 홍보글 게시를 요청하려면 어떻게 하나요?",
-      "학번별 단체 카카오톡방에 참여하려면 어떻게 하나요?",
-      "졸업 요건과 교과목 이수 순서는 어디서 확인하나요?",
-      "연구실, 교수진, 시설 정보는 어디서 확인하나요?",
-      "집행위원회 모집은 언제 하나요?",
-      "학생회 활동인증서는 어디에 요청하나요?",
-      "기업 후원이나 제휴를 제안하려면 어떻게 하나요?",
-      "전산학부 학생회칙은 어디서 확인하나요?",
-    ]),
-  },
-] as const;
+const FAQ_SECTIONS = FAQ_CATEGORIES;
 
 type FaqFilter = "all" | (typeof FAQ_SECTIONS)[number]["key"];
 
@@ -88,14 +40,15 @@ const FAQ_FILTERS: Array<{ value: FaqFilter; titleKo: string; titleEn: string }>
   { value: "other", titleKo: "기타", titleEn: "Other" },
 ];
 
-const faqCategoryForTitle = (titleKo: string): FaqFilter =>
-  FAQ_SECTIONS.find((section) => section.titles.has(titleKo))?.key ?? "other";
 
 export function FaqPage() {
   const { lang } = useLanguage();
   const [openItems, setOpenItems] = useState<Set<string>>(() => new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FaqFilter>("all");
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draftFilter, setDraftFilter] = useState<FaqFilter>("all");
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const { data: session } = useCurrentSession();
   const apiClient = useMemo(
@@ -120,7 +73,7 @@ export function FaqPage() {
   const filteredItems = useMemo(() => {
     const query = deferredSearchQuery.trim().toLocaleLowerCase();
     return items.filter((item) => {
-      if (activeFilter !== "all" && faqCategoryForTitle(item.titleKo) !== activeFilter) {
+      if (activeFilter !== "all" && resolveFaqCategory(item) !== activeFilter) {
         return false;
       }
       if (!query) return true;
@@ -132,7 +85,7 @@ export function FaqPage() {
   const faqSections = useMemo(() => {
     const sections = FAQ_SECTIONS.flatMap((section) => {
       const sectionItems = filteredItems.filter(
-        (item) => faqCategoryForTitle(item.titleKo) === section.key,
+        (item) => resolveFaqCategory(item) === section.key,
       );
       return sectionItems.length > 0 ? [{ ...section, items: sectionItems }] : [];
     });
@@ -140,7 +93,7 @@ export function FaqPage() {
   }, [filteredItems]);
 
   return (
-    <PageShell>
+    <PageShell className="mobile-white-page">
 
       <PageMain>
         <PageHeader
@@ -152,13 +105,23 @@ export function FaqPage() {
 
         <PageContainer className="faq-page-container max-w-4xl pb-12">
          <div className="faq-page-tools">
+          {isMobile ? <>
+            <div className="mobile-filter-toolbar">
+              <PageSearchField ariaLabel={lang === "ko" ? "FAQ 검색" : "Search FAQ"} placeholder={lang === "ko" ? "질문 검색" : "Search questions"} value={searchQuery} onChange={setSearchQuery} onClear={() => setSearchQuery("")} className="!w-full" />
+              <MobileFilterButton label={lang === "ko" ? "필터" : "Filters"} open={filterOpen} active={activeFilter !== "all"} onClick={() => { setDraftFilter(activeFilter); setFilterOpen(true); }} />
+            </div>
+            <FilterSheet className="mobile-filter-sheet" open={filterOpen} onClose={() => setFilterOpen(false)} title={lang === "ko" ? "FAQ 필터" : "FAQ filters"} closeLabel={lang === "ko" ? "필터 닫기" : "Close filters"} footer={<MobileFilterActions lang={lang} onReset={() => setDraftFilter("all")} onApply={() => { setActiveFilter(draftFilter); setFilterOpen(false); }} />}>
+              <fieldset className="mobile-filter-fieldset"><legend>{lang === "ko" ? "분류" : "Category"}</legend>{FAQ_FILTERS.map(filter => <label key={filter.value} className="mobile-filter-option"><input type="radio" name="mobile-faq-category" checked={draftFilter === filter.value} onChange={() => setDraftFilter(filter.value)} /><span>{lang === "ko" ? filter.titleKo : filter.titleEn}</span></label>)}</fieldset>
+            </FilterSheet>
+            {canWriteFaq && <PageActionLink state={{ initialCategory: "faq" }} to="/board/write" tone="primary">{lang === "ko" ? "작성" : "Write"}</PageActionLink>}
+          </> : <>
            <div className="min-w-0 max-w-full overflow-x-auto">
              <SegmentedControl
                ariaLabel={lang === "ko" ? "FAQ 분류" : "FAQ categories"}
                className="clean-segmented-control"
                options={FAQ_FILTERS.map((filter) => ({
                  value: filter.value,
-                 label: lang === "ko" ? filter.titleKo : filter.titleEn,
+                 label: <><span className="sm:hidden">{lang === "ko" ? filter.value === "account" ? "계정" : filter.value === "fees" ? "과비" : filter.titleKo : filter.value === "account" ? "Account" : filter.value === "fees" ? "Fees" : filter.value === "events-surveys" ? "Events" : filter.titleEn}</span><span className="hidden sm:inline">{lang === "ko" ? filter.titleKo : filter.titleEn}</span></>,
                }))}
                value={activeFilter}
                onChange={setActiveFilter}
@@ -179,6 +142,7 @@ export function FaqPage() {
                 </PageActionLink>
               ) : null}
             </div>
+          </>}
          </div>
 
           <span className="sr-only" aria-live="polite">
@@ -252,7 +216,7 @@ export function FaqPage() {
                     <DataViewCard
                       key={section.key}
                       aria-labelledby={`faq-section-${section.key}`}
-                      className="shadow-none"
+                      className="mobile-faq-group shadow-none"
                     >
                       <h3
                         id={`faq-section-${section.key}`}

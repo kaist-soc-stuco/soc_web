@@ -3,6 +3,7 @@ export * from "./http/mock.js";
 export * from "./http/auth.js";
 export * from "./http/survey.js";
 export * from "./http/board.js";
+export * from "./faq.js";
 export * from "./http/permissions.js";
 export * from "./http/audit.js";
 export * from "./http/finance.js";

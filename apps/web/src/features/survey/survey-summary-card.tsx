@@ -37,7 +37,7 @@ export function SurveySummaryCard({ lang, survey }: SurveySummaryCardProps) {
       {description && (
         <RichTextContent
           content={description}
-          className="mt-4 text-[length:var(--ui-text-section-size)] font-medium leading-relaxed text-slate-600"
+          className="survey-summary-description mt-4 text-[length:var(--ui-text-section-size)] font-medium leading-relaxed text-slate-600"
         />
       )}
 
@@ -49,7 +49,7 @@ export function SurveySummaryCard({ lang, survey }: SurveySummaryCardProps) {
         />
       ) : null}
 
-      <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-xs font-normal text-slate-500">
+      <div className="survey-summary-metadata mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-xs font-normal text-slate-500">
         <span className="inline-flex items-center gap-1.5">
           <Users className="h-3.5 w-3.5 text-kaist-darkgreen" />
           {getAudienceLabel(survey, lang)}

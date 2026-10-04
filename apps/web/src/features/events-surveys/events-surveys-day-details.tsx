@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, EyeOff, MoreHorizontal, Pencil } from "lucide-react";
+import { CalendarDays, ChevronRight, EyeOff, MoreHorizontal, Pencil } from "lucide-react";
+import { MobileEmptyState } from "@/components/ui/mobile-empty-state";
 
 import type { Language } from "@/hooks/use-language";
 import { formatNumericDate } from "@/lib/date-display";
@@ -19,12 +20,14 @@ interface EventsSurveysDayDetailsProps {
   events: CalendarEvent[];
   lang: Language;
   selectedDateStr: string;
+  embedded?: boolean;
 }
 
 export function EventsSurveysDayDetails({
   events,
   lang,
   selectedDateStr,
+  embedded = false,
 }: EventsSurveysDayDetailsProps) {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const queryClient = useQueryClient();
@@ -116,19 +119,20 @@ export function EventsSurveysDayDetails({
   return (
     <>
       <aside
-        className="scroll-mt-4 flex h-full min-h-0 flex-col self-start rounded-lg border border-card-border-subtle bg-white p-5 shadow-none lg:sticky lg:top-24 lg:min-h-[500px] lg:col-span-1"
-        id="calendar-day-details"
+        className={embedded ? "flex min-h-40 flex-col bg-white" : "scroll-mt-4 flex h-full min-h-0 flex-col self-start rounded-lg border border-card-border-subtle bg-white p-5 shadow-none lg:sticky lg:top-24 lg:min-h-[500px]"}
+        id={embedded ? undefined : "calendar-day-details"}
       >
-      <div className="shrink-0 border-b border-slate-100 pb-4 select-none">
+      {!embedded ? <div className="shrink-0 border-b border-slate-100 pb-4 select-none">
         <h3 className="text-lg font-semibold text-slate-800">{selectedDateStr}</h3>
-      </div>
+      </div> : null}
 
       {events.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center py-12 text-center select-none">
+        <><MobileEmptyState icon={CalendarDays} className="mobile-calendar-empty-state" message={lang === "ko" ? "등록된 일정이 없습니다." : "No events scheduled."} />
+        <div className="hidden flex-1 flex-col items-center justify-center py-12 text-center select-none md:flex">
           <p className="text-sm font-semibold text-slate-400">
             {lang === "ko" ? "등록된 일정이 없습니다." : "No events scheduled."}
           </p>
-        </div>
+        </div></>
       ) : (
         <div className="scrollbar-hidden flex-1 space-y-2.5 overflow-y-auto py-4 pr-1">
           {events.map((event, idx) => {
@@ -150,9 +154,9 @@ export function EventsSurveysDayDetails({
               `group relative block min-h-11 w-full shrink-0 select-none rounded-lg bg-transparent px-1 py-3 transition-colors hover:bg-slate-50 ${showAdminMenu ? "z-20" : "z-0"}`;
             const cardContent = (
               <>
-                <div className="flex items-start gap-2.5">
+                <div className="calendar-agenda-event flex items-start gap-2.5">
                   <span
-                    className={`mt-0.5 h-7 w-[3px] shrink-0 rounded-full ${style.bullet}`}
+                    className={`calendar-agenda-marker mt-0.5 h-7 w-[3px] shrink-0 rounded-full ${style.bullet}`}
                     aria-hidden="true"
                   />
                   <div className="min-w-0 flex-1">

@@ -100,7 +100,7 @@ export function SurveyQuestionInput({
         <div>
           <UiInput
             {...inputAccessibility}
-            className={`${controlClass} !w-1/2`}
+            className={`${controlClass} !w-full sm:!w-1/2`}
             type="text"
             value={value as string}
             onChange={(e) => onChange(e.target.value)}

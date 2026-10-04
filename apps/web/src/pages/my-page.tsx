@@ -1,3 +1,4 @@
+import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { ErrorState } from "@/components/ui/data-state";
 import { Footer } from "@/components/organisms/footer";
 import {
@@ -46,27 +47,6 @@ export function MyPage() {
       <main className="mx-auto flex min-w-0 w-full max-w-7xl flex-1 flex-col items-stretch gap-6 px-4 py-6 sm:px-6 md:flex-row md:items-start md:gap-8 md:px-8 md:py-8">
         {canUseMyPage ? (
           <>
-            <div className="w-full md:hidden">
-              <label className="sr-only" htmlFor="my-page-menu">
-                {lang === "ko" ? "마이페이지 메뉴 선택" : "Choose a My Page section"}
-              </label>
-              <select
-                id="my-page-menu"
-                value={activeMenu}
-                onChange={(event) => {
-                  const nextMenu = menuItems.find((item) => item.id === event.currentTarget.value)?.id;
-                  if (!nextMenu) return;
-                  setActiveMenu(nextMenu);
-                }}
-                className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/15"
-              >
-                {menuItems.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </div>
             <MyPageSidebar
               activeMenu={activeMenu}
               lang={lang}
@@ -77,6 +57,7 @@ export function MyPage() {
         ) : null}
 
         <section className="w-full min-w-0 flex-1">
+          {canUseMyPage && !initialLoading ? <h1 className="mb-5 md:hidden"><SelectDropdown ariaLabel={lang === "ko" ? "마이페이지 메뉴 선택" : "Choose a My Page section"} value={activeMenu} options={menuItems.map(item => ({ value: item.id, label: item.label }))} onChange={value => { const menu = menuItems.find(item => item.id === value); if (menu) setActiveMenu(menu.id); }} className="w-fit min-w-40" buttonClassName="mypage-mobile-heading" /></h1> : null}
           {initialLoading ? (
             <MyPageLoadingState lang={lang} />
           ) : !canUseMyPage ? (
@@ -85,7 +66,7 @@ export function MyPage() {
               lang={lang}
             />
           ) : (
-            <div className="flex flex-col gap-5 w-full">
+            <div className="mypage-content flex flex-col gap-5 w-full">
               {activeMenu === "profile" && (profileError ? <ErrorState onRetry={retryProfile} /> :
                 <MyPageProfilePanel
                   displayName={displayName}

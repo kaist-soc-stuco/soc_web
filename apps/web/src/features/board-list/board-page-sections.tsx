@@ -2,10 +2,11 @@ import { SearchLoadingContext } from "@/lib/search-loading-context";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { ArticleListTitle } from "@/components/ui/article-list-title";
 import { PromotionStatus } from "@/components/ui/promotion-period";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { ArticleListItem } from "@soc/contracts";
 import { isoToDate, isoToMs, nowMs } from "@soc/shared";
-import { Paperclip } from "lucide-react";
+import { Paperclip, SquarePen } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/board-metadata";
 
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
+import { Button } from "@/components/ui/button";
 import {
   PageActionLink,
   PageContainer,
@@ -48,6 +50,34 @@ export function BoardCategoryNavigation({
   lang,
 }: BoardCategoryNavigationProps) {
   const navigate = useNavigate();
+  const tabsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = tabsRef.current;
+    if (!root) return;
+    const updateEdges = () => {
+      root.dataset.overflowStart = String(root.scrollLeft > 2);
+      root.dataset.overflowEnd = String(root.scrollWidth - root.clientWidth - root.scrollLeft > 2);
+    };
+    const revealActive = () => {
+      if (window.innerWidth < 768) {
+        const active = root.querySelector<HTMLButtonElement>("button.is-active");
+        if (active) {
+          const bounds = root.getBoundingClientRect();
+          const tab = active.getBoundingClientRect();
+          if (tab.left < bounds.left + 16) root.scrollLeft += tab.left - bounds.left - 16;
+          else if (tab.right > bounds.right - 16) root.scrollLeft += tab.right - bounds.right + 16;
+        }
+      }
+      updateEdges();
+    };
+    revealActive();
+    const observer = new ResizeObserver(revealActive);
+    observer.observe(root);
+    const tabs = root.firstElementChild;
+    if (tabs) observer.observe(tabs);
+    root.addEventListener("scroll", updateEdges, { passive: true });
+    return () => { observer.disconnect(); root.removeEventListener("scroll", updateEdges); };
+  }, [boards, category]);
   const categoryOptions = [
     { value: "", label: lang === "ko" ? "전체" : "All" },
     ...boards
@@ -60,6 +90,7 @@ export function BoardCategoryNavigation({
 
   return (
     <PageToolbar>
+      <div ref={tabsRef} className="mobile-board-tabs-shell">
       <SegmentedControl
         variant="underline"
         ariaLabel={lang === "ko" ? "게시판 분류" : "Board categories"}
@@ -69,6 +100,7 @@ export function BoardCategoryNavigation({
         options={categoryOptions}
         onChange={value => navigate(value ? "/board/" + value : "/board")}
       />
+      </div>
     </PageToolbar>
   );
 }
@@ -95,7 +127,7 @@ export function BoardDataControls({
   return (
       <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
         <span
-          className="shrink-0 text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-muted)]"
+          className="hidden shrink-0 text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-muted)] md:inline"
           aria-live="polite"
         >
           {lang === "ko" ? (
@@ -107,6 +139,7 @@ export function BoardDataControls({
 
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
           <PageSearchField
+            className="mobile-board-search-field"
             ariaLabel={lang === "ko" ? "게시판 검색" : "Search board"}
             placeholder={lang === "ko" ? "제목, 내용 검색" : "Search title, content"}
             value={searchQuery}
@@ -120,11 +153,13 @@ export function BoardDataControls({
             }}
           />
 
+          {canWrite && <BoardWriteFloatingAction lang={lang} writeState={writeState} />}
           {canWrite ? (
             <PageActionLink
               state={writeState}
               to="/board/write"
               tone="primary"
+              className="hidden md:inline-flex"
             >
               {lang === "ko" ? "작성" : "Write"}
             </PageActionLink>
@@ -132,6 +167,14 @@ export function BoardDataControls({
         </div>
       </div>
   );
+}
+
+function BoardWriteFloatingAction({ lang, writeState }: { lang: string; writeState?: { initialCategory: string } }) {
+  useEffect(() => {
+    document.body.classList.add("board-write-fab-visible");
+    return () => document.body.classList.remove("board-write-fab-visible");
+  }, []);
+  return createPortal(<Link to="/board/write" state={writeState} className="board-write-fab" aria-label={lang === "ko" ? "게시글 작성" : "Write a post"}><SquarePen aria-hidden="true" className="size-6" strokeWidth={1.5} /></Link>, document.body);
 }
 
 interface BoardArticleTableProps {
@@ -150,6 +193,9 @@ interface BoardArticleTableProps {
   totalCount: number;
   totalPages: number;
   toolbar: ReactNode;
+  hasMoreArticles: boolean;
+  isLoadingMore: boolean;
+  onLoadMore: () => void;
 }
 
 function BoardTableSkeleton({ columns }: { columns: number }) {
@@ -173,6 +219,9 @@ export function BoardArticleTable({
   totalCount,
   totalPages,
   toolbar,
+  hasMoreArticles,
+  isLoadingMore,
+  onLoadMore,
 }: BoardArticleTableProps) {
   const rangeStart = totalCount === 0 ? 0 : (currentPage - 1) * postsPerPage + 1;
   const rangeEnd = Math.min(totalCount, currentPage * postsPerPage);
@@ -192,6 +241,7 @@ export function BoardArticleTable({
     return (
       <div
         key={post.articleId}
+        data-pinned={pinned || undefined}
         className={`interaction-row group flex min-h-12 border-b border-slate-100 px-4 py-1.5 md:px-6 ${
           pinned ? "bg-emerald-50/70 hover:bg-emerald-100/60" : ""
         }`}
@@ -201,7 +251,7 @@ export function BoardArticleTable({
           className={`grid min-w-0 w-full grid-cols-1 gap-1.5 md:items-center md:gap-3 ${tableGridClass}`}
         >
           {!category ? (
-            <div className="flex shrink-0 justify-start text-left">
+            <div className="hidden shrink-0 justify-start text-left md:flex">
               <span className={`text-[length:var(--ui-text-caption-size)] font-medium select-none ${pinned ? "text-kaist-darkgreen" : "text-slate-500"}`}>
                 {getBoardLabelFromMetadata(postBoard, postCategory, lang)}
               </span>
@@ -210,7 +260,7 @@ export function BoardArticleTable({
           <div className={`flex min-w-0 items-center gap-2 text-left text-[length:var(--ui-text-section-size)] leading-5 tracking-tight text-app-text-strong ${pinned ? "font-semibold" : "font-medium"}`}>
             {postCategory === "promotions" && <PromotionStatus start={post.eventStartDate} end={post.eventEndDate} lang={lang} />}
             {pinned ? <span aria-label={lang === "ko" ? "고정 공지" : "Pinned notice"} className="shrink-0 text-sm">📌</span> : null}
-            <ArticleListTitle>{lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}</ArticleListTitle>
+            <ArticleListTitle className="mobile-board-title">{lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}</ArticleListTitle>
             {post.commentCount > 0 ? (
               <span
                 aria-label={
@@ -234,9 +284,9 @@ export function BoardArticleTable({
               </span>
             ) : null}
           </div>
-          <div className="flex items-center gap-2 text-[length:var(--ui-text-body-size)] font-normal tracking-tight text-[var(--j-color-text-secondary)] md:hidden">
-            <span>{authorLabel(post)}</span>
-            <span aria-hidden="true">·</span>
+          <div className="mobile-board-metadata flex items-center gap-2 text-[length:var(--ui-text-body-size)] font-normal tracking-tight text-[var(--j-color-text-secondary)] md:hidden">
+            {!category && <><span className="mobile-board-category">{getBoardLabelFromMetadata(postBoard, postCategory, lang)}</span><span className="mobile-board-divider" aria-hidden="true">·</span></>}
+            <span className="mobile-board-author">{authorLabel(post)}</span>
             <time dateTime={post.postedAt} className="tabular-nums">
               {formatBoardListDate(post.postedAt)}
             </time>
@@ -261,7 +311,7 @@ export function BoardArticleTable({
     <PageContainer className="pb-8">
       <DataViewCard className="board-article-table" aria-label={lang === "ko" ? "게시글 목록" : "Article list"}>
         <SearchLoadingContext.Provider value={isLoading}>
-          <DataViewToolbar>{toolbar}</DataViewToolbar>
+          <DataViewToolbar className="mobile-board-list-toolbar">{toolbar}</DataViewToolbar>
         </SearchLoadingContext.Provider>
         <DataViewBody>
         <div className={`hidden h-[var(--ui-table-head-height)] ${tableGridClass} items-center gap-3 border-b border-[var(--ui-border-subtle)] bg-slate-50/70 px-6 text-[length:var(--ui-text-body-size)] font-medium tracking-tight text-slate-500 md:grid`}>
@@ -321,7 +371,7 @@ export function BoardArticleTable({
         </DataViewBody>
 
         {totalCount > 0 ? (
-          <DataViewFooter className="select-none">
+          <DataViewFooter className="hidden select-none md:flex">
             <Pagination
               className="w-full"
               currentPage={currentPage}
@@ -341,6 +391,11 @@ export function BoardArticleTable({
             />
           </DataViewFooter>
         ) : null}
+        {hasMoreArticles ? <div className="mobile-board-more md:hidden">
+          <Button variant="ghost" onClick={onLoadMore} disabled={isLoading} className="min-h-11 w-full">
+            {isLoadingMore ? (lang === "ko" ? "불러오는 중…" : "Loading…") : (lang === "ko" ? `${category === "notice" ? "공지" : "게시글"} 더보기 +` : "Load more posts +")}
+          </Button>
+        </div> : null}
       </DataViewCard>
     </PageContainer>
   );

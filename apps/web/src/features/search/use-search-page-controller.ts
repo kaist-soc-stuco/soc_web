@@ -33,6 +33,12 @@ export function useSearchPageController() {
   };
   const setFilter = (value: SearchFilter) => updateSearchOption("type", value === "all" ? "" : value);
   const setSearchBy = (value: SearchBy) => updateSearchOption("by", value === "title_content" ? "" : value);
+  const setSearchFilters = (scope: SearchBy, kind: SearchFilter) => {
+    const next = new URLSearchParams(searchParams);
+    if (scope === "title_content") next.delete("by"); else next.set("by", scope);
+    if (kind === "all") next.delete("type"); else next.set("type", kind);
+    setSearchParams(next, { replace: true, state: { preserveScroll: true } });
+  };
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<PublicCalendarEventItem[]>([]);
   const [surveys, setSurveys] = useState<PublicSurveyRecord[]>([]);
@@ -276,6 +282,7 @@ export function useSearchPageController() {
     setFilter,
     searchBy,
     setSearchBy,
+    setSearchFilters,
     surveys,
     votes,
     totalCount,

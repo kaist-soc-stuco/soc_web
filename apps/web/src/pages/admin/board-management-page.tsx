@@ -241,7 +241,7 @@ function BoardManagementPageContent() {
           onDragCancel={handleDragCancel}
           onDragEnd={handleDragEnd}
         >
-          <AdminDataTable minWidth={0} isDragging={Boolean(activeBoardCode)} className={`admin-sortable-table ${loading && boards.length > 0 ? "opacity-60 transition-opacity" : ""}`}>
+          <AdminDataTable minWidth={0} isDragging={Boolean(activeBoardCode)} className={`admin-sortable-table admin-sortable-list ${loading && boards.length > 0 ? "opacity-60 transition-opacity" : ""}`}>
             <colgroup><col style={{ width: 36 }} /><col /><col style={{ width: "32%" }} /><col style={{ width: 80 }} /></colgroup>
             <AdminTableHeader><tr><AdminTableHead><span className="sr-only">순서</span></AdminTableHead><AdminTableHead>게시판</AdminTableHead><AdminTableHead>운영 설정</AdminTableHead><AdminTableHead>상태</AdminTableHead></tr></AdminTableHeader>
             <AdminTableBody>

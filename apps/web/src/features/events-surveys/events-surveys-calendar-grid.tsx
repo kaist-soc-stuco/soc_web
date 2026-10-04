@@ -211,6 +211,7 @@ export function EventsSurveysCalendarGrid({
     x: number,
     y: number,
   ) => {
+    if (window.matchMedia("(max-width: 767px)").matches) return;
     setHoveredEventKey(getCalendarEventKey(event));
     setTooltip({ event, x, y });
   };
@@ -316,6 +317,9 @@ export function EventsSurveysCalendarGrid({
             const holidayName = holiday
               ? getKoreanHolidayName(holiday.dateName, lang)
               : "";
+            const mobileHiddenEventCount = dayEventEntries.filter((entry) =>
+              (weekLaneLayout.eventLanes.get(entry.eventIndex) ?? 0) >= 2,
+            ).length;
 
             return (
               <button
@@ -329,9 +333,13 @@ export function EventsSurveysCalendarGrid({
                 aria-pressed={selected}
                 className={`relative !z-auto !transform-none !shadow-none flex h-full min-h-0 min-w-0 flex-col overflow-visible border-b border-r border-slate-100 px-1.5 py-1 text-left focus:outline-none focus-visible:outline-none focus-visible:ring-0 ${selected ? "bg-slate-100" : "bg-white hover:bg-slate-50/80"}`}
                 key={toDateKey(cell.date)}
-                onClick={() => onSelectedDateChange(cell.date)}
+                onClick={(event) => {
+                  event.currentTarget.focus({ preventScroll: true });
+                  onSelectedDateChange(cell.date);
+                }}
                 type="button"
               >
+                <span className="flex w-full shrink-0 items-center justify-between gap-0.5">
                 <span
                   className={`shrink-0 text-sm font-medium ${getDateTextClass(
                     cell,
@@ -341,13 +349,15 @@ export function EventsSurveysCalendarGrid({
                 >
                   {cell.day}
                 </span>
+                {mobileHiddenEventCount > 0 && cell.isCurrentMonth ? <span className="text-[length:var(--ui-text-micro-size)] leading-4 text-slate-500 md:hidden">+{mobileHiddenEventCount}</span> : null}
+                </span>
 
-                <span className="mt-1 grid min-h-0 w-full flex-1 grid-rows-[repeat(4,20px)_16px] gap-y-0.5 overflow-visible">
+                <span className="calendar-day-lanes mt-1 grid min-h-0 w-full flex-1 grid-rows-[repeat(4,20px)_16px] gap-y-0.5 overflow-visible">
                   {Array.from({ length: MAX_VISIBLE_EVENTS }, (_, laneIndex) => {
                     const entry = eventByLane.get(laneIndex);
                     if (!entry) {
                       return (
-                        <span aria-hidden="true" key={`empty-lane-${laneIndex}`} />
+                        <span className="calendar-day-lane" data-lane={laneIndex} aria-hidden="true" key={`empty-lane-${laneIndex}`} />
                       );
                     }
 
@@ -379,7 +389,7 @@ export function EventsSurveysCalendarGrid({
 
                     return (
                       <span
-                        className="min-w-0"
+                        className="calendar-day-lane min-w-0" data-lane={laneIndex}
                         key={`${event.id}-${event.dateType}-${laneIndex}`}
                       >
                         <span
@@ -409,16 +419,12 @@ export function EventsSurveysCalendarGrid({
                               className="pointer-events-none absolute inset-y-0 flex min-w-0 items-center justify-center overflow-hidden px-2"
                               style={{
                                 left: `calc(-${labelSegment.offsetDays * 100}%)`,
-                                width: `calc(${labelSegment.dayCount * 100}% - 0.5rem)`,
+                                width: `calc(${labelSegment.dayCount * 100}% - var(--calendar-label-gap, 0.5rem))`,
                               } satisfies CSSProperties}
                             >
-                              <span className="hidden min-w-0 max-w-full truncate whitespace-nowrap md:block">
+                              <span className="calendar-bar-title min-w-0 max-w-full truncate whitespace-nowrap">
                                 {titleText}
                               </span>
-                              <span
-                                aria-hidden="true"
-                                className={`mx-auto block h-1.5 w-6 rounded-full md:hidden ${eventStyle.bullet}`}
-                              />
                             </span>
                           ) : (
                             <span className="block h-4 w-full" aria-hidden="true" />
@@ -429,11 +435,11 @@ export function EventsSurveysCalendarGrid({
                   })}
 
                   {hiddenEventCount > 0 && cell.isCurrentMonth ? (
-                    <span className="self-end pr-1 text-[length:var(--ui-text-micro-size)] font-semibold leading-4 text-slate-400">
+                    <span className="hidden md:block self-end pr-1 text-[length:var(--ui-text-micro-size)] font-semibold leading-4 text-slate-400">
                       +{hiddenEventCount}
                     </span>
                   ) : (
-                    <span aria-hidden="true" />
+                    <span className="hidden md:block" aria-hidden="true" />
                   )}
                 </span>
               </button>

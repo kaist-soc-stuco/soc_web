@@ -12,7 +12,7 @@ import {
   type NodeProps,
   type ReactFlowInstance,
 } from "@xyflow/react";
-import { Clock3, MapPin, Maximize2, Minimize2, Minus, Plus, RotateCcw, Search, X } from "lucide-react";
+import { ChevronDown, Clock3, MapPin, Maximize2, Minimize2, Minus, Plus, RotateCcw, Search, X } from "lucide-react";
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -27,6 +27,9 @@ import { useQuery } from "@tanstack/react-query";
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { IconButton } from "@/components/ui/icon-button";
 import { TextInput } from "@/components/ui/text-input";
+import { FilterSheet } from "@/components/ui/filter-sheet";
+import { MobileFilterActions, MobileFilterButton } from "@/components/ui/mobile-filter-controls";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { cn } from "@/lib/utils";
 import {
@@ -354,6 +357,9 @@ export function RoadmapGraph({
   const [searchText, setSearchText] = useState("");
   const [selectedTerm, setSelectedTerm] = useState<RoadmapOfferingTerm>("2026-fall");
   const [offeredOnly, setOfferedOnly] = useState(false);
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draftFilters, setDraftFilters] = useState({ term: selectedTerm, offeredOnly, tracks: new Set<string>() });
   const [flow, setFlow] = useState<ReactFlowInstance<GraphNode, Edge> | null>(null);
   const flowViewportRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -718,6 +724,19 @@ export function RoadmapGraph({
   return (
     <>
       <div className="lg:hidden">
+        {isMobile ? <>
+          <div className="mobile-filter-toolbar">
+            <TextInput type="search" value={searchText} onChange={event => setSearchText(event.target.value)} aria-label={lang === "ko" ? "과목 검색" : "Search courses"} placeholder={lang === "ko" ? "과목 코드, 과목명 검색" : "Search courses"} leading={<Search className="size-4" aria-hidden="true" />} />
+            <MobileFilterButton label={lang === "ko" ? "필터" : "Filters"} open={filterOpen} active={offeredOnly || selectedTrackIds.size > 0 || selectedTerm !== "2026-fall"} onClick={() => { setDraftFilters({ term: selectedTerm, offeredOnly, tracks: new Set(selectedTrackIds) }); setFilterOpen(true); }} />
+          </div>
+          <FilterSheet className="mobile-filter-sheet" open={filterOpen} onClose={() => setFilterOpen(false)} title={lang === "ko" ? "과목 필터" : "Course filters"} closeLabel={lang === "ko" ? "필터 닫기" : "Close filters"} footer={<MobileFilterActions lang={lang} onReset={() => setDraftFilters({ term: termOptions.find(option => option.value === "2026-fall")?.value ?? termOptions[0]?.value ?? selectedTerm, offeredOnly: false, tracks: new Set() })} onApply={() => { setSelectedTerm(draftFilters.term); setOfferedOnly(draftFilters.offeredOnly); setSelectedTrackIds(draftFilters.tracks); setFilterOpen(false); }} />}>
+            <fieldset className="mobile-filter-fieldset"><legend>{lang === "ko" ? "학기" : "Semester"}</legend>
+              <select aria-label={lang === "ko" ? "학기" : "Semester"} value={draftFilters.term} onChange={event => setDraftFilters(previous => ({ ...previous, term: event.target.value as RoadmapOfferingTerm }))}>{termOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+              <label className="mobile-filter-option"><input type="checkbox" checked={draftFilters.offeredOnly} onChange={event => setDraftFilters(previous => ({ ...previous, offeredOnly: event.target.checked }))} /><span>{lang === "ko" ? "선택한 학기 개설 과목만" : "Offered this semester only"}</span></label>
+            </fieldset>
+            <fieldset className="mobile-filter-fieldset"><legend>{lang === "ko" ? "교육 분야" : "Fields"}</legend>{ROADMAP_TRACKS.map(track => <label key={track.id} className="mobile-filter-option"><input type="checkbox" checked={draftFilters.tracks.has(track.id)} onChange={() => setDraftFilters(previous => { const tracks = new Set(previous.tracks); if (tracks.has(track.id)) tracks.delete(track.id); else tracks.add(track.id); return { ...previous, tracks }; })} /><span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: track.color }} /><span>{track.label[lang]}</span></label>)}</fieldset>
+          </FilterSheet>
+        </> : <>
         <TextInput
           className="!font-normal"
               type="search"
@@ -735,30 +754,20 @@ export function RoadmapGraph({
           onOfferedOnlyChange={setOfferedOnly}
           onTermChange={setSelectedTerm}
         />
-        <div className="mt-3 flex flex-wrap gap-2">
-          {ROADMAP_TRACKS.map((track) => {
-            const selected = selectedTrackIds.has(track.id);
-            return (
-              <button
-                key={track.id}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => toggleTrack(track.id)}
-                className={cn(
-                  "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3 text-xs font-semibold",
-                  selected
-                    ? "border-slate-400 bg-slate-100 text-slate-950"
-                    : "border-slate-200 bg-white text-slate-600",
-                )}
-              >
-                <span className="size-2 rounded-full" style={{ backgroundColor: track.color }} />
-                {track.label[lang]}
-              </button>
-            );
-          })}
-        </div>
+        <details className="roadmap-mobile-fields mt-3 rounded-xl border border-slate-200 bg-white">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-medium text-slate-700">
+            <span>{lang === "ko" ? "교육 분야" : "Fields"} · {selectedTrackIds.size === 0 ? (lang === "ko" ? "전체" : "All") : (lang === "ko" ? `${selectedTrackIds.size}개 선택` : `${selectedTrackIds.size} selected`)}</span>
+            <ChevronDown aria-hidden="true" className="size-4 shrink-0 transition-transform" />
+          </summary>
+          <div className="grid gap-1 border-t border-slate-100 p-2 sm:grid-cols-2">
+            {ROADMAP_TRACKS.map(track => <label key={track.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm text-slate-700 hover:bg-slate-50"><input type="checkbox" checked={selectedTrackIds.has(track.id)} onChange={() => toggleTrack(track.id)} className="size-4 shrink-0 accent-emerald-700" /><span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: track.color }} />{track.label[lang]}</label>)}
+          </div>
+        </details>
+        </>}
 
-        {selectedCourseCode ? (
+        {isMobile ? <FilterSheet className="mobile-filter-sheet mobile-course-sheet" open={Boolean(selectedCourseCode)} onClose={() => onSelectedCourseChange(null)} title={selectedCourseCode ? roadmapCourseByCode.get(selectedCourseCode)?.name[lang] ?? (lang === "ko" ? "과목 상세" : "Course details") : ""} closeLabel={lang === "ko" ? "과목 상세 닫기" : "Close course details"}>
+          <CourseDetails courseCode={selectedCourseCode} courseByCode={roadmapCourseByCode} displayCodeByCourse={displayCodeByCourse} lang={lang} relations={roadmapRelations} offeringsByCourse={offeringsByCourse} selectedTerm={selectedTerm} onClose={() => onSelectedCourseChange(null)} onCourseClick={onSelectedCourseChange} sheet />
+        </FilterSheet> : selectedCourseCode ? (
           <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 pb-5">
             <CourseDetails
               courseCode={selectedCourseCode}
@@ -779,15 +788,17 @@ export function RoadmapGraph({
             <button
               key={item.code}
               type="button"
+              aria-haspopup={isMobile ? "dialog" : undefined}
               onClick={() => onSelectedCourseChange(item.code)}
-              className="flex min-h-16 w-full items-center gap-3 py-3 text-left"
+              className="mobile-roadmap-course-row flex min-h-16 w-full items-center gap-3 py-3 text-left"
             >
-              <span className="w-14 shrink-0 text-xs font-semibold text-slate-500">
+              <span className="hidden w-14 shrink-0 text-xs font-semibold text-slate-500 md:block">
                 {displayCodeByCourse.get(item.code) ?? item.code}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block line-clamp-2 break-words text-sm font-semibold leading-5 text-slate-900">{item.name[lang]}</span>
                 <span className="mt-1 block text-xs font-medium text-slate-400">
+                  <span className="md:hidden">{displayCodeByCourse.get(item.code) ?? item.code} · </span>
                   {CATEGORY_LABELS[item.category][lang]} · {item.semesters}
                 </span>
               </span>
@@ -1038,7 +1049,7 @@ function RoadmapOfferingControls({
   onTermChange: (value: RoadmapOfferingTerm) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="roadmap-offering-controls flex flex-wrap items-center gap-2">
       <SelectDropdown
         ariaLabel={lang === "ko" ? "개설 학기" : "Offering semester"}
         value={selectedTerm}
@@ -1048,14 +1059,14 @@ function RoadmapOfferingControls({
         buttonClassName="h-11 !min-h-11 text-[length:var(--ui-text-body-sm-size)] font-normal"
         optionClassName="text-[length:var(--ui-text-body-sm-size)] !font-normal"
       />
-      <label className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900">
+      <label className="roadmap-offered-only inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900">
         <input
           type="checkbox"
           checked={offeredOnly}
           onChange={(event) => onOfferedOnlyChange(event.currentTarget.checked)}
           className="size-3.5 accent-emerald-700"
         />
-        <span>{lang === "ko" ? "이번 학기 개설 과목만 보기" : "Show courses offered this semester"}</span>
+        <span className="lg:hidden">{lang === "ko" ? "이번 학기 개설만" : "Offered only"}</span><span className="hidden lg:inline">{lang === "ko" ? "이번 학기 개설 과목만 보기" : "Show courses offered this semester"}</span>
       </label>
     </div>
   );
@@ -1071,6 +1082,7 @@ interface CourseDetailsProps {
   offeringsByCourse: ReadonlyMap<string, RoadmapOffering[]>;
   relations: ReadonlyArray<{ source: string; target: string }>;
   selectedTerm: RoadmapOfferingTerm;
+  sheet?: boolean;
 }
 
 function CourseDetails({
@@ -1083,6 +1095,7 @@ function CourseDetails({
   offeringsByCourse,
   relations,
   selectedTerm,
+  sheet = false,
 }: CourseDetailsProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "offerings">("overview");
   const item = courseCode ? courseByCode.get(courseCode) : undefined;
@@ -1125,11 +1138,11 @@ function CourseDetails({
           <span className="text-xs font-semibold text-kaist-darkgreen">
             {displayCodeByCourse.get(item.code) ?? item.code}
           </span>
-          <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">{item.name[lang]}</h2>
+          {!sheet && <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">{item.name[lang]}</h2>}
         </div>
-        <IconButton aria-label={lang === "ko" ? "과목 상세 닫기" : "Close details"} onClick={onClose}>
+        {!sheet && <IconButton aria-label={lang === "ko" ? "과목 상세 닫기" : "Close details"} onClick={onClose}>
           <X aria-hidden="true" className="size-4" />
-        </IconButton>
+        </IconButton>}
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1" role="tablist" aria-label={lang === "ko" ? "과목 상세 탭" : "Course detail tabs"}>
@@ -1177,13 +1190,13 @@ function CourseDetails({
           <dt className="font-medium text-slate-400">{lang === "ko" ? "강·실·학" : "Lecture·Lab·Credit"}</dt>
           <dd className="mt-1 font-semibold tabular-nums text-slate-800">{item.credits}</dd>
         </div>
-        <div>
+        <div className={!item.ai ? "mobile-empty-course-field" : undefined}>
           <dt className="font-medium text-slate-400">{lang === "ko" ? "AI 중점" : "AI focus"}</dt>
           <dd className="mt-1 font-semibold text-slate-800">{item.ai ? (lang === "ko" ? "해당" : "Yes") : "—"}</dd>
         </div>
           </dl>
 
-          <div className="mt-4">
+          <div className={`mt-4${item.tracks.length === 0 ? " mobile-empty-course-field" : ""}`}>
         <h3 className="text-xs font-semibold text-slate-500">{lang === "ko" ? "교육 분야" : "Fields"}</h3>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {item.tracks.map((trackId) => {
@@ -1239,7 +1252,7 @@ function OfferingList({
   }
 
   return (
-    <div className="mt-4 space-y-2">
+    <div className="roadmap-offering-list mt-4 space-y-2">
       {offerings.map((offering) => {
         const enrollment =
           offering.capacity !== null
@@ -1257,12 +1270,13 @@ function OfferingList({
         return (
           <article
             key={`${offering.term}-${offering.currentCode}-${offering.nameKo}-${offering.section ?? "none"}`}
-            className="rounded-lg border border-slate-200 bg-white p-3"
+            className="roadmap-offering-row rounded-lg border border-slate-200 bg-white p-3"
           >
             <div className="space-y-1.5 text-[length:var(--ui-text-micro-size)]">
               <div className="flex min-w-0 items-baseline justify-between gap-3">
                 <p className="min-w-0 flex-1 break-words font-semibold text-slate-800">
-                  {courseMeta}
+                  <span className="hidden md:inline">{courseMeta}</span>
+                  <span className="md:hidden">{[offering.section ? lang === "ko" ? `${offering.section}분반` : `Section ${offering.section}` : offering.currentCode, offering.instructor].filter(Boolean).join(" · ")}</span>
                 </p>
                 {enrollment ? (
                   <p className="shrink-0 whitespace-nowrap font-semibold tabular-nums text-slate-700">

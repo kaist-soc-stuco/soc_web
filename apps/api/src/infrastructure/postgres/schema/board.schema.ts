@@ -46,6 +46,7 @@ export const articles = pgTable("article", {
     .references(() => users.userId),
   titleKo: varchar("title_ko", { length: 255 }).notNull(),
   titleEn: varchar("title_en", { length: 255 }),
+  faqCategory: varchar("faq_category", { length: 30 }).$type<"account" | "fees" | "events-surveys" | "other">(),
   contentKo: text("content_ko").notNull(),
   contentEn: text("content_en"),
   status: varchar("status", { length: 20 }).notNull().default("PUBLISHED"),

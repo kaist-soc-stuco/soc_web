@@ -29,7 +29,6 @@ import {
   AdminTableHeader,
 } from "@/components/ui/admin-data-table";
 import {
-  AdminEditorGuidance,
   AdminFormField,
   AdminLoadingState,
   AdminPageHeader,
@@ -568,10 +567,6 @@ export function FeeManagementPage() {
               </Button>
             )}
           />
-
-          <AdminEditorGuidance>
-            <p>일괄 납부 확정은 원장에 반영됩니다. 모바일에서는 대상·금액·적용 학기를 검토 화면에서 모두 확인한 뒤 확정하세요.</p>
-          </AdminEditorGuidance>
 
           <SegmentedControl
             variant="underline" ariaLabel="과비 관리 보기"

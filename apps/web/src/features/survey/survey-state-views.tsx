@@ -37,7 +37,7 @@ export function BeforeOpenView({
   lang: string;
 }) {
   return (
-    <div className="flex w-full flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-none animate-in fade-in zoom-in-95 duration-300 sm:p-10">
+    <div className="response-state-view flex w-full flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-none animate-in fade-in zoom-in-95 duration-300 sm:p-10">
       <div className="w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 mb-6 border border-amber-100">
         <Clock className="w-8 h-8" />
       </div>
@@ -72,7 +72,7 @@ export function ClosedView({
 }) {
   return (
     <div
-      className={`${
+      className={`response-state-view ${
         embedded
           ? "flex flex-col items-center text-center"
           : "flex w-full flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-none sm:p-10"
@@ -131,7 +131,7 @@ export function SuccessView({
 
   return (
     <div
-      className={`${
+      className={`response-state-view ${
         embedded
           ? "flex w-full flex-col items-center text-center"
           : "flex w-full flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-none sm:p-10"
@@ -181,7 +181,7 @@ export function AlreadySubmittedView({
 
   return (
     <div
-      className={`${
+      className={`response-state-view ${
         embedded
           ? "flex w-full flex-col items-center text-center"
           : "flex w-full flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-none sm:p-10"

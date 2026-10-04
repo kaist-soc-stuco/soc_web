@@ -5,7 +5,7 @@ import type {
   ArticleAssetItem,
   ArticleEngagementKind,
 } from "@soc/contracts";
-import { ArrowUpRight, Check, ChevronUp, ChevronDown, ClipboardCheck, Edit2, EllipsisVertical, Eye, EyeOff, Share2, Trash2 } from "lucide-react";
+import { ArrowUpRight, Bookmark, Heart, MessageCircle, Check, ChevronUp, ChevronDown, ClipboardCheck, Edit2, EllipsisVertical, Eye, EyeOff, Share2, Trash2 } from "lucide-react";
 import { isoToDate } from "@soc/shared";
 import { Link } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -16,12 +16,13 @@ import {
   AdminActionMenuItem,
   AdminActionMenuPanel,
 } from "@/components/ui/admin-action-menu";
-import { ArticleEngagementActions } from "@/components/ui/article-engagement-actions";
+import { ArticleEngagementActions, EngagementActionButton } from "@/components/ui/article-engagement-actions";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { RichTextContent, stripRichText } from "@/components/ui/rich-text-content";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { Button } from "@/components/ui/button";
 
-function formatDate(isoString: string) {
+function formatDate(isoString: string, omitYear = false) {
   const date = isoToDate(isoString);
   if (Number.isNaN(date.getTime())) return "";
 
@@ -30,11 +31,12 @@ function formatDate(isoString: string) {
   const day = String(date.getDate()).padStart(2, "0");
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${yyyy}.${month}.${day} ${hours}:${minutes}`;
+  return `${omitYear ? "" : `${yyyy}.`}${month}.${day} ${hours}:${minutes}`;
 }
 
 interface ArticleCardProps {
   article: ArticleDetailResponse;
+  adjacentBasePath: string;
   allowEngagement: boolean;
   attachmentAssets: ArticleAssetItem[];
   canEdit: boolean;
@@ -56,10 +58,14 @@ interface ArticleCardProps {
   surveyTitle: string;
   submitting: ArticleEngagementKind | null;
   title: string;
+  canComment?: boolean;
+  commentTotal?: number;
+  onCommentClick?: () => void;
 }
 
 export function BoardDetailArticleCard({
   article,
+  adjacentBasePath,
   allowEngagement,
   attachmentAssets,
   canEdit,
@@ -81,11 +87,15 @@ export function BoardDetailArticleCard({
   surveyTitle,
   submitting,
   title,
+  canComment = false,
+  commentTotal = 0,
+  onCommentClick,
 }: ArticleCardProps) {
+  const isMobile = useMediaQuery("(width < 768px)");
   return (
     <article className={article.status === "HIDDEN"
-      ? "w-full rounded-xl border border-amber-200 bg-white px-4 py-5 shadow-card min-[640px]:px-5 md:py-6 lg:px-[52px] lg:py-[32px]"
-      : "w-full rounded-xl border border-card-border-subtle bg-white px-4 py-5 shadow-card min-[640px]:px-5 md:py-6 lg:px-[52px] lg:py-[32px]"}>
+      ? "mobile-flat-article w-full rounded-xl border border-amber-200 bg-white px-4 py-5 shadow-card min-[640px]:px-5 md:py-6 lg:px-[52px] lg:py-[32px]"
+      : "mobile-flat-article w-full rounded-xl border border-card-border-subtle bg-white px-4 py-5 shadow-card min-[640px]:px-5 md:py-6 lg:px-[52px] lg:py-[32px]"}>
       {article.status === "HIDDEN" ? (
         <div
           role="status"
@@ -102,29 +112,29 @@ export function BoardDetailArticleCard({
           </div>
         </div>
       ) : null}
-      <header>
-        <h1 className="break-words text-[1.18rem] font-semibold leading-snug tracking-tight text-app-text-strong [overflow-wrap:anywhere] md:text-[1.45rem]">
+      <header className="relative">
+        <h1 className={`${!isMobile && (canEdit || canModerate) ? "pr-12" : ""} break-words text-[1.18rem] font-semibold leading-snug tracking-tight text-app-text-strong [overflow-wrap:anywhere] md:text-[1.45rem]`}>
           {title}
           {category === "promotions" && <span className="ml-3"><PromotionStatus start={article.eventStartDate} end={article.eventEndDate} lang={lang} /></span>}
         </h1>
         <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal text-slate-400">
-            <span>
+          <div className="mobile-article-metadata flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal text-slate-400">
+            <span className="mobile-article-author">
             {article.isAnonymous
                 ? lang === "ko"
                   ? "익명"
                   : "Anonymous"
                 : (lang === "en" ? article.author.nameEn || article.author.name : article.author.name)}
             </span>
-            <span className="text-slate-300">·</span>
-            <span>{formatDate(article.postedAt)}</span>
+            <span className="mobile-article-author-divider text-slate-300">·</span>
+            <time dateTime={article.postedAt}>{formatDate(article.postedAt, isMobile)}</time>
             <span className="text-slate-300">·</span>
             <span className="inline-flex items-center gap-1">
               <Eye className="h-3.5 w-3.5" aria-hidden="true" />
               {article.viewCount}
             </span>
           </div>
-          {canEdit || canModerate ? (
+          {!isMobile && (canEdit || canModerate) ? (
             <DropdownMenu.Root modal={false}>
               <DropdownMenu.Trigger asChild>
                 <Button
@@ -132,7 +142,7 @@ export function BoardDetailArticleCard({
                   variant="ghost"
                   size="icon"
                   aria-label={lang === "ko" ? "게시글 더보기" : "More post actions"}
-                  className="min-h-11 min-w-11 bg-transparent text-slate-400 hover:bg-transparent hover:text-slate-700"
+                  className="absolute -right-2 -top-2 min-h-11 min-w-11 bg-transparent text-slate-400 hover:text-slate-700"
                 >
                   <EllipsisVertical className="size-4" aria-hidden="true" />
                 </Button>
@@ -243,7 +253,15 @@ export function BoardDetailArticleCard({
         </Link>
       )}
 
-      <div className="mt-8 flex items-center justify-start gap-2 border-t border-slate-100 pt-4">
+      {isMobile ? (allowEngagement || canComment) && <div className="mobile-article-engagement" style={{ gridTemplateColumns: `repeat(${(allowEngagement ? 2 : 0) + (canComment ? 1 : 0)},minmax(0,1fr))` }}>
+        {allowEngagement &&
+          <EngagementActionButton active={isAuthenticated && article.viewerHasLiked} count={article.likeCount} icon={<Heart className="size-5" fill={isAuthenticated && article.viewerHasLiked ? "currentColor" : "none"} />} label={lang === "ko" ? "좋아요" : "Like"} loading={submitting === "LIKE"} onClick={() => onToggle("LIKE", !article.viewerHasLiked)} className="mobile-detail-engagement-action" tone="like" showLabel />
+        }
+        {canComment && <Button type="button" variant="ghost" className="mobile-detail-engagement-action" aria-label={lang === "ko" ? "댓글 쓰기" : "Write a comment"} onClick={onCommentClick}><MessageCircle className="size-5" aria-hidden="true" /><span>{lang === "ko" ? "댓글" : "Reply"}</span><span className="tabular-nums">{commentTotal}</span></Button>}
+        {allowEngagement &&
+          <EngagementActionButton active={isAuthenticated && article.viewerHasScrapped} count={article.scrapCount} icon={<Bookmark className="size-5" fill={isAuthenticated && article.viewerHasScrapped ? "currentColor" : "none"} />} label={lang === "ko" ? "스크랩" : "Save"} loading={submitting === "SCRAP"} onClick={() => onToggle("SCRAP", !article.viewerHasScrapped)} className="mobile-detail-engagement-action" tone="scrap" showLabel />
+        }
+      </div> : <div className="mt-8 flex items-center justify-start gap-2 border-t border-slate-100 pt-4">
         <ArticleEngagementActions
           allowLike={allowEngagement}
           allowScrap={allowEngagement}
@@ -278,7 +296,13 @@ export function BoardDetailArticleCard({
             <Share2 className="size-3.5" aria-hidden="true" />
           )}
         </Button>
-      </div>
+      </div>}
+      <BoardDetailAdjacentNav
+        lang={lang}
+        nextArticle={article.nextArticle}
+        prevArticle={article.prevArticle}
+        toBase={adjacentBasePath}
+      />
     </article>
   );
 }
@@ -311,15 +335,15 @@ export function BoardDetailAdjacentNav({
   const renderRow = (article: AdjacentArticle | null | undefined, direction: "prev" | "next") => {
     const label = lang === "ko" ? (direction === "prev" ? "이전글" : "다음글") : direction === "prev" ? "Previous" : "Next";
     const content = <>
-      <span className="flex shrink-0 items-center gap-2 border-r border-slate-200 pr-4 text-sm font-medium text-slate-700 sm:pr-6">
+      <span className="flex shrink-0 items-center gap-1.5 text-sm font-medium text-slate-700 sm:gap-2">
         {direction === "prev" ? <ChevronUp className="size-4" aria-hidden="true" /> : <ChevronDown className="size-4" aria-hidden="true" />}
         {label}
       </span>
-      <span className={`min-w-0 truncate text-sm font-normal ${article ? "text-slate-800" : "text-slate-400"}`}>
+      <span className={`min-w-0 line-clamp-2 text-sm font-normal sm:block sm:truncate ${article ? "text-slate-800" : "text-slate-400"}`}>
         {article ? (lang === "ko" ? article.titleKo : article.titleEn || article.titleKo) : (lang === "ko" ? `${label}이 없습니다.` : `No ${direction === "prev" ? "previous" : "next"} post.`)}
       </span>
     </>;
-    const className = "grid min-h-14 min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-4 px-4 py-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-6 sm:px-6";
+    const className = "grid min-h-14 min-w-0 grid-cols-[5rem_minmax(0,1fr)] items-center gap-3 py-3 sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-4";
     return article ? (
       <Link key={direction} to={`${toBase}/${article.articleId}`} className={`${className} transition-colors hover:bg-slate-50`}>
         {content}
@@ -330,7 +354,7 @@ export function BoardDetailAdjacentNav({
   return (
     <nav
       aria-label={lang === "ko" ? "게시글 이동" : "Post navigation"}
-      className="w-full divide-y divide-slate-200 border-y border-slate-200"
+      className="article-adjacent-navigation mt-6 w-full divide-y divide-slate-100 border-t border-slate-200"
     >
       {renderRow(prevArticle, "prev")}
       {renderRow(nextArticle, "next")}

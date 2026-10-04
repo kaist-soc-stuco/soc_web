@@ -1,5 +1,5 @@
 import { ClosedView } from "@/features/survey/survey-state-views";
-import { ResponsePageMain, ResponseHeaderCard } from "@/features/survey/response-layout";
+import { ResponseMobileNavigation, ResponsePageMain, ResponseHeaderCard } from "@/features/survey/response-layout";
 import { SurveyParticipationNotice } from "@/features/survey/survey-participation-notice";
 import { SurveyQuestionCard } from "@/features/survey/survey-question-card";
 import { RichTextContent } from "@/components/ui/rich-text-content";
@@ -117,8 +117,8 @@ export function VotePage() {
     }
   };
 
-  if (error && !vote) return <PageShell><main className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-24 text-center text-sm text-rose-600" role="alert"><p>{error}</p><Button type="button" variant="ghost" size="sm" onClick={() => setReloadKey((current) => current + 1)}>{t.retry}</Button></main></PageShell>;
-  if (!vote) return <PageShell><main className="flex-1 py-24 text-center text-sm text-[#344054]">불러오는 중...</main></PageShell>;
+  if (error && !vote) return <PageShell className="mobile-flat-response">{!isPreview && <ResponseMobileNavigation to="/votes" lang={lang} />}<main className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-24 text-center text-sm text-rose-600" role="alert"><p>{error}</p><Button type="button" variant="ghost" size="sm" onClick={() => setReloadKey((current) => current + 1)}>{t.retry}</Button></main></PageShell>;
+  if (!vote) return <PageShell className="mobile-flat-response">{!isPreview && <ResponseMobileNavigation to="/votes" lang={lang} />}<main className="flex-1 py-24 text-center text-sm text-[#344054]">불러오는 중...</main></PageShell>;
 
   const now = nowMs();
   const isOpen = vote.status === "PUBLISHED" && now >= isoToMs(vote.startsAt) && now < isoToMs(vote.endsAt);
@@ -129,13 +129,14 @@ export function VotePage() {
   const canParticipate = isOpen && vote.eligibility === "ELIGIBLE";
 
   return (
-    <PageShell>
-      {isPreview && <header className="flex min-h-16 items-center border-b border-slate-200 bg-white px-6"><Link to={`/admin/votes/${id}`} className="inline-flex items-center gap-3 text-sm"><ArrowLeft className="size-4" />미리보기 모드</Link></header>}
-      <ResponsePageMain>
+    <PageShell className="mobile-flat-response">
+      {!isPreview && <ResponseMobileNavigation to="/votes" lang={lang} />}
+      {isPreview && <header className="flex min-h-16 items-center border-b border-slate-200 bg-white px-6"><Link to={`/admin/votes/${id}`} className="inline-flex items-center gap-3 text-sm"><ArrowLeft className="size-4" />미리보기</Link></header>}
+      <ResponsePageMain className="vote-response-page">
           <ResponseHeaderCard title={lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo}>
             <p className="mt-2 text-sm tabular-nums text-slate-600">{formatVotePeriod(vote.startsAt, vote.endsAt)}</p>
             {(vote.descriptionKo || vote.descriptionEn) && <RichTextContent content={lang === "en" && vote.descriptionEn ? vote.descriptionEn : vote.descriptionKo ?? ""} className="mt-3 text-sm leading-6 text-slate-600" />}
-            <div className="mt-4 border-t border-slate-100 pt-4"><VoteTurnout vote={vote} lang={lang} /></div>
+            <div className="vote-summary-metadata mt-4 border-t border-slate-100 pt-4"><VoteTurnout vote={vote} lang={lang} /></div>
           </ResponseHeaderCard>
 
           <div className="min-w-0">

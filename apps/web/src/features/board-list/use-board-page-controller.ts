@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
@@ -16,6 +16,7 @@ import {
   canWriteBoardFromMetadata,
 } from "@/lib/board-metadata";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 export type BoardSearchCriteria = "title" | "author" | "title_content";
 
@@ -48,6 +49,7 @@ function parsePageSizeParam(value: string | null) {
 }
 
 export function useBoardPageController() {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const { category: routeCategory } = useParams<{ category?: string }>();
   const category = routeCategory ? normalizeBoardCode(routeCategory) : undefined;
   const location = useLocation();
@@ -84,26 +86,48 @@ export function useBoardPageController() {
   );
 
   const queryClient = useQueryClient();
+  const fetchArticles = async (page: number, limit: number) => {
+    const data = category
+      ? await apiClient.getArticles(category, { page, limit, q: searchQuery })
+      : await apiClient.getAllArticles({ page, limit, q: searchQuery, searchBy: searchCriteria, sortBy: "latest", sortDirection: "desc" });
+    const items = [...data.items];
+    if (!category) items.sort(comparePinnedArticles);
+    return { ...data, items, renderedCategory: category };
+  };
   const articleQueryKey = ["board-articles", session?.userId ?? "guest", category ?? "all", currentPage, postsPerPage, searchQuery, searchCriteria] as const;
   const articleQuery = useQuery({
     queryKey: articleQueryKey,
-    queryFn: async () => {
-      const data = category
-        ? await apiClient.getArticles(category, { page: currentPage, limit: postsPerPage, q: searchQuery })
-        : await apiClient.getAllArticles({ page: currentPage, limit: postsPerPage, q: searchQuery, searchBy: searchCriteria, sortBy: "latest", sortDirection: "desc" });
-      const items = [...data.items];
-      if (!category) items.sort(comparePinnedArticles);
-      return { ...data, items, renderedCategory: category };
-    },
+    queryFn: () => fetchArticles(currentPage, postsPerPage),
+    enabled: !isMobile,
     placeholderData: (previous, previousQuery) => previousQuery?.queryKey[1] === (session?.userId ?? "guest") ? previous : undefined,
   });
-  const articles = articleQuery.data?.items ?? [];
-  const totalCount = articleQuery.data?.total ?? 0;
-  const renderedCategory = articleQuery.data ? articleQuery.data.renderedCategory : category;
-  const isArticleLoading = articleQuery.isFetching;
-  const hasCompletedInitialLoad = !articleQuery.isPending;
-  const articleError = articleQuery.isError && !articleQuery.data ? "failed" : null;
+  const mobileQueryKey = ["board-articles", session?.userId ?? "guest", category ?? "all", "mobile", searchQuery, searchCriteria] as const;
+  const mobileQuery = useInfiniteQuery({
+    queryKey: mobileQueryKey,
+    queryFn: ({ pageParam }) => fetchArticles(pageParam, 20),
+    initialPageParam: 1,
+    getNextPageParam: (last, pages) => last.items.length > 0 && pages.length * 20 < last.total ? pages.length + 1 : undefined,
+    enabled: isMobile,
+    placeholderData: (previous, previousQuery) => previousQuery?.queryKey[1] === (session?.userId ?? "guest") ? previous : undefined,
+  });
+  const activeQuery = isMobile ? mobileQuery : articleQuery;
+  const mobileArticles = useMemo(() => {
+    const unique = new Map<string, ArticleListItem>();
+    for (const page of mobileQuery.data?.pages ?? []) for (const article of page.items) unique.set(String(article.articleId), article);
+    return [...unique.values()];
+  }, [mobileQuery.data]);
+  const articles = isMobile ? mobileArticles : articleQuery.data?.items ?? [];
+  const activeData = isMobile ? mobileQuery.data?.pages[0] : articleQuery.data;
+  const totalCount = activeData?.total ?? 0;
+  const renderedCategory = activeData ? activeData.renderedCategory : category;
+  const isArticleLoading = activeQuery.isFetching;
+  const hasCompletedInitialLoad = !activeQuery.isPending;
+  const articleError = activeQuery.isError && !activeQuery.data ? "failed" : null;
   const setArticles = (update: (items: ArticleListItem[]) => ArticleListItem[]) => {
+    if (isMobile) {
+      queryClient.setQueryData<NonNullable<typeof mobileQuery.data>>(mobileQueryKey, current => current ? { ...current, pages: current.pages.map(page => ({ ...page, items: update(page.items) })) } : current);
+      return;
+    }
     queryClient.setQueryData<NonNullable<typeof articleQuery.data>>(articleQueryKey, current => current ? { ...current, items: update(current.items) } : current);
   };
 
@@ -343,7 +367,10 @@ export function useBoardPageController() {
     engagementSubmitting,
     isBoardNotFound,
     isArticleLoading,
-    retryArticles: () => void articleQuery.refetch(),
+    retryArticles: () => void activeQuery.refetch(),
+    hasMoreArticles: Boolean(mobileQuery.hasNextPage) && !mobileQuery.isPlaceholderData,
+    isLoadingMore: mobileQuery.isFetchingNextPage,
+    loadMoreArticles: () => { if (!mobileQuery.isFetching && !mobileQuery.isPlaceholderData) void mobileQuery.fetchNextPage(); },
     showInitialSkeleton: isArticleLoading && !hasCompletedInitialLoad,
     lang,
     postsPerPage,

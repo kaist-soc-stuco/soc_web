@@ -30,7 +30,7 @@ import { PopoverPanel } from "@/components/ui/popover-panel";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { RichTextEditor } from "@/components/organisms/rich-text-editor";
 import { RichTextContent } from "@/components/ui/rich-text-content";
-import { AdminEmptyState, AdminEditorGuidance, AdminFormField, AdminPageShell, AdminPageHeader } from "@/components/ui/admin-page";
+import { AdminEmptyState,  AdminFormField, AdminPageShell, AdminPageHeader } from "@/components/ui/admin-page";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -608,9 +608,6 @@ function BulkEmailPageContent() {
 
 
         <div className="p-4 pb-0 sm:p-5 sm:pb-0 md:hidden">
-          <AdminEditorGuidance>
-            <p>긴 메일 본문은 데스크톱 편집을 권장합니다. 초안은 자동 저장되며 최종 발송 전 검토 화면에서 다시 확인하세요.</p>
-          </AdminEditorGuidance>
         </div>
 
 
@@ -733,7 +730,7 @@ function BulkEmailPageContent() {
                     setContentType("html");
                   }}
                   spellCheck={false}
-                  className="min-h-[400px] w-full resize-none rounded-none border-0 bg-transparent px-4 py-6 font-mono text-sm font-normal leading-6 text-slate-700 shadow-none focus:border-0 focus:ring-0 sm:px-6"
+                  className="email-composer-html block min-h-[400px] w-full resize-none rounded-none border-0 bg-transparent px-4 py-6 font-mono text-sm font-normal leading-6 text-slate-700 shadow-none focus:border-0 focus:ring-0 sm:px-6"
                 />
               </>
             )}

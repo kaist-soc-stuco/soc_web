@@ -1,8 +1,8 @@
-import { ResponsePageMain } from "@/features/survey/response-layout";
+import { ResponseMobileNavigation, ResponsePageMain } from "@/features/survey/response-layout";
 import { useEffect, useRef } from "react";
 import { OPERATIONAL_SURVEY_IDS } from "@soc/contracts";
 import { Navigate, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Link as LinkIcon } from "lucide-react";
+import { ArrowLeft, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SurveyResponseForm } from "@/features/survey/survey-response-form";
 import { SurveyParticipationNotice } from "@/features/survey/survey-participation-notice";
@@ -79,8 +79,9 @@ function ActiveSurveyPage() {
 
   if (loadError) {
     return (
-      <PageShell>
-        <ResponsePageMain>
+      <PageShell className="mobile-card-response">
+        {!isPreview && <ResponseMobileNavigation to="/surveys" lang={lang} />}
+        <ResponsePageMain className="survey-response-page">
           <ErrorState
             className="rounded-xl border border-slate-200 bg-white shadow-none"
             description={
@@ -177,12 +178,13 @@ function ActiveSurveyPage() {
   };
 
   return (
-    <PageShell>
-      {isPreview && <header className="flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 sm:px-8">
-        <a href={`/admin/surveys/${id}/edit`} className="inline-flex items-center gap-3 text-sm"><ArrowLeft className="size-4" />미리보기 모드</a>
-        <div className="flex items-center gap-4">{survey?.isPublished && <span className="inline-flex items-center gap-2 text-sm text-emerald-600"><CheckCircle2 className="size-4" />게시됨</span>}<Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/survey/${id}`, location.origin).href); toast({type:"success",message:"응답자 링크를 복사했습니다."}); } catch { toast({type:"error",message:"링크를 복사하지 못했습니다."}); } }}><LinkIcon className="size-4" />응답자 링크 복사</Button></div>
+    <PageShell className="mobile-card-response">
+      {!isPreview && <ResponseMobileNavigation to="/surveys" lang={lang} />}
+      {isPreview && <header className="survey-preview-header flex min-h-16 items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 sm:px-8">
+        <a href={`/admin/surveys/${id}/edit`} className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap text-sm"><ArrowLeft className="size-4 shrink-0" />{lang === "ko" ? "미리보기" : "Preview"}</a>
+        <div className="flex shrink-0 items-center gap-2">{survey?.isPublished && <span className="rounded-full bg-emerald-700 px-2 py-1 text-xs font-medium whitespace-nowrap text-white">{lang === "ko" ? "게시됨" : "Published"}</span>}<Button className="survey-preview-copy-link" variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/survey/${id}`, location.origin).href); toast({type:"success",message:"응답 링크를 복사했습니다."}); } catch { toast({type:"error",message:"링크를 복사하지 못했습니다."}); } }}><LinkIcon className="size-4 shrink-0" /><span className="md:hidden">{lang === "ko" ? "링크 복사" : "Copy link"}</span><span className="hidden md:inline">{lang === "ko" ? "응답 링크 복사" : "Copy response link"}</span></Button></div>
       </header>}
-      <ResponsePageMain busy={(!survey || sessionLoading || !draftHydrated) && !loadError}>
+      <ResponsePageMain className="survey-response-page" busy={(!survey || sessionLoading || !draftHydrated) && !loadError}>
           {survey && <SurveySummaryCard lang={lang} survey={survey} />}
           {renderBody()}
       </ResponsePageMain>

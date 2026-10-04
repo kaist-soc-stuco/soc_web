@@ -49,8 +49,8 @@ export function Hero() {
                 const text = resolveContentBlockText(block, lang);
                 return block.linkUrl ? (
                   <a key={block.contentBlockId} href={block.linkUrl} className="home-hero-quick-link">
-                    {text.title}
-                    <ArrowUpRight aria-hidden="true" className="size-3.5" />
+                    {lang === "ko" && text.title === "행사·일정 확인" ? "행사·일정 보기" : text.title}
+                    <ArrowUpRight aria-hidden="true" className="size-4" />
                   </a>
                 ) : null;
               })}

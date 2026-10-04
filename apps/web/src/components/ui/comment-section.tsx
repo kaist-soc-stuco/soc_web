@@ -3,8 +3,9 @@ import type {
   CommentItem,
 } from "@soc/contracts";
 import { isoToDate, nowDate } from "@soc/shared";
-import { ArrowUp, Edit2, Eye, EyeOff, Heart, Loader2, MessageCircle, MoreVertical, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { ArrowUp, Edit2, Eye, EyeOff, Heart, Loader2, MessageCircle, MoreVertical, Send, Trash2 } from "lucide-react";
+import { useState, type Ref } from "react";
+import { Link, useLocation } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { AdminActionMenuPanel, AdminActionMenuItem } from "@/components/ui/admin-action-menu";
 
@@ -14,6 +15,7 @@ import { UiInput, UiTextarea } from "@/components/ui/form-control";
 import { Modal } from "@/components/ui/modal";
 import { Pagination } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
+import { rememberAuthReturnPath } from "@/lib/auth-storage";
 
 const COMMENT_TEXTAREA_CLASS =
   "block w-full resize-none rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-base leading-normal text-slate-800 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 md:text-[length:var(--ui-text-body-size)]";
@@ -35,6 +37,7 @@ type CommentSectionProps = {
   currentUserId: string | null;
   isAuthenticated: boolean;
   lang: string;
+  hideComposerOnMobile?: boolean;
   onCommentTextChange: (value: string) => void;
   onCreateComment: () => Promise<void>;
   onCreateReply: (parentCommentId: string) => Promise<void>;
@@ -72,6 +75,7 @@ export function CommentSection({
   commentSubmitting,
   isAuthenticated,
   lang,
+  hideComposerOnMobile = false,
   onCommentTextChange,
   onCreateComment,
   onCreateReply,
@@ -87,6 +91,7 @@ export function CommentSection({
   replyTargetId,
   replyText,
 }: CommentSectionProps) {
+  const location = useLocation();
   const topLevelComments = comments.filter((comment) => !comment.parentCommentId);
   const repliesByParent = new Map<string, CommentItem[]>();
   comments
@@ -99,9 +104,9 @@ export function CommentSection({
     });
 
   return (
-    <section className="flex w-full flex-col rounded-xl border border-slate-200 bg-white px-4 py-5 shadow-none min-[360px]:px-5 min-[640px]:px-6 md:px-[52px] md:py-[24px]">
+    <section id="article-comments" className={cn("article-comments flex w-full flex-col rounded-xl border border-slate-200 bg-white px-4 py-5 shadow-none min-[360px]:px-5 min-[640px]:px-6 md:px-[52px] md:py-[24px]", comments.length === 0 && !commentsLoading && "mobile-comments-empty")}>
       <div className="flex items-center justify-between">
-        <h2 className="text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-slate-800">
+        <h2 className="max-md:sr-only text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-slate-800">
           <span>{lang === "ko" ? "댓글" : "Comments"}</span>
           <span className="ml-1 text-[length:var(--ui-text-body-size)] font-normal text-brand-primary">{commentTotal}</span>
         </h2>
@@ -112,8 +117,9 @@ export function CommentSection({
 
       <div className="mt-3">
         {comments.length === 0 && !commentsLoading ? (
-          <div className="py-4 text-[length:var(--ui-text-body-size)] font-medium text-slate-500">
-            {lang === "ko" ? "아직 등록된 댓글이 없습니다." : "No comments yet."}
+          <div className="py-2 text-[length:var(--ui-text-body-size)] font-normal text-slate-500">
+            <span className="hidden md:inline">{lang === "ko" ? "아직 등록된 댓글이 없습니다." : "No comments yet."}</span>
+            <span className="mobile-comment-empty-message md:hidden">{lang === "ko" ? "첫 댓글을 남겨주세요." : "Leave the first comment."}</span>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
@@ -203,8 +209,12 @@ export function CommentSection({
         />
       ) : null}
 
-      <div className="mt-5">
-        <CommentComposer
+      <div className={cn("mt-3", hideComposerOnMobile && "hidden md:block")}>
+        {!isAuthenticated ? <Button asChild variant="outline" className="w-full justify-center">
+          <Link to="/login" onClick={() => rememberAuthReturnPath(`${location.pathname}${location.search}${location.hash}`)}>
+            {lang === "ko" ? "로그인하고 댓글 쓰기" : "Sign in to write a comment"}
+          </Link>
+        </Button> : <CommentComposer
           ariaLabel={lang === "ko" ? "댓글 입력" : "Comment input"}
           disabled={!isAuthenticated || !canCreateComment}
           isSubmitting={commentSubmitting}
@@ -220,7 +230,7 @@ export function CommentSection({
                 : "Sign in to write a comment."
           }
           value={commentText}
-        />
+        />}
         {!canCreateComment && isAuthenticated && (
           <p className="mt-2 text-xs font-medium text-rose-600">
             {lang === "ko"
@@ -390,13 +400,13 @@ function CommentRow({
             {(canDelete || canHide || canRestore) && (
               <DropdownMenu.Root modal={false}>
                 <DropdownMenu.Trigger asChild>
-                  <Button type="button" variant="ghost" size="icon" aria-label={lang === "ko" ? "댓글 더보기" : "Comment actions"} className="!size-7 !min-h-0 rounded-md border-0 text-slate-500">
+                  <Button type="button" variant="ghost" size="icon" aria-label={lang === "ko" ? "댓글 더보기" : "Comment actions"} className="mobile-more-trigger !size-7 !min-h-0 rounded-md border-0 text-slate-500">
                     <MoreVertical className="size-4" />
                   </Button>
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Portal>
                   <DropdownMenu.Content asChild align="end" sideOffset={4}>
-                    <AdminActionMenuPanel className="z-50 !w-max !min-w-28">
+                    <AdminActionMenuPanel className="mobile-detail-menu z-50 !w-max !min-w-28">
                       {canDelete ? <DropdownMenu.Item asChild onSelect={() => { setEditText(comment.content); setEditing(true); }}>
                         <AdminActionMenuItem icon={<Edit2 />}>{lang === "ko" ? "수정" : "Edit"}</AdminActionMenuItem>
                       </DropdownMenu.Item> : null}
@@ -541,7 +551,7 @@ function CommentRow({
   );
 }
 
-function CommentComposer({
+export function CommentComposer({
   ariaLabel,
   disabled,
   isSubmitting,
@@ -549,6 +559,9 @@ function CommentComposer({
   onSubmit,
   placeholder,
   value,
+  inputRef,
+  mobile = false,
+  submitLabel,
 }: {
   ariaLabel: string;
   disabled: boolean;
@@ -557,6 +570,9 @@ function CommentComposer({
   onSubmit: () => Promise<void>;
   placeholder: string;
   value: string;
+  inputRef?: Ref<HTMLTextAreaElement>;
+  mobile?: boolean;
+  submitLabel?: string;
 }) {
   const hasText = Boolean(value.trim());
   const [isFocused, setIsFocused] = useState(false);
@@ -572,6 +588,7 @@ function CommentComposer({
       }}
     >
       <UiTextarea
+        ref={inputRef}
         rows={1}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -580,29 +597,32 @@ function CommentComposer({
         disabled={disabled}
         className={cn(COMMENT_TEXTAREA_CLASS, "min-h-[var(--ui-control-height-mobile)] pr-14 font-medium")}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229 && hasText && !disabled && !isSubmitting) {
+          if (!mobile && event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229 && hasText && !disabled && !isSubmitting) {
             event.preventDefault();
             void onSubmit();
           }
         }}
       />
-      {isFocused ? (
+      {isFocused || mobile ? (
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          aria-label={ariaLabel.replace("입력", "등록")}
+          aria-label={submitLabel ?? ariaLabel.replace("입력", "등록")}
           onClick={() => void onSubmit()}
           disabled={disabled || isSubmitting || !hasText}
           className={cn(
-            "absolute right-2 top-1/2 !size-8 !min-h-0 -translate-y-1/2 rounded-full !p-0 !text-white hover:!text-white focus-visible:!text-white",
-            hasText
+            "absolute !p-0",
+            mobile ? "bottom-0 right-0.5 !size-11 !min-h-11 rounded-lg !bg-transparent !text-brand-primary hover:!bg-transparent focus-visible:!bg-transparent" : "right-2 top-1/2 !size-8 !min-h-0 -translate-y-1/2 rounded-full !text-white hover:!text-white focus-visible:!text-white",
+            !mobile && (hasText
               ? "bg-brand-primary hover:bg-brand-primary/90"
-              : "bg-brand-primary/20 hover:bg-brand-primary/20",
+              : "bg-brand-primary/20 hover:bg-brand-primary/20"),
           )}
         >
           {isSubmitting ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Loader2 className={cn(mobile ? "size-5" : "size-4", "animate-spin")} />
+          ) : mobile ? (
+            <Send className="size-5" aria-hidden="true" />
           ) : (
             <ArrowUp className="size-4" aria-hidden="true" />
           )}

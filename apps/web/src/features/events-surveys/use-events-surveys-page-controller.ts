@@ -19,6 +19,7 @@ import {
   type UnifiedItem,
 } from "@/lib/events-surveys";
 import { buildCalendarGrid } from "./events-surveys-calendar-utils";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 const PUBLIC_ITEMS_PAGE_SIZE = 9;
 const PUBLIC_SERVER_PAGE_SIZE = 100;
@@ -69,6 +70,7 @@ export function useEventsSurveysPageController({
   lang: string;
   selectedParam: string | null;
 }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
@@ -92,7 +94,8 @@ export function useEventsSurveysPageController({
   const setStateFilter = (value: EventsSurveysStateFilter) => updateFilters({ state: value === "all" ? "" : value, page: "" });
   const setItemQuery = (value: string) => updateFilters({ q: value, page: "" }, true);
   const setDateRange = ({ from, to }: { from: string; to: string }) => updateFilters({ from, to, page: "" }, true, true);
-  const setCurrentPage = (page: number) => updateFilters({ page: page > 1 ? String(page) : "" });
+  const setListFilters = ({ state, from, to }: { state: EventsSurveysStateFilter; from: string; to: string }) => updateFilters({ state: state === "all" ? "" : state, from, to, page: "" }, true, true);
+  const setCurrentPage = (page: number) => updateFilters({ page: page > 1 ? String(page) : "" }, isMobile);
   const resetListFilters = () => updateFilters({ q: "", from: "", to: "", state: "", page: "" });
   const [currentDate, setCurrentDate] = useState(() => {
     const selected = parseSelectedCalendarDate(selectedParam);
@@ -314,9 +317,9 @@ export function useEventsSurveysPageController({
   }, [currentPage, currentTab, listQuery.isSuccess, listQuery.isFetching, totalPages, updateFilters]);
 
   const visibleItems = useMemo(() => {
-    const start = (currentPage - 1) * PUBLIC_ITEMS_PAGE_SIZE;
-    return sortedItems.slice(start, start + PUBLIC_ITEMS_PAGE_SIZE);
-  }, [currentPage, sortedItems]);
+    const start = isMobile ? 0 : (currentPage - 1) * PUBLIC_ITEMS_PAGE_SIZE;
+    return sortedItems.slice(start, currentPage * PUBLIC_ITEMS_PAGE_SIZE);
+  }, [currentPage, isMobile, sortedItems]);
 
   const stateCounts = useMemo(
     () => ({
@@ -429,6 +432,7 @@ export function useEventsSurveysPageController({
   return {
     calendarFeedUrl: apiClient.getPublicCalendarIcsUrl(),
     calendarEvents,
+    isCalendarFetching: calendarEventsQuery.isFetching || holidaysQuery.isFetching,
     currentDate,
     dateFrom,
     dateTo,
@@ -460,6 +464,7 @@ export function useEventsSurveysPageController({
     setCalendarQuery,
     setCurrentPage,
     setDateRange,
+    setListFilters,
     resetListFilters,
     itemQuery,
     setItemQuery,

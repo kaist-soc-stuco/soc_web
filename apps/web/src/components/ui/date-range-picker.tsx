@@ -3,6 +3,9 @@ import { createPortal } from "react-dom";
 import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { localDate, nowDate } from "@soc/shared";
 import { Button } from "./button";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { useOverlayBehavior } from "./use-overlay-behavior";
+import { SheetHandle } from "./sheet-handle";
 
 export type DateRange = { from: string; to: string };
 export type DateRangePresetType = "past" | "future";
@@ -69,6 +72,7 @@ export function DateRangePicker({
   disableFuture = false,
   align = "end",
   presetType = "past",
+  compactLabel = false,
 }: {
   value: DateRange;
   onChange: (range: DateRange) => void;
@@ -77,8 +81,10 @@ export function DateRangePicker({
   disableFuture?: boolean;
   align?: "start" | "end";
   presetType?: DateRangePresetType;
+  compactLabel?: boolean;
 }) {
   const ko = lang === "ko";
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const todayStamp = stamp(nowDate());
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -90,6 +96,7 @@ export function DateRangePicker({
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const id = useId();
+  const mobileKeyDown = useOverlayBehavior({ open: open && isMobile, surfaceRef: panel, onClose: () => setOpen(false) });
   const presetKinds: readonly PresetKind[] = presetType === "future"
     ? ["today", "week", "month", "nextMonth"]
     : ["today", "yesterday", "week", "month"];
@@ -149,7 +156,7 @@ export function DateRangePicker({
   }, [open, month, focusedDay]);
 
   const format = (valueToFormat: string) => valueToFormat.replaceAll("-", ".");
-  const rangeLabel = value.from || value.to
+  const rangeLabel = !compactLabel && (value.from || value.to)
     ? `${value.from ? format(value.from) : "…"} ~ ${value.to ? format(value.to).slice(value.from.slice(0, 4) === value.to.slice(0, 4) ? 5 : 0) : "…"}`
     : label;
   const rangeSummary = draft.from
@@ -179,7 +186,7 @@ export function DateRangePicker({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        aria-label={rangeLabel ? `${label}: ${rangeLabel}` : label}
+        aria-label={value.from || value.to ? `${label}: ${rangeLabel}` : label}
         className={`ui-filter-trigger max-w-full gap-2 font-normal ${value.from || value.to ? "pr-10" : ""}`}
         onClick={() => {
           if (open) {
@@ -206,15 +213,17 @@ export function DateRangePicker({
         }}
       ><X aria-hidden="true" className="size-3.5" /></button> : null}
     </div>
-    {open && createPortal(<div
+    {open && createPortal(<><button type="button" aria-label={ko ? "기간 선택 닫기" : "Close date filter"} tabIndex={-1} onClick={() => setOpen(false)} className="mobile-date-range-backdrop hidden" /><div
       ref={panel}
       id={id}
       role="dialog"
+      aria-modal={isMobile || undefined}
       aria-label={label}
       tabIndex={-1}
       style={position}
-      className="fixed z-[100] max-h-[calc(100dvh-1.5rem)] w-[min(20rem,calc(100vw-1.5rem))] overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 shadow-lg outline-none sm:w-[38rem]"
+      className="mobile-date-range-panel fixed z-[100] max-h-[calc(100dvh-1.5rem)] w-[min(20rem,calc(100vw-1.5rem))] overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 shadow-lg outline-none sm:w-[38rem]"
       onKeyDown={event => {
+        if (isMobile) { mobileKeyDown(event); return; }
         if (event.key === "Escape") {
           event.preventDefault();
           close();
@@ -234,6 +243,7 @@ export function DateRangePicker({
         }
       }}
     >
+      <SheetHandle onClose={close} />
       <div className="mb-3 flex flex-wrap gap-2 border-b border-slate-100 pb-3">
         {presetKinds.map((kind, index) => <button
           type="button"
@@ -311,6 +321,6 @@ export function DateRangePicker({
           <Button type="button" size="sm" disabled={Boolean(draft.from && !draft.to) || (disableFuture && (draft.from > todayStamp || draft.to > todayStamp))} onClick={() => { onChange(draft); close(); }}>{ko ? "적용" : "Apply"}</Button>
         </div>
       </div>
-    </div>, document.body)}
+    </div></>, document.body)}
   </>;
 }

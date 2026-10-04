@@ -3,13 +3,18 @@ import { createApiClient } from "@soc/api-client";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { showChannelTalk } from "@/features/channel-talk/channel-talk";
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ArrowRight, Maximize2 } from "lucide-react";
+import { ImageViewer } from "@/components/ui/image-viewer";
+import { Button } from "@/components/ui/button";
 
 import { useLocalizedSiteContent, usePublicContentBlocksByType } from "@/features/site-content/site-content";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { PledgesSection } from "./pledges-section";
 import type { AboutSectionId } from "./use-about-page-controller";
+
+// The supplied default bitmap has large blank margins around the diagram.
+const DEFAULT_ORG_CHART_BOUNDS = { x: .055, y: .295, width: .865, height: .365 };
 
 const SECTIONS: Array<{
   id: AboutSectionId;
@@ -43,23 +48,6 @@ export function AboutSectionNavigation({
 
   return (
     <nav className="about-section-nav" aria-label={lang === "ko" ? "소개 페이지 목차" : "About page sections"}>
-      <div className="about-section-nav-mobile about-landing-container">
-        <label className="sr-only" htmlFor="about-section-select">
-          {lang === "ko" ? "소개 페이지 섹션 선택" : "Choose an about page section"}
-        </label>
-        <select
-          id="about-section-select"
-          value={activeSection}
-          onChange={(event) => onNavigate(event.currentTarget.value as AboutSectionId)}
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/15"
-        >
-          {SECTIONS.map((section) => (
-            <option key={section.id} value={section.id}>
-              {labels[section.id]}
-            </option>
-          ))}
-        </select>
-      </div>
       <div className="about-landing-container about-section-nav-inner">
         {SECTIONS.map((section) => {
           const active = activeSection === section.id;
@@ -74,7 +62,8 @@ export function AboutSectionNavigation({
                 onNavigate(section.id);
               }}
             >
-              {labels[section.id]}
+              <span className="sm:hidden">{lang === "ko" ? ({ intro: "소개", work: "공약", people: "조직도", partnership: "제휴" })[section.id] : ({ intro: "Intro", work: "Pledges", people: "Team", partnership: "Partners" })[section.id]}</span>
+              <span className="hidden sm:inline">{labels[section.id]}</span>
             </a>
           );
         })}
@@ -85,14 +74,18 @@ export function AboutSectionNavigation({
 
 export function AboutLandingContent({
   lang,
+  mobileSection,
 }: {
   lang: string;
+  mobileSection?: AboutSectionId;
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const root = contentRef.current;
     if (!root) return;
+
+    if (mobileSection) return;
 
     const targets = Array.from(root.querySelectorAll<HTMLElement>("[data-about-reveal]"));
     root.classList.add("about-motion-ready");
@@ -118,14 +111,14 @@ export function AboutLandingContent({
       observer.disconnect();
       root.classList.remove("about-motion-ready");
     };
-  }, []);
+  }, [mobileSection]);
 
   return (
-    <div ref={contentRef} data-about-content>
-      <IntroSection lang={lang} />
-      <WorkSection lang={lang} />
-      <PeopleSection lang={lang} />
-      <PartnershipSection lang={lang} />
+    <div ref={contentRef} data-about-content data-mobile-section={mobileSection}>
+      {(!mobileSection || mobileSection === "intro") && <IntroSection lang={lang} />}
+      {(!mobileSection || mobileSection === "work") && <WorkSection lang={lang} />}
+      {(!mobileSection || mobileSection === "people") && <PeopleSection lang={lang} />}
+      {(!mobileSection || mobileSection === "partnership") && <PartnershipSection lang={lang} />}
     </div>
   );
 }
@@ -210,6 +203,7 @@ function WorkSection({ lang }: { lang: string }) {
 }
 
 function PeopleSection({ lang }: { lang: string }) {
+  const [viewerOpen, setViewerOpen] = useState(false);
   const title = useLocalizedSiteContent("about.organization.title");
   const description = useLocalizedSiteContent("about.organization.description");
   const organizationChart = usePublicContentBlocksByType("ORGANIZATION_CHART")[0];
@@ -218,6 +212,7 @@ function PeopleSection({ lang }: { lang: string }) {
       ? organizationChart.imageUrlEn || organizationChart.imageUrl
       : organizationChart.imageUrl
     : null;
+  const isDefaultChart = organizationImage?.endsWith("/organization-chart.png") || organizationImage === "organization-chart.png";
   return (
     <section id="people" className="about-anchor-section about-landing-section">
       <div className="about-landing-container">
@@ -227,16 +222,36 @@ function PeopleSection({ lang }: { lang: string }) {
         </div>
 
         {organizationImage && organizationChart ? (
-          <figure className="about-org-chart about-reveal-delay-2" data-about-reveal>
-            <a className="about-org-chart-content block" href={resolveAssetUrl(organizationImage)} target="_blank" rel="noopener noreferrer" aria-label={lang === "ko" ? "조직도 확대 보기" : "Open full-size organization chart"}>
+          <>
+          {isDefaultChart && <div className="mobile-organization-list md:hidden">
+            <h3>{lang === "ko" ? "회장단" : "Council leadership"}</h3>
+            <p>{lang === "ko" ? "학생회장 · 부학생회장" : "President · Vice president"}</p>
+            <ul aria-label={lang === "ko" ? "집행위원회 부서" : "Council departments"}>
+              {[
+                ["비서실", "Secretariat", "실장 · 실원", "Head · Members"],
+                ["대외소통부", "External Communications", "부장 · 부원", "Head · Members"],
+                ["기획부", "Planning", "부장 · 부원", "Head · Members"],
+                ["전산관리부", "IT Management", "부장 · 부원", "Head · Members"],
+                ["TF", "Task Force", "TF장 · TF원", "Lead · Members"],
+              ].map(([ko, en, rolesKo, rolesEn]) => <li key={ko}><strong>{lang === "ko" ? ko : en}</strong><span>{lang === "ko" ? rolesKo : rolesEn}</span></li>)}
+            </ul>
+            <Button variant="outline" onClick={() => setViewerOpen(true)}><Maximize2 className="size-4" aria-hidden="true" />{lang === "ko" ? "전체 조직도 보기" : "View full organization chart"}</Button>
+          </div>}
+          <figure className={`about-org-chart about-reveal-delay-2${isDefaultChart ? " mobile-default-org-image" : ""}`} data-about-reveal>
+            <button type="button" className="about-org-chart-content block w-full" data-default-chart={organizationImage.endsWith("/organization-chart.png") || organizationImage === "organization-chart.png"} onClick={() => setViewerOpen(true)} aria-label={lang === "ko" ? "조직도 확대 보기" : "View full-size organization chart"}>
               <img
                 src={resolveAssetUrl(organizationImage)}
                 alt={lang === "ko" ? "전산학부 집행위원회 전체 조직도" : "Full SoC Student Council organization chart"}
                 loading="lazy"
                 decoding="async"
               />
-            </a>
+            </button>
+            <figcaption className="flex justify-end px-3 pb-3">
+              <Button variant="ghost" size="sm" onClick={() => setViewerOpen(true)}><Maximize2 className="size-4" aria-hidden="true" />{lang === "ko" ? "확대 보기" : "Expand"}</Button>
+            </figcaption>
+            <ImageViewer open={viewerOpen} onClose={() => setViewerOpen(false)} src={resolveAssetUrl(organizationImage)} title={lang === "ko" ? "조직도" : "Organization chart"} lang={lang} mobileContentBounds={isDefaultChart ? DEFAULT_ORG_CHART_BOUNDS : undefined} />
           </figure>
+          </>
         ) : null}
       </div>
     </section>

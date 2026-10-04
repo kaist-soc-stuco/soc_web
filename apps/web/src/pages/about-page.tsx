@@ -9,11 +9,12 @@ export function AboutPage() {
   const {
     activeSection,
     lang,
+    isMobile,
     scrollToSection,
   } = useAboutPageController();
 
   return (
-    <PageShell className="about-landing-page">
+    <PageShell className="about-landing-page mobile-white-page">
 
       <main className="channel-talk-safe-area flex-1">
         <AboutSectionNavigation
@@ -23,6 +24,7 @@ export function AboutPage() {
         />
         <AboutLandingContent
           lang={lang}
+          mobileSection={isMobile ? activeSection : undefined}
         />
       </main>
     </PageShell>

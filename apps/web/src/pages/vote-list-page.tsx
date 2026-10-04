@@ -6,12 +6,14 @@ import type { VoteRecord } from "@soc/contracts";
 import { isoToMs, nowMs } from "@soc/shared";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
 import { PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { formatVotePeriod } from "@/lib/vote-display";
+import { formatNumericDate } from "@/lib/date-display";
 import { useLanguage } from "@/hooks/use-language";
 
 function isOngoingVote(vote: VoteRecord, now: number) {
@@ -36,7 +38,7 @@ function ActiveVoteCard({ vote, lang }: { vote: VoteRecord; lang: string }) {
   return (
     <Link
       to={`/votes/${vote.id}`} target="_blank" rel="noopener noreferrer"
-      className="group block rounded-xl border border-slate-200 bg-white p-5 transition-colors hover:border-emerald-500 sm:p-6"
+      className="mobile-active-vote-card group block rounded-xl border border-slate-200 bg-white p-5 transition-colors hover:border-emerald-500 sm:p-6"
     >
       <h3 className="break-words text-xl font-semibold tracking-[-0.025em] text-app-text-strong sm:text-2xl">
         {title}
@@ -46,12 +48,13 @@ function ActiveVoteCard({ vote, lang }: { vote: VoteRecord; lang: string }) {
           {stripRichText(description)}
         </p>
       ) : null}
-      <div className="mt-6 grid gap-3 border-t border-slate-100 py-4 text-sm sm:grid-cols-2">
-        <div>
+      <ChevronRight className="mobile-vote-chevron md:hidden" aria-hidden="true" />
+      <div className="mobile-active-vote-metadata mt-4 grid gap-2 border-t border-slate-100 pt-3 text-sm sm:mt-6 sm:grid-cols-2 sm:gap-3">
+        <div className="flex items-baseline gap-2 sm:block">
           <span className="block text-xs font-medium text-app-text-muted">
             {lang === "ko" ? "참여 현황" : "Participation"}
           </span>
-          <strong className="mt-1 block font-semibold tabular-nums text-app-text-strong">
+          <strong className="font-medium tabular-nums text-app-text-strong sm:mt-1 sm:block">
             {vote.votedCount}/{vote.eligibleCount}{lang === "ko" ? "명" : " voters"}
           </strong>
         </div>
@@ -59,9 +62,9 @@ function ActiveVoteCard({ vote, lang }: { vote: VoteRecord; lang: string }) {
           <span className="block text-xs font-medium text-app-text-muted">
             {lang === "ko" ? "투표 기간" : "Voting period"}
           </span>
-          <strong className="mt-1 block font-semibold tabular-nums text-app-text-strong">
+          <span className="mt-1 block text-[length:var(--ui-text-body-sm-size)] font-normal tabular-nums text-app-text-body">
             {formatVotePeriod(vote.startsAt, vote.endsAt)}
-          </strong>
+          </span>
         </div>
       </div>
     </Link>
@@ -70,7 +73,15 @@ function ActiveVoteCard({ vote, lang }: { vote: VoteRecord; lang: string }) {
 
 function VoteHistoryTable({ votes, lang }: { votes: VoteRecord[]; lang: string }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-card">
+    <>
+    <div className="mobile-vote-history md:hidden">
+      {votes.map(vote => <Link key={vote.id} to={`/votes/${vote.id}`} target="_blank" rel="noopener noreferrer" className="mobile-vote-row">
+        <h3>{stripRichText(lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo)}</h3>
+        <span className="mobile-vote-period">{formatNumericDate(vote.startsAt)} ~ {formatNumericDate(vote.endsAt)}</span>
+        <ChevronRight className="mobile-vote-chevron" aria-hidden="true" />
+      </Link>)}
+    </div>
+    <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-card md:block">
       <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
         <caption className="sr-only">
           {lang === "ko" ? "지난 투표 목록" : "Past votes"}
@@ -107,6 +118,7 @@ function VoteHistoryTable({ votes, lang }: { votes: VoteRecord[]; lang: string }
         </tbody>
       </table>
     </div>
+    </>
   );
 }
 
@@ -153,7 +165,7 @@ export function VoteListPage() {
     .sort((left, right) => isoToMs(right.startsAt) - isoToMs(left.startsAt));
 
   return (
-    <PageShell>
+    <PageShell className="mobile-white-page">
 
       <PageMain>
         <PageHeader

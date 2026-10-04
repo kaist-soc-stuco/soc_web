@@ -60,6 +60,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
   const {
     calendarFeedUrl,
     calendarEvents,
+    isCalendarFetching,
     calendarQuery,
     currentPage,
     currentDate,
@@ -76,6 +77,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
     setCalendarQuery,
     setCurrentPage,
     setDateRange,
+    setListFilters,
     resetListFilters,
     itemQuery,
     setItemQuery,
@@ -107,12 +109,12 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
 
 
   return (
-    <PageShell>
+    <PageShell className="mobile-white-page">
 
 
       <PageMain>
         <PageHeader
-          containerClassName={currentTab === "calendar" ? "pt-4" : undefined}
+          containerClassName={currentTab === "calendar" ? "mobile-calendar-page-heading events-list-page-heading pt-4" : "events-list-page-heading"}
           actions={
             currentTab === "calendar" ? (
               <CalendarSubscriptionButton feedUrl={calendarFeedUrl} lang={lang} />
@@ -146,6 +148,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
               onQueryChange={setItemQuery}
               onDateRangeChange={setDateRange}
               onStateFilterChange={setStateFilter}
+              onFiltersChange={setListFilters}
               dateFrom={dateFrom}
               dateTo={dateTo}
               query={itemQuery}
@@ -175,6 +178,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
           ) : currentTab === "calendar" ? (
             <EventsSurveysCalendar
               calendarEvents={calendarEvents}
+              isFetching={isCalendarFetching}
               calendarQuery={calendarQuery}
               currentDate={currentDate}
               holidays={holidays}
@@ -213,13 +217,16 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
                 onEngagementToggle={handleSetEngagement}
               />
               <Pagination
-                className="mt-6"
+                className="mt-6 hidden md:flex"
                 currentPage={currentPage}
                 onPageChange={setCurrentPage}
                 range={lang === "ko" ? `총 ${totalItems}건` : `${totalItems} total`}
                 totalPages={totalPages}
                 lang={lang}
               />
+              {currentPage < totalPages && <Button variant="ghost" className="mt-4 min-h-11 w-full md:hidden" onClick={() => setCurrentPage(currentPage + 1)}>
+                {lang === "ko" ? `${currentTab === "survey" ? "설문" : "행사"} 더보기 +` : "Load more +"}
+              </Button>}
             </>
           )}
         </PageContainer>

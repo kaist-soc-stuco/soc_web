@@ -1,4 +1,5 @@
 import { useAdminListQuery } from "@/hooks/use-admin-list-query";
+import { useUnsavedNavigation } from "@/hooks/use-unsaved-navigation";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type {
   AdminRoadmapOfferingListResponse,
@@ -28,7 +29,6 @@ import {
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import {
   AdminFormField,
-  AdminEditorGuidance,
   AdminMetaText,
   AdminPageHeader,
   AdminPageMain,
@@ -276,10 +276,6 @@ function RoadmapManagementPageContent() {
           }
         />
 
-        <AdminEditorGuidance>
-          <p>과목·분반 편집과 엑셀 검토는 데스크톱에서 계속하는 것을 권장합니다. 모바일에서 입력 중이라면 저장 전 페이지를 이동하지 마세요.</p>
-        </AdminEditorGuidance>
-
         <SegmentedControl variant="underline" role="tablist" ariaLabel="로드맵 관리 탭" value={activeTab} onChange={setActiveTab} options={[{ value: "courses", label: "전체 교과목" }, { value: "offerings", label: "학기별 개설 관리" }]} />
         <AdminTableCard refreshing={roadmapQuery.isFetching}
           toolbar={
@@ -333,17 +329,17 @@ function RoadmapManagementPageContent() {
 
 function CourseTable({ courses, loading, onOpen }: { courses: RoadmapCourseRecord[]; loading: boolean; onOpen: (course: RoadmapCourseRecord) => void }) {
   return (
-    <AdminDataTable minWidth={0}>
+    <AdminDataTable minWidth={0} mobileMode="cards" className="admin-course-mobile-list">
       <colgroup><col style={{ width: "11%" }} /><col style={{ width: "24%" }} /><col style={{ width: "25%" }} /><col style={{ width: "10%" }} /><col style={{ width: "30%" }} /></colgroup>
       <AdminTableHeader><tr><AdminTableHead>과목코드</AdminTableHead><AdminTableHead>과목명</AdminTableHead><AdminTableHead>교육 분야</AdminTableHead><AdminTableHead className="text-center">학점</AdminTableHead><AdminTableHead>권장 선수 과목</AdminTableHead></tr></AdminTableHeader>
       <AdminTableBody>
         {loading && courses.length === 0 ? <AdminTableEmpty colSpan={5}>불러오는 중...</AdminTableEmpty> : courses.length === 0 ? <AdminTableEmpty colSpan={5}>등록된 전체 교과목이 없습니다.</AdminTableEmpty> : courses.map((course) => (
           <tr key={course.courseId} tabIndex={0} role="button" onClick={() => onOpen(course)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(course); } }} className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50/70 focus:bg-slate-50/70 focus:outline-none">
-            <AdminTableCell className="font-semibold tabular-nums text-slate-900">{course.courseCode}</AdminTableCell>
-            <AdminTableCell truncate><span className="font-medium text-slate-900">{course.nameKo}</span></AdminTableCell>
-            <AdminTableCell truncate>{course.trackIds.length > 0 ? course.trackIds.map((id) => TRACKS.find(([trackId]) => trackId === id)?.[1] ?? id).join(", ") : ""}</AdminTableCell>
-            <AdminTableCell className="text-center tabular-nums">{course.credits || ""}</AdminTableCell>
-            <AdminTableCell truncate>{course.prerequisiteCourseCodes.join(", ") || ""}</AdminTableCell>
+            <AdminTableCell className="font-semibold tabular-nums text-slate-900"><span className="hidden lg:inline">{course.courseCode}</span><span className="lg:hidden"><span className="block text-[0.9375rem] font-medium text-slate-900">{course.nameKo}</span><span className="mt-1 block text-xs font-normal text-slate-500">{course.courseCode}{course.credits ? ` · ${course.credits}` : ""}</span></span></AdminTableCell>
+            <AdminTableCell data-mobile-label="과목명" truncate className="max-lg:!hidden"><span className="font-medium text-slate-900">{course.nameKo}</span></AdminTableCell>
+            <AdminTableCell data-mobile-label="교육 분야" truncate>{course.trackIds.length > 0 ? course.trackIds.map((id) => TRACKS.find(([trackId]) => trackId === id)?.[1] ?? id).join(", ") : ""}</AdminTableCell>
+            <AdminTableCell data-mobile-label="학점" className="text-center tabular-nums max-lg:!hidden">{course.credits || ""}</AdminTableCell>
+            <AdminTableCell data-mobile-label="권장 선수 과목" truncate>{course.prerequisiteCourseCodes.join(", ") || ""}</AdminTableCell>
           </tr>
         ))}
       </AdminTableBody>
@@ -353,20 +349,20 @@ function CourseTable({ courses, loading, onOpen }: { courses: RoadmapCourseRecor
 
 function OfferingTable({ offerings, loading, onOpen }: { offerings: RoadmapOfferingRecord[]; loading: boolean; onOpen: (offering: RoadmapOfferingRecord) => void }) {
   return (
-    <AdminDataTable minWidth={0}>
+    <AdminDataTable minWidth={0} mobileMode="cards" className="admin-course-mobile-list">
       <colgroup><col style={{ width: "11%" }} /><col style={{ width: "24%" }} /><col style={{ width: "5%" }} /><col style={{ width: "10%" }} /><col style={{ width: "12%" }} /><col style={{ width: "14%" }} /><col style={{ width: "9%" }} /><col style={{ width: "15%" }} /></colgroup>
       <AdminTableHeader><tr><AdminTableHead>과목코드</AdminTableHead><AdminTableHead>과목명</AdminTableHead><AdminTableHead className="text-center">분반</AdminTableHead><AdminTableHead className="text-center">담당교수</AdminTableHead><AdminTableHead className="text-center">강의시간</AdminTableHead><AdminTableHead>강의실</AdminTableHead><AdminTableHead className="text-center">수강 / 정원</AdminTableHead><AdminTableHead className="text-left">강의 방식</AdminTableHead></tr></AdminTableHeader>
       <AdminTableBody>
         {loading && offerings.length === 0 ? <AdminTableEmpty colSpan={8}>불러오는 중...</AdminTableEmpty> : offerings.length === 0 ? <AdminTableEmpty colSpan={8}>선택한 학기의 개설 정보가 없습니다.</AdminTableEmpty> : offerings.map((offering) => (
           <tr key={offering.offeringId} tabIndex={0} role="button" onClick={() => onOpen(offering)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(offering); } }} className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50/70 focus:bg-slate-50/70 focus:outline-none">
-            <AdminTableCell className="font-semibold tabular-nums text-slate-900">{offering.courseCode}</AdminTableCell>
-            <AdminTableCell truncate className="font-medium text-slate-900">{offering.nameKo}</AdminTableCell>
-            <AdminTableCell className="text-center">{offering.section || ""}</AdminTableCell>
-            <AdminTableCell truncate className="text-center">{offering.instructor || ""}</AdminTableCell>
-            <AdminTableCell truncate className="text-center">{offering.time || ""}</AdminTableCell>
-            <AdminTableCell truncate >{offering.room || ""}</AdminTableCell>
-            <AdminTableCell className="text-center tabular-nums">{formatEnrollment(offering.enrolled, offering.capacity)}</AdminTableCell>
-            <AdminTableCell truncate className="text-left">{offering.delivery || ""}</AdminTableCell>
+            <AdminTableCell className="font-semibold tabular-nums text-slate-900"><span className="hidden lg:inline">{offering.courseCode}</span><span className="lg:hidden"><span className="block text-[0.9375rem] font-medium text-slate-900">{offering.nameKo}</span><span className="mt-1 block text-xs font-normal text-slate-500">{offering.courseCode}{offering.section ? ` · ${offering.section}분반` : ""}</span></span></AdminTableCell>
+            <AdminTableCell data-mobile-label="과목명" truncate className="font-medium text-slate-900 max-lg:!hidden">{offering.nameKo}</AdminTableCell>
+            <AdminTableCell data-mobile-label="분반" className="text-center max-lg:!hidden">{offering.section || ""}</AdminTableCell>
+            <AdminTableCell data-mobile-label="담당교수" truncate className="text-center">{offering.instructor || ""}</AdminTableCell>
+            <AdminTableCell data-mobile-label="강의시간" truncate className="text-center">{offering.time || ""}</AdminTableCell>
+            <AdminTableCell data-mobile-label="강의실" truncate>{offering.room || ""}</AdminTableCell>
+            <AdminTableCell data-mobile-label="수강 / 정원" className="text-center tabular-nums">{formatEnrollment(offering.enrolled, offering.capacity)}</AdminTableCell>
+            <AdminTableCell data-mobile-label="강의 방식" truncate className="text-left">{offering.delivery || ""}</AdminTableCell>
           </tr>
         ))}
       </AdminTableBody>
@@ -406,6 +402,16 @@ function CourseEditorModal({ apiClient, course, data, isNew, onClose, onSaved, o
     ? offeringTerm
     : defaultOfferingTerm;
   const offeringCount = offerings.filter((offering) => offering.term === activeOfferingTerm).length;
+  const masterDirty = JSON.stringify(form) !== JSON.stringify(course ? courseToForm(course) : emptyCourseForm());
+  const originalOffering = offerings.find((offering) => offering.offeringId === selectedOfferingId);
+  const offeringDirty = Boolean(offeringDraft && JSON.stringify(offeringDraft) !== JSON.stringify(originalOffering ? offeringToForm(originalOffering) : blankOffering(offeringDraft.term)));
+  const hasUnsavedChanges = open && (masterDirty || offeringDirty);
+  const confirmDiscard = () => requestConfirm({ title: "저장하지 않은 변경 사항을 버릴까요?", confirmLabel: "변경 사항 버리기", tone: "danger" });
+  useUnsavedNavigation(hasUnsavedChanges, confirmDiscard);
+  const closeEditor = async () => {
+    if (saving || (hasUnsavedChanges && !await confirmDiscard())) return;
+    onClose();
+  };
 
   const saveCourse = async () => {
     if (!form.courseCode.trim() || !form.nameKo.trim()) {
@@ -482,7 +488,7 @@ function CourseEditorModal({ apiClient, course, data, isNew, onClose, onSaved, o
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={isNew ? "과목 추가" : `${course?.courseCode ?? "과목"} 편집`} mobileFullscreen size="wide" className="sm:h-[48.5rem]" bodyClassName="flex min-h-0 flex-1 flex-col gap-5" footer={tab === "master" ? <><Button type="button" variant="outline" onClick={onClose}>취소</Button><Button loading={saving} type="button" disabled={saving} onClick={() => void saveCourse()}>{isNew ? "추가" : "저장"}</Button></> : null}>
+    <Modal open={open} onClose={() => void closeEditor()} title={isNew ? "과목 추가" : `${course?.courseCode ?? "과목"} 편집`} mobileFullscreen size="wide" className="sm:h-[48.5rem]" bodyClassName="flex min-h-0 flex-1 flex-col gap-5" footer={tab === "master" ? <><Button type="button" variant="outline" onClick={() => void closeEditor()}>취소</Button><Button loading={saving} type="button" disabled={saving} onClick={() => void saveCourse()}>{isNew ? "추가" : "저장"}</Button></> : null}>
       <SegmentedControl
         variant="underline" ariaLabel="과목 편집 탭"
         role="tablist"

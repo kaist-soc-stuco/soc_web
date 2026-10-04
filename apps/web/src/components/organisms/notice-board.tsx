@@ -6,7 +6,7 @@ import { isoToMs, nowMs } from "@soc/shared";
 import { ArrowUpRight } from "lucide-react";
 
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { formatNumericDateRange } from "@/lib/date-display";
+import { formatNumericDateRange, formatNumericDate } from "@/lib/date-display";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -69,7 +69,8 @@ export function NoticeBoard() {
                       ) : null}
                     </div>
                     <time className="home-notice-entry-time shrink-0" dateTime={notice.postedAt}>
-                      {formatNumericDateRange(notice.postedAt, notice.postedAt)}
+                      <span className="md:hidden">{formatNumericDate(notice.postedAt)}</span>
+                      <span className="hidden md:inline">{formatNumericDateRange(notice.postedAt, notice.postedAt)}</span>
                     </time>
                   </div>
                 </Link>

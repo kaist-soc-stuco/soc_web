@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarClock, CheckCircle2, Clock, Target, type LucideIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, Target } from "lucide-react";
 
 import {
   resolveContentBlockText,
@@ -17,16 +17,12 @@ const filterLabels = {
 function getPledgeStatus(status: string | null | undefined, lang: string): {
   cardClassName: string;
   badgeClassName: string;
-  icon: LucideIcon;
-  iconClassName: string;
   label: string;
 } {
   if (status === "COMPLETED") {
     return {
       cardClassName: "is-completed",
       badgeClassName: "border border-emerald-200 bg-emerald-50 text-emerald-700",
-      icon: CheckCircle2,
-      iconClassName: "text-emerald-600",
       label: lang === "ko" ? "완료" : "Completed",
     };
   }
@@ -34,22 +30,19 @@ function getPledgeStatus(status: string | null | undefined, lang: string): {
     return {
       cardClassName: "is-in-progress",
       badgeClassName: "border border-blue-200 bg-blue-50 text-blue-700",
-      icon: Clock,
-      iconClassName: "text-blue-600",
       label: lang === "ko" ? "진행 중" : "In progress",
     };
   }
   return {
     cardClassName: "is-planned",
     badgeClassName: "border border-slate-200 bg-slate-50 text-slate-600",
-    icon: CalendarClock,
-    iconClassName: "text-slate-500",
     label: lang === "ko" ? "시작 예정" : "Upcoming",
   };
 }
 
 export function PledgesSection({ lang }: { lang: string }) {
   const [filter, setFilter] = useState<PledgeFilter>("ALL");
+  const [expandedPledges, setExpandedPledges] = useState<Set<string>>(new Set());
   const pledges = [...usePublicContentBlocksByType("PLEDGE")].sort(
     (left, right) => left.sortOrder - right.sortOrder,
   );
@@ -128,12 +121,11 @@ export function PledgesSection({ lang }: { lang: string }) {
             {visiblePledges.map((pledge) => {
               const text = resolveContentBlockText(pledge, lang === "ko" ? "ko" : "en");
               const status = getPledgeStatus(pledge.pledgeStatus, lang);
-              const StatusIcon = status.icon;
+              const expanded = expandedPledges.has(pledge.contentBlockId);
 
               return (
-                <article key={pledge.contentBlockId} className={`about-pledge-item ${status.cardClassName}`}>
+                <article key={pledge.contentBlockId} className={`about-pledge-item ${status.cardClassName}`} data-expanded={expanded}>
                   <div className="about-pledge-item-heading">
-                    <StatusIcon aria-hidden="true" className={`size-5 shrink-0 ${status.iconClassName}`} />
                     <div className="about-pledge-title">
                       <span>{text.title}</span>
                     </div>
@@ -141,7 +133,17 @@ export function PledgesSection({ lang }: { lang: string }) {
                       {status.label}
                     </span>
                   </div>
-                  {text.body ? <p>{text.body}</p> : null}
+                  {text.body ? <>
+                    <p id={`pledge-body-${pledge.contentBlockId}`} className="mobile-pledge-summary">{text.body}</p>
+                    <button type="button" className="mobile-pledge-expand md:hidden" aria-expanded={expanded} aria-controls={`pledge-body-${pledge.contentBlockId}`} onClick={() => setExpandedPledges(previous => {
+                      const next = new Set(previous);
+                      if (next.has(pledge.contentBlockId)) next.delete(pledge.contentBlockId); else next.add(pledge.contentBlockId);
+                      return next;
+                    })}>
+                      {lang === "ko" ? expanded ? "접기" : "펼쳐 읽기" : expanded ? "Collapse" : "Read more"}
+                      {expanded ? <ChevronUp aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
+                    </button>
+                  </> : null}
                 </article>
               );
             })}

@@ -508,7 +508,10 @@ function ContactCells({ contact, activityYear = "" }: { contact: ContactRecord; 
     <div role="cell" data-mobile-label="연도" className="px-5 py-3 text-sm tabular-nums text-slate-700">{years.map(formatActivityYear).join(", ") || ""}</div>
     <div role="cell" data-mobile-label="부서" className="min-w-0 px-5 py-3 text-sm text-slate-700">{[...new Set(activities.map((activity) => activity.departmentKo).filter(Boolean))].join(", ") || ""}</div>
     <div role="cell" data-mobile-label="직책" className="min-w-0 px-5 py-3 text-sm text-slate-700">{[...new Set(activities.map((activity) => activity.roleKo).filter(Boolean))].join(", ") || ""}</div>
-    <div role="cell" className="min-w-0 space-y-1 px-5 py-3"><div className="admin-table-text flex min-w-0 items-center gap-1.5"><Mail className="size-3.5 shrink-0 text-slate-400" /><span className="truncate">{contact.email || ""}</span></div><div className="admin-table-text flex min-w-0 items-center gap-1.5"><Phone className="size-3.5 shrink-0 text-slate-400" /><span className="truncate">{contact.phoneNumber || ""}</span></div></div>
+    <div role="cell" className="min-w-0 space-y-1 px-5 py-3">
+      {contact.email ? <div className="admin-table-text flex min-w-0 items-center gap-1.5"><Mail aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" /><span className="truncate">{contact.email}</span></div> : null}
+      {contact.phoneNumber ? <div className="admin-table-text flex min-w-0 items-center gap-1.5"><Phone aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" /><span className="truncate">{contact.phoneNumber}</span></div> : null}
+    </div>
   </>;
 }
 

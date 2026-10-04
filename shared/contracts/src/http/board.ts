@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { FaqCategory } from "../faq.js";
 import type {
   ArticleAssetRequestSchema,
   ArticleCreateSchema,
@@ -81,6 +82,7 @@ export interface ArticleAuthorSummary {
 }
 
 export interface ArticleListItem {
+  faqCategory?: FaqCategory | null;
   articleId: string;
   boardId: number;
   titleKo: string;
@@ -152,6 +154,7 @@ export interface SurveySummary {
 }
 
 export interface ArticleDetailResponse {
+  faqCategory?: FaqCategory | null;
   articleId: string;
   boardId: number;
   titleKo: string;
@@ -254,6 +257,7 @@ export interface AnonymousArticleAuthorResponse {
 }
 
 export interface ArticleDraftRecord {
+  faqCategory?: FaqCategory;
   draftId: string;
   boardId: number;
   boardCode: string;

@@ -4,6 +4,7 @@ import {
   SearchFilterTabs,
   SearchResults,
   SearchStatus,
+  MobileSearchFilters,
 } from "@/features/search/search-page-sections";
 import { useSearchPageController } from "@/features/search/use-search-page-controller";
 
@@ -27,6 +28,7 @@ export function SearchPage() {
     setFilter,
     searchBy,
     setSearchBy,
+    setSearchFilters,
     surveys,
     votes,
     totalCount,
@@ -35,11 +37,11 @@ export function SearchPage() {
   } = useSearchPageController();
 
   return (
-    <PageShell>
+    <PageShell className="mobile-white-page">
 
       <PageHeader title={lang === "ko" ? "통합검색" : "Search"} />
 
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-5 px-4 py-8 md:px-8">
+      <main className="mobile-search-results mx-auto flex w-full max-w-5xl flex-1 flex-col gap-5 px-4 py-8 md:px-8">
         <SearchForm
           inputValue={inputValue}
           lang={lang}
@@ -47,6 +49,7 @@ export function SearchPage() {
           onSubmit={handleSubmit}
           onSearchByChange={setSearchBy}
           searchBy={searchBy}
+          mobileFilter={<MobileSearchFilters searchBy={searchBy} filter={filter} lang={lang} onApply={setSearchFilters} counts={{ all: totalCount, board: boardArticles.length, event: eventArticles.length + calendarEvents.length, faq: faqArticles.length, survey: surveys.length, vote: votes.length }} />}
         />
         <SearchFilterTabs
           partialErrors={partialErrors}

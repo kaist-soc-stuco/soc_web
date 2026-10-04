@@ -15,8 +15,10 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 import { Logo } from "@/components/atoms/logo";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +33,7 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { clearStoredAuthState, rememberAuthReturnPath } from "@/lib/auth-storage";
 import { getBoardLabelFromMetadata, isLegacyPublicBoardCode } from "@/lib/board-metadata";
 import { Permissions } from "@/lib/permissions";
+import { MobileSearchPreview } from "@/features/search/mobile-search-preview";
 
 interface HeaderProps {
   variant?: "default" | "home";
@@ -48,6 +51,10 @@ export function Header({ variant = "default" }: HeaderProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [indicatorHoverIndex, setIndicatorHoverIndex] = useState<number | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+  const mobileSearchRef = useRef<HTMLDivElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useMediaQuery("(width < 768px)");
+  const isCompactNavigation = useMediaQuery("(width < 1280px)");
   const searchTriggerRef = useRef<HTMLButtonElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -61,6 +68,7 @@ export function Header({ variant = "default" }: HeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [expandedMobileSection, setExpandedMobileSection] = useState<string | null | undefined>(undefined);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -73,6 +81,27 @@ export function Header({ variant = "default" }: HeaderProps) {
     open: mobileMenuOpen,
     surfaceRef: mobileMenuRef,
   });
+  const handleMobileSearchKeyDown = useOverlayBehavior({
+    onClose: () => setSearchOpen(false),
+    open: isMobile && searchOpen,
+    surfaceRef: mobileSearchRef,
+  });
+
+  useLayoutEffect(() => {
+    if (!isCompactNavigation || !mobileMenuOpen) return;
+    const position = { left: window.scrollX, top: window.scrollY };
+    const pathname = location.pathname;
+    return () => {
+      requestAnimationFrame(() => {
+        if (window.location.pathname === pathname) window.scrollTo({ ...position, behavior: "instant" });
+      });
+    };
+  }, [isCompactNavigation, mobileMenuOpen, location.pathname]);
+
+  useEffect(() => {
+    document.body.classList.toggle("site-mobile-search-open", isMobile && searchOpen);
+    return () => document.body.classList.remove("site-mobile-search-open");
+  }, [isMobile, searchOpen]);
 
   const [homeHeaderScrolled, setHomeHeaderScrolled] = useState(false);
 
@@ -86,7 +115,7 @@ export function Header({ variant = "default" }: HeaderProps) {
     return () => window.removeEventListener("resize", closeMobileMenuOnDesktop);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof document === "undefined") return;
 
     document.body.classList.toggle("site-mobile-menu-open", mobileMenuOpen);
@@ -119,7 +148,7 @@ export function Header({ variant = "default" }: HeaderProps) {
     };
   }, [variant]);
 
-  const homeHeaderDark = variant === "home" && !homeHeaderScrolled;
+  const homeHeaderDark = variant === "home" && !homeHeaderScrolled && !isMobile && !mobileMenuOpen;
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -186,13 +215,21 @@ export function Header({ variant = "default" }: HeaderProps) {
     };
   }, [apiClient, user?.id]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setSearchOpen(false);
     setDropdownOpen(false);
     setNotificationOpen(false);
     setMobileMenuOpen(false);
     setHoveredIndex(null);
   }, [location.pathname]);
+
+  const handleMobileNavigation = (event: ReactMouseEvent<HTMLAnchorElement>) => {
+    const target = new URL(event.currentTarget.href);
+    const staysOnPage = target.pathname === location.pathname && target.search === location.search;
+    if (!isCompactNavigation || staysOnPage || event.currentTarget.target === "_blank" || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      closePopovers();
+    }
+  };
 
   const navClickClosed = useRef<number | null>(null);
   const closeNavigation = () => {
@@ -274,7 +311,7 @@ export function Header({ variant = "default" }: HeaderProps) {
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
-      const isInsideSearch = searchRef.current?.contains(target);
+      const isInsideSearch = searchRef.current?.contains(target) || mobileSearchRef.current?.contains(target);
       const isInsideProfile = profileRef.current?.contains(target);
       const isInsideNotifications = notificationRef.current?.contains(target);
 
@@ -300,8 +337,8 @@ export function Header({ variant = "default" }: HeaderProps) {
   }, []);
 
   useEffect(() => {
-    if (searchOpen) searchInputRef.current?.focus({ preventScroll: true });
-  }, [searchOpen]);
+    if (searchOpen) (isMobile ? mobileSearchInputRef : searchInputRef).current?.focus({ preventScroll: true });
+  }, [isMobile, searchOpen]);
 
   useEffect(() => {
     const wasOpen = previousNotificationOpen.current;
@@ -455,6 +492,9 @@ export function Header({ variant = "default" }: HeaderProps) {
   };
 
   const activeNavIndex = navItems.findIndex(isNavItemActive);
+  const expandedMobileHref = expandedMobileSection === undefined
+    ? navItems[activeNavIndex]?.href ?? navItems[0]?.href
+    : expandedMobileSection;
   const indicatorIndex = indicatorHoverIndex ?? activeNavIndex;
   const indicatorOffset = Array.from(
     { length: Math.max(0, indicatorIndex) },
@@ -466,18 +506,19 @@ export function Header({ variant = "default" }: HeaderProps) {
 
   return (
     <header
+      data-site-header
       ref={headerRef}
       data-search-open={searchOpen}
       className={
         variant === "home"
           ? `site-header-home sticky top-0 z-50 w-full ${
-              homeHeaderScrolled ? "home-header-scrolled" : ""
+              homeHeaderScrolled || isMobile ? "home-header-scrolled" : ""
             }`
           : "sticky top-0 z-50 shrink-0 border-b border-[var(--ui-menu-divider)] bg-white"
       }
       onMouseLeave={() => { navClickClosed.current = null; setHoveredIndex(null); setIndicatorHoverIndex(null); }}
     >
-      <div className="flex h-[var(--ui-header-height)] w-full items-stretch justify-between">
+      <div className="site-header-main flex h-[var(--ui-header-height)] w-full items-stretch justify-between">
         <div className="flex items-stretch">
           <div className="site-header-brand flex w-[var(--ui-brand-rail-width)] shrink-0 items-center px-6">
             <Logo inverse={homeHeaderDark} />
@@ -610,7 +651,7 @@ export function Header({ variant = "default" }: HeaderProps) {
 
         <div className="home-header-utilities relative flex items-center gap-1.5 pr-3 md:gap-2 md:pr-6">
           <div ref={searchRef} className="site-header-search-slot">
-            <form role="search" autoComplete="off" className="site-header-inline-search" data-open={searchOpen} onSubmit={handleSearchSubmit}
+            <form role="search" autoComplete="off" className="site-header-inline-search" data-open={searchOpen && !isMobile} onSubmit={handleSearchSubmit}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   event.stopPropagation();
@@ -620,8 +661,8 @@ export function Header({ variant = "default" }: HeaderProps) {
               }}>
               <IconButton ref={searchTriggerRef}
                 aria-label={lang === "ko" ? "통합검색" : "Search"}
-                disabled={searchOpen}
-                aria-expanded={searchOpen} aria-controls="site-header-search-input"
+                disabled={searchOpen && !isMobile}
+                aria-expanded={searchOpen} aria-controls={isMobile ? "mobile-site-search-input" : "site-header-search-input"}
                 onClick={() => {
                   setSearchOpen(true); setHoveredIndex(null); setIndicatorHoverIndex(null);
                   setDropdownOpen(false); setNotificationOpen(false); setMobileMenuOpen(false);
@@ -629,7 +670,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                 className={variant === "home" && !searchOpen ? "home-header-icon" : undefined}>
                 <Search aria-hidden="true" />
               </IconButton>
-              <div className="site-header-search-fields" inert={!searchOpen} aria-hidden={!searchOpen}>
+              <div className="site-header-search-fields" inert={!searchOpen || isMobile} aria-hidden={!searchOpen || isMobile}>
                 <input ref={searchInputRef} id="site-header-search-input" type="search" autoComplete="off"
                   aria-label={lang === "ko" ? "통합검색 검색어" : "Site search query"}
                   placeholder={lang === "ko" ? "제목, 내용 검색" : "Search titles and content"}
@@ -646,7 +687,8 @@ export function Header({ variant = "default" }: HeaderProps) {
             type="button"
             variant="ghost"
             onClick={() => setLanguage(lang === "ko" ? "en" : "ko")}
-            className={`hidden h-[var(--ui-control-height)] gap-1.5 border-0 bg-transparent px-2.5 text-xs font-medium shadow-none transition-colors duration-300 md:flex ${
+            aria-label={lang === "ko" ? "영어로 전환" : "Switch to Korean"}
+            className={`site-header-language hidden h-[var(--ui-control-height)] gap-1.5 border-0 bg-transparent px-2.5 text-xs font-medium shadow-none transition-colors duration-300 md:flex ${
               homeHeaderDark
                 ? "text-white hover:bg-white/10 [&_svg]:text-white/70"
                 : "text-slate-700 hover:bg-slate-100 [&_svg]:text-slate-500"
@@ -840,6 +882,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                   : "Open menu"
             }
             onClick={() => {
+              if (!mobileMenuOpen) setExpandedMobileSection(undefined);
               setMobileMenuOpen((value) => !value);
               setSearchOpen(false);
               setDropdownOpen(false);
@@ -855,7 +898,7 @@ export function Header({ variant = "default" }: HeaderProps) {
         </div>
       </div>
 
-      {mobileMenuOpen && (
+      {mobileMenuOpen && createPortal(
         <>
           <button
             type="button"
@@ -881,38 +924,57 @@ export function Header({ variant = "default" }: HeaderProps) {
               className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4"
               aria-label={lang === "ko" ? "모바일 주요 메뉴" : "Mobile primary navigation"}
             >
-            <div className="grid gap-2">
-              {navItems.map((item) => {
+            <div className="mobile-navigation-sections grid gap-2">
+              {navItems.map((item, index) => {
                 const active = isNavItemActive(item);
+                const expanded = item.href === expandedMobileHref;
+                const groupId = `mobile-navigation-group-${index}`;
+                const children = item.href === "/board"
+                  ? [{ href: "/board", label: lang === "ko" ? "전체 게시판" : "All boards", newTab: false }, ...item.megaItems]
+                  : item.megaItems;
+                const mobileAboutLabels: Record<string, string> = lang === "ko"
+                  ? { "/about#intro": "소개", "/about#pledges": "공약", "/about#work": "공약", "/about#people": "조직도", "/about#partnership": "제휴" }
+                  : { "/about#intro": "Intro", "/about#pledges": "Pledges", "/about#work": "Pledges", "/about#people": "Team", "/about#partnership": "Partners" };
                 return (
                   <div
                     key={item.href}
-                    className="min-w-0"
+                    className="mobile-navigation-section min-w-0"
                   >
-                    <Link
+                    {children.length > 0 ? <button
+                      type="button"
+                      className="mobile-navigation-toggle"
+                      data-active={active}
+                      aria-expanded={expanded}
+                      aria-controls={groupId}
+                      onClick={() => setExpandedMobileSection(expanded ? null : item.href)}
+                    >
+                      <span>{item.href === "/about" ? lang === "ko" ? "집행위원회" : "Council" : item.label}</span>
+                      <ChevronDown aria-hidden="true" className={expanded ? "is-expanded" : undefined} />
+                    </button> : <Link
                       to={item.href}
-                      onClick={closePopovers}
+                      onClick={handleMobileNavigation}
                       aria-current={active ? "page" : undefined}
-                      className={`flex min-h-11 items-center justify-start rounded-xl border px-3 text-left text-xs font-semibold transition-colors ${
+                      className={`mobile-navigation-heading flex min-h-11 items-center justify-start rounded-xl border px-3 text-left text-xs font-semibold transition-colors ${
                         active
                           ? "border-kaist-darkgreen/30 bg-kaist-lightgreen/15 text-kaist-darkgreen"
                           : "border-slate-200 bg-slate-50 text-slate-800 hover:border-kaist-darkgreen/20 hover:bg-kaist-lightgreen/10 hover:text-kaist-darkgreen"
                       }`}
                     >
                       {item.label}
-                    </Link>
-                    {item.megaItems.length > 0 ? (
-                      <div className="mt-1 grid gap-1 pl-3">
-                        {item.megaItems.map((child) => (
+                    </Link>}
+                    {children.length > 0 ? (
+                      <div id={groupId} hidden={!expanded} className="mobile-navigation-links mt-1 grid gap-1 pl-3">
+                        {children.map((child) => (
                           <Link
                             key={child.href}
                             to={child.href}
-                            onClick={closePopovers}
+                            onClick={handleMobileNavigation}
+                            aria-current={(child.href === "/board" ? location.pathname === "/board" : isChildNavItemActive(child.href)) ? "page" : undefined}
                             target={child.newTab ? "_blank" : undefined}
                             rel={child.newTab ? "noopener noreferrer" : undefined}
-                            className="flex min-h-11 items-center justify-start rounded-lg border border-slate-200 bg-white px-3 text-left text-[length:var(--ui-text-caption-size)] font-medium text-slate-600 hover:bg-slate-50 hover:text-brand-primary"
+                            className="mobile-navigation-link flex min-h-11 items-center justify-start rounded-lg border border-slate-200 bg-white px-3 text-left text-[length:var(--ui-text-caption-size)] font-medium text-slate-600 hover:bg-slate-50 hover:text-brand-primary"
                           >
-                            {child.label}
+                            {mobileAboutLabels[child.href] ?? child.label}
                           </Link>
                         ))}
                       </div>
@@ -923,15 +985,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             </div>
             </nav>
 
-          <div className="shrink-0 grid gap-3 border-t border-slate-100 bg-white px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
-            <Button variant="ghost"
-              type="button"
-              onClick={() => setLanguage(lang === "ko" ? "en" : "ko")}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-xs font-medium text-slate-700"
-            >
-              {lang === "ko" ? "English" : "한국어"}
-            </Button>
-
+          <div className="mobile-nav-account shrink-0 grid gap-3 border-t border-slate-100 bg-white px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
             {user ? (
               <div
                 className={`grid items-center gap-2 ${
@@ -942,7 +996,7 @@ export function Header({ variant = "default" }: HeaderProps) {
               >
                 <Link
                   to="/mypage"
-                  onClick={closePopovers}
+                  onClick={handleMobileNavigation}
                   className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl border border-slate-200 px-2 text-center text-xs font-medium text-slate-700"
                 >
                   {lang === "ko" ? "마이페이지" : "My Page"}
@@ -950,7 +1004,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                 {canUseAdminDashboard && (
                   <Link
                     to="/admin/content"
-                    onClick={closePopovers}
+                    onClick={handleMobileNavigation}
                     className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-kaist-darkgreen px-2 text-center text-xs font-medium text-white"
                   >
                     {lang === "ko" ? "관리자" : "Admin"}
@@ -966,7 +1020,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 items-center gap-2">
+              <div className="mobile-nav-login grid grid-cols-2 items-center gap-2">
                 <Button variant="ghost"
                   type="button"
                   onClick={() => void handleStartLogin()}
@@ -979,9 +1033,25 @@ export function Header({ variant = "default" }: HeaderProps) {
             )}
           </div>
           </div>
-        </>
+        </>, document.body,
       )}
 
+      {isMobile && searchOpen && createPortal(
+        <div ref={mobileSearchRef} role="dialog" aria-modal="true" aria-label={lang === "ko" ? "통합검색" : "Site search"}
+          tabIndex={-1} onKeyDown={handleMobileSearchKeyDown} className="mobile-search-overlay">
+          <form role="search" onSubmit={handleSearchSubmit} className="mobile-search-form">
+            <Search aria-hidden="true" className="size-5 shrink-0 text-slate-400" />
+            <input ref={mobileSearchInputRef} id="mobile-site-search-input" type="search" aria-label={lang === "ko" ? "통합검색 검색어" : "Site search query"}
+              placeholder={lang === "ko" ? "무엇을 찾으시나요?" : "What are you looking for?"}
+              value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} autoComplete="off" enterKeyHint="search" />
+            <IconButton aria-label={lang === "ko" ? "검색 닫기" : "Close search"} onClick={() => { setSearchOpen(false); requestAnimationFrame(() => searchTriggerRef.current?.focus()); }}><X /></IconButton>
+          </form>
+          <MobileSearchPreview query={searchQuery} lang={lang} onSelect={closePopovers} />
+          {searchQuery.trim() && <button type="button" className="mobile-search-submit" onClick={() => {
+            navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`); closePopovers();
+          }}><Search className="size-4 text-slate-400" aria-hidden="true" /><span>{lang === "ko" ? "전체 검색 결과 보기" : "View all search results"}</span></button>}
+        </div>, document.body,
+      )}
     </header>
   );
 }

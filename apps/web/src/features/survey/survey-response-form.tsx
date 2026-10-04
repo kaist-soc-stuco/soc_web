@@ -84,7 +84,7 @@ export function SurveyResponseForm({
           <section
             key={section.id}
             id={`survey-section-${section.id}`}
-            className="flex scroll-mt-24 flex-col gap-4"
+            className="survey-response-section flex scroll-mt-24 flex-col gap-4"
           >
             {(() => {
               const sectionTitle = getLocalizedText(
@@ -101,7 +101,7 @@ export function SurveyResponseForm({
               if (section.id === survey.sections[0]?.id || (!sectionTitle && !sectionDescription)) return null;
 
               return (
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-none">
+                <div className="survey-response-section-heading overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-none">
                   {sectionTitle ? (
                     <div className="bg-brand-primary px-5 py-3.5 text-white">
                       <h2 className="break-words text-base font-normal leading-6">
@@ -112,7 +112,7 @@ export function SurveyResponseForm({
                   {sectionDescription ? (
                     <RichTextContent
                       content={sectionDescription}
-                      className="px-5 py-4 text-[length:var(--ui-text-section-size)] font-normal leading-relaxed text-slate-600"
+                      className="survey-section-description px-5 py-4 text-[length:var(--ui-text-section-size)] font-normal leading-relaxed text-slate-600"
                     />
                   ) : null}
                 </div>
@@ -131,7 +131,7 @@ export function SurveyResponseForm({
                 return (
                   <div
                     key={question.id}
-                    className="scroll-mt-24 border-b border-slate-200 px-1 py-3 last:border-b-0"
+                    className="survey-response-display-block scroll-mt-24 border-b border-slate-200 px-1 py-3 last:border-b-0"
                   >
                     {title ? (
                       <h2 className="break-words text-xl font-medium leading-7 text-slate-950">

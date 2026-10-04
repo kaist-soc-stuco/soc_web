@@ -160,7 +160,7 @@ export const getCardPeriodText = (item: UnifiedItem, lang: "ko" | string = "ko")
   return formatEventCardPeriod(item.opensAt, item.closesAt, lang);
 };
 
-function formatEventCardPeriod(
+export function formatEventCardPeriod(
   startValue: string | null,
   endValue: string | null,
   lang: string,

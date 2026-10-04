@@ -62,7 +62,7 @@ export function SurveyParticipationNotice({
   return (
     <div
       className={cn(
-        "flex flex-col gap-4 rounded-2xl border text-left",
+        "survey-participation-notice flex flex-col gap-4 rounded-2xl border text-left",
         compact
           ? "mt-4 border-slate-200 bg-slate-50/80 p-4"
           : "w-full border-slate-200 bg-white p-8 text-center shadow-none",

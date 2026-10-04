@@ -91,6 +91,7 @@ export function EngagementActionButton({
   loading,
   onClick,
   tone,
+  showLabel = false,
 }: {
   active: boolean;
   className: string;
@@ -100,6 +101,7 @@ export function EngagementActionButton({
   loading: boolean;
   onClick: () => void;
   tone: 'like' | 'scrap';
+  showLabel?: boolean;
 }) {
   const [isBouncing, setIsBouncing] = useState(false);
   const activeClass =
@@ -133,6 +135,7 @@ export function EngagementActionButton({
       ) : (
         icon
       )}
+      {showLabel && <span className="engagement-action-label">{label}</span>}
       {count !== null ? <span className="tabular-nums text-black">{count}</span> : null}
     </Button>
   );

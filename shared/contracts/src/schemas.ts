@@ -311,7 +311,8 @@ const ArticleAssetsSchema = z
     }
   });
 
-  export const ArticleCreateSchema = z.object({
+export const ArticleCreateSchema = z.object({
+  faqCategory: z.enum(["account", "fees", "events-surveys", "other"]).optional(),
   titleKo: z.string().min(1).max(255),
   titleEn: z.string().max(255).optional(),
   contentKo: z.string().min(1).max(50_000),
@@ -334,6 +335,7 @@ const ArticleAssetsSchema = z
 });
 
 export const ArticleUpdateSchema = z.object({
+  faqCategory: z.enum(["account", "fees", "events-surveys", "other"]).optional(),
   titleKo: z.string().min(1).max(255).optional(),
   titleEn: z.string().max(255).optional(),
   contentKo: z.string().min(1).max(50_000).optional(),
@@ -367,6 +369,7 @@ export const FaqReorderSchema = z.object({
 }).strict();
 
 export const ArticleDraftSaveSchema = z.object({
+  faqCategory: z.enum(["account", "fees", "events-surveys", "other"]).optional(),
   draftId: z.string().uuid().optional(),
   boardCode: z.string().trim().min(1).max(20),
   targetArticleId: z.string().regex(/^\d+$/).nullable().optional(),

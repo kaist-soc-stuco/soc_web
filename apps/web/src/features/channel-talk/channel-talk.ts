@@ -30,8 +30,8 @@ export function loadChannelTalkScript(): Promise<void> {
   return scriptPromise;
 }
 
-export function bootChannelTalk(options: ChannelTalkBootOptions): void {
-  ChannelService.boot(options);
+export function bootChannelTalk(options: ChannelTalkBootOptions, onBoot?: () => void): void {
+  ChannelService.boot(options, (error) => { if (!error) onBoot?.(); });
 }
 
 export function shutdownChannelTalk(): void {
@@ -40,4 +40,14 @@ export function shutdownChannelTalk(): void {
 
 export function showChannelTalk(): void {
   ChannelService.showMessenger();
+}
+
+export function hideChannelTalk(): void {
+  ChannelService.hideMessenger();
+}
+
+export function onChannelTalkVisibilityChange(callback: (open: boolean) => void): void {
+  ChannelService.clearCallbacks();
+  ChannelService.onShowMessenger(() => callback(true));
+  ChannelService.onHideMessenger(() => callback(false));
 }

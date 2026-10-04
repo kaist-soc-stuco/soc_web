@@ -1206,7 +1206,7 @@ export function RichTextEditor({
         variableToken={variableToken}
         variableOptions={variableOptions}
       />
-      <div className="flex flex-col pt-5">
+      <div className="rich-text-canvas flex flex-col pt-5">
         {onTitleChange ? (
           <>
             <input

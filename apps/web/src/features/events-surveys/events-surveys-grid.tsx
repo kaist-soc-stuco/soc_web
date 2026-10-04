@@ -2,7 +2,7 @@ import type {
   ArticleEngagementKind,
 } from "@soc/contracts";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
-import { ClipboardList, Clock, MapPin } from "lucide-react";
+import { ChevronRight, ClipboardList, Clock, LockKeyhole, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -15,6 +15,8 @@ import {
 } from "@/lib/events-surveys";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { EventCardFallback } from "@/components/organisms/event-card-fallback";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { formatNumericDate } from "@/lib/date-display";
 
 interface EventsSurveysGridProps {
   isAuthenticated: boolean;
@@ -76,6 +78,7 @@ function getStatusText(item: UnifiedItem, lang: string) {
 interface CardBadge {
   label: string;
   tone: "open" | "closed" | "neutral";
+  locked?: boolean;
 }
 
 function getCardBadges(item: UnifiedItem, lang: string): CardBadge[] {
@@ -89,7 +92,7 @@ function getCardBadges(item: UnifiedItem, lang: string): CardBadge[] {
       label: getApplicationText(item, lang) ?? "",
       tone: applicationClosed ? "closed" : item.linkedSurveyState === "open" ? "open" : "neutral",
     },
-    { label: getAudienceText(item, lang), tone: "neutral" },
+    { label: getAudienceText(item, lang), tone: "neutral", locked: item.kind === "EVENT" ? Boolean(item.linkedSurveyFeePayersOnly || item.visibilityScope === "STAFF_ONLY" || item.visibilityScope === "MEMBERS") : !item.allowAnonymous },
   ];
 
   return badges
@@ -160,11 +163,7 @@ function getAudienceText(item: UnifiedItem, lang: string) {
           ? "로그인 필요"
           : "Login required";
 
-  const audienceText = audience
-    ? item.kind !== "EVENT" && item.allowAnonymous
-      ? audience
-      : `🔒 ${audience}`
-    : "";
+  const audienceText = audience;
   const languageText = item.isKoreanOnly
     ? lang === "ko"
       ? "한국어 전용"
@@ -212,6 +211,42 @@ function CardMedia({
   );
 }
 
+function MobileSurveyList({ items, lang }: { items: UnifiedItem[]; lang: string }) {
+  const groups = [
+    { state: "open", label: lang === "ko" ? "참여 가능" : "Open" },
+    { state: "before_open", label: lang === "ko" ? "시작 예정" : "Upcoming" },
+    { state: "closed", label: lang === "ko" ? "종료" : "Closed" },
+  ] as const;
+
+  return <div className="mobile-survey-list">
+    {groups.map(group => {
+      const entries = items.filter(item => item.computedState === group.state);
+      if (!entries.length) return null;
+      return <section key={group.state} aria-label={group.label}>
+        <h2 className="mobile-survey-group-heading">{group.label}</h2>
+        {entries.map(item => {
+          const title = stripRichText(lang === "ko" ? item.titleKo : item.titleEn || item.titleKo);
+          const start = formatNumericDate(item.opensAt);
+          const end = formatNumericDate(item.closesAt);
+          const timing = item.isAlwaysOpen ? "" : start && end ? `${start} ~ ${end}` : end ? `~${end}` : start ? `${start}~` : "";
+          const badges = getCardBadges(item, lang).filter(badge => badge.label !== getStatusText(item, lang));
+
+          return <Link key={item.id} to={getItemHref(item)} target="_blank" rel="noopener noreferrer" className={`mobile-survey-list-row${isClosedItem(item) ? " is-closed" : ""}`}>
+            <div className="mobile-survey-copy">
+              <h3><span>{title}</span></h3>
+              {badges.length > 0 && <div className="home-portal-event-badges mobile-survey-badges">
+                {badges.map(badge => <span key={badge.label} className={`home-portal-event-badge is-${badge.tone}`}>{badge.label}</span>)}
+              </div>}
+              {timing && <p className="mobile-survey-period">{timing}</p>}
+            </div>
+            <ChevronRight className="mobile-survey-chevron" aria-hidden="true" />
+          </Link>;
+        })}
+      </section>;
+    })}
+  </div>;
+}
+
 export function EventsSurveysGrid({
   isAuthenticated,
   items,
@@ -219,8 +254,10 @@ export function EventsSurveysGrid({
   engagementSubmitting,
   onEngagementToggle,
 }: EventsSurveysGridProps) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  if (isMobile && items.every(item => item.kind !== "EVENT")) return <MobileSurveyList items={items} lang={lang} />;
   return (
-    <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="events-surveys-card-grid grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => {
         const title = stripRichText(lang === "ko" ? item.titleKo : item.titleEn || item.titleKo);
         const desc = stripRichText(
@@ -244,7 +281,7 @@ export function EventsSurveysGrid({
             key={item.id}
             className={
               isHomeEventCard
-                ? `event-survey-card home-portal-event-card select-none group${closed ? " is-closed" : ""}`
+                ? `event-survey-card home-portal-event-card select-none group${closed ? " is-closed" : ""}${!item.imageUrl ? " event-card-no-image" : ""}`
                 : `event-survey-card${closed ? " is-closed" : ""} interaction-card select-none group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-none transition-[transform,border-color] duration-180 ease-out hover:-translate-y-0.5 ${closed ? "border-slate-200" : "border-gray-200"}`
             }
           >
@@ -289,6 +326,7 @@ export function EventsSurveysGrid({
                 <div className="home-portal-event-badges">
                   {badges.map((badge) => (
                     <span key={badge.label} className={`home-portal-event-badge is-${badge.tone}`}>
+                      {badge.locked && <LockKeyhole aria-hidden="true" className="size-3 shrink-0" strokeWidth={1.5} />}
                       {badge.label}
                     </span>
                   ))}

@@ -1,4 +1,8 @@
-import { useEffect, useMemo, useRef, type PropsWithChildren } from "react";
+import { useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
+import { createPortal } from "react-dom";
+import { X } from "lucide-react";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { IconButton } from "@/components/ui/icon-button";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
@@ -9,6 +13,8 @@ import {
   bootChannelTalk,
   loadChannelTalkScript,
   shutdownChannelTalk,
+  hideChannelTalk as hideMessenger,
+  onChannelTalkVisibilityChange,
 } from "./channel-talk";
 
 function updateChannelTalkLauncherLayer(offsetBottom: boolean, hideLauncher: boolean) {
@@ -21,7 +27,10 @@ function updateChannelTalkLauncherLayer(offsetBottom: boolean, hideLauncher: boo
   const hidden =
     hideLauncher ||
     document.body.classList.contains("site-mobile-menu-open") ||
+    document.body.classList.contains("site-mobile-search-open") ||
+    document.body.classList.contains("site-mobile-comment-open") ||
     document.body.classList.contains("ui-modal-open");
+  const mobileMessengerOpen = window.innerWidth < 768 && document.body.classList.contains("channel-talk-messenger-open");
   let layerStyle = shadowRoot.querySelector<HTMLStyleElement>(
     "style[data-soc-channel-talk-mobile-layer]",
   );
@@ -32,12 +41,39 @@ function updateChannelTalkLauncherLayer(offsetBottom: boolean, hideLauncher: boo
   }
   layerStyle.textContent = hidden
     ? "* { visibility: hidden !important; pointer-events: none !important; }"
-    : "";
+    : mobileMessengerOpen
+      ? '[data-ch-testid="launcher"], [data-ch-testid="launcher"] * { visibility: hidden !important; pointer-events: none !important; }'
+      : "";
+  layerStyle.textContent += `
+    @media (max-width: 767px) {
+      [data-ch-testid="launcher"], [data-ch-testid="launcher"] * {
+        box-shadow: none !important;
+        filter: none !important;
+      }
+      [data-ch-testid="launcher"] > button {
+        width: 44px !important;
+        height: 44px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+        overflow: hidden !important;
+        border-radius: 16px !important;
+      }
+      [data-ch-testid="launcher"] > button > div {
+        width: 44px !important;
+        height: 44px !important;
+      }
+      [data-ch-testid="launcher"] > button div {
+        max-width: 100% !important;
+        max-height: 100% !important;
+      }
+      [data-ch-testid="launcher"] > button :is(svg,img) {
+        width: 28px !important;
+        height: 28px !important;
+      }
+    }
+  `;
 
-  const launcherButton = [...shadowRoot.querySelectorAll("button")].find((button) => {
-    const rect = button.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
-  });
+  const launcherButton = shadowRoot.querySelector<HTMLButtonElement>('[data-ch-testid="launcher"] > button');
   if (!launcherButton) return;
 
   let launcherWrapper: HTMLElement | null = launcherButton.parentElement;
@@ -46,18 +82,33 @@ function updateChannelTalkLauncherLayer(offsetBottom: boolean, hideLauncher: boo
     launcherWrapper = launcherWrapper.parentElement;
   }
   if (!launcherWrapper || launcherWrapper === shadowHost) return;
+  // Never reposition the messenger: its buttons share the launcher's shadow root.
+  const wrapperRect = launcherWrapper.getBoundingClientRect();
+  if (wrapperRect.width > 120 || wrapperRect.height > 120) return;
 
-  const shouldOffset = offsetBottom && window.innerWidth < 768;
+  const shouldOffset = (offsetBottom || document.body.classList.contains("board-write-fab-visible")) && window.innerWidth < 768;
   launcherWrapper.style.setProperty(
     "bottom",
     shouldOffset ? "calc(5.5rem + env(safe-area-inset-bottom))" : "24px",
     "important",
   );
-  launcherWrapper.style.setProperty("visibility", hidden ? "hidden" : "visible", "important");
-  launcherWrapper.style.setProperty("pointer-events", hidden ? "none" : "auto", "important");
+  const mobileScrollHidden = window.innerWidth < 768 && document.body.classList.contains("channel-talk-scroll-hidden");
+  if (window.innerWidth < 768) {
+    launcherWrapper.style.setProperty("box-shadow", "none", "important");
+    launcherWrapper.style.setProperty("width", "44px", "important");
+    launcherWrapper.style.setProperty("height", "44px", "important");
+    launcherWrapper.style.setProperty("transition", "transform 180ms ease, opacity 180ms ease");
+    launcherWrapper.style.setProperty("transform", mobileScrollHidden ? "translateY(100px)" : "none");
+    launcherWrapper.style.setProperty("opacity", mobileScrollHidden ? "0" : "1");
+  } else for (const property of ["width", "height", "box-shadow", "transition", "transform", "opacity"]) launcherWrapper.style.removeProperty(property);
+  launcherWrapper.style.setProperty("visibility", hidden || mobileMessengerOpen ? "hidden" : "visible", "important");
+  launcherWrapper.style.setProperty("pointer-events", hidden || mobileScrollHidden || mobileMessengerOpen ? "none" : "auto", "important");
 }
 
 export function ChannelTalkProvider({ children }: PropsWithChildren) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const [messengerOpen, setMessengerOpen] = useState(false);
+  const needsMobileCloseBar = isMobile && messengerOpen && document.querySelector("#ch-plugin-script")?.classList.contains("ch-desk-messenger");
   const location = useLocation();
   const isAdminRoute = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
   const hideChannelTalk =
@@ -68,6 +119,10 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
     (location.pathname.endsWith("/write") ||
       location.pathname.endsWith("/edit"));
   const hasBootedRef = useRef(false);
+  useEffect(() => {
+    document.body.classList.toggle("channel-talk-messenger-open", messengerOpen && isMobile);
+    return () => document.body.classList.remove("channel-talk-messenger-open");
+  }, [messengerOpen, isMobile]);
   const previousIdentityRef = useRef<string | null>(null);
   const { data: session, isPending: isSessionPending } = useCurrentSession();
   const channelTalkIdentity =
@@ -114,6 +169,19 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
   }, [hideChannelTalk, shouldOffsetChannelTalk]);
 
   useEffect(() => {
+    let previousY = window.scrollY;
+    const updateScroll = () => {
+      const nextY = window.scrollY;
+      if (Math.abs(nextY - previousY) < 8 && nextY > 40) return;
+      document.body.classList.toggle("channel-talk-scroll-hidden", window.innerWidth < 768 && nextY > 80 && nextY > previousY);
+      previousY = nextY;
+      updateChannelTalkLauncherLayer(shouldOffsetChannelTalk, hideChannelTalk);
+    };
+    window.addEventListener("scroll", updateScroll, { passive: true });
+    return () => { window.removeEventListener("scroll", updateScroll); document.body.classList.remove("channel-talk-scroll-hidden"); };
+  }, [hideChannelTalk, shouldOffsetChannelTalk]);
+
+  useEffect(() => {
     if (isSessionPending) return;
 
     const previousIdentity = previousIdentityRef.current;
@@ -126,6 +194,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
     ) {
       shutdownChannelTalk();
       hasBootedRef.current = false;
+      setMessengerOpen(false);
     }
   }, [channelTalkIdentity, isSessionPending]);
 
@@ -134,6 +203,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
       if (hasBootedRef.current) {
         shutdownChannelTalk();
         hasBootedRef.current = false;
+        setMessengerOpen(false);
       }
       return;
     }
@@ -153,6 +223,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
 
         if (hasBootedRef.current) {
           shutdownChannelTalk();
+          setMessengerOpen(false);
         }
         bootChannelTalk({
           hidePopup: window.matchMedia("(max-width: 767px)").matches,
@@ -165,7 +236,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
           // Route-specific bottom spacing and modal/menu body states prevent
           // the launcher from competing with fixed controls.
           zIndex: 55,
-        });
+        }, () => { if (!cancelled) onChannelTalkVisibilityChange(setMessengerOpen); });
         hasBootedRef.current = true;
       } catch (error) {
         console.warn("Channel Talk could not be initialized.", error);
@@ -179,7 +250,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
     };
   }, [data, hideChannelTalk, isAdminRoute]);
 
-  // The SDK owns the launcher and messenger UI. Keeping this provider renderless
-  // avoids a second, competing affordance in the page layout.
-  return <>{children}</>;
+  return <>{children}{needsMobileCloseBar && createPortal(
+    <div className="channel-mobile-close-bar"><IconButton className="channel-mobile-close" aria-label={data?.language === "en" ? "Close chat" : "상담 창 닫기"} onClick={hideMessenger}><X /></IconButton></div>, document.body,
+  )}</>;
 }

@@ -26,6 +26,11 @@ export default defineConfig(({ mode }) => {
   return {
     envDir: workspaceRoot,
     plugins: [react(), tailwindcss()],
+    optimizeDeps: {
+      // The roadmap is lazy-loaded. Optimize its React dependencies at startup
+      // instead of changing the dependency graph after a page is already open.
+      include: ["react", "react-dom/client", "@xyflow/react"],
+    },
     build: {
       rollupOptions: {
         output: {
@@ -68,6 +73,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     resolve: {
+      // Workspace packages and React Flow must share the renderer's React instance.
+      dedupe: ["react", "react-dom"],
       alias: {
         "@": path.resolve(__dirname, "./src"),
         "@soc/contracts": path.resolve(

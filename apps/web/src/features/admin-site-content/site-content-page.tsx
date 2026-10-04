@@ -1,4 +1,5 @@
 import { useToast } from "@/components/ui/toast";
+import { useUnsavedNavigation } from "@/hooks/use-unsaved-navigation";
 import { restrictListDrag } from "@/lib/drag-bounds";
 import { createApiClient } from "@soc/api-client";
 import type { ContentBlockListResponse, ContentBlockRecord, ContentBlockStatus, ContentBlockType, CreateContentBlockRequest, UpdateContentBlockRequest } from "@soc/contracts";
@@ -11,7 +12,7 @@ import { GripVertical, Link2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
-import { AdminCard, AdminCardHeader, AdminEmptyState, AdminEditorGuidance, AdminFormField, AdminLoadingState, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSectionTitle } from "@/components/ui/admin-page";
+import { AdminCard, AdminCardHeader, AdminEmptyState, AdminFormField, AdminLoadingState, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSectionTitle } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { Button } from "@/components/ui/button";
@@ -199,6 +200,10 @@ function SiteContentPageContent() {
   );
 
   const isDirty = JSON.stringify(normalizeDraft(draft)) !== JSON.stringify(normalizeDraft(selectedBlock ? draftFromBlock(selectedBlock) : draftForCategory(category)));
+  const createDirty = createOpen && JSON.stringify(normalizeDraft(createDraft)) !== JSON.stringify(normalizeDraft(draftForCategory(category)));
+  useUnsavedNavigation(Boolean(blocksQuery.data) && (isDirty || createDirty), () =>
+    confirm({ title: "저장하지 않은 변경 사항을 버릴까요?", confirmLabel: "변경 사항 버리기", tone: "danger" }),
+  );
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: CONTENT_BLOCK_QUERY_KEY });
@@ -361,10 +366,6 @@ function SiteContentPageContent() {
     {ConfirmDialog}
     <AdminPageMain className="admin-site-content !max-w-6xl">
       <AdminPageHeader title="사이트 설정" />
-
-      <AdminEditorGuidance>
-        <p>복잡한 콘텐츠 편집과 정렬은 데스크톱에서 계속하는 것을 권장합니다. 모바일에서 입력 중이라면 저장 전 페이지를 이동하지 마세요.</p>
-      </AdminEditorGuidance>
 
 
       <div className="flex min-w-0 flex-wrap items-center gap-3">

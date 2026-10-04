@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useLanguage } from "@/hooks/use-language";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 export const ABOUT_SECTION_IDS = ["intro", "work", "people", "partnership"] as const;
 export type AboutSectionId = (typeof ABOUT_SECTION_IDS)[number];
@@ -38,12 +39,27 @@ function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+function sectionScrollTop(target: HTMLElement) {
+  const nav = document.querySelector<HTMLElement>(".about-section-nav");
+  const style = nav ? getComputedStyle(nav) : null;
+  const offset = nav ? (Number.parseFloat(style?.top ?? "0") || 0) + nav.offsetHeight + 16 : 0;
+  const heading = target.querySelector<HTMLElement>("h1, h2") ?? target;
+  // Reveal transforms change bounding rectangles without changing layout.
+  // Use layout offsets so the heading stays clear after the animation ends.
+  let top = 0;
+  for (let element: HTMLElement | null = heading; element; element = element.offsetParent as HTMLElement | null) {
+    top += element.offsetTop;
+  }
+  return top - offset;
+}
+
 export function useAboutPageController() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const legacyTab = searchParams.get("tab");
   const { lang } = useLanguage();
+  const isMobile = useMediaQuery("(width < 768px)");
   const requestedSection = useMemo(() => {
     const hashSection = location.hash.replace(/^#/, "");
     const resolvedHash = resolveAboutSectionId(hashSection);
@@ -57,6 +73,12 @@ export function useAboutPageController() {
   );
 
   const scrollToSection = useCallback((sectionId: AboutSectionId, behavior: ScrollBehavior = "smooth") => {
+    if (isMobile) {
+      setActiveSection(sectionId);
+      replaceSectionHash(sectionId);
+      window.scrollTo({ top: 0, behavior: "instant" });
+      return;
+    }
     const target = document.getElementById(getSectionTargetId(sectionId));
     if (!target) return;
     // Native smooth-scroll duration grows with travel distance. Keep the
@@ -65,11 +87,18 @@ export function useAboutPageController() {
     suppressScrollSpyUntilRef.current = performance.now() + (behavior === "smooth" ? 1800 : 120);
     setActiveSection(sectionId);
     replaceSectionHash(sectionId);
-    target.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : behavior, block: "start" });
-  }, []);
+    window.scrollTo({ top: sectionScrollTop(target), behavior: prefersReducedMotion() ? "auto" : behavior });
+  }, [isMobile]);
 
   useEffect(() => {
     if (!requestedSection) return;
+
+    if (isMobile) {
+      setActiveSection(requestedSection);
+      if (legacyTab) navigate(`/about#${requestedSection === "work" ? "pledges" : requestedSection}`, { replace: true });
+      window.scrollTo({ top: 0, behavior: "instant" });
+      return;
+    }
 
     if (legacyTab) {
       navigate(`/about#${requestedSection}`, { replace: true });
@@ -101,7 +130,7 @@ export function useAboutPageController() {
           );
           setActiveSection(requestedSection);
           replaceSectionHash(requestedSection);
-          target.scrollIntoView({ behavior: "auto", block: "start" });
+          window.scrollTo({ top: sectionScrollTop(target), behavior: "auto" });
         });
       });
     };
@@ -128,9 +157,10 @@ export function useAboutPageController() {
       window.removeEventListener("pointerdown", stopCorrections);
       window.removeEventListener("keydown", stopCorrections);
     };
-  }, [legacyTab, location.hash, navigate, requestedSection]);
+  }, [legacyTab, location.hash, navigate, requestedSection, isMobile]);
 
   useEffect(() => {
+    if (isMobile) return;
     let animationFrame = 0;
     const updateActiveSection = () => {
       animationFrame = 0;
@@ -145,7 +175,7 @@ export function useAboutPageController() {
       const anchorLine = headerHeight + 76;
       let nextSection: AboutSectionId = ABOUT_SECTION_IDS[0];
       for (const sectionId of ABOUT_SECTION_IDS) {
-        const section = document.getElementById(sectionId);
+        const section = document.getElementById(getSectionTargetId(sectionId));
         if (section && section.getBoundingClientRect().top <= anchorLine) nextSection = sectionId;
       }
       if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) {
@@ -169,11 +199,12 @@ export function useAboutPageController() {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, []);
+  }, [isMobile]);
 
   return {
     activeSection,
     lang,
+    isMobile,
     scrollToSection,
   };
 }

@@ -19,7 +19,8 @@ import {
 import { useBoardEditPageController } from "@/features/board-write/use-board-edit-page-controller";
 import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
 import { Button } from "@/components/ui/button";
-import { UiInput } from "@/components/ui/form-control";
+import { UiInput, UiSelect } from "@/components/ui/form-control";
+import { FAQ_CATEGORIES, type FaqCategory } from "@soc/contracts";
 import {
   switchEventDateInputMode,
   switchEventEndDateInputMode,
@@ -29,6 +30,8 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
   const [editorView, setEditorView] = useState<"ko" | "en" | "split">("ko");
   const {
     ConfirmDialog,
+    faqCategory,
+    setFaqCategory,
     assets,
     allowComment,
     allowSecret,
@@ -223,14 +226,18 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
           promotion={category === "promotions"} endDate={eventEndDate} onEndDateChange={(value) => { setEventEndDate(value); setIsEventAlwaysOpen(!value); }} />}
         category={category}
         lang={lang}
-        leadingActions={canManageTemplates ? (
+          leadingActions={<>
+            {category === "faq" ? <UiSelect aria-label={lang === "ko" ? "FAQ 카테고리" : "FAQ category"} value={faqCategory} onChange={(event) => setFaqCategory(event.currentTarget.value as FaqCategory)} className="h-8 text-sm">
+              {FAQ_CATEGORIES.map((item) => <option key={item.key} value={item.key}>{lang === "ko" ? item.titleKo : item.titleEn}</option>)}
+            </UiSelect> : null}
+            {canManageTemplates ? (
           <ArticleTemplateControl
             boardCode={category}
             lang={lang}
             onApply={applyTemplate}
             snapshot={templateSnapshot}
           />
-        ) : null}
+          ) : null}</>}
       />
 
       <div className="min-h-[450px]">

@@ -1,5 +1,9 @@
 import type { PartialSearchKind } from "./use-search-page-controller";
 import type { FormEvent, ReactNode } from "react";
+import { useState } from "react";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { FilterSheet } from "@/components/ui/filter-sheet";
+import { MobileFilterActions, MobileFilterButton } from "@/components/ui/mobile-filter-controls";
 import { Link } from "react-router-dom";
 import type {
   ArticleListItem,
@@ -8,7 +12,8 @@ import type {
   PublicSurveyRecord,
   VoteRecord,
 } from "@soc/contracts";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Search } from "lucide-react";
+import { MobileEmptyState } from "@/components/ui/mobile-empty-state";
 
 import { PageActionButton, PageSearchField, PageTabButton, PageTabs } from "@/components/ui/page-layout";
 import { Button } from "@/components/ui/button";
@@ -42,6 +47,7 @@ export function SearchForm({
   onSubmit,
   onSearchByChange,
   searchBy,
+  mobileFilter,
 }: {
   inputValue: string;
   lang: string;
@@ -49,24 +55,31 @@ export function SearchForm({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSearchByChange: (value: "title" | "title_content") => void;
   searchBy: "title" | "title_content";
+  mobileFilter?: ReactNode;
 }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  if (isMobile) return <form onSubmit={onSubmit} className="mobile-filter-toolbar mobile-search-page-form">
+    <PageSearchField ariaLabel={lang === "ko" ? "통합검색" : "Site search"} className="!w-full min-w-0 flex-1" value={inputValue} onChange={onInputValueChange} onClear={() => onInputValueChange("")} placeholder={lang === "ko" ? "검색어를 입력하세요" : "Enter a search term"} />
+    {mobileFilter}
+  </form>;
   return (
     <form
       onSubmit={onSubmit}
       className="rounded-lg border border-card-border-subtle bg-white p-3"
     >
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="search-form-controls grid grid-cols-[minmax(0,1fr)_auto] gap-2 md:flex md:gap-3">
         <PageSearchField
           ariaLabel={lang === "ko" ? "통합검색" : "Site search"}
-          className="lg:w-auto lg:flex-1"
+          className="col-start-1 row-start-1 !w-full min-w-0 md:order-1 md:!w-auto md:!flex-1"
           value={inputValue}
           onChange={onInputValueChange}
           onClear={() => onInputValueChange("")}
           placeholder={lang === "ko" ? "검색어를 입력하세요" : "Enter a search term"}
         />
+        <div className="col-span-2 row-start-2 flex min-w-0 gap-2 md:order-2 md:w-36">
         <SelectDropdown
           ariaLabel={lang === "ko" ? "검색 범위" : "Search scope"}
-          className="w-full sm:w-36"
+          className="min-w-0 flex-1 md:w-36"
           value={searchBy}
           onChange={(value) => onSearchByChange(value as "title" | "title_content")}
           options={[
@@ -76,12 +89,37 @@ export function SearchForm({
           buttonClassName="text-sm font-normal"
           optionClassName="text-sm !font-normal"
         />
-        <PageActionButton type="submit" tone="primary" className="px-5">
+        {mobileFilter ? <div className="min-w-0 flex-1 md:hidden">{mobileFilter}</div> : null}
+        </div>
+        <PageActionButton type="submit" tone="primary" className="col-start-2 row-start-1 px-5 md:order-3">
           {lang === "ko" ? "검색" : "Search"}
         </PageActionButton>
       </div>
     </form>
   );
+}
+
+export function MobileSearchFilters({ searchBy, filter, counts, lang, onApply }: {
+  searchBy: "title" | "title_content"; filter: SearchFilter;
+  counts: Record<SearchFilter, number>; lang: string;
+  onApply: (scope: "title" | "title_content", kind: SearchFilter) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState({ scope: searchBy, kind: filter });
+  const kinds: Array<{ value: SearchFilter; label: string }> = [
+    { value: "all", label: lang === "ko" ? "전체" : "All" },
+    { value: "board", label: lang === "ko" ? "게시판" : "Board" },
+    { value: "faq", label: "FAQ" },
+    { value: "event", label: lang === "ko" ? "행사" : "Events" },
+    { value: "survey", label: lang === "ko" ? "설문" : "Surveys" },
+    { value: "vote", label: lang === "ko" ? "투표" : "Votes" },
+  ];
+  return <><MobileFilterButton open={open} active={filter !== "all" || searchBy !== "title_content"} label={lang === "ko" ? "필터" : "Filters"} onClick={() => { setDraft({ scope: searchBy, kind: filter }); setOpen(true); }} />
+    <FilterSheet className="mobile-filter-sheet" open={open} onClose={() => setOpen(false)} title={lang === "ko" ? "검색 필터" : "Search filters"} closeLabel={lang === "ko" ? "필터 닫기" : "Close filters"} footer={<MobileFilterActions lang={lang} onReset={() => setDraft({ scope: "title_content", kind: "all" })} onApply={() => { onApply(draft.scope, draft.kind); setOpen(false); }} />}>
+      <fieldset className="mobile-filter-fieldset"><legend>{lang === "ko" ? "검색 범위" : "Search scope"}</legend>{(["title_content", "title"] as const).map(scope => <label key={scope} className="mobile-filter-option"><input type="radio" name="mobile-search-scope" checked={draft.scope === scope} onChange={() => setDraft(previous => ({ ...previous, scope }))} /><span>{scope === "title" ? (lang === "ko" ? "제목" : "Title") : (lang === "ko" ? "제목 + 내용" : "Title + content")}</span></label>)}</fieldset>
+      <fieldset className="mobile-filter-fieldset"><legend>{lang === "ko" ? "결과 종류" : "Result type"}</legend>{kinds.map(kind => <label key={kind.value} className="mobile-filter-option"><input type="radio" name="mobile-search-kind" checked={draft.kind === kind.value} onChange={() => setDraft(previous => ({ ...previous, kind: kind.value }))} /><span>{kind.label}</span><span className="ml-auto text-xs tabular-nums text-slate-400">{counts[kind.value]}</span></label>)}</fieldset>
+    </FilterSheet>
+  </>;
 }
 
 export function SearchFilterTabs({
@@ -96,6 +134,7 @@ export function SearchFilterTabs({
   totalCount,
   voteCount,
   visible,
+  mode = "desktop",
 }: {
   partialErrors: PartialSearchKind[];
   activeFilter: SearchFilter;
@@ -108,6 +147,7 @@ export function SearchFilterTabs({
   totalCount: number;
   voteCount: number;
   visible: boolean;
+  mode?: "mobile" | "desktop";
 }) {
   if (!visible) return null;
 
@@ -124,8 +164,7 @@ export function SearchFilterTabs({
     { count: voteCount, filter: "vote", label: lang === "ko" ? "투표" : "Votes" },
   ];
 
-  return (
-    <>
+  if (mode === "mobile") return (
       <MobileSectionSelector
         ariaLabel={lang === "ko" ? "검색 결과 필터 선택" : "Select search result filter"}
         closeLabel={lang === "ko" ? "검색 결과 필터 닫기" : "Close search result filters"}
@@ -137,6 +176,8 @@ export function SearchFilterTabs({
         title={lang === "ko" ? "검색 결과 필터" : "Search result filters"}
         value={activeFilter}
       />
+  );
+  return (
       <PageTabs
         variant="trackless"
         aria-label={lang === "ko" ? "검색 결과 필터" : "Search result filters"}
@@ -154,7 +195,6 @@ export function SearchFilterTabs({
           </PageTabButton>
         ))}
       </PageTabs>
-    </>
   );
 }
 
@@ -178,13 +218,13 @@ export function SearchStatus({
       <span>
         {lang === "ko" ? (
           <>
-            <HighlightedText value={`"${query}"`} query={query} /> 검색 결과
+            <span className="md:hidden">&quot;{query}&quot;</span><span className="hidden md:inline"><HighlightedText value={`"${query}"`} query={query} /></span> 검색 결과
           </>
         ) : (
           <>Results for &quot;{query}&quot;</>
         )}
       </span>
-      {!loading ? <span>{lang === "ko" ? `표시된 결과 ${totalCount}건` : `${totalCount} results shown`}</span> : null}
+      {!loading ? <span className="hidden md:inline">{lang === "ko" ? `표시된 결과 ${totalCount}건` : `${totalCount} results shown`}</span> : null}
     </div>
   );
 }
@@ -269,9 +309,10 @@ export function SearchResults({
   const visibleErrors = partialErrors.filter(kind => filter === "all" || filter === kind);
   if (query && visibleCount === 0 && visibleErrors.length === 0) {
     return (
-      <p className="px-1 py-10 text-center text-sm font-normal text-slate-500" role="status">
+      <><MobileEmptyState icon={Search} message={lang === "ko" ? "검색 결과가 없습니다." : "No results found."} />
+      <p className="hidden px-1 py-10 text-center text-sm font-normal text-slate-500 md:block" role="status">
         {lang === "ko" ? "검색 결과가 없습니다." : "No results found."}
-      </p>
+      </p></>
     );
   }
 
@@ -340,6 +381,7 @@ function ArticleResults({
   lang: string;
   query: string;
 }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   return (
     <SectionShell count={articles.length} title={lang === "ko" ? "게시판" : "Board"}>
       {articles.map((article) => {
@@ -349,6 +391,7 @@ function ArticleResults({
         const snippet = getSnippet(
           matchingSnippet(article.snippetKo, article.snippetEn, article.titleKo, article.titleEn, query, lang),
           query,
+          isMobile,
         );
 
         return (
@@ -378,6 +421,7 @@ function EventResults({
   lang: string;
   query: string;
 }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   return (
     <SectionShell count={articles.length} title={lang === "ko" ? "행사" : "Events"}>
       {articles.map((article) => {
@@ -386,7 +430,7 @@ function EventResults({
         const period = end && end !== start ? `${start} ～ ${end}` : start;
         const description = matchingSnippet(article.eventDescriptionKo, article.eventDescriptionEn, article.titleKo, article.titleEn, query, lang);
         const title = lang === "ko" ? article.titleKo : article.titleEn || article.titleKo;
-        const snippet = getSnippet(description, query);
+        const snippet = getSnippet(description, query, isMobile);
 
         return (
           <SearchLink key={article.articleId} to={`/events/${article.articleId}`}>
@@ -461,12 +505,13 @@ function SurveyResults({
   query: string;
   surveys: PublicSurveyRecord[];
 }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   return (
     <SectionShell count={surveys.length} title={lang === "ko" ? "설문" : "Surveys"}>
       {surveys.map((survey) => {
         const title = lang === "ko" ? survey.titleKo : survey.titleEn || survey.titleKo;
         const description = matchingSnippet(survey.descriptionKo, survey.descriptionEn, survey.titleKo, survey.titleEn, query, lang);
-        const snippet = getSnippet(description, query);
+        const snippet = getSnippet(description, query, isMobile);
 
         return (
           <SearchLink key={survey.id} to={`/survey/${survey.id}`}>
@@ -494,6 +539,7 @@ function FaqResults({
   lang: string;
   query: string;
 }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   return (
     <SectionShell count={articles.length} title="FAQ">
       {articles.map((article) => {
@@ -501,6 +547,7 @@ function FaqResults({
         const snippet = getSnippet(
           matchingSnippet(article.snippetKo, article.snippetEn, article.titleKo, article.titleEn, query, lang),
           query,
+          isMobile,
         );
 
         return (
@@ -601,15 +648,16 @@ function SearchLink({ children, to }: { children: ReactNode; to: string }) {
 }
 
 function Snippet({ value, query }: { value: string; query: string }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   return (
-    <p className="mt-1 line-clamp-2 text-[length:var(--ui-text-body-sm-size)] font-normal leading-5 text-slate-500">
-      <HighlightedText value={value} query={query} />
+    <p className="search-result-snippet mt-1 line-clamp-2 text-[length:var(--ui-text-body-sm-size)] font-normal leading-5 text-slate-500">
+      <span className="md:hidden">{isMobile ? getSnippet(value, query, true) : value}</span><span className="hidden md:inline"><HighlightedText value={value} query={query} /></span>
     </p>
   );
 }
 
-function getSnippet(value: string | null | undefined, query: string) {
-  const text = stripRichText(value);
+function getSnippet(value: string | null | undefined, query: string, mobile = false) {
+  const text = stripRichText(mobile ? value?.replace(/\r?\n/g, " ").replace(/(<\/(?:p|div|li|h[1-6]|tr|blockquote)>|<br\s*\/?>)/gi, "$1 ") : value);
   if (!text) return "";
 
   const normalizedText = text.toLocaleLowerCase();
@@ -618,7 +666,17 @@ function getSnippet(value: string | null | undefined, query: string) {
   const maxLength = 180;
   if (text.length <= maxLength || matchIndex < 0) return text.slice(0, maxLength);
 
-  const start = Math.max(0, matchIndex - 42);
+  let start = Math.max(0, matchIndex - 42);
+  if (mobile && start > 0) {
+    const prefix = text.slice(start, matchIndex);
+    const boundaries = [...prefix.matchAll(/[.!?。！？]\s+/g)];
+    const boundary = boundaries.at(-1);
+    if (boundary) start += boundary.index + boundary[0].length;
+    else if (/\S/.test(text[start - 1])) {
+      const space = prefix.indexOf(" ");
+      if (space >= 0) start += space + 1;
+    }
+  }
   const end = Math.min(text.length, start + maxLength);
   return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
 }
@@ -637,7 +695,7 @@ function HighlightedText({ value, query }: { value: string; query: string }) {
     nodes.push(
       <mark
         key={`${matchIndex}-${cursor}`}
-        className="rounded-sm bg-emerald-50 px-0.5 font-medium text-emerald-700"
+        className="search-keyword-highlight rounded-sm bg-emerald-50 px-0.5 font-medium text-emerald-700"
       >
         {value.slice(matchIndex, matchIndex + query.length)}
       </mark>,

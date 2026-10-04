@@ -32,6 +32,9 @@ export function BoardPage() {
     totalCount,
     totalPages,
     writeState,
+    hasMoreArticles,
+    isLoadingMore,
+    loadMoreArticles,
   } = useBoardPageController();
 
   if (isBoardNotFound) {
@@ -39,7 +42,7 @@ export function BoardPage() {
   }
 
   return (
-    <PageShell>
+    <PageShell className="mobile-flat-board-list">
 
 
       <PageMain className="board-page-main">
@@ -80,6 +83,9 @@ export function BoardPage() {
           postsPerPage={postsPerPage}
           totalCount={totalCount}
           totalPages={totalPages}
+          hasMoreArticles={hasMoreArticles}
+          isLoadingMore={isLoadingMore}
+          onLoadMore={loadMoreArticles}
         />
       </PageMain>
     </PageShell>

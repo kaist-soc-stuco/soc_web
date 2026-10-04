@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { useOverlayBehavior } from "@/components/ui/use-overlay-behavior";
 import { cn } from "@/lib/utils";
+import { SheetHandle } from "@/components/ui/sheet-handle";
 
 export function Modal({
   children,
@@ -13,6 +14,7 @@ export function Modal({
   footer,
   headerActions,
   mobileFullscreen = false,
+  placement = "center",
   onClose,
   open,
   showClose = true,
@@ -26,6 +28,7 @@ export function Modal({
   footer?: ReactNode;
   headerActions?: ReactNode;
   mobileFullscreen?: boolean;
+  placement?: "center" | "bottom";
   onClose: () => void;
   open: boolean;
   showClose?: boolean;
@@ -50,7 +53,7 @@ export function Modal({
   if (!open) return null;
 
   return createPortal(
-    <div className={cn("ui-modal fixed inset-0 z-[70] flex items-center justify-center p-4 sm:py-6", mobileFullscreen && "max-sm:p-0")}>
+    <div className={cn("ui-modal fixed inset-0 z-[70] flex items-center justify-center p-4 sm:py-6", mobileFullscreen && "max-sm:p-0", placement === "bottom" && "ui-modal--bottom !items-end !p-0")}>
       <button
         type="button"
         aria-label="닫기"
@@ -74,6 +77,7 @@ export function Modal({
           className,
         )}
       >
+        {placement === "bottom" && <SheetHandle onClose={onClose} />}
         <div
           className={cn(
             "ui-modal__header flex shrink-0 items-center justify-between gap-3 px-5 pt-5",
