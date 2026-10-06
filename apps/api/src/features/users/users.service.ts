@@ -69,6 +69,27 @@ export class UsersService {
     return { limit, offset, page };
   }
 
+  private async recordStudentFeeAccess(
+    action: string,
+    subjectUserIds: string[],
+    filters: Record<string, unknown>,
+    audit?: AuditMetadata,
+  ): Promise<void> {
+    if (!audit) return;
+    const targets: Array<string | null> = [...new Set(subjectUserIds)];
+    if (targets.length === 0) targets.push(null);
+    for (const targetId of targets) {
+      await this.auditLogService.record({
+        action,
+        actorUserId: audit.actorUserId ?? null,
+        ipAddress: audit.ipAddress ?? null,
+        payload: { count: targetId ? 1 : 0, filters },
+        targetId,
+        targetType: "student_fee_status",
+      }, { required: true });
+    }
+  }
+
   /**
    * KAIST UID로 저장된 사용자를 조회합니다.
    */
@@ -289,6 +310,21 @@ export class UsersService {
     return this.usersRepository.getStudentFeeStatus(userId);
   }
 
+  async getStudentFeeStatusForAdmin(
+    userId: string,
+    audit?: AuditMetadata,
+  ): Promise<StudentFeeStatusRecord> {
+    const status = await this.usersRepository.getStudentFeeStatus(userId)
+      ?? await this.usersRepository.ensureStudentFeeStatus(userId);
+    await this.recordStudentFeeAccess(
+      "student_fee_status.status",
+      [userId],
+      {},
+      audit,
+    );
+    return status;
+  }
+
   async applyStudentFeeBootstrap(
     userId: string,
     stdNo: string | null | undefined,
@@ -323,7 +359,10 @@ export class UsersService {
     return record;
   }
 
-  async previewStudentFeeImport(input: BulkUpdateStudentFeeStatusRequest): Promise<StudentFeeImportPreview> {
+  async previewStudentFeeImport(
+    input: BulkUpdateStudentFeeStatusRequest,
+    audit?: AuditMetadata,
+  ): Promise<StudentFeeImportPreview> {
     const seen = new Set<string>();
     const rows: StudentFeeImportPreview["rows"] = [];
     for (const update of input.updates) {
@@ -335,6 +374,12 @@ export class UsersService {
       rows.push({ identifier: update.userId ?? update.stdNo!, userId: user?.userId ?? null,
         current: user ? await this.usersRepository.getStudentFeeStatus(user.userId) : null, error });
     }
+    await this.recordStudentFeeAccess(
+      "student_fee_status.preview",
+      rows.flatMap((row) => row.userId ? [row.userId] : []),
+      { requestCount: input.updates.length },
+      audit,
+    );
     return { rows, canApply: rows.length > 0 && rows.every((row) => !row.error) };
   }
 
@@ -382,8 +427,19 @@ export class UsersService {
     return this.usersRepository.ensureStudentFeeStatus(userId);
   }
 
-  async getStudentFeeDetail(userId: string, referenceSemester?: string): Promise<StudentFeeDetailResponse | null> {
-    return this.usersRepository.getStudentFeeDetail(userId, referenceSemester);
+  async getStudentFeeDetail(
+    userId: string,
+    referenceSemester?: string,
+    audit?: AuditMetadata,
+  ): Promise<StudentFeeDetailResponse | null> {
+    const detail = await this.usersRepository.getStudentFeeDetail(userId, referenceSemester);
+    await this.recordStudentFeeAccess(
+      "student_fee_status.detail",
+      detail ? [userId] : [],
+      { referenceSemester: referenceSemester ?? null },
+      audit,
+    );
+    return detail;
   }
 
   async processStudentFeePayments(
@@ -419,8 +475,9 @@ export class UsersService {
     majorCategory?: FeeMajorCategory,
     referenceSemester?: string,
     userIds?: string[],
+    audit?: AuditMetadata,
   ): Promise<StudentFeeListResponse> {
-    return this.usersRepository.listStudentsByFeeStatus(
+    const result = await this.usersRepository.listStudentsByFeeStatus(
       status,
       page,
       pageSize,
@@ -432,6 +489,22 @@ export class UsersService {
       referenceSemester,
       userIds,
     );
+    await this.recordStudentFeeAccess(
+      "student_fee_status.list",
+      result.students.map((student) => student.userId),
+      {
+        majorCategory: majorCategory ?? null,
+        page: page ?? 1,
+        pageSize: pageSize ?? 20,
+        paymentYear: paymentYear ?? null,
+        queryApplied: Boolean(query?.trim()),
+        referenceSemester: referenceSemester ?? null,
+        status: status ?? null,
+        userIdFilterCount: userIds?.length ?? 0,
+      },
+      audit,
+    );
+    return result;
   }
 
   async getStudentFeeStats(options: StudentFeeStatsOptions = {}): Promise<StudentFeeStatsResponse> {

@@ -126,6 +126,10 @@ const ACTION_DEFINITIONS: Record<string, { label: string; kind: AuditLogEventKin
   "executive_contact.spreadsheet.sync": { label: "연락망 시트 동기화", kind: "EXECUTE" },
   "executive_contact.update": { label: "연락망 구성원 수정", kind: "UPDATE" },
   "student_fee.export": { label: "과비 내보내기", kind: "EXECUTE" },
+  "student_fee_status.detail": { label: "과비 개인정보 상세 조회", kind: "EXECUTE" },
+  "student_fee_status.list": { label: "과비 개인정보 목록 조회", kind: "EXECUTE" },
+  "student_fee_status.preview": { label: "과비 변경 미리보기 조회", kind: "EXECUTE" },
+  "student_fee_status.status": { label: "과비 상태 조회", kind: "EXECUTE" },
   "student_fee_status.bulk_update": { label: "과비 상태 일괄 변경", kind: "BATCH" },
   "student_fee.spreadsheet.connect": { label: "과비 시트 연결", kind: "EXECUTE" },
   "student_fee.spreadsheet.sync": { label: "과비 시트 동기화", kind: "EXECUTE" },
@@ -313,6 +317,7 @@ export class AuditLogRepository {
             ilike(auditLogs.targetType, queryPattern),
             ilike(auditLogs.targetId, queryPattern),
             ilike(auditLogs.payload, queryPattern),
+            ilike(users.kaistUid, queryPattern),
             ilike(users.nameKo, queryPattern),
             ilike(users.email, queryPattern),
             sql`EXISTS (
@@ -341,6 +346,7 @@ export class AuditLogRepository {
     const rows = await this.db
       .select({
         action: auditLogs.action,
+        actorKaistUid: users.kaistUid,
         actorNameKo: users.nameKo,
         actorUserId: auditLogs.actorUserId,
         auditLogId: auditLogs.auditLogId,
@@ -446,6 +452,7 @@ export class AuditLogRepository {
       return {
         action: row.action,
         actionLabel: definition.label,
+        actorKaistUid: row.actorKaistUid ?? null,
         actorNameKo: row.actorNameKo ?? null,
         actorUserId: row.actorUserId ?? null,
         auditLogId: row.auditLogId,

@@ -243,6 +243,7 @@ export class UsersController {
   @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
   async listStudentsByFeeStatus(
+    @Req() req: AuthenticatedRequest,
     @Query("status") status?: string,
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
@@ -279,6 +280,7 @@ export class UsersController {
       feeMajorCategory,
       referenceSemester,
       userIds?.split(",").filter(Boolean),
+      auditMetadataFromRequest(req),
     );
   }
 
@@ -429,8 +431,9 @@ export class UsersController {
   @RequirePermissions(Permissions.MANAGE_FINANCE)
   previewStudentFeeImport(
     @Body(new ZodValidationPipe(BulkUpdateStudentFeeStatusSchema)) body: BulkUpdateStudentFeeStatusRequest,
+    @Req() req: AuthenticatedRequest,
   ) {
-    return this.usersService.previewStudentFeeImport(body);
+    return this.usersService.previewStudentFeeImport(body, auditMetadataFromRequest(req));
   }
 
   @Post("fee-status/bulk")
@@ -464,8 +467,16 @@ export class UsersController {
   @Get("fee-status/detail/:userId")
   @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
-  async getStudentFeeDetail(@Param("userId") userId: string, @Query("referenceSemester") referenceSemester?: string) {
-    const detail = await this.usersService.getStudentFeeDetail(userId, referenceSemester);
+  async getStudentFeeDetail(
+    @Req() req: AuthenticatedRequest,
+    @Param("userId") userId: string,
+    @Query("referenceSemester") referenceSemester?: string,
+  ) {
+    const detail = await this.usersService.getStudentFeeDetail(
+      userId,
+      referenceSemester,
+      auditMetadataFromRequest(req),
+    );
     if (!detail) return { user: null, status: null, history: [] };
     return detail;
   }
@@ -473,13 +484,14 @@ export class UsersController {
   @Get(":userId/fee-status")
   @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
-  async getStudentFeeStatus(@Param("userId") userId: string) {
-    const status = await this.usersService.getStudentFeeStatus(userId);
-    if (!status) {
-      // 없으면 기본값으로 생성
-      return this.usersService.ensureStudentFeeStatus(userId);
-    }
-    return status;
+  async getStudentFeeStatus(
+    @Req() req: AuthenticatedRequest,
+    @Param("userId") userId: string,
+  ) {
+    return this.usersService.getStudentFeeStatusForAdmin(
+      userId,
+      auditMetadataFromRequest(req),
+    );
   }
 
   @Put(":userId/fee-status")

@@ -10,6 +10,7 @@ const {
 } = require("../dist/apps/api/src/features/users/users.service.js");
 
 const USER_ID = "48cf27f9-c914-4485-adb8-7cec115a6b15";
+const SECOND_USER_ID = "ab4f7286-a0c9-4584-a92d-13459808a6f6";
 
 function createFeeRepository(initialRow) {
   let row = initialRow ? { ...initialRow } : null;
@@ -251,4 +252,152 @@ test("note-only fee updates remain visible in the existing audit trail", async (
     record,
   });
   assert.deepEqual(queuedResources, ["STUDENT_FEES"]);
+});
+
+test("fee-management list views record the current-page subjects without duplicating internal reads", async () => {
+  const records = [];
+  const response = {
+    students: [{ userId: USER_ID }, { userId: SECOND_USER_ID }],
+    total: 2,
+    page: 1,
+    pageSize: 20,
+    summary: {},
+  };
+  const service = new UsersService(
+    { listStudentsByFeeStatus: async () => response },
+    { record: async (input, options) => records.push({ input, options }) },
+  );
+
+  const result = await service.listStudentsByFeeStatus(
+    "PAID",
+    1,
+    20,
+    "studentId",
+    "asc",
+    "20260000",
+    2026,
+    "PRIMARY",
+    "2026-2",
+    undefined,
+    { actorUserId: "admin-user", ipAddress: "203.0.113.10" },
+  );
+
+  assert.strictEqual(result, response);
+  assert.deepEqual(records, [USER_ID, SECOND_USER_ID].map((targetId) => ({
+    input: {
+      action: "student_fee_status.list",
+      actorUserId: "admin-user",
+      ipAddress: "203.0.113.10",
+      payload: {
+        count: 1,
+        filters: {
+          majorCategory: "PRIMARY",
+          page: 1,
+          pageSize: 20,
+          paymentYear: 2026,
+          queryApplied: true,
+          referenceSemester: "2026-2",
+          status: "PAID",
+          userIdFilterCount: 0,
+        },
+      },
+      targetId,
+      targetType: "student_fee_status",
+    },
+    options: { required: true },
+  })));
+
+  await service.listStudentsByFeeStatus("PAID", 1, 20);
+  assert.equal(records.length, 2);
+});
+
+test("empty fee-management list views still record the access attempt", async () => {
+  const records = [];
+  const service = new UsersService(
+    { listStudentsByFeeStatus: async () => ({ students: [], total: 0, page: 1, pageSize: 20, summary: {} }) },
+    { record: async (input, options) => records.push({ input, options }) },
+  );
+
+  await service.listStudentsByFeeStatus(
+    undefined,
+    1,
+    20,
+    "name",
+    "asc",
+    "no-result",
+    undefined,
+    undefined,
+    "2026-2",
+    undefined,
+    { actorUserId: "admin-user", ipAddress: "203.0.113.10" },
+  );
+
+  assert.equal(records.length, 1);
+  assert.equal(records[0].input.targetId, null);
+  assert.equal(records[0].input.payload.count, 0);
+  assert.deepEqual(records[0].options, { required: true });
+});
+
+test("fee-management detail views record the subject and fail closed on audit storage errors", async () => {
+  const detail = { user: { userId: USER_ID }, status: {}, history: [] };
+  const failure = new Error("audit storage unavailable");
+  const service = new UsersService(
+    { getStudentFeeDetail: async () => detail },
+    {
+      record: async (input, options) => {
+        assert.equal(input.action, "student_fee_status.detail");
+        assert.equal(input.actorUserId, "admin-user");
+        assert.equal(input.ipAddress, "203.0.113.10");
+        assert.equal(input.targetId, USER_ID);
+        assert.deepEqual(input.payload, {
+          count: 1,
+          filters: { referenceSemester: "2026-2" },
+        });
+        assert.deepEqual(options, { required: true });
+        throw failure;
+      },
+    },
+  );
+
+  await assert.rejects(
+    service.getStudentFeeDetail(
+      USER_ID,
+      "2026-2",
+      { actorUserId: "admin-user", ipAddress: "203.0.113.10" },
+    ),
+    failure,
+  );
+});
+
+test("fee status and preview read paths record each resolved subject", async () => {
+  const records = [];
+  const status = { userId: USER_ID, status: "PAID" };
+  const repository = {
+    getStudentFeeStatus: async (userId) => userId === USER_ID ? status : { userId, status: "UNPAID" },
+    findById: async (userId) => ({ userId }),
+    findByStdNo: async () => null,
+  };
+  const service = new UsersService(
+    repository,
+    { record: async (input, options) => records.push({ input, options }) },
+  );
+  const audit = { actorUserId: "admin-user", ipAddress: "203.0.113.10" };
+
+  assert.strictEqual(await service.getStudentFeeStatusForAdmin(USER_ID, audit), status);
+  const preview = await service.previewStudentFeeImport({
+    updates: [
+      { userId: USER_ID, status: "PAID" },
+      { userId: SECOND_USER_ID, status: "UNPAID" },
+      { stdNo: "not-found", status: "UNPAID" },
+    ],
+  }, audit);
+
+  assert.equal(preview.rows.length, 3);
+  assert.deepEqual(records.map(({ input }) => [input.action, input.targetId]), [
+    ["student_fee_status.status", USER_ID],
+    ["student_fee_status.preview", USER_ID],
+    ["student_fee_status.preview", SECOND_USER_ID],
+  ]);
+  assert.ok(records.every(({ options }) => options.required === true));
+  assert.deepEqual(records[1].input.payload, { count: 1, filters: { requestCount: 3 } });
 });

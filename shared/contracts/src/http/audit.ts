@@ -2,6 +2,7 @@ export type AuditLogEventKind = "UPDATE" | "EXECUTE" | "BATCH" | "CREATE" | "DEL
 
 export interface AuditLogRecord {
   auditLogId: number;
+  actorKaistUid: string | null;
   actorUserId: string | null;
   actorNameKo: string | null;
   action: string;

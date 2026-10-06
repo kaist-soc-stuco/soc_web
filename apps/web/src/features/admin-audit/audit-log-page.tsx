@@ -75,7 +75,7 @@ const formatDateTime = (value: string | null | undefined) => {
   if (!value) return "—";
   const date = isoToDate(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}`;
 };
 
 const parsePayload = (value: string | null): AuditPayload => {
@@ -126,6 +126,16 @@ const snapshotEntries = (log: AuditLogRecord) => {
   return snapshot ? Object.entries(snapshot).filter(([key]) => !["createdAt", "updatedAt", "id"].includes(key)) : [];
 };
 
+const subjectIdentifierSummary = (log: AuditLogRecord) => {
+  const payload = parsePayload(log.payload);
+  const subjectUserIds = Array.isArray(payload.subjectUserIds)
+    ? payload.subjectUserIds.filter((value): value is string => typeof value === "string" && value.length > 0)
+    : [];
+  const identifiers = [...new Set([...(log.targetId ? [log.targetId] : []), ...subjectUserIds])];
+  if (identifiers.length === 0) return "식별자 없음";
+  return identifiers.length === 1 ? identifiers[0] : `${identifiers[0]} 외 ${identifiers.length - 1}건`;
+};
+
 const getEventLabel = (kind: AuditLogEventKind) => ({
   BATCH: "일괄 실행",
   CREATE: "생성",
@@ -164,7 +174,7 @@ export function AuditLogPage() {
   });
   const data = logsQuery.data;
   const loading = logsQuery.isFetching;
-  const error = logsQuery.isError ? "운영 로그를 불러오지 못했습니다." : null;
+  const error = logsQuery.isError ? "접속기록을 불러오지 못했습니다." : null;
 
   const totalCount = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -215,7 +225,7 @@ export function AuditLogPage() {
       {DownloadReasonDialog}
         <AdminPageMain tableLayout className="!max-w-6xl">
           <AdminPageHeader
-            title="운영 로그"
+            title="접속기록 관리"
             actions={<Button type="button" disabled={exporting} aria-busy={exporting} onClick={() => void handleExport()}><Download aria-hidden="true" className="size-4" />내보내기</Button>}
           />
 
@@ -231,7 +241,7 @@ export function AuditLogPage() {
                 className="w-full flex-none sm:w-72"
                 onChange={(value) => updatePageFilter(setQuery, value)}
                 onClear={() => updatePageFilter(setQuery, "")}
-                placeholder="담당자, 대상, 액션 검색"
+                placeholder="계정, 정보주체, 수행 업무 검색"
                 value={query}
               />
             </div>
@@ -240,15 +250,15 @@ export function AuditLogPage() {
 
             <div aria-busy={loading} >
               {error && !data ? <div className="p-6"><EmptyState message={error} /></div> : data && data.items.length > 0 ? (
-                <AdminDataTable minWidth={0} mobileMode="cards">
-                  <colgroup><col style={{ width: "18%" }} /><col style={{ width: "13%" }} /><col style={{ width: "23%" }} /><col style={{ width: "28%" }} /><col style={{ width: "18%" }} /></colgroup>
+                <AdminDataTable minWidth={1040} mobileMode="cards">
+                  <colgroup><col style={{ width: "21%" }} /><col style={{ width: "17%" }} /><col style={{ width: "14%" }} /><col style={{ width: "25%" }} /><col style={{ width: "23%" }} /></colgroup>
                   <AdminTableHeader>
                     <tr>
-                      <SortableHead label="발생 시각" active={sortBy === "createdAt"} ascending={sortDirection === "asc"} onClick={() => changeSort("createdAt")} />
-                      <AdminTableHead>구분</AdminTableHead>
-                      <SortableHead label="액션" active={sortBy === "action"} ascending={sortDirection === "asc"} onClick={() => changeSort("action")} />
-                      <AdminTableHead>대상 (식별 정보)</AdminTableHead>
-                      <SortableHead label="담당자" active={sortBy === "actor"} ascending={sortDirection === "asc"} onClick={() => changeSort("actor")} />
+                      <SortableHead label="계정(식별자)" active={sortBy === "actor"} ascending={sortDirection === "asc"} onClick={() => changeSort("actor")} />
+                      <SortableHead label="접속 일시" active={sortBy === "createdAt"} ascending={sortDirection === "asc"} onClick={() => changeSort("createdAt")} />
+                      <AdminTableHead>접속지 정보</AdminTableHead>
+                      <AdminTableHead>처리한 정보주체</AdminTableHead>
+                      <SortableHead label="수행 업무(처리 내역)" active={sortBy === "action"} ascending={sortDirection === "asc"} onClick={() => changeSort("action")} />
                     </tr>
                   </AdminTableHeader>
                   <AdminTableBody>
@@ -260,16 +270,16 @@ export function AuditLogPage() {
                         onClick={() => setSelectedLog(log)}
                         onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedLog(log); } }}
                       >
-                        <AdminTableCell className="whitespace-nowrap text-sm tabular-nums text-slate-600">{formatDateTime(log.createdAt)}</AdminTableCell>
-                        <AdminTableCell data-mobile-label="구분"><Badge className="border-0 bg-slate-100 text-slate-700">{log.domainLabel}</Badge></AdminTableCell>
-                        <AdminTableCell data-mobile-label="액션" className="admin-table-text-emphasis">{log.actionLabel}</AdminTableCell>
-                        <AdminTableCell data-mobile-label="대상" className="max-w-0"><span className="block truncate text-sm font-normal text-slate-700" title={log.targetLabel}>{log.targetLabel}</span></AdminTableCell>
-                        <AdminTableCell data-mobile-label="담당자" className="text-sm font-normal text-slate-600">{log.actorNameKo ?? "시스템"}</AdminTableCell>
+                        <AdminTableCell data-mobile-label="계정(식별자)" className="min-w-0"><span className="block truncate text-sm font-medium text-slate-800">{log.actorNameKo ?? "시스템"}</span><span className="block truncate font-mono text-xs text-slate-500" title={log.actorKaistUid ?? log.actorUserId ?? undefined}>{log.actorKaistUid ? `KAIST ID ${log.actorKaistUid}` : log.actorUserId ?? "—"}</span></AdminTableCell>
+                        <AdminTableCell data-mobile-label="접속 일시" className="whitespace-nowrap text-sm tabular-nums text-slate-600">{formatDateTime(log.createdAt)}</AdminTableCell>
+                        <AdminTableCell data-mobile-label="접속지 정보" className="font-mono text-xs text-slate-600">{log.ipAddress ?? "—"}</AdminTableCell>
+                        <AdminTableCell data-mobile-label="처리한 정보주체" className="min-w-0"><span className="block truncate text-sm font-normal text-slate-700" title={log.targetLabel}>{log.targetLabel}</span><span className="block truncate font-mono text-xs text-slate-500" title={subjectIdentifierSummary(log)}>{subjectIdentifierSummary(log)}</span></AdminTableCell>
+                        <AdminTableCell data-mobile-label="수행 업무(처리 내역)" className="min-w-0"><span className="flex items-center gap-2"><Badge className="shrink-0 border-0 bg-slate-100 text-slate-700">{log.domainLabel}</Badge><span className="truncate text-sm font-medium text-slate-800">{log.actionLabel}</span></span><span className="mt-1 block truncate font-mono text-xs text-slate-500" title={log.action}>{log.action}</span></AdminTableCell>
                       </tr>
                     ))}
                   </AdminTableBody>
                 </AdminDataTable>
-              ) : data ? <AdminEmptyState message="등록된 운영 로그가 없습니다." className="flex-1" /> : null}
+              ) : data ? <AdminEmptyState message="등록된 접속기록이 없습니다." className="flex-1" /> : null}
             </div>
 
             <div className="border-t border-slate-100 px-5 py-3">
@@ -309,12 +319,12 @@ function AuditLogDetailDrawer({ log, onClose }: { log: AuditLogRecord | null; on
   const snapshots = log ? snapshotEntries(log) : [];
 
   return (
-    <AdminDrawer open={Boolean(log)} onClose={onClose} title="운영 로그 상세" width="max-w-2xl">
+    <AdminDrawer open={Boolean(log)} onClose={onClose} title="접속기록 상세" width="max-w-2xl">
       {log ? (
         <div className="space-y-6">
           <header className="space-y-3">
             <div className="flex flex-wrap items-center gap-2"><Badge className="border-0 bg-slate-100 text-slate-700">{log.domainLabel}</Badge><span className="text-base font-semibold text-slate-950">{log.actionLabel}</span></div>
-            <p className="text-sm font-normal text-slate-500">{formatDateTime(log.createdAt)} · 실행자: {log.actorNameKo ?? "시스템"}{log.actorUserId ? ` (${log.actorUserId})` : ""}</p>
+            <p className="text-sm font-normal text-slate-500">{formatDateTime(log.createdAt)} · 접속 계정: {log.actorNameKo ?? "시스템"}{log.actorKaistUid ? ` (${log.actorKaistUid})` : log.actorUserId ? ` (${log.actorUserId})` : ""}</p>
           </header>
 
           <dl className="grid gap-4 rounded-xl bg-slate-50 px-4 py-4 sm:grid-cols-2">
