@@ -142,6 +142,7 @@ const getEventLabel = (kind: AuditLogEventKind) => ({
   DELETE: "삭제",
   EXECUTE: "실행",
   OTHER: "실행",
+  READ: "조회",
   UPDATE: "수정",
 }[kind]);
 

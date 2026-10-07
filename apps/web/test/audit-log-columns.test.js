@@ -24,3 +24,22 @@ test("audit log table exposes all five required access-record fields", () => {
   assert.match(source, /subjectIdentifierSummary\(log\)/);
   assert.match(source, /log\.actionLabel/);
 });
+
+test("student fee access events are displayed as reads", () => {
+  const pageSource = fs.readFileSync(
+    path.join(__dirname, "../src/features/admin-audit/audit-log-page.tsx"),
+    "utf8",
+  );
+  const repositorySource = fs.readFileSync(
+    path.join(__dirname, "../../api/src/features/audit/audit-log.repository.ts"),
+    "utf8",
+  );
+
+  assert.match(pageSource, /READ:\s*"조회"/);
+  for (const action of ["detail", "list", "preview", "status"]) {
+    assert.match(
+      repositorySource,
+      new RegExp(`"student_fee_status\\.${action}"[^\\n]+kind: "READ"`),
+    );
+  }
+});

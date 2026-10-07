@@ -1,4 +1,4 @@
-export type AuditLogEventKind = "UPDATE" | "EXECUTE" | "BATCH" | "CREATE" | "DELETE" | "OTHER";
+export type AuditLogEventKind = "UPDATE" | "READ" | "EXECUTE" | "BATCH" | "CREATE" | "DELETE" | "OTHER";
 
 export interface AuditLogRecord {
   auditLogId: number;
