@@ -40,12 +40,9 @@ export const createAuthApi = ({
     });
   },
 
-  getSession: async (sessionId?: string): Promise<LoginSessionResponse> => {
-    const query = sessionId
-      ? `?sessionId=${encodeURIComponent(sessionId)}`
-      : "";
+  getSession: async (): Promise<LoginSessionResponse> => {
     return requestJson<LoginSessionResponse>(
-      `${authBaseUrl}/session${query}`,
+      `${authBaseUrl}/session`,
       {
         cache: "no-store",
         method: "GET",

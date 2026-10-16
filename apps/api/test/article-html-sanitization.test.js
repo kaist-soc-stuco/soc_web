@@ -235,12 +235,26 @@ test("only the anonymous article owner can edit without exposing their identity"
 
 test("editor sizes and image layout survive sanitization without allowing unsafe attributes", () => {
   const { sanitizeArticleHtml } = require("../dist/apps/api/src/features/board/article-html-sanitizer.js");
-  const result = sanitizeArticleHtml('<p><strong><span style="font-size:50px;color:#2563eb">First</span></strong></p><p><strong><span style="font-size:50px;color:#2563eb">Next</span></strong></p><img src="https://example.com/a.png" width="320" height="180" data-align="center" onerror="alert(1)">');
+  const result = sanitizeArticleHtml('<p><strong><span style="font-size:50px;color:#2563eb">First</span></strong></p><p><strong><span style="font-size:50px;color:#2563eb">Next</span></strong></p><img src="/api/assets/42/content" width="320" height="180" data-align="center" onerror="alert(1)">');
   assert.equal((result.match(/font-size:50px/g) || []).length, 2);
   assert.match(result, /width="320"/);
   assert.match(result, /height="180"/);
   assert.match(result, /data-align="center"/);
   assert.doesNotMatch(result, /onerror/);
-  const unsafe = sanitizeArticleHtml('<img src="https://example.com/a.png" width="-20" height="100%" data-align="invalid" style="position:fixed">');
+  const unsafe = sanitizeArticleHtml('<img src="asset:42" width="-20" height="100%" data-align="invalid" style="position:fixed">');
   assert.doesNotMatch(unsafe, /width=|height=|data-align=|style=/);
+});
+
+test("article images allow only internal asset references", () => {
+  const { sanitizeArticleHtml } = require("../dist/apps/api/src/features/board/article-html-sanitizer.js");
+  const result = sanitizeArticleHtml([
+    '<img src="https://attacker.example/pixel">',
+    '<img src="https://attacker.example/api/assets/42/content">',
+    '<img src="/api/assets/42/content">',
+    '<img src="asset:43">',
+  ].join(""));
+  assert.doesNotMatch(result, /attacker\.example/);
+  assert.match(result, /src="\/api\/assets\/42\/content"/);
+  assert.match(result, /src="asset:43"/);
+  assert.equal((result.match(/<img/g) || []).length, 2);
 });

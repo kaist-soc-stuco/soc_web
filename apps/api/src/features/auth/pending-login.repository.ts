@@ -4,51 +4,57 @@ import {
   InternalServerErrorException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import {
-  createCipheriv,
-  createDecipheriv,
-  createHash,
-  randomBytes,
-} from "node:crypto";
 import Redis from "ioredis";
 
 import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
+import { AuthPayloadCipher } from "./auth-payload-crypto";
 import type { PendingSsoUser } from "./auth.types";
 
 const PENDING_LOGIN_PREFIX = "auth:pending-login:";
 
-interface StoredPendingSsoUser {
-  encryptedEmail: string;
-  expiresAt: number;
-  kaistUid: string;
-  academicStatus?: string;
-  departmentEn?: string;
-  departmentKo?: string;
-  primaryMajor?: string;
-  gender?: string;
-  identityCode?: string;
-  nameEn?: string;
-  nameKo: string;
-  ssoSubject: string;
-  stdNo?: string;
-}
+const isOptionalString = (value: unknown): value is string | undefined =>
+  value === undefined || typeof value === "string";
+
+const isPendingSsoUser = (value: unknown): value is PendingSsoUser => {
+  if (!value || typeof value !== "object") return false;
+  const payload = value as Partial<Record<keyof PendingSsoUser, unknown>>;
+  return (
+    typeof payload.expiresAt === "number" &&
+    Number.isFinite(payload.expiresAt) &&
+    typeof payload.ssoSubject === "string" &&
+    typeof payload.kaistUid === "string" &&
+    typeof payload.nameKo === "string" &&
+    typeof payload.email === "string" &&
+    isOptionalString(payload.nameEn) &&
+    isOptionalString(payload.stdNo) &&
+    isOptionalString(payload.departmentKo) &&
+    isOptionalString(payload.departmentEn) &&
+    isOptionalString(payload.primaryMajor) &&
+    isOptionalString(payload.gender) &&
+    isOptionalString(payload.academicStatus) &&
+    isOptionalString(payload.identityCode)
+  );
+};
 
 @Injectable()
 export class PendingLoginRepository {
-  private readonly encryptionKey: Buffer;
+  private readonly cipher: AuthPayloadCipher;
 
   constructor(
     private readonly configService: ConfigService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {
-    this.encryptionKey = this.createEncryptionKey();
+    this.cipher = new AuthPayloadCipher(
+      this.readEncryptionSecret(),
+      "pending-login",
+    );
   }
 
   private buildKey(pendingLoginToken: string): string {
     return `${PENDING_LOGIN_PREFIX}${pendingLoginToken}`;
   }
 
-  private createEncryptionKey(): Buffer {
+  private readEncryptionSecret(): string {
     const encryptionSeed = this.configService.get<string>(
       "AUTH_PENDING_LOGIN_ENCRYPTION_KEY",
     );
@@ -59,80 +65,12 @@ export class PendingLoginRepository {
       );
     }
 
-    return createHash("sha256").update(encryptionSeed).digest();
-  }
-
-  private encrypt(plainText: string): string {
-    const iv = randomBytes(12);
-    const cipher = createCipheriv("aes-256-gcm", this.encryptionKey, iv);
-    const encrypted = Buffer.concat([
-      cipher.update(plainText, "utf8"),
-      cipher.final(),
-    ]);
-    const authTag = cipher.getAuthTag();
-
-    return `${iv.toString("base64url")}.${authTag.toString("base64url")}.${encrypted.toString("base64url")}`;
-  }
-
-  private decrypt(cipherText: string): string {
-    const [ivRaw, authTagRaw, encryptedRaw] = cipherText.split(".");
-
-    if (!ivRaw || !authTagRaw || !encryptedRaw) {
-      throw new InternalServerErrorException("pending_login_payload_corrupted");
-    }
-
-    const iv = Buffer.from(ivRaw, "base64url");
-    const authTag = Buffer.from(authTagRaw, "base64url");
-    const encrypted = Buffer.from(encryptedRaw, "base64url");
-    const decipher = createDecipheriv("aes-256-gcm", this.encryptionKey, iv);
-
-    decipher.setAuthTag(authTag);
-
-    return Buffer.concat([
-      decipher.update(encrypted),
-      decipher.final(),
-    ]).toString("utf8");
-  }
-
-  private serialize(payload: PendingSsoUser): StoredPendingSsoUser {
-    return {
-      encryptedEmail: this.encrypt(payload.email),
-      academicStatus: payload.academicStatus,
-      departmentEn: payload.departmentEn,
-      departmentKo: payload.departmentKo,
-      primaryMajor: payload.primaryMajor,
-      gender: payload.gender,
-      expiresAt: payload.expiresAt,
-      identityCode: payload.identityCode,
-      kaistUid: payload.kaistUid,
-      nameEn: payload.nameEn,
-      nameKo: payload.nameKo,
-      ssoSubject: payload.ssoSubject,
-      stdNo: payload.stdNo,
-    };
+    return encryptionSeed;
   }
 
   private parse(rawValue: string): PendingSsoUser | null {
-    try {
-      const parsed = JSON.parse(rawValue) as StoredPendingSsoUser;
-      return {
-        academicStatus: parsed.academicStatus,
-        departmentEn: parsed.departmentEn,
-        departmentKo: parsed.departmentKo,
-        primaryMajor: parsed.primaryMajor,
-        gender: parsed.gender,
-        email: this.decrypt(parsed.encryptedEmail),
-        expiresAt: parsed.expiresAt,
-        identityCode: parsed.identityCode,
-        kaistUid: parsed.kaistUid,
-        nameEn: parsed.nameEn,
-        nameKo: parsed.nameKo,
-        ssoSubject: parsed.ssoSubject,
-        stdNo: parsed.stdNo,
-      };
-    } catch {
-      return null;
-    }
+    const parsed = this.cipher.decrypt(rawValue);
+    return isPendingSsoUser(parsed) ? parsed : null;
   }
 
   async save(
@@ -144,7 +82,7 @@ export class PendingLoginRepository {
 
     await this.redis.set(
       pendingKey,
-      JSON.stringify(this.serialize(payload)),
+      this.cipher.encrypt(payload),
       "EX",
       ttlSeconds,
     );

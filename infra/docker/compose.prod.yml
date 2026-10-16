@@ -67,6 +67,9 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+    networks:
+      - frontend
+      - backend
 
   web:
     build:
@@ -97,6 +100,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    networks:
+      - frontend
 
   postgres:
     image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
@@ -117,6 +122,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+    networks:
+      - backend
 
   audit-log-backup:
     image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
@@ -153,6 +160,8 @@ services:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
+    networks:
+      - backend
 
   db-migrate:
     build:
@@ -179,10 +188,14 @@ services:
       - ../../apps/api/uploads:/app/apps/api/uploads
     logging: *default-logging
     command: ["sh", "-c", "pnpm db:migrate"]
+    networks:
+      - backend
 
   redis:
     image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    command: ["sh", "-c", "exec redis-server /usr/local/etc/redis/redis.conf --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     volumes:
       - redis_data:/data
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
@@ -191,10 +204,12 @@ services:
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - backend
 
   nginx:
     image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
@@ -228,7 +243,14 @@ services:
         condition: service_healthy
       api:
         condition: service_healthy
+    networks:
+      - frontend
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  frontend:
+  backend:
+    internal: true

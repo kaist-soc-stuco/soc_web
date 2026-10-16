@@ -5,7 +5,6 @@ import {
   Header,
   InternalServerErrorException,
   Post,
-  Query,
   Req,
   Res,
   Optional,
@@ -204,11 +203,10 @@ export class AuthController {
   @Header("Cache-Control", "private, no-store")
   async getSession(
     @Cookies(AUTH_SESSION_COOKIE_NAME) cookieSessionId: string | undefined,
-    @Query("sessionId") querySessionId: string | undefined,
     @Req() request: Request,
   ) {
     return this.authSessionService.getSession(
-      cookieSessionId ?? querySessionId,
+      cookieSessionId,
       extractBearerToken(request.headers.authorization),
     );
   }

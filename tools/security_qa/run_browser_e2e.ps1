@@ -104,7 +104,7 @@ try {
   # The protocol smoke fixture and the browser flow are independent checks.
   # Reset only the disposable Redis instance between them so the browser's
   # normal auth budget is not consumed by fixture setup requests.
-  docker compose --project-name $project --env-file $envFile --file (Join-Path $PSScriptRoot "compose.yml") exec -T redis redis-cli FLUSHDB | Out-Null
+  docker compose --project-name $project --env-file $envFile --file (Join-Path $PSScriptRoot "compose.yml") exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli FLUSHDB' | Out-Null
   $args = @("tools/security_qa/browser_security_e2e.py", "--scenario", "temporary")
   if ($Headed) { $args += "--headed" }
   python @args
@@ -112,7 +112,7 @@ try {
   # Keep the temporary and persisted account-switch checks independent of the
   # fixed per-IP auth budget while retaining the same-tab A→logout→B flow in
   # each browser context.
-  docker compose --project-name $project --env-file $envFile --file (Join-Path $PSScriptRoot "compose.yml") exec -T redis redis-cli FLUSHDB | Out-Null
+  docker compose --project-name $project --env-file $envFile --file (Join-Path $PSScriptRoot "compose.yml") exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli FLUSHDB' | Out-Null
   $args = @("tools/security_qa/browser_security_e2e.py", "--scenario", "persisted")
   if ($Headed) { $args += "--headed" }
   python @args

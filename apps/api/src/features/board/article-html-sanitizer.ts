@@ -4,7 +4,7 @@ import { isSafeUrlReference } from "@soc/contracts";
 const isSafeImageSource = (value: string | undefined) => {
   const source = value?.trim() ?? "";
   return (
-    isSafeUrlReference(source, ["http:", "https:"], false) ||
+    /^asset:\d+$/.test(source) ||
     /^\/(?:api\/)?(?:v\d+\/)?assets\/\d+\/content(?:[?#].*)?$/i.test(source)
   );
 };
@@ -48,7 +48,7 @@ const ARTICLE_HTML_SANITIZE_OPTIONS: IOptions = {
     span: ["style"],
     img: ["src", "alt", "width", "height", { name: "data-align", values: ["left", "center", "right"] }],
   },
-  allowedSchemes: ["http", "https", "mailto", "tel"],
+  allowedSchemes: ["http", "https", "mailto", "tel", "asset"],
   allowProtocolRelative: false,
   allowedStyles: {
     span: {

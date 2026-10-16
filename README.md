@@ -48,13 +48,14 @@ cp .env.example .env.production
 - `API_PORT`, `WEB_PORT`, `NGINX_PORT`: 로컬 포트
 - `VITE_API_BASE_URL`: 프론트엔드 API base URL. nginx를 통해 접근하면 `/api` 사용
 - `TRUST_PROXY_IPS`, `TRUST_PROXY_HOPS`: 신뢰할 리버스 프록시 IP/CIDR과 홉 수. 운영 Compose는 Docker 내부 `172.16.0.0/12` 두 홉을 기본값으로 사용
-- `AUTH_JWT_SECRET`: JWT 서명 secret. 운영에서는 반드시 교체
-- `AUTH_PENDING_LOGIN_ENCRYPTION_KEY`: SSO pending login 암호화 키. 32자 이상의 랜덤 문자열 권장
-- `VOTE_BALLOT_ENCRYPTION_KEY`: 투표 데이터 전용 암호화 키. 인증 키와 분리하고 DB 백업과 함께 보관
+- `AUTH_JWT_SECRET`: JWT 서명 secret. 운영에서는 32바이트 이상의 랜덤 값을 사용
+- `AUTH_PENDING_LOGIN_ENCRYPTION_KEY`: SSO pending login과 login transaction 암호화 키. 운영에서는 32바이트 이상의 랜덤 값을 사용
+- `VOTE_BALLOT_ENCRYPTION_KEY`: 투표 데이터 전용 32바이트 이상 랜덤 키. 다른 인증·암호화 키와 분리하고 DB 백업과 함께 보관
 - `INITIAL__ADMIN_STDNOS`: 최초 SSO 로그인 시 최고 관리자 역할을 부여할 8자리 학번 목록. 쉼표로 구분
 - `REDIS_AUTH_TTL_SECONDS`: 임시 로그인 세션 TTL
 - `POSTGRES_*`: PostgreSQL 접속 정보
-- `REDIS_URL`: Redis 접속 URL
+- `REDIS_URL`: Redis 접속 URL. 비밀번호를 URL에 포함하지 않음
+- `REDIS_PASSWORD`: Redis 서버와 API client가 함께 쓰는 비밀번호. 운영에서는 32바이트 이상의 랜덤 값을 사용
 - `ASSET_UPLOAD_DIR`: 게시글 이미지/첨부파일 저장 위치. 생략하면 로컬 개발 기본 경로 사용
 - `ASSET_ORPHAN_GRACE_HOURS`: 게시글에 연결되지 않은 업로드 파일을 정리하기 전까지 기다릴 시간. 기본값 24
 - `ASSET_ORPHAN_CLEANUP_ENABLED`: 미연결 업로드 파일 자동 정리 스케줄러 실행 여부. 기본값 false
@@ -70,7 +71,11 @@ cp .env.example .env.production
 
 업로드 후 게시글에 연결되지 않은 파일은 관리자 권한으로 `POST /v1/assets/cleanup-orphans`를 호출해 정리할 수 있습니다. 자동 정리는 `ASSET_ORPHAN_CLEANUP_ENABLED=true`인 API 프로세스에서만 실행하세요.
 
-운영 배포 전에는 `.env.production`의 `NODE_ENV=production`, `SEED_MODE=reference`, 실제 HTTPS origin과 SSO redirect, 운영 전용 secret을 확인해야 합니다. `.env`와 `.env.production`은 모두 Git에 커밋하지 않습니다.
+운영 배포 전에는 `.env.production`의 `NODE_ENV=production`, `SEED_MODE=reference`, 실제 HTTPS origin과 SSO redirect, 운영 전용 secret을 확인해야 합니다. 운영에서는 JWT, pending-login, 투표, Redis 비밀값이 각각 고유한 32바이트 이상 랜덤 값이어야 하며 예제 placeholder를 그대로 쓰면 API가 기동을 거부합니다. `.env`와 `.env.production`은 모두 Git에 커밋하지 않습니다.
+
+pending-login과 login transaction은 versioned AES-GCM envelope로 Redis에 저장됩니다. 이 형식이 처음 배포되거나 암호화 키가 교체되면 배포 전에 시작된 로그인 흐름은 다시 시작해야 합니다.
+
+과거 평문은 코드 배포만으로 Redis 영속 파일이나 백업에서 제거되지 않습니다. 업그레이드 시 구 버전 API 프로세스를 종료하거나 드레인하고 최대 10분 동안 진행 중인 로그인의 만료를 기다린 뒤 Redis AOF rewrite와 RDB 재생성을 수행하세요. 기존 백업의 보존·폐기 정책과 접근 통제도 함께 점검해야 합니다.
 
 ## 설치
 

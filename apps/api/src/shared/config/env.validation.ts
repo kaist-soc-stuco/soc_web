@@ -15,6 +15,36 @@ const asOptionalString = (value: unknown): string | undefined => {
   return normalized.length > 0 ? normalized : undefined;
 };
 
+const MIN_PRODUCTION_SECRET_BYTES = 32;
+const KNOWN_SECRET_PLACEHOLDER = /^(?:replace[-_ ]with|change[-_ ]me|changeme|example|test(?:[-_ ]only)?|default|secret|password)(?:$|[-_ ])/i;
+
+const validateProductionSecret = (value: string, name: string): string => {
+  const normalized = value.trim();
+  if (Buffer.byteLength(normalized, "utf8") < MIN_PRODUCTION_SECRET_BYTES) {
+    throw new Error(
+      `${name} must be at least ${MIN_PRODUCTION_SECRET_BYTES} bytes in production`,
+    );
+  }
+  if (KNOWN_SECRET_PLACEHOLDER.test(normalized)) {
+    throw new Error(`${name} must not use a documented or predictable placeholder`);
+  }
+  return normalized;
+};
+
+const rejectReusedProductionSecrets = (
+  secrets: Array<[name: string, value: string]>,
+): void => {
+  for (let left = 0; left < secrets.length; left += 1) {
+    for (let right = left + 1; right < secrets.length; right += 1) {
+      if (secrets[left][1] === secrets[right][1]) {
+        throw new Error(
+          `${secrets[left][0]} and ${secrets[right][0]} must use different production secrets`,
+        );
+      }
+    }
+  }
+};
+
 const asPort = (value: unknown, name: string): number => {
   const raw =
     typeof value === 'string'
@@ -98,6 +128,8 @@ const asAssetStorageProvider = (value: unknown): "local" | "s3" => {
 };
 
 export const validateEnv = (config: Record<string, unknown>): Record<string, unknown> => {
+  const nodeEnv = asString(config.NODE_ENV, 'NODE_ENV').trim();
+  const isProduction = nodeEnv === 'production';
   const postgresHost = asString(config.POSTGRES_HOST, 'POSTGRES_HOST');
   const postgresPort = asPort(config.POSTGRES_PORT, 'POSTGRES_PORT');
   const postgresUser = asString(config.POSTGRES_USER, 'POSTGRES_USER');
@@ -105,6 +137,43 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
   const postgresDb = asString(config.POSTGRES_DB, 'POSTGRES_DB');
 
   const redisUrl = asString(config.REDIS_URL, 'REDIS_URL');
+  const authJwtSecret = asString(config.AUTH_JWT_SECRET, 'AUTH_JWT_SECRET');
+  const pendingLoginEncryptionKey = asString(
+    config.AUTH_PENDING_LOGIN_ENCRYPTION_KEY,
+    'AUTH_PENDING_LOGIN_ENCRYPTION_KEY',
+  );
+  const voteBallotEncryptionKey = isProduction
+    ? asString(config.VOTE_BALLOT_ENCRYPTION_KEY, 'VOTE_BALLOT_ENCRYPTION_KEY')
+    : asOptionalString(config.VOTE_BALLOT_ENCRYPTION_KEY);
+  const redisPassword = isProduction
+    ? asString(config.REDIS_PASSWORD, 'REDIS_PASSWORD')
+    : asOptionalString(config.REDIS_PASSWORD);
+
+  if (isProduction) {
+    const productionSecrets: Array<[string, string]> = [
+      ['AUTH_JWT_SECRET', validateProductionSecret(authJwtSecret, 'AUTH_JWT_SECRET')],
+      [
+        'AUTH_PENDING_LOGIN_ENCRYPTION_KEY',
+        validateProductionSecret(
+          pendingLoginEncryptionKey,
+          'AUTH_PENDING_LOGIN_ENCRYPTION_KEY',
+        ),
+      ],
+      [
+        'VOTE_BALLOT_ENCRYPTION_KEY',
+        validateProductionSecret(
+          voteBallotEncryptionKey as string,
+          'VOTE_BALLOT_ENCRYPTION_KEY',
+        ),
+      ],
+      [
+        'REDIS_PASSWORD',
+        validateProductionSecret(redisPassword as string, 'REDIS_PASSWORD'),
+      ],
+    ];
+    rejectReusedProductionSecrets(productionSecrets);
+  }
+
   const assetStorageProvider = asAssetStorageProvider(config.ASSET_STORAGE_PROVIDER);
   const awsS3Bucket = asOptionalString(config.AWS_S3_BUCKET);
   const awsRegion = asOptionalString(config.AWS_REGION);
@@ -116,7 +185,7 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
 
   return {
     ...config,
-    NODE_ENV: asString(config.NODE_ENV, 'NODE_ENV'),
+    NODE_ENV: nodeEnv,
     API_PORT: asPort(config.API_PORT, 'API_PORT'),
     SSO_CLIENT_ID: asString(config.SSO_CLIENT_ID, 'SSO_CLIENT_ID'),
     SSO_LOGIN_URL: asString(config.SSO_LOGIN_URL, 'SSO_LOGIN_URL'),
@@ -167,7 +236,7 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     EMAIL_DRY_RUN: asOptionalBoolean(
       config.EMAIL_DRY_RUN,
       'EMAIL_DRY_RUN',
-      config.NODE_ENV !== 'production',
+      !isProduction,
     ),
     BULK_EMAIL_SCHEDULER_ENABLED: asOptionalBoolean(
       config.BULK_EMAIL_SCHEDULER_ENABLED,
@@ -184,15 +253,9 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       'BULK_EMAIL_MAX_ATTACHMENT_BYTES',
       25 * 1024 * 1024,
     ),
-    AUTH_JWT_SECRET: asString(
-      config.AUTH_JWT_SECRET,
-      'AUTH_JWT_SECRET'
-    ),
-    AUTH_PENDING_LOGIN_ENCRYPTION_KEY: asString(
-      config.AUTH_PENDING_LOGIN_ENCRYPTION_KEY,
-      'AUTH_PENDING_LOGIN_ENCRYPTION_KEY',
-    ),
-    VOTE_BALLOT_ENCRYPTION_KEY: asOptionalString(config.VOTE_BALLOT_ENCRYPTION_KEY),
+    AUTH_JWT_SECRET: authJwtSecret,
+    AUTH_PENDING_LOGIN_ENCRYPTION_KEY: pendingLoginEncryptionKey,
+    VOTE_BALLOT_ENCRYPTION_KEY: voteBallotEncryptionKey,
     INITIAL__ADMIN_STDNOS: asOptionalString(config.INITIAL__ADMIN_STDNOS),
     INITIAL_ADMIN_STDNOS: asOptionalString(config.INITIAL_ADMIN_STDNOS),
     REDIS_AUTH_TTL_SECONDS: asPositiveInt(
@@ -243,5 +306,6 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     POSTGRES_PASSWORD: postgresPassword,
     POSTGRES_DB: postgresDb,
     REDIS_URL: redisUrl,
+    REDIS_PASSWORD: redisPassword,
   };
 };

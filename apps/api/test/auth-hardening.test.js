@@ -11,6 +11,12 @@ const {
 const {
   AuthCookieService,
 } = require("../dist/apps/api/src/features/auth/auth-cookie.service.js");
+const {
+  AuthController,
+} = require("../dist/apps/api/src/features/auth/auth.controller.js");
+const {
+  PendingLoginRepository,
+} = require("../dist/apps/api/src/features/auth/pending-login.repository.js");
 
 const config = {
   get(name) {
@@ -70,6 +76,109 @@ function createUsersService() {
     async applyStudentFeeBootstrap() { return null; },
   };
 }
+
+function createRedisStore() {
+  const values = new Map();
+  return {
+    values,
+    async set(key, value) { values.set(key, value); },
+    async get(key) { return values.get(key) ?? null; },
+    async getdel(key) {
+      const value = values.get(key) ?? null;
+      values.delete(key);
+      return value;
+    },
+    async del(key) { values.delete(key); },
+  };
+}
+
+test("pending login records encrypt the complete SSO profile and fail closed", async () => {
+  const redis = createRedisStore();
+  const repository = new PendingLoginRepository(config, redis);
+  const payload = {
+    expiresAt: Date.now() + 60_000,
+    ssoSubject: "subject-encrypted",
+    kaistUid: "uid-encrypted",
+    nameKo: "합성 암호화 사용자",
+    nameEn: "Synthetic Encrypted User",
+    email: "encrypted@example.invalid",
+    stdNo: "20991234",
+    departmentKo: "합성 학과",
+    gender: "synthetic-gender",
+  };
+
+  await repository.save("opaque-pending", payload, 60);
+  const raw = redis.values.get("auth:pending-login:opaque-pending");
+  assert.equal(typeof raw, "string");
+  for (const sensitiveValue of Object.values(payload).filter((value) => typeof value === "string")) {
+    assert.equal(raw.includes(sensitiveValue), false);
+  }
+  assert.deepEqual(await repository.find("opaque-pending"), payload);
+
+  const envelope = JSON.parse(raw);
+  const tamperedCiphertext = Buffer.from(envelope.ciphertext, "base64url");
+  tamperedCiphertext[0] ^= 1;
+  envelope.ciphertext = tamperedCiphertext.toString("base64url");
+  redis.values.set("auth:pending-login:opaque-pending", JSON.stringify(envelope));
+  assert.equal(await repository.find("opaque-pending"), null);
+});
+
+test("login result transactions encrypt bearer credentials at rest", async () => {
+  const redis = createRedisStore();
+  const service = new AuthService(
+    config,
+    createUsersService(),
+    {},
+    {},
+    {},
+    redis,
+  );
+  const result = {
+    accessToken: "synthetic-access-token",
+    refreshToken: "synthetic-refresh-token",
+    sessionId: "synthetic-session-id",
+    storageMode: "persisted",
+    userId: "synthetic-user-id",
+  };
+
+  await service.storeLoginTransaction(
+    "opaque-transaction",
+    { kind: "result", result },
+    60,
+  );
+  const raw = redis.values.get("auth:login-transaction:opaque-transaction");
+  assert.equal(typeof raw, "string");
+  for (const sensitiveValue of Object.values(result)) {
+    assert.equal(raw.includes(sensitiveValue), false);
+  }
+  assert.deepEqual(await service.consumeLoginResult("opaque-transaction"), result);
+  await assert.rejects(
+    service.consumeLoginResult("opaque-transaction"),
+    UnauthorizedException,
+  );
+});
+
+test("session lookup uses only the HttpOnly cookie or bearer token", async () => {
+  let received;
+  const controller = new AuthController(
+    {},
+    {},
+    {
+      async getSession(sessionId, accessToken) {
+        received = { sessionId, accessToken };
+        return { authenticated: false };
+      },
+    },
+  );
+
+  await controller.getSession(undefined, {
+    headers: { authorization: "Bearer synthetic-bearer" },
+  });
+  assert.deepEqual(received, {
+    sessionId: undefined,
+    accessToken: "synthetic-bearer",
+  });
+});
 
 test("persisted access tokens require the active Redis session and carry sid", async () => {
   const repository = createSessionRepository();

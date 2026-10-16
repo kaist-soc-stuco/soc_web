@@ -46,6 +46,9 @@ for (const line of productionCompose.split(/\r?\n/)) {
 }
 requireText(productionCompose.includes("no-new-privileges:true"), "production Compose lacks no-new-privileges");
 requireText(productionCompose.includes("cap_drop:"), "production Compose lacks capability dropping");
+requireText(productionCompose.includes("--requirepass"), "production Redis authentication is not enabled");
+requireText(productionCompose.includes("REDISCLI_AUTH"), "production Redis healthcheck is unauthenticated");
+requireText(productionCompose.includes("internal: true"), "production data network is not internal");
 requireText(read("apps/api/Dockerfile.prod").includes("USER nodeapp"), "API runtime is not non-root");
 requireText(read("apps/web/Dockerfile.prod").includes("USER nginx"), "web runtime is not non-root");
 requireText(read("infra/docker/redis/redis.conf").includes("maxmemory-policy noeviction"), "Redis eviction policy is unsafe for durable state");

@@ -15,6 +15,7 @@ import { nowIso, expiresAtMs } from "@soc/shared";
 import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
 import { UsersService } from "../users/users.service";
 import { AuthSessionService } from "./auth-session.service";
+import { AuthPayloadCipher } from "./auth-payload-crypto";
 import { PendingLoginRepository } from "./pending-login.repository";
 import { InitialAdminService } from "./initial-admin.service";
 import { readResponseTextWithLimit } from "../../shared/http/bounded-fetch";
@@ -89,6 +90,7 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly startConfig: SsoConfig;
   private readonly callbackConfig: SsoCallbackConfig;
+  private readonly loginTransactionCipher: AuthPayloadCipher;
 
   constructor(
     private readonly configService: ConfigService,
@@ -100,6 +102,13 @@ export class AuthService {
   ) {
     this.startConfig = this.loadStartConfig();
     this.callbackConfig = this.loadCallbackConfig(this.startConfig);
+    this.loginTransactionCipher = new AuthPayloadCipher(
+      this.ensureRequired(
+        this.configService.get<string>("AUTH_PENDING_LOGIN_ENCRYPTION_KEY"),
+        "AUTH_PENDING_LOGIN_ENCRYPTION_KEY",
+      ),
+      "login-transaction",
+    );
   }
 
   /**
@@ -505,14 +514,47 @@ export class AuthService {
   private parseLoginTransaction(
     rawValue: string,
   ): LoginTransactionPayload | null {
-    try {
-      const parsed = JSON.parse(rawValue) as LoginTransactionPayload;
-      if (parsed.kind === "result" && parsed.result?.accessToken) return parsed;
-      if (parsed.kind === "pending" && parsed.pendingLoginToken) return parsed;
-      return null;
-    } catch {
+    const parsed = this.loginTransactionCipher.decrypt(rawValue);
+    if (!parsed || typeof parsed !== "object" || !("kind" in parsed)) {
       return null;
     }
+
+    if (parsed.kind === "pending") {
+      const pendingLoginToken = "pendingLoginToken" in parsed
+        ? parsed.pendingLoginToken
+        : undefined;
+      return typeof pendingLoginToken === "string" && pendingLoginToken.length > 0
+        ? { kind: "pending", pendingLoginToken }
+        : null;
+    }
+
+    if (parsed.kind !== "result" || !("result" in parsed)) return null;
+    const result = parsed.result;
+    if (!result || typeof result !== "object") return null;
+    const candidate = result as Partial<LoginResultPayload>;
+    if (
+      typeof candidate.accessToken !== "string" ||
+      candidate.accessToken.length === 0 ||
+      typeof candidate.refreshToken !== "string" ||
+      candidate.refreshToken.length === 0 ||
+      typeof candidate.sessionId !== "string" ||
+      candidate.sessionId.length === 0 ||
+      candidate.storageMode !== "persisted" ||
+      (candidate.userId !== undefined && typeof candidate.userId !== "string")
+    ) {
+      return null;
+    }
+
+    return {
+      kind: "result",
+      result: {
+        accessToken: candidate.accessToken,
+        refreshToken: candidate.refreshToken,
+        sessionId: candidate.sessionId,
+        storageMode: candidate.storageMode,
+        userId: candidate.userId,
+      },
+    };
   }
 
   /** state와 nonce를 TTL과 함께 Redis에 저장합니다. */
@@ -546,7 +588,7 @@ export class AuthService {
 
     await this.redis.set(
       transactionKey,
-      JSON.stringify(payload),
+      this.loginTransactionCipher.encrypt(payload),
       "EX",
       ttlSeconds,
     );

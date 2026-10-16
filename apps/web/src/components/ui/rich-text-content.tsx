@@ -40,6 +40,36 @@ const SAFE_STYLE_VALUE = {
   "font-size": /^(?:8|9|10|11|12|14|16|18|20|22|24|28|30|36|50|72|96)px$/,
 };
 
+const ASSET_REFERENCE_PATTERN = /^asset:(\d+)$/;
+const ASSET_PATH_PATTERN = /^\/(?:api\/)?(?:v\d+\/)?assets\/(\d+)\/content$/i;
+
+function resolveInternalImageSource(rawSource: string): string | null {
+  const directReference = ASSET_REFERENCE_PATTERN.exec(rawSource);
+  if (directReference) {
+    return new URL(
+      resolveAssetUrl(`asset:${directReference[1]}`),
+      window.location.origin,
+    ).toString();
+  }
+
+  const candidate = new URL(rawSource, window.location.origin);
+  const pathMatch = ASSET_PATH_PATTERN.exec(candidate.pathname);
+  if (!pathMatch || candidate.username || candidate.password) return null;
+
+  const expected = new URL(
+    resolveAssetUrl(`asset:${pathMatch[1]}`),
+    window.location.origin,
+  );
+  if (
+    candidate.origin !== expected.origin ||
+    candidate.pathname !== expected.pathname
+  ) {
+    return null;
+  }
+
+  return candidate.toString();
+}
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -104,23 +134,14 @@ export function sanitizeForDisplay(value: string) {
         if (element.tagName === "IMG" && name === "src") {
           try {
             const rawSource = attribute.value.trim();
-            if (
-              !/^https?:\/\//i.test(rawSource) &&
-              !/^\/(?:api\/)?(?:v\d+\/)?assets\/\d+\/content(?:[?#].*)?$/i.test(rawSource) &&
-              !/^asset:\d+$/.test(rawSource)
-            ) {
+            const resolved = resolveInternalImageSource(rawSource);
+            if (!resolved) {
               element.remove();
               continue;
             }
-            const resolved = resolveAssetUrl(rawSource);
-            const url = new URL(resolved, window.location.origin);
-            if (!["http:", "https:"].includes(url.protocol)) {
-              element.removeAttribute(attribute.name);
-            } else {
-              element.setAttribute("src", url.toString());
-            }
+            element.setAttribute("src", resolved);
           } catch {
-            element.removeAttribute(attribute.name);
+            element.remove();
           }
           continue;
         }

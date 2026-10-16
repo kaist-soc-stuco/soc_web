@@ -23,6 +23,28 @@ const createLockManager = () => {
   };
 };
 
+test("session requests never place a session identifier in the URL", async () => {
+  let requestedUrl;
+  const client = createApiClient({
+    baseUrl: "/api/v1",
+    fetcher: async (url) => {
+      requestedUrl = String(url);
+      return new Response(JSON.stringify({
+        authenticated: false,
+        canUsePersistentFeatures: false,
+        requiresConsent: false,
+        storageMode: null,
+      }), {
+        headers: { "Content-Type": "application/json" },
+        status: 200,
+      });
+    },
+  });
+
+  await client.getSession("must-not-be-used");
+  assert.equal(requestedUrl, "/api/v1/auth/session");
+});
+
 test("API clients serialize refresh rotation across tabs", async () => {
   const originalWindow = global.window;
   const originalDocument = global.document;
