@@ -21,3 +21,15 @@ test("personalized delivery limits concurrent sends and preserves message IDs", 
   assert.equal(result.acceptedCount,21);
   assert.deepEqual(ids,Array.from({length:21},(_,i)=>`job-1.${i+1}`));
 });
+
+test("a recovered personalized delivery stops before starting another batch", async () => {
+  let sends = 0, checks = 0;
+  const service = Object.create(BulkEmailService.prototype);
+  service.emailDeliveryService = { send: async () => { sends++; return { dryRun: true, acceptedCount: 1 }; } };
+  await assert.rejects(service.deliverPersonalized(
+    Array.from({ length: 12 }, (_, i) => ({ email: `synthetic-${i}@example.invalid` })),
+    { subject: "Test", content: "Body", contentType: "plain" }, [], "job-2",
+    async () => { if (++checks > 1) throw new Error("delivery interrupted"); },
+  ), /delivery interrupted/);
+  assert.equal(sends, 5);
+});

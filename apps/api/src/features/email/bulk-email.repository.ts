@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, lte, sql } from "drizzle-orm";
 import { DRIZZLE_DB, PostgresDatabase } from "../../infrastructure/postgres/postgres.provider";
 import {
   bulkEmailDeliveryAttempts,
@@ -441,6 +441,32 @@ export class BulkEmailRepository {
       .limit(limit);
 
     return rows.map((row) => row.id);
+  }
+
+  async touchActiveDelivery(id: string): Promise<boolean> {
+    const rows = await this.db.update(bulkEmails)
+      .set({ updatedAt: nowDate() })
+      .where(and(eq(bulkEmails.id, id), inArray(bulkEmails.status, ["PENDING", "SENDING"])))
+      .returning({ id: bulkEmails.id });
+    return rows.length > 0;
+  }
+
+  async recoverInterruptedDeliveries(cutoff: Date, limit = 100): Promise<string[]> {
+    return this.db.transaction(async tx => {
+      const interrupted = await tx.select({ id: bulkEmails.id }).from(bulkEmails)
+        .where(and(inArray(bulkEmails.status, ["PENDING", "SENDING"]), lt(bulkEmails.updatedAt, cutoff)))
+        .orderBy(asc(bulkEmails.updatedAt)).limit(limit).for("update", { skipLocked: true });
+      const ids = interrupted.map(row => row.id);
+      if (!ids.length) return [];
+      const now = nowDate();
+      // SMTP acceptance cannot be reconstructed after a crash. Never requeue it.
+      await tx.update(bulkEmails).set({ status: "UNKNOWN", updatedAt: now, completedAt: now, errorMessage: "email_delivery_interrupted" })
+        .where(inArray(bulkEmails.id, ids));
+      await tx.update(bulkEmailDeliveryAttempts)
+        .set({ status: "UNKNOWN", completedAt: now, errorCode: "email_delivery_interrupted" })
+        .where(and(inArray(bulkEmailDeliveryAttempts.emailId, ids), inArray(bulkEmailDeliveryAttempts.status, ["PENDING", "SENDING"])));
+      return ids;
+    });
   }
 
   async updateStatus(

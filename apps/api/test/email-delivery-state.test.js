@@ -69,9 +69,14 @@ function makeService({
     statuses: [],
     attempts: [],
     persistFailure,
+    heartbeatCount: 0,
   };
 
   const bulkEmailRepo = {
+    async touchActiveDelivery() {
+      state.heartbeatCount++;
+      return ["PENDING", "SENDING"].includes(state.record.status);
+    },
     async findByIdempotencyKey(_sender, key) {
       return state.record.idempotencyKey === key ? state.record : null;
     },
@@ -314,4 +319,31 @@ test("partial provider acceptance is recorded as UNKNOWN with recipient counts",
   const replay = await service.sendBulkEmail(senderId, makeRequest(idempotencyKey));
   assert.equal(replay.deliveryMode, "unknown");
   assert.equal(state.sendCount, 1);
+});
+
+test("an unfinished send keeps its heartbeat and stops it after completion", async t => {
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  let complete;
+  const { service, state } = makeService({ send: () => new Promise(resolve => { complete = resolve; }) });
+  const sending = service.sendBulkEmail(senderId, makeRequest(null));
+  await new Promise(setImmediate);
+  const before = state.heartbeatCount;
+  t.mock.timers.tick(30_000);
+  await new Promise(setImmediate);
+  assert.ok(state.heartbeatCount > before);
+  complete({ dryRun: false, acceptedCount: 1, rejectedCount: 0 });
+  await sending;
+  const stopped = state.heartbeatCount;
+  t.mock.timers.tick(60_000);
+  await new Promise(setImmediate);
+  assert.equal(state.heartbeatCount, stopped);
+});
+
+test("an idempotent replay never reports an unfinished PENDING email as sent", async () => {
+  const key = "pending-replay-synthetic-key";
+  const { service, state } = makeService({ recordStatus: "PENDING", idempotencyKey: key, send: async () => { throw new Error("must not send"); } });
+  const replay = await service.sendBulkEmail(senderId, makeRequest(key));
+  assert.equal(replay.success, false);
+  assert.equal(replay.deliveryMode, "unknown");
+  assert.equal(state.sendCount, 0);
 });

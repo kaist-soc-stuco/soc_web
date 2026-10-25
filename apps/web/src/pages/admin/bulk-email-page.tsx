@@ -120,6 +120,7 @@ const EXECUTION_HISTORY_STATUSES = new Set<BulkEmailRecord["status"]>([
   "SUCCESS",
   "SCHEDULED",
   "DRY_RUN",
+  "PENDING",
   "SENDING",
   "UNKNOWN",
 ]);
@@ -956,6 +957,8 @@ function formatBulkEmailStatus(status: BulkEmailRecord["status"]): string {
       return "테스트 발송";
     case "SENDING":
       return "전송 확인 중";
+    case "PENDING":
+      return "발송 대기";
     case "UNKNOWN":
       return "전송 결과 확인 필요";
     default:

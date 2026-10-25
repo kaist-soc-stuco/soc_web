@@ -30,7 +30,7 @@ import type {
 } from "@soc/contracts";
 import { UsersService } from "../users/users.service";
 import sanitizeHtml from "sanitize-html";
-import { isoToDate, nowDate, nowMs } from "@soc/shared";
+import { isoToDate, msToDate, nowDate, nowMs } from "@soc/shared";
 import { AuditLogService } from "../audit/audit-log.service";
 import type { AuditMetadata } from "../audit/audit-context";
 import {
@@ -113,11 +113,22 @@ type EmailDeliverySummary = {
   messageId?: string;
 };
 
+type DeliveryInput = {
+  emailId: string;
+  senderId: string;
+  recipients: EmailRecipient[];
+  compose: EmailCompose;
+};
+
+const DELIVERY_HEARTBEAT_MS = 30_000;
+const INTERRUPTED_DELIVERY_GRACE_MS = 5 * 60_000;
+
 @Injectable()
 export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BulkEmailService.name);
   private schedulerInterval: ReturnType<typeof setInterval> | null = null;
   private scheduledRunInProgress = false;
+  private recoveryRunInProgress = false;
 
   constructor(
     private readonly bulkEmailRepo: BulkEmailRepository,
@@ -134,19 +145,16 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       "BULK_EMAIL_SCHEDULER_ENABLED",
       true,
     );
-    if (!enabled) {
-      this.logger.log("Bulk email scheduler is disabled.");
-      return;
-    }
-
     const intervalMs = Math.max(
       1_000,
       this.configService.get<number>("BULK_EMAIL_SCHEDULER_INTERVAL_MS", 30_000),
     );
     this.schedulerInterval = setInterval(() => {
-      void this.processScheduledEmails();
+      void this.recoverInterruptedDeliveries();
+      if (enabled) void this.processScheduledEmails();
     }, intervalMs);
-    this.logger.log(`Bulk email scheduler started; interval=${intervalMs}ms`);
+    void this.recoverInterruptedDeliveries();
+    this.logger.log(`Bulk email maintenance started; scheduledSending=${enabled}; interval=${intervalMs}ms`);
   }
 
   onModuleDestroy(): void {
@@ -162,6 +170,7 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       record.status === "SUCCESS" ||
       record.status === "SCHEDULED" ||
       record.status === "DRY_RUN" ||
+      record.status === "PENDING" ||
       record.status === "SENDING" ||
       record.status === "UNKNOWN",
     );
@@ -483,6 +492,22 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     return result;
   }
 
+  private async recoverInterruptedDeliveries(): Promise<void> {
+    if (this.recoveryRunInProgress) return;
+    this.recoveryRunInProgress = true;
+    try {
+      const recovered = await this.bulkEmailRepo.recoverInterruptedDeliveries(msToDate(nowMs() - INTERRUPTED_DELIVERY_GRACE_MS));
+      for (const emailId of recovered) {
+        this.logger.warn(`Interrupted bulk email marked UNKNOWN: ${emailId}`);
+        await this.recordAuditSafely({ action: "bulk_email.recover", targetId: emailId, targetType: "bulk_email", payload: { status: "UNKNOWN", source: "recovery" } });
+      }
+    } catch {
+      this.logger.error("Interrupted bulk email recovery failed; the next maintenance run will retry.");
+    } finally {
+      this.recoveryRunInProgress = false;
+    }
+  }
+
   async processScheduledEmails(): Promise<void> {
     if (this.scheduledRunInProgress) return;
     this.scheduledRunInProgress = true;
@@ -658,12 +683,32 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async deliver(input: {
-    emailId: string;
-    senderId: string;
-    recipients: EmailRecipient[];
-    compose: EmailCompose;
-  }): Promise<EmailDeliverySummary> {
+  private async deliver(input: DeliveryInput): Promise<EmailDeliverySummary> {
+    const ensureActive = async () => {
+      try {
+        if (await this.bulkEmailRepo.touchActiveDelivery(input.emailId)) return;
+      } catch {
+        throw new EmailDeliveryError("email_delivery_state_unavailable", "ambiguous");
+      }
+      throw new EmailDeliveryError("email_delivery_interrupted", "ambiguous");
+    };
+    await ensureActive();
+    let heartbeatRunning = false;
+    const heartbeat = setInterval(() => {
+      if (heartbeatRunning) return;
+      heartbeatRunning = true;
+      void ensureActive().catch(() => {
+        this.logger.warn(`Bulk email heartbeat failed: ${input.emailId}`);
+      }).finally(() => { heartbeatRunning = false; });
+    }, DELIVERY_HEARTBEAT_MS);
+    try {
+      return await this.performDelivery(input, ensureActive);
+    } finally {
+      clearInterval(heartbeat);
+    }
+  }
+
+  private async performDelivery(input: DeliveryInput, ensureActive: () => Promise<void>): Promise<EmailDeliverySummary> {
     const attachments = await this.loadAttachments(
       input.senderId,
       input.compose.attachmentAssetIds,
@@ -690,8 +735,9 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       hasBulkEmailTemplateTokens(input.compose.content);
     let delivery: EmailDeliverySummary;
     try {
+      await ensureActive();
       delivery = hasTemplateTokens
-        ? await this.deliverPersonalized(input.recipients, input.compose, attachments, messageId)
+        ? await this.deliverPersonalized(input.recipients, input.compose, attachments, messageId, ensureActive)
         : await this.emailDeliveryService.send({
             recipients: input.recipients.map((recipient) => recipient.email),
             subject: input.compose.subject,
@@ -797,9 +843,11 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     compose: EmailCompose,
     attachments: DeliveryAttachment[],
     messageId: string,
+    ensureActive: () => Promise<void> = async () => {},
   ): Promise<EmailDeliverySummary> {
     const deliveries: PromiseSettledResult<Awaited<ReturnType<EmailDeliveryService["send"]>>>[] = [];
     for (let offset = 0; offset < recipients.length; offset += 5) {
+      await ensureActive();
       deliveries.push(...await Promise.allSettled(
         recipients.slice(offset, offset + 5).map((recipient, index) => {
           const subject = renderBulkEmailTemplate(compose.subject, recipient);
@@ -988,6 +1036,7 @@ function isEmailDeliveryError(error: unknown): error is EmailDeliveryError {
 
 function responseForExistingRecord(record: BulkEmailStoredRecord): SendBulkEmailResponse {
   const uncertain = record.status === "UNKNOWN" ||
+    record.status === "PENDING" ||
     record.status === "SENDING" ||
     record.status === "FAILED";
   return {
