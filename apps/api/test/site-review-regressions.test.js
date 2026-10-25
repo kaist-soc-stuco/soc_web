@@ -35,16 +35,17 @@ function database(results) {
 
 test("fee detail and ledger agree before, during, and after paid coverage", async () => {
   const user = { userId: "u", nameKo: "QA", nameEn: "QA", email: "qa@example.invalid", primaryMajor: "CS" };
-  const legacy = { status: "PAID", coverageSemesters: 1, paidAt: new Date("2026-09-20T00:00:00Z"), paidAmount: 45000, verifiedAt: null };
+  const legacy = { userId: "u", status: "PAID", coverageSemesters: 1, paidAt: new Date("2026-09-20T00:00:00Z"), paidAmount: 45000, verifiedAt: null, verifiedBy: null, note: null, updatedAt: new Date("2026-09-20T00:00:00Z") };
   const payment = { ...legacy, paymentId: "p", userId: "u", amount: 45000, effectiveStartSemester: "2026-2", createdAt: legacy.paidAt };
   for (const [semester, expected] of [["2026-1", "UNPAID"], ["2026-2", "PAID"], ["2027-1", "UNPAID"]]) {
-    const repo = new UsersRepository(database([[{ ...user, ...legacy }], [payment], [user], [payment]]));
+    const repo = new UsersRepository(database([[{ ...user, ...legacy }], [payment], [user], [legacy], [payment]]));
     repo.getStudentFeePolicy = async () => ({ amount: 45000 });
-    repo.getStudentFeeStatus = async () => ({ ...legacy, paidAt: legacy.paidAt.toISOString() });
     const ledger = await repo.listStudentsByFeeStatus(undefined, 1, 20, "name", "asc", undefined, undefined, undefined, semester);
     const detail = await repo.getStudentFeeDetail("u", semester);
     assert.equal(ledger.students[0].status, expected);
     assert.equal(detail.status.status, expected);
+    assert.equal(detail.history[0].paymentId, payment.paymentId);
+    assert.equal(detail.status.updatedAt, legacy.updatedAt.toISOString());
   }
 });
 
