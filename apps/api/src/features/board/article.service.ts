@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from "@nestjs/common";
@@ -90,6 +91,7 @@ const maskSecretListItem = (item: ArticleListItem): ArticleListItem => ({
 
 @Injectable()
 export class ArticleService {
+  private readonly logger = new Logger(ArticleService.name);
   private readonly auditLogService: AuditLogService;
 
   constructor(
@@ -360,6 +362,9 @@ export class ArticleService {
     payload: ArticleUpdateRequest,
     user: AuthenticatedUser,
   ): Promise<ArticleUpdateResponse> {
+    if (this.usersService && await this.usersService.isPostingSuspended(user.id)) {
+      throw new ForbiddenException("posting_suspended");
+    }
     if (payload.contentKo && payload.contentKo.length > MAX_CONTENT_LENGTH) {
       throw new BadRequestException("content_too_long");
     }
@@ -471,7 +476,7 @@ export class ArticleService {
     }
 
     const result = await this.articleRepository.softDeleteArticle(board.boardId, articleId);
-    await this.notificationsService?.removeForArticle(code, articleId);
+    await this.removeArticleNotifications(code, articleId);
     await this.auditLogService.record({
       action: "article.delete",
       actorUserId: user.id,
@@ -480,6 +485,14 @@ export class ArticleService {
       payload: { deleted: { articleId, boardCode: code } },
     });
     return result;
+  }
+
+  private async removeArticleNotifications(code: string, articleId: string): Promise<void> {
+    try {
+      await this.notificationsService?.removeForArticle(code, articleId);
+    } catch (error) {
+      this.logger.warn(`article_notification_cleanup_failed article=${articleId} ${String(error)}`);
+    }
   }
 
   async updateFaqArticle(
@@ -594,7 +607,7 @@ export class ArticleService {
       throw new NotFoundException("article_not_found");
     }
     const result = await this.articleRepository.softDeleteArticle(board.boardId, articleId);
-      await this.notificationsService?.removeForArticle("faq", articleId);
+    await this.removeArticleNotifications("faq", articleId);
     await this.auditLogService.record({
       action: "article.delete",
       actorUserId: user.id,

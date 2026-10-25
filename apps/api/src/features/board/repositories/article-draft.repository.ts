@@ -9,7 +9,10 @@ import { msToIso, nowDate } from "@soc/shared";
 import {
   DRIZZLE_DB,
   PostgresDatabase,
+  PostgresTransaction,
 } from "../../../infrastructure/postgres/postgres.provider";
+import { collectAssetReferenceIds } from "../../asset/asset-reference";
+import { lockAssetReferences } from "../../asset/lock-asset-references";
 import {
   articleDrafts,
   boards,
@@ -108,8 +111,9 @@ export class ArticleDraftRepository {
   async findById(
     ownerUserId: string,
     draftId: string,
+    query: PostgresDatabase | PostgresTransaction = this.db,
   ): Promise<ArticleDraftRecord | null> {
-    const rows = await this.db
+    const rows = await query
       .select(selectDraftColumns)
       .from(articleDrafts)
       .innerJoin(boards, eq(articleDrafts.boardId, boards.boardId))
@@ -167,30 +171,33 @@ export class ArticleDraftRepository {
     delete payload.fingerprint;
     delete payload.boardCode;
 
-    const [created] = await this.db
-      .insert(articleDrafts)
-      .values({
-        ownerUserId,
-        boardId,
-        targetArticleId: input.targetArticleId
-          ? Number(input.targetArticleId)
-          : null,
-        titleKo: input.titleKo,
-        titleEn: input.titleEn ?? null,
-        contentKo: input.contentKo,
-        contentEn: input.contentEn ?? null,
-        fingerprint: input.fingerprint,
-        payload,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning({ draftId: articleDrafts.draftId });
+    return this.db.transaction(async (tx) => {
+      await lockAssetReferences(tx, draftAssetIds(input));
+      const [created] = await tx
+        .insert(articleDrafts)
+        .values({
+          ownerUserId,
+          boardId,
+          targetArticleId: input.targetArticleId
+            ? Number(input.targetArticleId)
+            : null,
+          titleKo: input.titleKo,
+          titleEn: input.titleEn ?? null,
+          contentKo: input.contentKo,
+          contentEn: input.contentEn ?? null,
+          fingerprint: input.fingerprint,
+          payload,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning({ draftId: articleDrafts.draftId });
 
-    const result = created
-      ? await this.findById(ownerUserId, created.draftId)
-      : null;
-    if (!result) throw new Error("article_draft_create_failed");
-    return result;
+      const result = created
+        ? await this.findById(ownerUserId, created.draftId, tx)
+        : null;
+      if (!result) throw new Error("article_draft_create_failed");
+      return result;
+    });
   }
 
   async update(
@@ -211,34 +218,37 @@ export class ArticleDraftRepository {
         ? undefined
         : eq(articleDrafts.version, input.expectedVersion);
 
-    const updated = await this.db
-      .update(articleDrafts)
-      .set({
-        boardId,
-        targetArticleId: input.targetArticleId
-          ? Number(input.targetArticleId)
-          : null,
-        titleKo: input.titleKo,
-        titleEn: input.titleEn ?? null,
-        contentKo: input.contentKo,
-        contentEn: input.contentEn ?? null,
-        fingerprint: input.fingerprint,
-        version: sql`${articleDrafts.version} + 1`,
-        payload,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(articleDrafts.ownerUserId, ownerUserId),
-          eq(articleDrafts.draftId, draftId),
-          versionFilter,
-        ),
-      )
-      .returning({ draftId: articleDrafts.draftId });
+    return this.db.transaction(async (tx) => {
+      await lockAssetReferences(tx, draftAssetIds(input));
+      const updated = await tx
+        .update(articleDrafts)
+        .set({
+          boardId,
+          targetArticleId: input.targetArticleId
+            ? Number(input.targetArticleId)
+            : null,
+          titleKo: input.titleKo,
+          titleEn: input.titleEn ?? null,
+          contentKo: input.contentKo,
+          contentEn: input.contentEn ?? null,
+          fingerprint: input.fingerprint,
+          version: sql`${articleDrafts.version} + 1`,
+          payload,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(articleDrafts.ownerUserId, ownerUserId),
+            eq(articleDrafts.draftId, draftId),
+            versionFilter,
+          ),
+        )
+        .returning({ draftId: articleDrafts.draftId });
 
-    return updated[0]
-      ? this.findById(ownerUserId, updated[0].draftId)
-      : null;
+      return updated[0]
+        ? this.findById(ownerUserId, updated[0].draftId, tx)
+        : null;
+    });
   }
 
   async delete(ownerUserId: string, draftId: string): Promise<boolean> {
@@ -254,4 +264,8 @@ export class ArticleDraftRepository {
 
     return deleted.length > 0;
   }
+}
+
+function draftAssetIds(input: ArticleDraftSaveRequest): string[] {
+  return [...(input.assets ?? []).map(asset => asset.assetId), ...collectAssetReferenceIds(input.contentKo, input.contentEn)];
 }

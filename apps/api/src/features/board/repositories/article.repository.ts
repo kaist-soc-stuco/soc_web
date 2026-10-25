@@ -905,7 +905,8 @@ export class ArticleRepository {
             uploadedBy: assets.uploadedBy,
           })
           .from(assets)
-          .where(inArray(assets.assetId, requestedAssetIds))
+          .where(and(inArray(assets.assetId, requestedAssetIds), eq(assets.uploadStatus, "COMPLETED")))
+          .orderBy(asc(assets.assetId))
           .for("update");
         const existingLinks = await tx
           .select({ assetId: articleAssets.assetId })
@@ -1186,7 +1187,8 @@ export class ArticleRepository {
             uploadedBy: assets.uploadedBy,
           })
           .from(assets)
-          .where(inArray(assets.assetId, requestedAssetIds))
+          .where(and(inArray(assets.assetId, requestedAssetIds), eq(assets.uploadStatus, "COMPLETED")))
+          .orderBy(asc(assets.assetId))
           .for("update");
         const existingLinks = await tx
           .select({

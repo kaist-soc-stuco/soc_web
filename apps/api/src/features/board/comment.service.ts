@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from "@nestjs/common";
@@ -48,6 +49,7 @@ const MAX_PAGE_SIZE = 100;
 
 @Injectable()
 export class CommentService {
+  private readonly logger = new Logger(CommentService.name);
   constructor(
     private readonly boardRepository: BoardRepository,
     private readonly articleRepository: ArticleRepository,
@@ -195,7 +197,7 @@ export class CommentService {
       if (
         !parent ||
         parent.articleId !== articleId ||
-        parent.status === COMMENT_STATUS.DELETED
+        parent.status !== COMMENT_STATUS.PUBLISHED
       ) {
         throw new BadRequestException("parent_comment_invalid");
       }
@@ -229,15 +231,17 @@ export class CommentService {
       },
     });
 
-    const notificationTargets = await this.commentRepository.findNotificationTargets(
-      created.commentId,
-    );
-    if (notificationTargets) {
-      await this.notificationsService.notifyCommentCreated({
-        ...notificationTargets,
-        actorUserId: user.id,
-        commentId: created.commentId,
-      });
+    try {
+      const notificationTargets = await this.commentRepository.findNotificationTargets(created.commentId);
+      if (notificationTargets) {
+        await this.notificationsService.notifyCommentCreated({
+          ...notificationTargets,
+          actorUserId: user.id,
+          commentId: created.commentId,
+        });
+      }
+    } catch (error) {
+      this.logger.warn(`comment_notification_failed comment=${created.commentId} ${String(error)}`);
     }
 
     return created;
@@ -250,6 +254,9 @@ export class CommentService {
     payload: CommentUpdateRequest,
     user: AuthenticatedUser,
   ): Promise<CommentUpdateResponse> {
+    if (this.usersService && await this.usersService.isPostingSuspended(user.id)) {
+      throw new ForbiddenException("posting_suspended");
+    }
     if (payload.content.length > MAX_CONTENT_LENGTH) {
       throw new BadRequestException("content_too_long");
     }
@@ -461,7 +468,7 @@ export class CommentService {
       board.boardId,
     );
 
-    if (!comment || comment.status === COMMENT_STATUS.DELETED) {
+    if (!comment || comment.status !== COMMENT_STATUS.PUBLISHED) {
       throw new NotFoundException("comment_not_found");
     }
   }

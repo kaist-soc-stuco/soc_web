@@ -150,7 +150,7 @@ export function CommentSection({
                     showReplyButton={canCreateComment && isAuthenticated}
                   />
 
-                  {showReplyComposer && canCreateComment && isAuthenticated ? (
+                  {showReplyComposer && canCreateComment && isAuthenticated && comment.status === "PUBLISHED" ? (
                     <div className="ml-5 min-w-0 border-l border-slate-200 pb-3 pl-4 pt-1 sm:ml-9 sm:pl-5">
                       <CommentComposer
                         ariaLabel={lang === "ko" ? "대댓글 입력" : "Reply input"}
@@ -317,6 +317,16 @@ function CommentRow({
       setEditSubmitting(false);
     }
   };
+
+  if (comment.status === "DELETED" || (comment.status === "HIDDEN" && !canModerate)) {
+    return (
+      <article className="py-4 text-sm text-slate-500">
+        {comment.status === "DELETED"
+          ? lang === "ko" ? "삭제된 댓글입니다." : "This comment was deleted."
+          : lang === "ko" ? "숨김 처리된 댓글입니다." : "This comment is hidden."}
+      </article>
+    );
+  }
 
   return (
     <article

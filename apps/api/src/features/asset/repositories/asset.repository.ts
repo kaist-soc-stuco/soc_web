@@ -548,62 +548,14 @@ export class AssetRepository {
     cutoff: Date,
     limit: number,
   ): Promise<Array<{ assetId: string; storageKey: string }>> {
-    const assetContentPath = sql`'/assets/' || ${assets.assetId}::text || '/content'`;
     const rows = await this.db
-      .select({
-        assetId: assets.assetId,
-        storageKey: assets.storageKey,
-      })
+      .select({ assetId: assets.assetId, storageKey: assets.storageKey })
       .from(assets)
-      .leftJoin(articleAssets, eq(articleAssets.assetId, assets.assetId))
-      .leftJoin(contentBlocks, or(
-        eq(contentBlocks.imageUrl, sql`'asset:' || ${assets.assetId}::text`),
-        eq(contentBlocks.imageUrlEn, sql`'asset:' || ${assets.assetId}::text`),
+      .where(and(
+        unlinkedAssetReferencesPredicate(),
+        or(lt(assets.createdAt, cutoff), and(eq(assets.uploadStatus, "PENDING"), lte(assets.uploadExpiresAt, nowDate()))),
       ))
-      .leftJoin(voteOptions, or(eq(voteOptions.imageUrl, sql`'asset:' || ${assets.assetId}::text`), sql`${voteOptions.imageUrl} LIKE ('%' || ${assetContentPath} || '%')`))
-      .leftJoin(executiveContacts, eq(executiveContacts.avatarStorageKey, sql`'asset:' || ${assets.assetId}::text`))
-      .leftJoin(surveyAnswers, sql`
-        ${surveyAnswers.content}->>'assetId' = ${assets.assetId}::text
-        OR (${surveyAnswers.content}->'assetIds') ? ${assets.assetId}::text
-      `)
-      .leftJoin(surveys, or(
-        eq(surveys.descriptionImageUrlKo, sql`'asset:' || ${assets.assetId}::text`),
-        eq(surveys.descriptionImageUrlEn, sql`'asset:' || ${assets.assetId}::text`),
-        sql`${surveys.descriptionKo}::text LIKE ('%' || ${assetContentPath} || '%')`,
-        sql`${surveys.descriptionEn}::text LIKE ('%' || ${assetContentPath} || '%')`,
-        sql`EXISTS (
-          SELECT 1
-          FROM "survey_sections" AS section
-          WHERE section."survey_id" = ${surveys.surveyId}
-            AND (
-              section."description_ko"::text LIKE ('%' || ${assetContentPath} || '%')
-              OR section."description_en"::text LIKE ('%' || ${assetContentPath} || '%')
-            )
-        )`,
-      ))
-      .leftJoin(surveyQuestions, sql`
-        ${surveyQuestions.options}::text LIKE ('%asset:' || ${assets.assetId}::text || '%')
-        OR ${surveyQuestions.config}::text LIKE ('%asset:' || ${assets.assetId}::text || '%')
-      `)
-      .where(
-        and(
-          isNull(articleAssets.articleAssetId),
-          isNull(voteOptions.optionId),
-          isNull(contentBlocks.contentBlockId),
-          isNull(executiveContacts.id),
-          isNull(surveyAnswers.id),
-          isNull(surveys.surveyId),
-          isNull(surveyQuestions.id),
-          or(
-            lt(assets.createdAt, cutoff),
-            and(
-              eq(assets.uploadStatus, "PENDING"),
-              lte(assets.uploadExpiresAt, nowDate()),
-            ),
-          ),
-        ),
-      )
-      .orderBy(asc(assets.createdAt))
+      .orderBy(asc(assets.createdAt), asc(assets.assetId))
       .limit(limit);
 
     return rows.map((row) => ({
@@ -784,6 +736,23 @@ function unlinkedAssetReferencesPredicate() {
     NOT EXISTS (
       SELECT 1 FROM "article_asset" aa
       WHERE aa."asset_id" = ${assets.assetId}
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM "article_draft" ad
+      WHERE ad."owner_user_id" = ${assets.uploadedBy}
+        AND (
+          ad."payload"->'assets' @> jsonb_build_array(jsonb_build_object('assetId', ${assets.assetId}::text))
+          OR ad."content_ko" LIKE ('%' || ${assetContentPath} || '%')
+          OR ad."content_en" LIKE ('%' || ${assetContentPath} || '%')
+          OR ad."content_ko" LIKE ('%' || ${assetReference} || '%')
+          OR ad."content_en" LIKE ('%' || ${assetReference} || '%')
+        )
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM "bulk_email" be
+      WHERE be."sender_id" = ${assets.uploadedBy}
+        AND be."status" IN ('DRAFT', 'SCHEDULED', 'PENDING', 'SENDING', 'FAILED', 'UNKNOWN')
+        AND be."attachment_asset_ids" ? ${assets.assetId}::text
     )
     AND NOT EXISTS (
       SELECT 1 FROM "content_block" cb

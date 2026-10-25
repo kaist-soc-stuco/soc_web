@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type {
   CommentCreateRequest,
   CommentCreateResponse,
@@ -45,7 +45,17 @@ export class CommentRepository {
         : eq(comments.status, COMMENT_STATUS.PUBLISHED),
     );
 
-    const topLevelFilter = and(baseFilter, isNull(comments.parentCommentId));
+    // Keep the thread when its parent is removed but visible replies remain.
+    const topLevelFilter = and(
+      eq(comments.articleId, Number(articleId)),
+      isNull(comments.parentCommentId),
+      or(baseFilter, sql`EXISTS (
+        SELECT 1 FROM "comment" reply
+        WHERE reply."parent_comment_id" = ${comments.commentId}
+          AND reply."article_id" = ${comments.articleId}
+          AND reply."status" IN ${includeHidden ? sql`('PUBLISHED', 'HIDDEN')` : sql`('PUBLISHED')`}
+      )`),
+    );
     const totalResult = await this.db
       .select({ count: sql<number>`count(*)` })
       .from(comments)
@@ -89,7 +99,7 @@ export class CommentRepository {
       .from(comments)
       .leftJoin(users, eq(comments.authorUserId, users.userId))
       .where(filter)
-      .orderBy(asc(comments.createdAt));
+      .orderBy(asc(comments.createdAt), asc(comments.commentId));
 
     const topLevelRows = await selectCommentRows(topLevelFilter)
       .limit(limit)
@@ -105,25 +115,28 @@ export class CommentRepository {
     return {
       total: Number(totalResult[0]?.count ?? 0),
       topLevelTotal: Number(topLevelTotalResult[0]?.count ?? 0),
-      items: rows.map((row) => ({
-        commentId: String(row.commentId),
-        articleId: String(row.articleId),
-        parentCommentId: row.parentCommentId ? String(row.parentCommentId) : null,
-        content: row.content,
-        status: row.status as CommentItem["status"],
-        createdAt: msToIso(row.createdAt.valueOf()),
-        updatedAt: msToIso(row.updatedAt.valueOf()),
-        author: {
-          userId: String(row.authorId ?? ""),
-          nameEn: row.isOfficial ? "SoC Executive Committee" : row.authorNameEn,
-          name: row.isOfficial
-            ? "전산학부 집행위원회"
-            : row.authorName ?? "unknown",
-        },
-        likeCount: Number(row.likeCount ?? 0),
-        viewerHasLiked: Boolean(row.viewerHasLiked),
-        isOfficial: row.isOfficial,
-      })),
+      items: rows.map((row) => {
+        const redacted = row.status === COMMENT_STATUS.DELETED || (row.status === COMMENT_STATUS.HIDDEN && !includeHidden);
+        return {
+          commentId: String(row.commentId),
+          articleId: String(row.articleId),
+          parentCommentId: row.parentCommentId ? String(row.parentCommentId) : null,
+          content: redacted ? "" : row.content,
+          status: row.status as CommentItem["status"],
+          createdAt: msToIso(row.createdAt.valueOf()),
+          updatedAt: msToIso(row.updatedAt.valueOf()),
+          author: redacted ? { name: "" } : {
+            userId: String(row.authorId ?? ""),
+            nameEn: row.isOfficial ? "SoC Executive Committee" : row.authorNameEn,
+            name: row.isOfficial
+              ? "전산학부 집행위원회"
+              : row.authorName ?? "unknown",
+          },
+          likeCount: redacted ? 0 : Number(row.likeCount ?? 0),
+          viewerHasLiked: !redacted && Boolean(row.viewerHasLiked),
+          isOfficial: !redacted && row.isOfficial,
+        };
+      }),
     };
   }
 

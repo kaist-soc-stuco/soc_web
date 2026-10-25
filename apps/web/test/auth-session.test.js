@@ -36,3 +36,27 @@ for (const status of [401, 403]) {
 test("explicit logged-out response is respected", async () => {
   assert.deepEqual(await getAuthSessionSummary({ getSession: async () => createEmptyAuthSession() }), createEmptyAuthSession());
 });
+
+test("late authentication errors cannot erase a newer temporary login or replace its cached session", async () => {
+  const originalWindow = global.window;
+  const state = new Map();
+  global.window = { sessionStorage: { getItem: key => state.get(key) ?? null, setItem: (key, value) => state.set(key, value), removeItem: key => state.delete(key) } };
+  try {
+    for (const status of [401, 403]) {
+      state.set("soc.auth.state", JSON.stringify({ temporarySession: { accessToken: "old-synthetic-token" } }));
+      let rejectOld;
+      const pending = new Promise((_, reject) => { rejectOld = reject; });
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      try {
+        const request = client.fetchQuery({ queryKey: ["auth", "session"], queryFn: () => getAuthSessionSummary({ getSession: () => pending }) });
+        const newerSession = { ...session, storageMode: "temporary", canUsePersistentFeatures: false };
+        state.set("soc.auth.state", JSON.stringify({ temporarySession: { accessToken: "new-synthetic-token" } }));
+        client.setQueryData(["auth", "session"], newerSession);
+        rejectOld(new ApiClientHttpError(status));
+        await assert.rejects(request, error => error.status === status);
+        assert.equal(JSON.parse(state.get("soc.auth.state")).temporarySession.accessToken, "new-synthetic-token");
+        assert.deepEqual(client.getQueryData(["auth", "session"]), newerSession);
+      } finally { client.clear(); }
+    }
+  } finally { if (originalWindow === undefined) delete global.window; else global.window = originalWindow; }
+});

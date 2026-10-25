@@ -1,4 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { lockAssetReferences } from "../asset/lock-asset-references";
 import { and, asc, desc, eq, inArray, lt, lte, sql } from "drizzle-orm";
 import { DRIZZLE_DB, PostgresDatabase } from "../../infrastructure/postgres/postgres.provider";
 import {
@@ -199,27 +200,30 @@ export class BulkEmailRepository {
     idempotencyKey?: string | null;
   }): Promise<string> {
     const now = nowDate();
-    const [row] = await this.db
-      .insert(bulkEmails)
-      .values({
-        subject: input.subject,
-        content: input.content,
-        contentType: input.contentType,
-        recipientType: input.recipientType,
-        recipientFilters: input.recipientFilters ?? null,
-        attachmentAssetIds: input.attachmentAssetIds ?? [],
-        senderId: input.senderId,
-        recipientCount: input.recipientCount,
-        status: input.status,
-        scheduledAt: input.scheduledAt ?? null,
-        sentAt: now,
-        updatedAt: now,
-        idempotencyKey: input.idempotencyKey ?? null,
-      })
-      .returning({ id: bulkEmails.id });
+    return this.db.transaction(async (tx) => {
+      await lockAssetReferences(tx, input.attachmentAssetIds ?? [], input.senderId);
+      const [row] = await tx
+        .insert(bulkEmails)
+        .values({
+          subject: input.subject,
+          content: input.content,
+          contentType: input.contentType,
+          recipientType: input.recipientType,
+          recipientFilters: input.recipientFilters ?? null,
+          attachmentAssetIds: input.attachmentAssetIds ?? [],
+          senderId: input.senderId,
+          recipientCount: input.recipientCount,
+          status: input.status,
+          scheduledAt: input.scheduledAt ?? null,
+          sentAt: now,
+          updatedAt: now,
+          idempotencyKey: input.idempotencyKey ?? null,
+        })
+        .returning({ id: bulkEmails.id });
 
-    if (!row) throw new Error("bulk_email_record_create_failed");
-    return row.id;
+      if (!row) throw new Error("bulk_email_record_create_failed");
+      return row.id;
+    });
   }
 
   async saveDraft(
@@ -242,33 +246,37 @@ export class BulkEmailRepository {
       updatedAt: now,
     };
 
-    if (input.draftId) {
-      const updated = await this.db
-        .update(bulkEmails)
-        .set(values)
-        .where(
-          and(
-            eq(bulkEmails.id, input.draftId),
-            eq(bulkEmails.senderId, senderId),
-            eq(bulkEmails.status, "DRAFT"),
-          ),
-        )
+    const savedId = await this.db.transaction(async (tx) => {
+      await lockAssetReferences(tx, input.attachmentAssetIds ?? [], senderId);
+      if (input.draftId) {
+        const updated = await tx
+          .update(bulkEmails)
+          .set(values)
+          .where(
+            and(
+              eq(bulkEmails.id, input.draftId),
+              eq(bulkEmails.senderId, senderId),
+              eq(bulkEmails.status, "DRAFT"),
+            ),
+          )
+          .returning({ id: bulkEmails.id });
+
+        if (updated.length === 0) return null;
+        return updated[0].id;
+      }
+
+      const [created] = await tx
+        .insert(bulkEmails)
+        .values({
+          ...values,
+          senderId,
+          sentAt: now,
+        })
         .returning({ id: bulkEmails.id });
 
-      if (updated.length === 0) return null;
-      return this.findById(updated[0].id);
-    }
-
-    const [created] = await this.db
-      .insert(bulkEmails)
-      .values({
-        ...values,
-        senderId,
-        sentAt: now,
-      })
-      .returning({ id: bulkEmails.id });
-
-    return created ? this.findById(created.id) : null;
+      return created?.id ?? null;
+    });
+    return savedId ? this.findById(savedId) : null;
   }
 
   async deleteDraft(senderId: string, draftId: string): Promise<boolean> {

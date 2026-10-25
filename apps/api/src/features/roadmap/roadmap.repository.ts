@@ -234,7 +234,8 @@ export class RoadmapRepository {
       const [current] = await tx
         .select()
         .from(roadmapCourses)
-        .where(eq(roadmapCourses.courseCode, normalizedCode));
+        .where(eq(roadmapCourses.courseCode, normalizedCode))
+        .for("update");
       if (!current) return null;
 
       const values: Partial<typeof roadmapCourses.$inferInsert> = { updatedAt: nowDate() };
@@ -257,6 +258,10 @@ export class RoadmapRepository {
         .set(values)
         .where(eq(roadmapCourses.courseId, current.courseId))
         .returning();
+      if (updatedCode !== current.courseCode) {
+        await tx.update(roadmapOfferings).set({ courseCode: updatedCode })
+          .where(eq(roadmapOfferings.courseCode, current.courseCode));
+      }
       if (input.prerequisiteCourseCodes !== undefined) {
         await replacePrerequisites(tx, current.courseId, input.prerequisiteCourseCodes);
       }
