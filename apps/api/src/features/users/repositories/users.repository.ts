@@ -10,7 +10,7 @@ import { DEFAULT_AUTHENTICATED_PERMISSION_BITS } from "@soc/contracts";
 import Redis from "ioredis";
 
 import { isoToDate, isoToMs, msToIso, nowDate } from "@soc/shared";
-import { and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
@@ -38,6 +38,7 @@ import {
 import type { UserRecord } from "../entities/user";
 import { hashStudentFeePaymentPayload } from "../fee-payment-idempotency";
 import { getStudentFeeBootstrap } from "../student-fee-bootstrap-loader";
+import { effectiveFeeStatusSql } from "../fee-status";
 import type {
   StudentFeePolicy,
   AdminUserListResponse,
@@ -565,14 +566,12 @@ export class UsersRepository {
       studentNumber: string | null;
     }>
   > {
+    const effectiveStatus = effectiveFeeStatusSql();
     const feeFilter =
       recipientType === "PAID_STUDENTS"
-        ? eq(studentFeeStatus.status, "PAID")
+        ? eq(effectiveStatus, "PAID")
         : recipientType === "UNPAID_STUDENTS"
-          ? or(
-              eq(studentFeeStatus.status, "UNPAID"),
-              isNull(studentFeeStatus.status),
-            )
+          ? eq(effectiveStatus, "UNPAID")
           : undefined;
 
     const conditions: SQL[] = [
@@ -639,13 +638,9 @@ export class UsersRepository {
           : undefined,
     ].filter(Boolean) as SQL[];
     const conditions = [...baseConditions];
+    const effectiveStatus = effectiveFeeStatusSql();
     if (input.majorType === "PRIMARY") conditions.push(sql`nullif(trim(${users.primaryMajor}), '') is not null`);
-    if (input.feeStatus === "PAID" || input.feeStatus === "PARTIAL") {
-      conditions.push(sql`exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = ${input.feeStatus})`);
-    }
-    if (input.feeStatus === "UNPAID") {
-      conditions.push(sql`not exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} in ('PAID', 'PARTIAL'))`);
-    }
+    if (input.feeStatus) conditions.push(eq(effectiveStatus, input.feeStatus));
     const whereClause =
       conditions.length === 0 ? undefined : and(...conditions);
     const direction = input.sortDirection === "desc" ? desc : asc;
@@ -662,8 +657,9 @@ export class UsersRepository {
               : direction(users.nameKo);
 
     const rows = await this.db
-      .select()
+      .select({ ...getTableColumns(users), feeStatus: effectiveStatus })
       .from(users)
+      .leftJoin(studentFeeStatus, eq(studentFeeStatus.userId, users.userId))
       .where(whereClause)
       .orderBy(primarySort, asc(users.nameKo), asc(users.stdNo))
       .limit(pageSize)
@@ -672,35 +668,24 @@ export class UsersRepository {
     const countResult = await this.db
       .select({ count: sql<number>`COUNT(*)` })
       .from(users)
+      .leftJoin(studentFeeStatus, eq(studentFeeStatus.userId, users.userId))
       .where(whereClause);
 
     const facetWhereClause = baseConditions.length === 0 ? undefined : and(...baseConditions);
     const facetRows = await this.db
       .select({
         primaryMajor: sql<number>`count(*) filter (where nullif(trim(${users.primaryMajor}), '') is not null)`,
-        paid: sql<number>`count(*) filter (where exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = 'PAID'))`,
-        partial: sql<number>`count(*) filter (where exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = 'PARTIAL'))`,
-        unpaid: sql<number>`count(*) filter (where not exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} in ('PAID', 'PARTIAL')))`,
+        paid: sql<number>`count(*) filter (where ${effectiveStatus} = 'PAID')`,
+        partial: sql<number>`count(*) filter (where ${effectiveStatus} = 'PARTIAL')`,
+        unpaid: sql<number>`count(*) filter (where ${effectiveStatus} = 'UNPAID')`,
       })
       .from(users)
+      .leftJoin(studentFeeStatus, eq(studentFeeStatus.userId, users.userId))
       .where(facetWhereClause);
-
-    const feeRows = rows.length
-      ? await this.db
-          .select({ userId: studentFeeStatus.userId, status: studentFeeStatus.status })
-          .from(studentFeeStatus)
-          .where(inArray(studentFeeStatus.userId, rows.map((row) => row.userId)))
-      : [];
-    const feeStatusByUserId = new Map(
-      feeRows.map((row) => [
-        row.userId,
-        row.status === "PAID" || row.status === "PARTIAL" ? row.status : "UNPAID",
-      ] as const),
-    );
 
     return {
       items: rows.map((row) =>
-        this.mapRowToAdminUserRecord(row, feeStatusByUserId.get(row.userId)),
+        this.mapRowToAdminUserRecord(row, row.feeStatus),
       ),
       page,
       pageSize,
@@ -853,29 +838,13 @@ export class UsersRepository {
   }
 
   async getStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord | null> {
-    const found = await this.db
-      .select()
-      .from(studentFeeStatus)
-      .where(eq(studentFeeStatus.userId, userId))
+    const [row] = await this.db
+      .select({ record: studentFeeStatus, status: effectiveFeeStatusSql() })
+      .from(users)
+      .leftJoin(studentFeeStatus, eq(studentFeeStatus.userId, users.userId))
+      .where(eq(users.userId, userId))
       .limit(1);
-
-    if (!found.length) return null;
-
-    const row = found[0];
-    const normalizedStatus: FeeStatus =
-      row.status === "PAID" ? "PAID" : row.status === "PARTIAL" && row.paidAmount > 0 ? "PARTIAL" : "UNPAID";
-
-    return {
-      userId: row.userId,
-      status: normalizedStatus,
-      coverageSemesters: row.coverageSemesters,
-      paidAmount: row.paidAmount,
-      paidAt: row.paidAt ? msToIso(row.paidAt.valueOf()) : null,
-      verifiedBy: row.verifiedBy,
-      verifiedAt: row.verifiedAt ? msToIso(row.verifiedAt.valueOf()) : null,
-      note: row.note,
-      updatedAt: msToIso(row.updatedAt.valueOf()),
-    };
+    return row?.record ? { ...this.mapFeeStatusRow(row.record), status: row.status } : null;
   }
 
   private mapFeePaymentRow(row: typeof studentFeePayments.$inferSelect): StudentFeePaymentRecord {
@@ -935,7 +904,7 @@ export class UsersRepository {
         .from(users)
         .where(eq(users.userId, userId))
         .limit(1),
-      this.getStudentFeeStatus(userId),
+      this.db.select().from(studentFeeStatus).where(eq(studentFeeStatus.userId, userId)).limit(1),
       this.db
         .select()
         .from(studentFeePayments)
@@ -944,7 +913,7 @@ export class UsersRepository {
     ]);
 
     if (!user[0]) return null;
-    const status = statusRecord ?? await this.ensureStudentFeeStatus(userId);
+    const status = statusRecord[0] ? this.mapFeeStatusRow(statusRecord[0]) : await this.ensureStudentFeeStatus(userId);
 
     return {
       user: {

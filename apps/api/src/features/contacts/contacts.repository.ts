@@ -19,6 +19,7 @@ import type {
   UpdateContactDepartmentRequest,
 } from "@soc/contracts";
 import { msToIso, nowDate } from "@soc/shared";
+import { enqueueSpreadsheetSync } from "../../infrastructure/google/enqueue-spreadsheet-sync";
 
 @Injectable()
 export class ContactsRepository {
@@ -330,8 +331,12 @@ export class ContactsRepository {
 
   async update(id: string, dto: UpdateContactRequest): Promise<ContactRecord | null> {
     if (dto.privacyConsented === false) {
-      await this.db.delete(executiveContacts).where(eq(executiveContacts.id, id));
-      return null;
+      return this.db.transaction(async tx => {
+        const [deleted] = await tx.delete(executiveContacts).where(eq(executiveContacts.id, id)).returning();
+        if (!deleted) return null;
+        await enqueueSpreadsheetSync(tx, "CONTACTS");
+        return { ...this.map(deleted), privacyConsented: false };
+      });
     }
     const set: Partial<typeof executiveContacts.$inferInsert> = {
       updatedAt: nowDate(),

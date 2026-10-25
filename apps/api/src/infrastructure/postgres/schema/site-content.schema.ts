@@ -1,5 +1,6 @@
 import { CONTENT_BLOCK_STATUSES, CONTENT_BLOCK_TYPES, SITE_CONTENT_KEYS } from "@soc/contracts";
-import { index, integer, pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { users } from "./auth.schema";
 
@@ -51,5 +52,7 @@ export const contentBlocks = pgTable(
   (table) => [
     index("content_block_status_order_idx").on(table.status, table.sortOrder),
     index("content_block_type_order_idx").on(table.type, table.sortOrder),
+    uniqueIndex("content_block_singleton_type_unique_idx").on(table.type)
+      .where(sql`${table.type} IN ('HERO', 'LOGO', 'TOP_BANNER', 'ORGANIZATION_CHART')`),
   ],
 );

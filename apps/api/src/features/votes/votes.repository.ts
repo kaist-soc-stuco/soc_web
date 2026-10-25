@@ -3,6 +3,7 @@ import { BadRequestException, ConflictException, Inject, Injectable } from "@nes
 import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import type { CreateVoteRequest, UpdateVoteRequest, VoteVoterRecord } from "@soc/contracts";
 import { isoToDate, msToDate, nowDate, nowMs } from "@soc/shared";
+import { effectiveFeeStatusSql } from "../users/fee-status";
 
 import { DRIZZLE_DB, type PostgresDatabase, type PostgresTransaction } from "../../infrastructure/postgres/postgres.provider";
 import {
@@ -205,7 +206,7 @@ export class VotesRepository {
       if (!vote || vote.status !== "DRAFT") {
         throw new ConflictException("vote_voter_roll_locked");
       }
-      const selected = await tx.select({ user: users, feeStatus: studentFeeStatus.status })
+      const selected = await tx.select({ user: users, feeStatus: effectiveFeeStatusSql() })
         .from(users).leftJoin(studentFeeStatus, eq(studentFeeStatus.userId, users.userId))
         .where(and(
           userIds.length > 0 && studentNumbers.length > 0

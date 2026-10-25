@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { msToIso, nowDate } from "@soc/shared";
+import { effectiveFeeStatusSql } from "../users/fee-status";
 import { enqueueSpreadsheetSync } from "../../infrastructure/google/enqueue-spreadsheet-sync";
 
 import {
@@ -196,28 +197,30 @@ export class SurveyResponsesRepository {
     };
   }
 
-  private responseSelectFields = {
-    id: surveyResponses.id,
-    surveyId: surveyResponses.surveyId,
-    userId: surveyResponses.userId,
-    status: surveyResponses.status,
-    submittedAt: surveyResponses.submittedAt,
-    createdAt: surveyResponses.createdAt,
-    updatedAt: surveyResponses.updatedAt,
-    userNameKo: users.nameKo,
-    userNameEn: users.nameEn,
-    userEmail: users.email,
-    userDepartmentKo: users.departmentKo,
-    userStdNo: users.stdNo,
-    userPrimaryMajor: users.primaryMajor,
-    userAcademicStatus: users.academicStatus,
-    userFeeStatus: sql<string | null>`(
-      select ${studentFeeStatus.status}
-      from ${studentFeeStatus}
-      where ${studentFeeStatus.userId} = ${users.userId}
-      limit 1
-    )`,
-  };
+  private get responseSelectFields() {
+    return {
+      id: surveyResponses.id,
+      surveyId: surveyResponses.surveyId,
+      userId: surveyResponses.userId,
+      status: surveyResponses.status,
+      submittedAt: surveyResponses.submittedAt,
+      createdAt: surveyResponses.createdAt,
+      updatedAt: surveyResponses.updatedAt,
+      userNameKo: users.nameKo,
+      userNameEn: users.nameEn,
+      userEmail: users.email,
+      userDepartmentKo: users.departmentKo,
+      userStdNo: users.stdNo,
+      userPrimaryMajor: users.primaryMajor,
+      userAcademicStatus: users.academicStatus,
+      userFeeStatus: sql<string | null>`(
+        select ${effectiveFeeStatusSql()}
+        from ${studentFeeStatus}
+        where ${studentFeeStatus.userId} = ${users.userId}
+        limit 1
+      )`,
+    };
+  }
 
   private mapAnswer(row: typeof surveyAnswers.$inferSelect): SurveyAnswerRecord {
     return {
@@ -316,9 +319,10 @@ export class SurveyResponsesRepository {
     if (!userId) return false;
 
     const [feeStatus] = await tx
-      .select({ status: studentFeeStatus.status })
-      .from(studentFeeStatus)
-      .where(eq(studentFeeStatus.userId, userId))
+      .select({ status: effectiveFeeStatusSql() })
+      .from(users)
+      .leftJoin(studentFeeStatus, eq(studentFeeStatus.userId, users.userId))
+      .where(eq(users.userId, userId))
       .limit(1);
     return feeStatus?.status === "PAID";
   }

@@ -138,6 +138,11 @@ export class ContactsService {
       { ...input, page: 1, pageSize: 500 },
       audit,
     );
+    for (let page = 2; response.items.length < (response.total ?? response.items.length); page += 1) {
+      const next = await this.contactsRepo.findManaged({ ...input, page, pageSize: 500 });
+      if (!next.items.length) break;
+      response.items.push(...next.items);
+    }
     await this.auditLogService.record({
       action: "executive_contact.export",
       actorUserId: audit?.actorUserId ?? null,
@@ -215,18 +220,17 @@ export class ContactsService {
   async update(id: string, dto: UpdateContactRequest, audit?: AuditMetadata): Promise<ContactRecord> {
     const before = await this.contactsRepo.findById(id);
     const contact = await this.contactsRepo.update(id, dto);
-    if (!contact) {
-      if (before && dto.privacyConsented === false) {
-        await this.auditLogService.record({
-          action: "executive_contact.delete",
-          actorUserId: audit?.actorUserId ?? null,
-          ipAddress: audit?.ipAddress ?? null,
-          payload: { deleted: safeContactSnapshot(before), reason: "privacy_revoked" },
-          targetId: id,
-          targetType: "executive_contact",
-        });
-      }
-      throw new NotFoundException("contact_not_found");
+    if (!contact) throw new NotFoundException("contact_not_found");
+    if (dto.privacyConsented === false) {
+      await this.auditLogService.record({
+        action: "executive_contact.delete",
+        actorUserId: audit?.actorUserId ?? null,
+        ipAddress: audit?.ipAddress ?? null,
+        payload: { deleted: safeContactSnapshot(contact), reason: "privacy_revoked" },
+        targetId: id,
+        targetType: "executive_contact",
+      });
+      return contact;
     }
     await this.auditLogService.record({
       action: "executive_contact.update",

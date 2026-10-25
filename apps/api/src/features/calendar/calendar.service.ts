@@ -24,7 +24,7 @@ import type {
   PublicCalendarEventItem,
   PublicCalendarEventsResponse,
 } from "@soc/contracts";
-import { isoToDate, msToDate, msToIso, nowDate, nowMs } from "@soc/shared";
+import { isoToDate, msToDate, msToIso, nowDate, nowMs, timeObjToMs } from "@soc/shared";
 
 import {
   DRIZZLE_DB,
@@ -500,6 +500,7 @@ export class CalendarService {
           descriptionEn: item.descriptionEn ?? null,
           startAt: item.startAt,
           endAt: item.endAt,
+          isAllDay: item.isAllDay,
           location: item.location ?? null,
           sourceUid: item.sourceUid ?? null,
           sourceType: "MANUAL",
@@ -1124,6 +1125,7 @@ interface ParsedIcsEvent {
   descriptionEn?: string;
   startAt: Date;
   endAt: Date;
+  isAllDay: boolean;
   location?: string;
   sourceUid?: string;
 }
@@ -1140,16 +1142,17 @@ function parseIcsEvents(input: string): ParsedIcsEvent[] {
     }
     if (line.toUpperCase() === "END:VEVENT") {
       if (current) {
-        const start = parseIcsDate(current.DTSTART);
-        const rawEnd = parseIcsDate(current.DTEND);
+        const start = parseIcsDate(current.DTSTART, current.DTSTART_PARAMS);
+        const rawEnd = parseIcsDate(current.DTEND, current.DTEND_PARAMS);
         if (current.SUMMARY && start && rawEnd) {
-          const isDateOnly = current.DTSTART_PARAMS?.includes("VALUE=DATE") || /^\d{8}$/.test(current.DTSTART ?? "");
+          const isDateOnly = /(?:^|;)VALUE=DATE(?:;|$)/i.test(current.DTSTART_PARAMS ?? "") || /^\d{8}$/.test(current.DTSTART ?? "");
           const end = isDateOnly ? msToDate(rawEnd.valueOf() - 1) : rawEnd;
           events.push({
             titleKo: unescapeIcsText(current.SUMMARY),
             descriptionKo: current.DESCRIPTION ? unescapeIcsText(current.DESCRIPTION) : undefined,
             startAt: start,
             endAt: end.valueOf() >= start.valueOf() ? end : start,
+            isAllDay: isDateOnly,
             location: current.LOCATION ? unescapeIcsText(current.LOCATION) : undefined,
             sourceUid: current.UID ? unescapeIcsText(current.UID) : undefined,
           });
@@ -1161,9 +1164,10 @@ function parseIcsEvents(input: string): ParsedIcsEvent[] {
     if (!current) continue;
     const separator = line.indexOf(":");
     if (separator <= 0) continue;
-    const keyWithParams = line.slice(0, separator).toUpperCase();
+    const keyWithParams = line.slice(0, separator);
     const value = line.slice(separator + 1);
-    const [key, ...params] = keyWithParams.split(";");
+    const [rawKey, ...params] = keyWithParams.split(";");
+    const key = rawKey.toUpperCase();
     current[key] = value;
     if (params.length > 0) current[`${key}_PARAMS`] = params.join(";");
   }
@@ -1171,31 +1175,19 @@ function parseIcsEvents(input: string): ParsedIcsEvent[] {
   return events;
 }
 
-function parseIcsDate(value: string | undefined): Date | null {
+function parseIcsDate(value: string | undefined, params?: string): Date | null {
   if (!value) return null;
-  if (/^\d{8}$/.test(value)) {
-    const year = Number(value.slice(0, 4));
-    const month = Number(value.slice(4, 6)) - 1;
-    const day = Number(value.slice(6, 8));
-    return msToDate(Date.UTC(year, month, day));
-  }
-  if (/^\d{8}T\d{6}Z$/.test(value)) {
-    const year = Number(value.slice(0, 4));
-    const month = Number(value.slice(4, 6)) - 1;
-    const day = Number(value.slice(6, 8));
-    const hour = Number(value.slice(9, 11));
-    const minute = Number(value.slice(11, 13));
-    const second = Number(value.slice(13, 15));
-    return msToDate(Date.UTC(year, month, day, hour, minute, second));
-  }
-  if (/^\d{8}T\d{6}$/.test(value)) {
-    const year = Number(value.slice(0, 4));
-    const month = Number(value.slice(4, 6)) - 1;
-    const day = Number(value.slice(6, 8));
-    const hour = Number(value.slice(9, 11));
-    const minute = Number(value.slice(11, 13));
-    const second = Number(value.slice(13, 15));
-    return msToDate(Date.UTC(year, month, day, hour, minute, second));
+  const compact = value.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/);
+  if (compact) {
+    const zone = /(?:^|;)TZID=([^;]+)/i.exec(params ?? "")?.[1].replace(/^"|"$/g, "");
+    try {
+      return msToDate(timeObjToMs({
+        year: Number(compact[1]), month: Number(compact[2]), day: Number(compact[3]),
+        hour: Number(compact[4] ?? 0), minute: Number(compact[5] ?? 0), second: Number(compact[6] ?? 0), millisecond: 0,
+      }, compact[7] ? "UTC" : zone ?? "Asia/Seoul"));
+    } catch {
+      throw new BadRequestException("ics_date_or_timezone_invalid");
+    }
   }
   const parsed = isoToDate(value);
   return Number.isNaN(parsed.valueOf()) ? null : parsed;
@@ -1215,6 +1207,5 @@ function formatIcsDate(date: Date): string {
 }
 
 function formatIcsDateOnly(date: Date): string {
-  const iso = date.toISOString();
-  return iso.slice(0, 10).replace(/-/g, "");
+  return formatSeoulDate(date).replace(/-/g, "");
 }

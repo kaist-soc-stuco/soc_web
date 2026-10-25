@@ -39,6 +39,13 @@ const singletonConflictCode = (type: ContentBlockRecord["type"]): string => {
   }
 };
 
+function isSingletonConflict(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const detail = error as { code?: string; constraint?: string; cause?: unknown };
+  return detail.code === "23505" && detail.constraint === "content_block_singleton_type_unique_idx"
+    || isSingletonConflict(detail.cause);
+}
+
 const toPublicRecord = ({
   key,
   updatedAt,
@@ -133,7 +140,10 @@ export class SiteContentService {
         throw new ConflictException(singletonConflictCode(input.type));
       }
     }
-    const after = await this.siteContentRepository.createContentBlock(input, audit.actorUserId);
+    const after = await this.siteContentRepository.createContentBlock(input, audit.actorUserId).catch(error => {
+      if (isSingletonConflict(error)) throw new ConflictException(singletonConflictCode(input.type));
+      throw error;
+    });
     await this.auditLogService.record({
       action: "content_block.create",
       actorUserId: audit.actorUserId,
@@ -159,7 +169,10 @@ export class SiteContentService {
         throw new ConflictException(singletonConflictCode(nextType));
       }
     }
-    const after = await this.siteContentRepository.updateContentBlock(contentBlockId, input, audit.actorUserId);
+    const after = await this.siteContentRepository.updateContentBlock(contentBlockId, input, audit.actorUserId).catch(error => {
+      if (isSingletonConflict(error)) throw new ConflictException(singletonConflictCode(nextType));
+      throw error;
+    });
     if (!after) throw new NotFoundException("content_block_not_found");
     await this.auditLogService.record({
       action: "content_block.update",

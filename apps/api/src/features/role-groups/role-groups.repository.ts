@@ -31,6 +31,7 @@ import type {
   UpdateRoleGroupRequest,
 } from "@soc/contracts";
 import { msToIso, nowDate } from "@soc/shared";
+import { effectiveFeeStatusSql } from "../users/fee-status";
 
 @Injectable()
 export class RoleGroupsRepository {
@@ -354,11 +355,7 @@ export class RoleGroupsRepository {
       input.majorType === "PRIMARY"
         ? sql`nullif(trim(${users.primaryMajor}), '') is not null`
         : undefined,
-      input.feeStatus === "PAID" || input.feeStatus === "PARTIAL"
-        ? sql`exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = ${input.feeStatus})`
-        : input.feeStatus === "UNPAID"
-          ? sql`not exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} in ('PAID', 'PARTIAL'))`
-          : undefined,
+      input.feeStatus ? eq(effectiveFeeStatusSql(), input.feeStatus) : undefined,
       input.status === "active"
         ? eq(users.isActive, true)
         : input.status === "inactive"
@@ -374,6 +371,7 @@ export class RoleGroupsRepository {
           isMember: sql<boolean>`CASE WHEN ${userRoleGroups.userRoleGroupId} IS NULL THEN false ELSE true END`,
         })
         .from(users)
+        .leftJoin(studentFeeStatus, eq(studentFeeStatus.userId, users.userId))
         .leftJoin(
           userRoleGroups,
           and(
@@ -386,7 +384,8 @@ export class RoleGroupsRepository {
         .orderBy(asc(users.nameKo), asc(users.kaistUid))
         .limit(pageSize)
         .offset(offset),
-      this.db.select({ count: sql<number>`COUNT(*)::int` }).from(users).where(whereClause),
+      this.db.select({ count: sql<number>`COUNT(*)::int` }).from(users)
+        .leftJoin(studentFeeStatus, eq(studentFeeStatus.userId, users.userId)).where(whereClause),
     ]);
 
     return {

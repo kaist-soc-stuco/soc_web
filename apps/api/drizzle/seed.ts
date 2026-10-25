@@ -2145,7 +2145,7 @@ async function seedAboutPageContent(seedAuthorId: string) {
       publishedBy: seedAuthorId,
       publishedAt,
     })),
-  ]);
+  ]).onConflictDoNothing();
 
   await db
     .insert(executiveContactDepartments)
@@ -2419,7 +2419,7 @@ async function seedReferenceAboutPageContent() {
     await db.insert(contentBlocks).values({
       ...organizationValues,
       createdBy: referenceAuthor.userId,
-    });
+    }).onConflictDoNothing();
   }
 
   console.log(
