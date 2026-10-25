@@ -323,3 +323,15 @@ test("logout requests survive page navigation", async () => {
   await client.logout();
   assert.equal(requestInit.keepalive, true);
 });
+
+test("API errors retain the request id from response headers or JSON", async () => {
+  for (const headers of [{ "x-request-id": "header-request-id" }, {}]) {
+    const client = createApiClient({ baseUrl: "/api", fetcher: async () => new Response(JSON.stringify({ message: "temporarily_unavailable", requestId: "body-request-id" }), { status: 503, headers }) });
+    await assert.rejects(client.getArticles("_EVENT"), error => error.status === 503 && error.code === "temporarily_unavailable" && error.requestId === (headers["x-request-id"] ?? "body-request-id"));
+  }
+});
+
+test("void and proxy error responses also retain request ids", async () => {
+  const client = createApiClient({ baseUrl: "/api", fetcher: async () => new Response("upstream unavailable", { status: 502, headers: { "x-request-id": "proxy-request-id" } }) });
+  await assert.rejects(client.deleteArticle("_EVENT", "1"), error => error.status === 502 && error.requestId === "proxy-request-id");
+});

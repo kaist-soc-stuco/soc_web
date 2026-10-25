@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ApiClientHttpError } from "@soc/api-client";
 import { FileQuestion, FileText } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -12,11 +13,14 @@ interface DataStateProps {
 }
 
 interface ErrorStateProps {
+  error?: unknown;
   actions?: ReactNode;
   className?: string;
   description?: string;
   onRetry?: () => void;
   retryLabel?: string;
+  requestId?: string;
+  requestIdLabel?: string;
   title?: string;
 }
 
@@ -41,13 +45,17 @@ export function EmptyState({
 }
 
 export function ErrorState({
+  error,
   actions,
   className,
   description = "잠시 후 다시 시도해 주세요. 문제가 계속되면 관리자에게 문의해 주세요.",
   onRetry,
   retryLabel = "다시 시도",
+  requestId,
+  requestIdLabel = "요청 번호",
   title = "내용을 불러올 수 없습니다",
 }: ErrorStateProps) {
+  const errorRequestId = requestId ?? (error instanceof ApiClientHttpError ? error.requestId : undefined);
   return (
     <div
       className={cn(
@@ -63,6 +71,7 @@ export function ErrorState({
       <p className="mt-2 max-w-full break-words whitespace-normal text-sm font-normal leading-6 text-slate-500">
         {description}
       </p>
+      {errorRequestId ? <p className="mt-3 max-w-full break-all text-xs text-slate-500">{requestIdLabel}: {errorRequestId}</p> : null}
       {onRetry || actions ? <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
       {onRetry ? (
         <Button

@@ -25,8 +25,7 @@ export class HealthService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
-  async getHealth() {
-    const correlationId = randomUUID();
+  async getHealth(correlationId: string = randomUUID()) {
     const [postgres, redis] = await Promise.all([
       this.checkPostgres(correlationId),
       this.checkRedis(correlationId),
@@ -44,7 +43,7 @@ export class HealthService {
     const start = nowMs();
 
     try {
-      await this.db.execute(sql`SELECT 1`);
+      await this.withDeadline(this.db.execute(sql`SELECT 1`));
 
       return {
         ok: true,
@@ -53,7 +52,7 @@ export class HealthService {
       };
     } catch {
       this.logger.error(
-        `dependency=postgres code=postgres_unavailable correlationId=${correlationId}`,
+        `dependency=postgres code=postgres_unavailable requestId=${correlationId}`,
       );
       return {
         ok: false,
@@ -67,11 +66,10 @@ export class HealthService {
     const start = nowMs();
 
     try {
-      if (this.redis.status === 'wait') {
-        await this.redis.connect();
-      }
-
-      await this.redis.ping();
+      await this.withDeadline((async () => {
+        if (this.redis.status === 'wait') await this.redis.connect();
+        await this.redis.ping();
+      })());
 
       return {
         ok: true,
@@ -80,13 +78,25 @@ export class HealthService {
       };
     } catch {
       this.logger.error(
-        `dependency=redis code=redis_unavailable correlationId=${correlationId}`,
+        `dependency=redis code=redis_unavailable requestId=${correlationId}`,
       );
       return {
         ok: false,
         latencyMs: nowMs() - start,
         code: 'redis_unavailable',
       };
+    }
+  }
+
+  private async withDeadline(operation: PromiseLike<unknown>): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        operation,
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('health_check_timeout')), 3_000); }),
+      ]);
+    } finally {
+      clearTimeout(timer);
     }
   }
 }

@@ -42,3 +42,14 @@ test("health logs a correlation id without returning dependency exception text",
   assert.equal(JSON.stringify(result).includes("secret-value"), false);
   assert.equal(logs.join(" ").includes("secret-value"), false);
 });
+
+test("a dependency that never responds becomes degraded after the health deadline", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const resultPromise = serviceWith(
+    { execute: () => new Promise(() => {}) },
+    { status: "wait", connect: () => new Promise(() => {}) },
+  ).getHealth();
+  t.mock.timers.tick(3_000);
+  const result = await resultPromise;
+  assert.equal(result.status, "degraded");
+});

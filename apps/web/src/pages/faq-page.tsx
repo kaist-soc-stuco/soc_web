@@ -163,6 +163,8 @@ export function FaqPage() {
                 </div>
               ) : faqQuery.isError ? (
                 <ErrorState
+                  error={faqQuery.error}
+                  requestIdLabel={lang === "ko" ? "요청 번호" : "Request ID"}
                   description={
                     lang === "ko"
                       ? "일시적인 네트워크 오류일 수 있습니다. 잠시 후 다시 시도해 주세요."

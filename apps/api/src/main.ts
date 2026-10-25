@@ -9,6 +9,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
+import { AllExceptionsFilter } from './shared/filters/all-exceptions.filter';
+import { RequestIdMiddleware } from './shared/middleware/request-id.middleware';
 
 import { createTrustedProxyCheck } from './infrastructure/http/trusted-proxy';
 import {
@@ -54,6 +56,8 @@ async function bootstrap(): Promise<void> {
   const { AppModule } = await import('./app.module');
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   app.enableShutdownHooks();
+  app.use(new RequestIdMiddleware().use);
+  app.useGlobalFilters(new AllExceptionsFilter());
   const httpServer = app.getHttpAdapter().getInstance();
   // Keep JSON/urlencoded requests bounded independently of the multipart
   // 21 MiB ingress allowance used for 20 MiB file uploads.
@@ -104,6 +108,7 @@ async function bootstrap(): Promise<void> {
         ? false
         : true,
     credentials: true,
+    exposedHeaders: ['x-request-id'],
   });
 
   app.use(cookieParser());

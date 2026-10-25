@@ -21,6 +21,7 @@ export class ApiClientHttpError extends Error {
   constructor(
     public readonly status: number,
     public readonly code?: string,
+    public readonly requestId?: string,
   ) {
     super(code ? `HTTP ${status}: ${code}` : `HTTP ${status}`);
     this.name = "ApiClientHttpError";
@@ -156,17 +157,7 @@ const redirectToLogin = (): void => {
 
 const readJson = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
-    let code: string | undefined;
-    try {
-      const payload = (await response.json()) as { message?: unknown };
-      if (typeof payload.message === "string") code = payload.message;
-      if (Array.isArray(payload.message) && typeof payload.message[0] === "string") {
-        code = payload.message[0];
-      }
-    } catch {
-      // Error responses from proxies do not always contain JSON.
-    }
-    throw new ApiClientHttpError(response.status, code);
+    throw await readHttpError(response);
   }
 
   return response.json() as Promise<T>;
@@ -174,7 +165,7 @@ const readJson = async <T>(response: Response): Promise<T> => {
 
 const readText = async (response: Response): Promise<string> => {
   if (!response.ok) {
-    throw new ApiClientHttpError(response.status);
+    throw await readHttpError(response);
   }
 
   return response.text();
@@ -182,10 +173,24 @@ const readText = async (response: Response): Promise<string> => {
 
 const readBlob = async (response: Response): Promise<Blob> => {
   if (!response.ok) {
-    throw new ApiClientHttpError(response.status);
+    throw await readHttpError(response);
   }
 
   return response.blob();
+};
+
+const readHttpError = async (response: Response): Promise<ApiClientHttpError> => {
+  let code: string | undefined;
+  let requestId = response.headers.get("x-request-id") ?? undefined;
+  try {
+    const payload = (await response.json()) as { message?: unknown; requestId?: unknown };
+    if (typeof payload.message === "string") code = payload.message;
+    if (Array.isArray(payload.message) && typeof payload.message[0] === "string") code = payload.message[0];
+    if (!requestId && typeof payload.requestId === "string") requestId = payload.requestId;
+  } catch {
+    // Error responses from proxies do not always contain JSON.
+  }
+  return new ApiClientHttpError(response.status, code, requestId);
 };
 
 /**
@@ -346,7 +351,7 @@ export const createApiClientContext = ({
           );
 
           if (!response.ok) {
-            const error = new ApiClientHttpError(response.status);
+            const error = await readHttpError(response);
 
             if (isAuthExpiredStatus(response.status)) {
               redirectToLogin();
@@ -431,14 +436,14 @@ export const createApiClientContext = ({
       );
 
       if (!retriedResponse.ok) {
-        throw new ApiClientHttpError(retriedResponse.status);
+        throw await readHttpError(retriedResponse);
       }
 
       return;
     }
 
     if (!response.ok) {
-      throw new ApiClientHttpError(response.status);
+      throw await readHttpError(response);
     }
   };
 
@@ -506,7 +511,7 @@ export const createApiClientContext = ({
       }),
     );
     if (!response.ok) {
-      throw new ApiClientHttpError(response.status);
+      throw await readHttpError(response);
     }
   };
 
@@ -525,7 +530,7 @@ export const createApiClientContext = ({
       method: "POST",
     });
     if (!response.ok) {
-      throw new ApiClientHttpError(response.status);
+      throw await readHttpError(response);
     }
   };
 

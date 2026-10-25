@@ -22,6 +22,7 @@ import { ChannelTalkProvider } from '@/features/channel-talk/channel-talk-provid
 import { BoardPage } from '@/pages/board-page';
 import { FaqPage } from '@/pages/faq-page';
 import { HomePage } from '@/pages/home-page';
+import { RouteErrorPage } from '@/pages/route-error-page';
 const LoginCallbackPage = lazy(() =>
   import('@/pages/login-callback-page').then((module) => ({ default: module.LoginCallbackPage })),
 );
@@ -394,7 +395,7 @@ function AppLayout() {
 }
 
 const router = createBrowserRouter(createRoutesFromElements(
-  <Route element={<AppLayout />}>
+  <Route element={<AppLayout />} errorElement={<RouteErrorPage />}>
 
         <Route element={<PublicLayout />}>
           <Route path="/" element={<HomePage />} />
