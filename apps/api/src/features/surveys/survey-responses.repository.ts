@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { msToIso, nowDate } from "@soc/shared";
+import { enqueueSpreadsheetSync } from "../../infrastructure/google/enqueue-spreadsheet-sync";
 
 import {
   DRIZZLE_DB,
@@ -379,6 +380,7 @@ export class SurveyResponsesRepository {
     return this.db.transaction(async tx => {
       await tx.select({ id: surveys.surveyId }).from(surveys).where(eq(surveys.surveyId, surveyId)).for("update");
       const deleted = await tx.delete(surveyResponses).where(eq(surveyResponses.surveyId, surveyId)).returning({ id: surveyResponses.id });
+      await enqueueSpreadsheetSync(tx, "SURVEY", surveyId);
       return { deletedCount: deleted.length };
     });
   }
@@ -414,7 +416,7 @@ export class SurveyResponsesRepository {
       .from(surveyResponses)
       .leftJoin(users, eq(surveyResponses.userId, users.userId))
       .where(and(...conditions))
-      .orderBy(submittedAtOrder(surveyResponses.submittedAt), submittedAtOrder(surveyResponses.createdAt))
+      .orderBy(submittedAtOrder(surveyResponses.submittedAt), submittedAtOrder(surveyResponses.createdAt), submittedAtOrder(surveyResponses.id))
       .limit(pageSize)
       .offset((page - 1) * pageSize);
     const [countRow] = await this.db
@@ -589,6 +591,7 @@ export class SurveyResponsesRepository {
           );
         }
 
+        await enqueueSpreadsheetSync(tx, "SURVEY", input.surveyId);
         const response = await this.findById(
           insertedResponse.id,
           insertedResponse.surveyId,
@@ -745,6 +748,7 @@ export class SurveyResponsesRepository {
         );
       }
 
+      await enqueueSpreadsheetSync(tx, "SURVEY", input.surveyId);
       const response = await this.findById(
         updatedResponse.id,
         updatedResponse.surveyId,

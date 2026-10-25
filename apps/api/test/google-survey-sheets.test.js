@@ -5,7 +5,7 @@ const {
   GoogleSurveySheetsService,
 } = require("../dist/apps/api/src/features/surveys/google-survey-sheets.service.js");
 
-function createService(initialSurvey, sheets = {}, auditLogService) {
+function createService(initialSurvey, sheets = {}, auditLogService, responseOverrides = {}) {
   let survey = { ...initialSurvey };
   const calls = [];
   const repository = {
@@ -46,6 +46,7 @@ function createService(initialSurvey, sheets = {}, auditLogService) {
       findBySurveyId: async () => ({ items: [], total: 0 }),
       findAnswersBySurveyId: async () => [],
       findAnswersByResponseIds: async () => [],
+      ...responseOverrides,
     },
     undefined,
     auditLogService,
@@ -84,6 +85,32 @@ test("creates and syncs a survey response sheet through the shared Sheets client
   assert.deepEqual(syncCall.definition.columnWidths, [155, 105, 240, 150, 100, 230]);
   assert.equal(getSurvey().spreadsheetId, "sheet-1");
   assert.equal(getSurvey().spreadsheetSyncStatus, "CONNECTED");
+});
+
+test("syncs every response beyond 100 while loading answers in bounded batches", async () => {
+  const responses = Array.from({ length: 251 }, (_, i) => ({ id: `response-${i}` }));
+  const pages = [];
+  const batches = [];
+  const {service,calls} = createService({id:"survey-1",spreadsheetId:"sheet-1"},{},undefined,{
+    findBySurveyId: async (_id,{page,pageSize,sortOrder}) => {
+      assert.equal(sortOrder,"asc");
+      pages.push(page);
+      return {items:responses.slice((page-1)*pageSize,page*pageSize),total:responses.length};
+    },
+    findAnswersByResponseIds: async ids => {batches.push(ids.length); return [];},
+  });
+  await service.refresh("survey-1",true);
+  const rows=calls.find(call=>call.kind==="syncSheet").definition.rows;
+  assert.deepEqual(pages,[1,2,3]);
+  assert.deepEqual(batches,[100,100,51]);
+  assert.deepEqual(rows.map(row=>row.at(-1)),responses.map(response=>response.id));
+});
+
+test("file answers retain every filename and asset reference", () => {
+  const {service}=createService({id:"survey-1"});
+  assert.equal(service.formatAnswer({content:{files:[
+    {fileName:"first.pdf",assetId:"1"},{fileName:"second.pdf",assetId:"2"},
+  ]}},{questionType:"file_upload"}),"first.pdf (asset:1), second.pdf (asset:2)");
 });
 
 test("moves an existing survey spreadsheet into the shared target folder before syncing", async () => {

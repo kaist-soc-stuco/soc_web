@@ -10,6 +10,7 @@ import {
   type PostgresDatabase,
 } from "../postgres/postgres.provider";
 import { googleSpreadsheetSyncJobs } from "../postgres/postgres.schema";
+import { enqueueSpreadsheetSync } from "./enqueue-spreadsheet-sync";
 
 export const GOOGLE_SHEET_RESOURCE = {
   CONTACTS: "CONTACTS",
@@ -58,37 +59,7 @@ export class GoogleSpreadsheetSyncQueueService {
   }
 
   async enqueue(resourceType: GoogleSheetResourceType, resourceKey = "global"): Promise<void> {
-    await this.db
-      .insert(googleSpreadsheetSyncJobs)
-      .values({
-        resourceType,
-        resourceKey,
-        status: PENDING,
-        revision: 1,
-        attempts: 0,
-        availableAt: nowDate(),
-        lockedAt: null,
-        leaseUntil: null,
-        claimToken: null,
-        lastError: null,
-      })
-      .onConflictDoUpdate({
-        target: [
-          googleSpreadsheetSyncJobs.resourceType,
-          googleSpreadsheetSyncJobs.resourceKey,
-        ],
-        set: {
-          status: PENDING,
-          revision: sql`${googleSpreadsheetSyncJobs.revision} + 1`,
-          attempts: 0,
-          availableAt: nowDate(),
-          lockedAt: null,
-          leaseUntil: null,
-          claimToken: null,
-          lastError: null,
-          updatedAt: nowDate(),
-        },
-      });
+    await enqueueSpreadsheetSync(this.db, resourceType, resourceKey);
   }
 
   async processPendingJobs(limit = 25): Promise<{

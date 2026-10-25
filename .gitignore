@@ -68,3 +68,4 @@ secrets/google-calendar-service-account.json
 secrets/google-oauth-client.json
 secrets/google-oauth-token.json
 /secrets/student-fee-bootstrap.json
+/apps/api/src/features/users/student-fee-bootstrap.ts

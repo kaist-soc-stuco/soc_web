@@ -12,3 +12,4 @@ tmp/
 tools/mobile_qa/
 docs/
 **/*.md
+apps/api/src/features/users/student-fee-bootstrap.ts

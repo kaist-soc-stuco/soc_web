@@ -53,6 +53,7 @@ async function bootstrap(): Promise<void> {
   preloadNodeEnvironment();
   const { AppModule } = await import('./app.module');
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.enableShutdownHooks();
   const httpServer = app.getHttpAdapter().getInstance();
   // Keep JSON/urlencoded requests bounded independently of the multipart
   // 21 MiB ingress allowance used for 20 MiB file uploads.

@@ -11,6 +11,7 @@ import { SurveySectionsRepository } from "./survey-sections.repository";
 import { SurveyQuestionsRepository } from "./survey-questions.repository";
 import { SurveyResponsesRepository } from "./survey-responses.repository";
 import type { SurveyAnswerRecord } from "./entities/survey-answer.entity";
+import type { SurveyResponseRecord } from "./entities/survey-response.entity";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import { AuditLogService } from "../audit/audit-log.service";
 
@@ -123,17 +124,22 @@ export class GoogleSurveySheetsService implements OnModuleInit {
           sections.map((section) => this.questionsRepo.findBySectionId(section.id)),
         )
       ).flat();
-      const responsePage = await this.responsesRepo.findBySurveyId(surveyId, {
-        page: 1,
-        pageSize: 100,
-      });
-      if (responsePage.total > responsePage.items.length) {
-        throw new Error("survey_sheet_response_limit_exceeded");
+      const responses: SurveyResponseRecord[] = [];
+      const answers: SurveyAnswerRecord[] = [];
+      for (let page = 1; ; page += 1) {
+        if (job && !(await job.isCurrentClaim())) return;
+        const batch = await this.responsesRepo.findBySurveyId(surveyId, {
+          page, pageSize: 100, sortOrder: "asc",
+        });
+        if (!batch.items.length && responses.length < batch.total) {
+          throw new Error("survey_sheet_response_page_missing");
+        }
+        responses.push(...batch.items);
+        answers.push(...await this.responsesRepo.findAnswersByResponseIds(
+          batch.items.map((response) => response.id),
+        ));
+        if (responses.length >= batch.total) break;
       }
-      const responses = responsePage.items;
-      const answers = await this.responsesRepo.findAnswersByResponseIds(
-        responses.map((response) => response.id),
-      );
       const answersByResponse = new Map<string, Map<string, SurveyAnswerRecord>>();
       for (const answer of answers) {
         const responseAnswers = answersByResponse.get(answer.responseId) ?? new Map();
@@ -260,6 +266,12 @@ export class GoogleSurveySheetsService implements OnModuleInit {
       return content.grid ? JSON.stringify(content.grid) : "";
     }
     if (question.questionType === "file_upload") {
+      if (Array.isArray(content.files)) {
+        return content.files.map((file) => {
+          const item = file as { fileName?: string; assetId?: string };
+          return `${item.fileName ?? "첨부 파일"}${item.assetId ? ` (asset:${item.assetId})` : ""}`;
+        }).join(", ");
+      }
       const name = typeof content.fileName === "string" ? content.fileName : "첨부 파일";
       const id = typeof content.assetId === "string" ? content.assetId : "";
       return id ? `${name} (asset:${id})` : name;

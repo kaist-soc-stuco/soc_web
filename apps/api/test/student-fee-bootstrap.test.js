@@ -3,7 +3,7 @@ const test = require("node:test");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const {getStudentFeeBootstrap} = require("../dist/apps/api/src/features/users/student-fee-bootstrap.js");
+const {getStudentFeeBootstrap} = require("../dist/apps/api/src/features/users/student-fee-bootstrap-loader.js");
 
 test("first-login matching reads private data and is optional when unconfigured", (t) => {
   const previous = process.env.STUDENT_FEE_BOOTSTRAP_PATH;

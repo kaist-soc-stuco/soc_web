@@ -29,7 +29,7 @@ test("mail failure does not reject response notification or prevent remaining re
   assert.equal(calls, 2);
 });
 
-test("delete all is scoped to survey and records audit and sheet refresh", async () => {
+test("delete all is scoped to survey and records audit without a post-commit queue write", async () => {
   const calls = [];
   const service = new SurveyResponsesService(
     { deleteAllResponses: async id => { calls.push(["delete", id]); return { deletedCount: 2 }; } },
@@ -39,7 +39,7 @@ test("delete all is scoped to survey and records audit and sheet refresh", async
     { record: async input => calls.push(["audit", input.actorUserId, input.targetId, input.payload.deletedCount]) },
   );
   assert.deepEqual(await service.deleteAll("survey-a", "admin"), { deletedCount: 2 });
-  assert.deepEqual(calls, [["delete","survey-a"], ["audit","admin","survey-a",2], ["sheet","survey-a"]]);
+  assert.deepEqual(calls, [["delete","survey-a"], ["audit","admin","survey-a",2]]);
 });
 
 test("missing surveys cannot create subscriptions or delete responses", async () => {

@@ -19,6 +19,15 @@ const validDto = {
   answers: [{ questionId: "question-1", content: { text: "홍길동" } }],
 };
 
+test("anonymous and temporary respondents can leave optional file questions empty", async () => {
+  const {service}=createService({surveyRecord:survey({allowAnonymous:true})});
+  service.sectionsRepo={findBySurveyId:async()=>[{id:"section-1"}]};
+  service.questionsRepo={findBySectionId:async()=>[{id:"optional-file",questionType:"file_upload",isRequired:false}]};
+  assert.equal((await service.submit("survey-1",{answers:[]})).id,"response-1");
+  assert.equal((await service.submit("survey-1",{answers:[]},{permission:0,temporaryClaims:{}})).id,"response-1");
+  await expectHttpError(service.submit("survey-1",{answers:[{questionId:"optional-file",content:{assetIds:["1"],files:[{assetId:"1",fileName:"file.pdf"}]}}]}),ForbiddenException,"login_required_for_file_upload");
+});
+
 function survey(overrides = {}) {
   return {
     id: "survey-1",
@@ -212,7 +221,7 @@ test("rejects submissions once capacity is full", async () => {
   assert.equal(insertSubmissionCalls.length, 1);
 });
 
-test("stores valid submissions and queues Sheets without calling Google inline", async () => {
+test("returns stored submissions without a second post-commit queue write", async () => {
   const { insertSubmissionCalls, service, sheetQueueCalls } = createService({
     surveyRecord: survey({ feePayersOnly: true, maxResponses: 10 }),
   });
@@ -227,7 +236,7 @@ test("stores valid submissions and queues Sheets without calling Google inline",
   });
   assert.equal(result.id, "response-1");
   assert.equal(result.answers.length, 1);
-  assert.deepEqual(sheetQueueCalls, ["survey-1"]);
+  assert.deepEqual(sheetQueueCalls, []);
 });
 
 test("rejects response edits when the survey does not allow editing", async () => {
@@ -243,7 +252,7 @@ test("rejects response edits when the survey does not allow editing", async () =
   assert.equal(updateSubmissionCalls.length, 0);
 });
 
-test("updates the caller's existing response and queues Sheets", async () => {
+test("returns the caller's updated response without a second post-commit queue write", async () => {
   const { service, sheetQueueCalls, updateSubmissionCalls } = createService({
     existingResponse: { id: "existing-response" },
     surveyRecord: survey({ allowResponseEdit: true }),
@@ -260,7 +269,7 @@ test("updates the caller's existing response and queues Sheets", async () => {
   });
   assert.equal(result.id, "existing-response");
   assert.equal(result.answers.length, 1);
-  assert.deepEqual(sheetQueueCalls, ["survey-1"]);
+  assert.deepEqual(sheetQueueCalls, []);
 });
 
 

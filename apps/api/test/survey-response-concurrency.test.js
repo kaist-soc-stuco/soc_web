@@ -59,6 +59,35 @@ let sectionsRepository;
 let questionsRepository;
 let mutationPolicy;
 
+test("submission and its refresh job commit or roll back together", integrationOptions, async () => {
+  await insertSurvey({id:SINGLE_SURVEY});
+  await pool.query("DELETE FROM google_spreadsheet_sync_job WHERE resource_type='SURVEY' AND resource_key=$1",[SINGLE_SURVEY]);
+  assert.equal((await submit(SINGLE_SURVEY,USER_ONE)).status,"created");
+  const job=await pool.query("SELECT status, revision FROM google_spreadsheet_sync_job WHERE resource_type='SURVEY' AND resource_key=$1",[SINGLE_SURVEY]);
+  assert.deepEqual(job.rows,[{status:"PENDING",revision:1}]);
+  await pool.query(`CREATE FUNCTION maintenance_reject_sync() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic_queue_failure'; END $$;
+    CREATE TRIGGER maintenance_reject_sync BEFORE INSERT OR UPDATE ON google_spreadsheet_sync_job FOR EACH ROW EXECUTE FUNCTION maintenance_reject_sync();`);
+  try {
+    await assert.rejects(submit(SINGLE_SURVEY,USER_TWO),/insert into "google_spreadsheet_sync_job"/i);
+    const count=await pool.query("SELECT count(*)::int AS count FROM survey_responses WHERE survey_id=$1",[SINGLE_SURVEY]);
+    assert.equal(count.rows[0].count,1);
+  } finally {
+    await pool.query("DROP TRIGGER maintenance_reject_sync ON google_spreadsheet_sync_job; DROP FUNCTION maintenance_reject_sync();");
+  }
+});
+
+test("deleting answered questions or sections preserves responses and returns a conflict", integrationOptions, async () => {
+  await insertSurvey({id:STRUCTURE_SURVEY});
+  const section=await pool.query("INSERT INTO survey_sections (survey_id,title_ko,sort_order) VALUES ($1,'Section',0) RETURNING id",[STRUCTURE_SURVEY]);
+  const question=await pool.query("INSERT INTO survey_questions (section_id,question_type,title_ko,is_required,sort_order) VALUES ($1,'short_text','Question',true,0) RETURNING id",[section.rows[0].id]);
+  assert.equal((await submit(STRUCTURE_SURVEY,USER_ONE,[{questionId:question.rows[0].id,content:{text:"Original answer"}}])).status,"created");
+  const conflict=error=>error.getStatus()===409;
+  await assert.rejects(questionsRepository.delete(question.rows[0].id,section.rows[0].id),conflict);
+  await assert.rejects(sectionsRepository.delete(section.rows[0].id,STRUCTURE_SURVEY),conflict);
+  const answers=await pool.query("SELECT content FROM survey_answers WHERE question_id=$1",[question.rows[0].id]);
+  assert.deepEqual(answers.rows,[{content:{text:"Original answer"}}]);
+});
+
 before(async () => {
   if (!databaseUrl) return;
 
@@ -84,6 +113,10 @@ beforeEach(async () => {
 });
 
 after(async () => {
+  await pool?.query(
+    "DELETE FROM google_spreadsheet_sync_job WHERE resource_type='SURVEY' AND resource_key=ANY($1::text[])",
+    [[SINGLE_SURVEY,MULTIPLE_SURVEY,CAPACITY_SURVEY,DELETE_SURVEY,STRUCTURE_SURVEY,STATE_SURVEY,DUPLICATE_SURVEY,RESPONSE_FIRST_SURVEY]],
+  );
   await pool?.end();
 });
 

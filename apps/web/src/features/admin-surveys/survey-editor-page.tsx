@@ -221,8 +221,13 @@ const questionToFormState = (question: SurveyQuestionRecord): QuestionFormState 
 
 const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
 
-const getErrorMessage = (err: unknown, fallback: string) =>
-  fallback;
+const getErrorMessage = (err: unknown, fallback: string) => {
+  if (err instanceof ApiClientHttpError &&
+      (err.code === "survey_question_has_answers" || err.code === "survey_section_has_answers")) {
+    return "응답이 있는 항목은 삭제할 수 없습니다. 설문을 복제해 수정해 주세요.";
+  }
+  return fallback;
+};
 
 const getSurveyErrorMessage = (err: unknown, fallback: string) => {
   const message = getErrorMessage(err, fallback);

@@ -66,7 +66,6 @@ export class SurveyResponsesService {
     if (!await this.surveysRepo.findById(surveyId)) throw new NotFoundException("survey_not_found");
     const result = await this.responsesRepo.deleteAllResponses(surveyId);
     await this.auditLogService?.record({ action: "survey_response.delete_all", actorUserId, targetId: surveyId, targetType: "survey", payload: result });
-    await this.surveySheetsService?.enqueueRefresh(surveyId);
     return result;
   }
 
@@ -194,13 +193,9 @@ export class SurveyResponsesService {
     const questions = this.sectionsRepo && this.questionsRepo
       ? await this.loadQuestions(surveyId)
       : [];
-    if (caller?.temporaryClaims) {
-      if (questions.some((question) => question.questionType === "file_upload")) {
-        throw new ForbiddenException("login_required_for_file_upload");
-      }
-    } else if (caller?.id) {
+    if (caller?.id) {
       await this.validateUploadedAssets(dto.answers, caller.id, questions);
-    } else if (questions.some((question) => question.questionType === "file_upload")) {
+    } else if (dto.answers.some((answer) => getCanonicalSurveyAssetIds(answer.content).length > 0)) {
       throw new ForbiddenException("login_required_for_file_upload");
     }
 
@@ -249,7 +244,6 @@ export class SurveyResponsesService {
         },
       },
     });
-    await this.surveySheetsService?.enqueueRefresh(surveyId);
     void this.notifyNewResponse(surveyId, survey.titleKo);
     return { ...submission.response, answers: submission.answers };
   }
@@ -347,7 +341,6 @@ export class SurveyResponsesService {
           },
         },
       });
-      await this.surveySheetsService?.enqueueRefresh(surveyId);
       return { ...update.response, answers: update.answers };
     }
     if (

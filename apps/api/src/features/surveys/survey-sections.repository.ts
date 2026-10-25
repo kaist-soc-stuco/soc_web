@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { ConflictException, Inject, Injectable } from "@nestjs/common";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { msToIso, nowDate } from "@soc/shared";
 
@@ -135,7 +135,14 @@ export class SurveySectionsRepository {
     const db = tx ?? this.db;
     await db
       .delete(surveySections)
-      .where(and(eq(surveySections.id, id), eq(surveySections.surveyId, surveyId)));
+      .where(and(eq(surveySections.id, id), eq(surveySections.surveyId, surveyId)))
+      .catch((error) => {
+        const cause = error.cause ?? error;
+        if (cause.code === "23503" && cause.constraint === "survey_answers_question_id_survey_questions_id_fk") {
+          throw new ConflictException("survey_section_has_answers");
+        }
+        throw error;
+      });
   }
 
   async reorder(

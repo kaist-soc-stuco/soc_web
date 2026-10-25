@@ -37,7 +37,7 @@ import {
 
 import type { UserRecord } from "../entities/user";
 import { hashStudentFeePaymentPayload } from "../fee-payment-idempotency";
-import { getStudentFeeBootstrap } from "../student-fee-bootstrap";
+import { getStudentFeeBootstrap } from "../student-fee-bootstrap-loader";
 import type {
   StudentFeePolicy,
   AdminUserListResponse,

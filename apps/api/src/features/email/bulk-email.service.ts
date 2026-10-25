@@ -798,20 +798,23 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     attachments: DeliveryAttachment[],
     messageId: string,
   ): Promise<EmailDeliverySummary> {
-    const deliveries = await Promise.allSettled(
-      recipients.map((recipient, index) => {
-        const subject = renderBulkEmailTemplate(compose.subject, recipient);
-        const content = renderBulkEmailTemplate(compose.content, recipient);
-        return this.emailDeliveryService.send({
-          recipients: [recipient.email],
-          subject,
-          content: compose.contentType === "html" ? stripHtml(content) : content,
-          ...(compose.contentType === "html" ? { html: sanitizeBulkEmailHtml(inlineImageSources(content, attachments)) } : {}),
-          ...(attachments.length ? { attachments: toMailAttachments(attachments) } : {}),
-          messageId: `${messageId}.${index + 1}`,
-        });
-      }),
-    );
+    const deliveries: PromiseSettledResult<Awaited<ReturnType<EmailDeliveryService["send"]>>>[] = [];
+    for (let offset = 0; offset < recipients.length; offset += 5) {
+      deliveries.push(...await Promise.allSettled(
+        recipients.slice(offset, offset + 5).map((recipient, index) => {
+          const subject = renderBulkEmailTemplate(compose.subject, recipient);
+          const content = renderBulkEmailTemplate(compose.content, recipient);
+          return this.emailDeliveryService.send({
+            recipients: [recipient.email],
+            subject,
+            content: compose.contentType === "html" ? stripHtml(content) : content,
+            ...(compose.contentType === "html" ? { html: sanitizeBulkEmailHtml(inlineImageSources(content, attachments)) } : {}),
+            ...(attachments.length ? { attachments: toMailAttachments(attachments) } : {}),
+            messageId: `${messageId}.${offset + index + 1}`,
+          });
+        }),
+      ));
+    }
 
     const successful = deliveries.flatMap((delivery) =>
       delivery.status === "fulfilled" ? [delivery.value] : [],

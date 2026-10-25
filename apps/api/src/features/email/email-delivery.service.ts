@@ -1,6 +1,7 @@
 import {
   Injectable,
   Logger,
+  OnModuleDestroy,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -18,10 +19,15 @@ export interface EmailDeliveryResult {
 }
 
 @Injectable()
-export class EmailDeliveryService {
+export class EmailDeliveryService implements OnModuleDestroy {
   private readonly logger = new Logger(EmailDeliveryService.name);
+  private transporter?: ReturnType<typeof nodemailer.createTransport>;
 
   constructor(private readonly configService: ConfigService) {}
+
+  onModuleDestroy() {
+    this.transporter?.close();
+  }
 
   async send(input: {
     recipients: string[];
@@ -56,8 +62,14 @@ export class EmailDeliveryService {
 
     const user = this.configService.get<string>("DOORAY_SMTP_USER");
     const password = this.configService.get<string>("DOORAY_SMTP_PASSWORD");
-    const transporter = nodemailer.createTransport({
+    const transporter = this.transporter ??= nodemailer.createTransport({
       host,
+      pool: true,
+      maxConnections: 5,
+      maxRequeues: 0,
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 30_000,
       port: this.configService.get<number>("DOORAY_SMTP_PORT", 587),
       secure: this.configService.get<boolean>("DOORAY_SMTP_SECURE", false),
       ...(user && password ? { auth: { user, pass: password } } : {}),

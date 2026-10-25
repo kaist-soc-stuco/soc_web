@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   foreignKey,
   index,
   integer,
@@ -13,6 +14,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { permissions, users } from "./auth.schema";
 
@@ -72,6 +74,7 @@ export const articles = pgTable("article", {
   eventDescriptionKo: text("event_description_ko"),
   eventDescriptionEn: text("event_description_en"),
 }, (table) => [
+  check("article_faq_category_check", sql`${table.faqCategory} IN ('account', 'fees', 'events-surveys', 'other')`),
   index("article_board_idx").on(table.boardId),
   index("article_board_status_posted_idx").on(
     table.boardId,
