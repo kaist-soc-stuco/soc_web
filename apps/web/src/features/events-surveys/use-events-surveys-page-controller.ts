@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
-import type { ArticleEngagementKind, KoreanHolidayRecord } from "@soc/contracts";
-import { isoToDate, isoToMs, localDate, nowDate } from "@soc/shared";
+import type { ArticleEngagementKind, KoreanHolidayRecord, PublicListStateCounts } from "@soc/contracts";
+import { isoToDate, localDate, nowDate } from "@soc/shared";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useToast } from "@/components/ui/toast";
@@ -12,8 +12,6 @@ import { resolveAssetUrl } from "@/lib/asset-url";
 import {
   buildCalendarEventsFromPublicItems,
   buildUnifiedItems,
-  filterItemsByTab,
-  sortVisibleItems,
   type CalendarEvent,
   type EventsSurveysStateFilter,
   type UnifiedItem,
@@ -22,38 +20,12 @@ import { buildCalendarGrid } from "./events-surveys-calendar-utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
 
 const PUBLIC_ITEMS_PAGE_SIZE = 9;
-const PUBLIC_SERVER_PAGE_SIZE = 100;
-
-type PaginatedResponse<T> = {
-  items: T[];
+type PublicItemsPage = {
+  items: UnifiedItem[];
   total: number;
-  pageSize?: number;
-  limit?: number;
+  page: number;
+  stateCounts?: PublicListStateCounts;
 };
-
-async function fetchAllPages<T>(
-  fetchPage: (page: number) => Promise<PaginatedResponse<T>>,
-): Promise<T[]> {
-  const firstPage = await fetchPage(1);
-  const pageSize = Math.max(
-    1,
-    firstPage.pageSize ?? firstPage.limit ?? PUBLIC_SERVER_PAGE_SIZE,
-  );
-  const pageCount = Math.max(1, Math.ceil(firstPage.total / pageSize));
-
-  if (pageCount === 1) return firstPage.items;
-
-  const remainingPages = await Promise.all(
-    Array.from({ length: pageCount - 1 }, (_, index) =>
-      fetchPage(index + 2),
-    ),
-  );
-
-  return [firstPage, ...remainingPages].reduce<T[]>(
-    (items, page) => items.concat(page.items),
-    [],
-  );
-}
 
 function parseSelectedCalendarDate(value: string | null) {
   if (!value) return null;
@@ -81,7 +53,7 @@ export function useEventsSurveysPageController({
   const dateFrom = params.get("from") ?? "";
   const dateTo = params.get("to") ?? "";
   const requestedPage = Number(params.get("page"));
-  const currentPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const requestedCurrentPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const updateFilters = useCallback((changes: Record<string, string>, preserveScroll = false, flushSync = false) => {
     setParams(previous => {
       const next = new URLSearchParams(previous);
@@ -95,7 +67,13 @@ export function useEventsSurveysPageController({
   const setItemQuery = (value: string) => updateFilters({ q: value, page: "" }, true);
   const setDateRange = ({ from, to }: { from: string; to: string }) => updateFilters({ from, to, page: "" }, true, true);
   const setListFilters = ({ state, from, to }: { state: EventsSurveysStateFilter; from: string; to: string }) => updateFilters({ state: state === "all" ? "" : state, from, to, page: "" }, true, true);
-  const setCurrentPage = (page: number) => updateFilters({ page: page > 1 ? String(page) : "" }, isMobile);
+  const setCurrentPage = (page: number) => {
+    if (!isMobile) { updateFilters({ page: page > 1 ? String(page) : "" }); return; }
+    if (listQuery.isFetchingNextPage) return;
+    void listQuery.fetchNextPage().then(result => {
+      if (result.isError) toast({ type: "error", message: lang === "ko" ? "추가 목록을 불러오지 못했습니다. 다시 시도해 주세요." : "Could not load more items. Please try again." });
+    });
+  };
   const resetListFilters = () => updateFilters({ q: "", from: "", to: "", state: "", page: "" });
   const [currentDate, setCurrentDate] = useState(() => {
     const selected = parseSelectedCalendarDate(selectedParam);
@@ -151,36 +129,21 @@ export function useEventsSurveysPageController({
   const calendarRangeFrom = calendarRange.from.toISOString();
   const calendarRangeTo = calendarRange.to.toISOString();
 
-  const listQuery = useQuery({
-    queryKey: ["events-surveys", "list", session?.userId ?? "anonymous"],
-    queryFn: async () => {
-      const [surveys, events] = await Promise.all([
-        fetchAllPages((page) =>
-          apiClient.getPublicSurveys({
-            page,
-            pageSize: PUBLIC_SERVER_PAGE_SIZE,
-          }),
-        ),
-        fetchAllPages((page) =>
-          apiClient.getArticles("_EVENT", {
-            page,
-            limit: PUBLIC_SERVER_PAGE_SIZE,
-          }),
-        ).catch(() => []),
-      ]);
-
-      const eventsWithImages = events.map((event) => ({
-        ...event,
-        imageUrl: event.thumbnailStorageKey?.trim()
-          ? resolveAssetUrl(event.thumbnailStorageKey.trim())
-          : null,
-      }));
-
-      return {
-        surveys,
-        events: eventsWithImages,
-      };
+  const listQuery = useInfiniteQuery({
+    queryKey: ["events-surveys", "list", currentTab, session?.draftNamespace ?? session?.userId ?? "anonymous", session?.permission,
+      itemQuery.trim(), stateFilter, dateFrom, dateTo, isMobile ? "mobile" : requestedCurrentPage],
+    initialPageParam: isMobile ? 1 : requestedCurrentPage,
+    queryFn: async ({ pageParam: page, signal }): Promise<PublicItemsPage> => {
+      const filters = { page, publicList: true, state: stateFilter, from: dateFrom || undefined, to: dateTo || undefined, signal };
+      if (currentTab === "survey") {
+        const result = await apiClient.getPublicSurveys({ ...filters, pageSize: PUBLIC_ITEMS_PAGE_SIZE, query: itemQuery });
+        return { ...result, items: buildUnifiedItems(result.items, []) };
+      }
+      const result = await apiClient.getArticles("_EVENT", { ...filters, limit: PUBLIC_ITEMS_PAGE_SIZE, q: itemQuery, searchBy: "title_content" });
+      const events = result.items.map(event => ({ ...event, imageUrl: event.thumbnailStorageKey?.trim() ? resolveAssetUrl(event.thumbnailStorageKey.trim()) : null }));
+      return { ...result, items: buildUnifiedItems([], events) };
     },
+    getNextPageParam: last => last.page * PUBLIC_ITEMS_PAGE_SIZE < last.total ? last.page + 1 : undefined,
     enabled: currentTab !== "calendar",
     staleTime: 60 * 1000,
   });
@@ -253,8 +216,6 @@ export function useEventsSurveysPageController({
     holidaysQuery.isPlaceholderData,
   ]);
 
-  const surveys = listQuery.data?.surveys ?? [];
-  const events = listQuery.data?.events ?? [];
   const holidays = holidaysQuery.data ?? [];
   const calendarEvents = useMemo<CalendarEvent[]>(
     () =>
@@ -265,71 +226,21 @@ export function useEventsSurveysPageController({
     [calendarEventsQuery.data?.items, lang],
   );
 
-  const unifiedItems = useMemo<UnifiedItem[]>(() => {
-    return buildUnifiedItems(surveys, events).map((item) => ({
-      ...item,
-      ...(engagementOverrides[item.id] ?? {}),
-    }));
-  }, [engagementOverrides, events, surveys]);
-
-  const filteredItems = useMemo(() => {
-    return filterItemsByTab(unifiedItems, currentTab);
-  }, [unifiedItems, currentTab]);
-
-  const searchedItems = useMemo(() => {
-    const query = itemQuery.trim().toLocaleLowerCase();
-    if (!query) return filteredItems;
-
-    return filteredItems.filter((item) =>
-      [item.titleKo, item.titleEn, item.descriptionKo, item.descriptionEn]
-        .filter(Boolean)
-        .some((value) => value!.toLocaleLowerCase().includes(query)),
-    );
-  }, [filteredItems, itemQuery]);
-
-  const dateFilteredItems = useMemo(() => {
-    if (!dateFrom && !dateTo) return searchedItems;
-
-    const from = dateFrom ? isoToMs(`${dateFrom}T00:00:00+09:00`) : -Infinity;
-    const to = dateTo ? isoToMs(`${dateTo}T23:59:59.999+09:00`) : Infinity;
-    if (from > to) return [];
-
-    return searchedItems.filter((item) => {
-      const itemStart = item.opensAt ? isoToMs(item.opensAt) : null;
-      const itemEnd = item.closesAt ? isoToMs(item.closesAt) : itemStart;
-      if (itemStart === null || Number.isNaN(itemStart)) return false;
-      if (itemEnd !== null && Number.isNaN(itemEnd)) return false;
-      return (itemEnd ?? itemStart) >= from && itemStart <= to;
-    });
-  }, [dateFrom, dateTo, searchedItems]);
-
-  const sortedItems = useMemo(() => {
-    return sortVisibleItems(dateFilteredItems, "latest", stateFilter);
-  }, [dateFilteredItems, stateFilter]);
-
-  const totalItems = sortedItems.length;
+  const currentPage = isMobile ? listQuery.data?.pages.at(-1)?.page ?? 1 : requestedCurrentPage;
+  const totalItems = listQuery.data?.pages[0]?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / PUBLIC_ITEMS_PAGE_SIZE));
 
   useEffect(() => {
-    if (listQuery.isSuccess && !listQuery.isFetching && currentTab !== "calendar" && currentPage > totalPages) {
+    if (!isMobile && listQuery.isSuccess && !listQuery.isFetching && currentTab !== "calendar" && currentPage > totalPages) {
       updateFilters({ page: totalPages > 1 ? String(totalPages) : "" }, true);
     }
-  }, [currentPage, currentTab, listQuery.isSuccess, listQuery.isFetching, totalPages, updateFilters]);
+  }, [isMobile, currentPage, currentTab, listQuery.isSuccess, listQuery.isFetching, totalPages, updateFilters]);
 
   const visibleItems = useMemo(() => {
-    const start = isMobile ? 0 : (currentPage - 1) * PUBLIC_ITEMS_PAGE_SIZE;
-    return sortedItems.slice(start, currentPage * PUBLIC_ITEMS_PAGE_SIZE);
-  }, [currentPage, isMobile, sortedItems]);
+    return (listQuery.data?.pages ?? []).flatMap(page => page.items).map(item => ({ ...item, ...(engagementOverrides[item.id] ?? {}) }));
+  }, [listQuery.data, engagementOverrides]);
 
-  const stateCounts = useMemo(
-    () => ({
-      all: dateFilteredItems.length,
-      before_open: dateFilteredItems.filter((item) => item.computedState === "before_open").length,
-      open: dateFilteredItems.filter((item) => item.computedState === "open").length,
-      closed: dateFilteredItems.filter((item) => item.computedState === "closed").length,
-    }),
-    [dateFilteredItems],
-  );
+  const stateCounts = listQuery.data?.pages[0]?.stateCounts ?? { all: 0, before_open: 0, open: 0, closed: 0 };
 
   const handleSetEngagement = async (
     item: UnifiedItem,
@@ -443,7 +354,7 @@ export function useEventsSurveysPageController({
             ? "일정을 불러오는 중 오류가 발생했습니다."
             : "Failed to load calendar events."
           : null
-        : listQuery.isError
+        : listQuery.isError && !listQuery.data
           ? lang === "ko"
             ? "목록을 불러오는 중 오류가 발생했습니다."
             : "Failed to load events and surveys."

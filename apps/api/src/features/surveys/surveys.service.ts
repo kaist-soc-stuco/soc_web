@@ -265,7 +265,7 @@ export class SurveysService {
 
   async findPublished(
     caller?: SurveyCaller,
-    input: { page?: number; pageSize?: number; query?: string } = {},
+    input: import("@soc/contracts").PublicListFilters & { page?: number; pageSize?: number; query?: string; publicList?: boolean } = {},
   ): Promise<import("@soc/contracts").PublicSurveyListResponse> {
     const page = Number.isInteger(input.page) && (input.page ?? 0) > 0 ? input.page! : 1;
     const pageSize = Number.isInteger(input.pageSize) && (input.pageSize ?? 0) > 0
@@ -275,6 +275,7 @@ export class SurveysService {
       page,
       pageSize,
       query: input.query,
+      ...(input.publicList ? { publicList: true, state: input.state, from: input.from, to: input.to } : {}),
     });
     const surveys = result.items;
     const eligibilityContext = await this.loadEligibilityContext(caller);
@@ -294,7 +295,7 @@ export class SurveysService {
         ),
       });
     });
-    return { page, pageSize, total: result.total, items };
+    return { page, pageSize, total: result.total, items, ...(result.stateCounts ? { stateCounts: result.stateCounts } : {}) };
   }
 
   async findById(id: string): Promise<SurveyRecordWithState> {

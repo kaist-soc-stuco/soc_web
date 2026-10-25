@@ -1,11 +1,13 @@
-import type { RefreshResponse } from "@soc/contracts";
+import type { RefreshResponse, PublicListFilters } from "@soc/contracts";
 
 export interface ApiClientOptions {
   baseUrl: string;
   fetcher?: typeof fetch;
 }
 
-export interface ListQueryOptions {
+export interface ListQueryOptions extends PublicListFilters {
+  publicList?: boolean;
+  signal?: AbortSignal;
   limit?: number;
   page?: number;
   period?: "all" | "today" | "7days" | "30days";
@@ -79,6 +81,10 @@ export const buildListQuery = (options?: ListQueryOptions): string => {
   }
 
   const params = new URLSearchParams();
+  if (options.publicList) params.set("publicList", "true");
+  if (options.state) params.set("state", options.state);
+  if (options.from) params.set("from", options.from);
+  if (options.to) params.set("to", options.to);
 
   if (options.page !== undefined) {
     params.set("page", String(options.page));

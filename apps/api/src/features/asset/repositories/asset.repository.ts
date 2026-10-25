@@ -21,6 +21,7 @@ import {
   surveySections,
   surveys,
   assetCleanupLeases,
+  assetDeletionJobs,
   users,
   votes,
   voteItems,
@@ -700,12 +701,23 @@ export class AssetRepository {
         .limit(1);
       if (!unlinked) return null;
 
+      await tx.insert(assetDeletionJobs).values({ storageKey: candidate.storageKey }).onConflictDoNothing();
+
       const [deleted] = await tx
         .delete(assets)
         .where(eq(assets.assetId, Number(assetId)))
         .returning({ storageKey: assets.storageKey });
       return deleted ? { storageKey: deleted.storageKey } : null;
     });
+  }
+
+  async findPendingDeletions(limit: number): Promise<Array<{ storageKey: string }>> {
+    return this.db.select({ storageKey: assetDeletionJobs.storageKey })
+      .from(assetDeletionJobs).orderBy(asc(assetDeletionJobs.createdAt)).limit(limit);
+  }
+
+  async completeStorageDeletion(storageKey: string): Promise<void> {
+    await this.db.delete(assetDeletionJobs).where(eq(assetDeletionJobs.storageKey, storageKey));
   }
 
   async tryAcquireCleanupLease(

@@ -99,6 +99,13 @@
       "when": 1791014400000,
       "tag": "0013_faq_category",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792931303092,
+      "tag": "0014_asset_deletion_retry",
+      "breakpoints": true
     }
   ]
 }

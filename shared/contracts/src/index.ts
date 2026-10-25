@@ -1,4 +1,5 @@
 export * from "./http/health.js";
+export * from "./http/public-list.js";
 export * from "./http/mock.js";
 export * from "./http/auth.js";
 export * from "./http/survey.js";

@@ -20,6 +20,7 @@ import type {
   ArticleModerationResponse,
   HiddenArticleListResponse,
   FaqReorderRequest,
+  PublicListFilters,
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 import { isoToDate, localDate, msToIso, nowDate, nowMs } from "@soc/shared";
@@ -42,7 +43,8 @@ import { AuditLogService } from "../audit/audit-log.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { UsersService } from "../users/users.service";
 
-interface ArticleQueryParams {
+interface ArticleQueryParams extends PublicListFilters {
+  publicList?: boolean;
   page?: number;
   limit?: number;
   q?: string;
@@ -132,6 +134,7 @@ export class ArticleService {
       currentUser.user?.id,
       params.includeContentPreview,
       params.searchBy === "title_content" ? "title_content" : "title",
+      code === "_EVENT" && params.publicList ? params : undefined,
     );
 
     const visibleItems = result.items.map((item) =>
@@ -144,6 +147,7 @@ export class ArticleService {
       page,
       limit,
       total: result.total,
+      ...(result.stateCounts ? { stateCounts: result.stateCounts } : {}),
       items: visibleItems,
     };
   }

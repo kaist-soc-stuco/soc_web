@@ -36,6 +36,7 @@ import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { AUTH_ACCESS_COOKIE_NAME } from "../auth/auth.tokens";
 import { AuthSessionService } from "../auth/auth-session.service";
 import { ArticleService } from "./article.service";
+import { parsePublicListFilters } from "../../shared/public-list";
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -59,6 +60,10 @@ export class ArticleController {
     @Query("q") q?: string,
     @Query("searchBy") searchBy?: "title" | "title_content",
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken?: string,
+    @Query("publicList") publicList?: string,
+    @Query("state") state?: import("@soc/contracts").PublicListFilters["state"],
+    @Query("from") from?: string,
+    @Query("to") to?: string,
   ): Promise<ArticleListResponse> {
     const currentUser =
       await this.authSessionService.getOptionalCurrentUser(accessToken);
@@ -69,6 +74,8 @@ export class ArticleController {
         limit,
         q,
         searchBy,
+        ...(code === "_EVENT" && publicList === "true"
+          ? { publicList: true, ...parsePublicListFilters({ state, from, to }) } : {}),
         includeContentPreview: code === "faq" || code === "notice",
       },
       currentUser,

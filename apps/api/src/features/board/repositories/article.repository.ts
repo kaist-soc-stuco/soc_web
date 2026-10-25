@@ -1,4 +1,6 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import type { PublicListFilters, PublicListStateCounts } from "@soc/contracts";
+import { publicListDateFilter, publicListStateFields, publicListStateFilter, publicListStateRank } from "../../../shared/public-list";
 import {
   and,
   asc,
@@ -188,7 +190,8 @@ export class ArticleRepository {
     viewerUserId?: string,
     includeContentPreview = false,
     searchBy: "title" | "title_content" = "title",
-  ): Promise<{ items: ArticleListItem[]; total: number }> {
+    publicList?: PublicListFilters,
+  ): Promise<{ items: ArticleListItem[]; total: number; stateCounts?: PublicListStateCounts }> {
     const offset = (page - 1) * limit;
     const normalizedQuery = query?.trim();
     const searchFilter = normalizedQuery
@@ -207,17 +210,28 @@ export class ArticleRepository {
           )
       : undefined;
 
+    const now = nowDate();
+    const eventState = sql<string>`CASE
+      WHEN ${articles.eventStartDate} IS NULL OR ${articles.eventEndDate} IS NULL THEN 'open'
+      WHEN ${articles.eventStartDate} > ${now} THEN 'before_open'
+      WHEN ${articles.eventEndDate} < ${now} THEN 'closed'
+      ELSE 'open' END`;
     const baseFilter = and(
       eq(articles.boardId, boardId),
       eq(articles.status, ARTICLE_STATUS.PUBLISHED),
       inArray(articles.visibilityScope, visibilityScopes),
       searchFilter,
+      publicList ? publicListDateFilter(sql`${articles.eventStartDate}`, sql`${articles.eventEndDate}`, publicList) : undefined,
     );
 
-    const totalResult = await this.db
+    const stateCounts = publicList ? (await this.db.select(publicListStateFields(eventState))
+      .from(articles).where(baseFilter))[0] : undefined;
+    const selectedFilter = and(baseFilter, publicList ? publicListStateFilter(eventState, publicList) : undefined);
+
+    const totalResult = stateCounts ? undefined : await this.db
       .select({ count: sql<number>`count(*)` })
       .from(articles)
-      .where(baseFilter);
+      .where(selectedFilter);
 
     const rows = await this.db
       .select({
@@ -274,17 +288,22 @@ export class ArticleRepository {
         surveys,
         and(eq(surveys.connectedArticleId, articles.articleId), eq(surveys.isPublished, true)),
       )
-      .where(baseFilter)
+      .where(selectedFilter)
       .orderBy(
-        desc(articles.isPinned),
-        asc(sql`coalesce(${articles.pinOrder}, 2147483647)`),
-        desc(articles.postedAt),
+        ...(publicList ? [
+          publicListStateRank(eventState),
+          sql`CASE WHEN ${eventState} = 'before_open' THEN ${articles.eventStartDate} ELSE NULL END ASC NULLS LAST`,
+          sql`CASE WHEN ${eventState} = 'closed' THEN coalesce(${articles.eventEndDate}, ${articles.eventStartDate}) ELSE NULL END DESC NULLS LAST`,
+          sql`coalesce(${articles.eventEndDate}, ${articles.eventStartDate}) ASC NULLS LAST`,
+          desc(articles.articleId),
+        ] : [desc(articles.isPinned), asc(sql`coalesce(${articles.pinOrder}, 2147483647)`), desc(articles.postedAt)]),
       )
       .limit(limit)
       .offset(offset);
 
     return {
-      total: Number(totalResult[0]?.count ?? 0),
+      total: stateCounts ? stateCounts[publicList?.state ?? "all"] : Number(totalResult?.[0]?.count ?? 0),
+      stateCounts,
       items: rows.map((row) => ({
         articleId: String(row.articleId),
         boardId: row.boardId,

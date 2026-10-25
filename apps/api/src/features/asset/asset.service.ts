@@ -550,12 +550,24 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       );
       const cutoff = isoToDate(msToIso(nowMs() - olderThanHours * 60 * 60 * 1000));
       await this.assetRepository.releaseExpiredAssetUploadReservations();
+      const pending = await this.assetRepository.findPendingDeletions(100);
       const candidates = await this.assetRepository.findUnlinkedAssetsBefore(
         cutoff,
         100,
       );
       let failed = 0;
       let deleted = 0;
+
+      const deleteStoredObject = async (storageKey: string) => {
+        try {
+          await this.storage.delete(storageKey);
+          await this.assetRepository.completeStorageDeletion(storageKey);
+          deleted += 1;
+        } catch {
+          failed += 1;
+        }
+      };
+      for (const job of pending) await deleteStoredObject(job.storageKey);
 
       for (const candidate of candidates) {
         try {
@@ -564,15 +576,14 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
           // first (so this returns null) or is rejected by the asset fence.
           const deletable = await this.assetRepository.deleteUnlinkedAsset(candidate.assetId);
           if (!deletable) continue;
-          await this.storage.delete(deletable.storageKey);
-          deleted += 1;
+          await deleteStoredObject(deletable.storageKey);
         } catch {
           failed += 1;
         }
       }
 
       const result = {
-        scanned: candidates.length,
+        scanned: candidates.length + pending.length,
         deleted,
         failed,
         olderThanHours,

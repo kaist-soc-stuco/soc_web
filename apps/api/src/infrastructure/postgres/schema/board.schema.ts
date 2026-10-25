@@ -225,6 +225,12 @@ export const assetCleanupLeases = pgTable("asset_cleanup_lease", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Survives removal of the asset row until the storage object is deleted. */
+export const assetDeletionJobs = pgTable("asset_deletion_job", {
+  storageKey: text("storage_key").primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const articleAssets = pgTable("article_asset", {
   articleAssetId: serial("article_asset_id").primaryKey(),
   articleId: integer("article_id")

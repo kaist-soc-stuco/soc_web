@@ -25,6 +25,7 @@ import { UpdateSurveyDto } from "./dto/update-survey.dto";
 import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
 import type { TemporaryAccessTokenClaims } from "../auth/auth.types";
 import { AuditLogService } from "../audit/audit-log.service";
+import { parsePublicListFilters } from "../../shared/public-list";
 
 interface AuthedRequest extends Request {
   user: { id: string; permission: number };
@@ -62,11 +63,16 @@ export class SurveysController {
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
     @Query("q") query?: string,
+    @Query("publicList") publicList?: string,
+    @Query("state") state?: import("@soc/contracts").PublicListFilters["state"],
+    @Query("from") from?: string,
+    @Query("to") to?: string,
   ) {
     return this.surveysService.findPublished(getSurveyCaller(req), {
       page: Number(page),
       pageSize: Number(pageSize),
       query,
+      ...(publicList === "true" ? { publicList: true, ...parsePublicListFilters({ state, from, to }) } : {}),
     });
   }
 

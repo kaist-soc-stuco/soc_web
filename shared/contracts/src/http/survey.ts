@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { PublicListStateCounts } from "./public-list.js";
 import type {
   CreateQuestionSchema,
   CreateSectionSchema,
@@ -109,6 +110,7 @@ export type PublicSurveyRecord = Omit<
 >;
 
 export interface PublicSurveyListResponse {
+  stateCounts?: PublicListStateCounts;
   page: number;
   pageSize: number;
   total: number;

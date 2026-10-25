@@ -69,6 +69,16 @@ const reservationInput = () => ({
   expiresAt: new Date(Date.now() + 60_000),
 });
 
+test("asset removal persists its storage deletion job before the row disappears", integrationOptions, async () => {
+  const storageKey = "synthetic://asset-quota/durable-delete";
+  const { assetId } = await repository.createAsset({ uploadedBy: USER_ID, storageKey, originalFilename: "fixture.txt", mimeType: "text/plain", sizeBytes: 1 });
+  assert.deepEqual(await repository.deleteUnlinkedAsset(assetId), { storageKey });
+  assert.equal((await db.select().from(schema.assets).where(eq(schema.assets.assetId, Number(assetId)))).length, 0);
+  assert.equal((await db.select().from(schema.assetDeletionJobs).where(eq(schema.assetDeletionJobs.storageKey, storageKey))).length, 1);
+  await repository.completeStorageDeletion(storageKey);
+  assert.equal((await db.select().from(schema.assetDeletionJobs).where(eq(schema.assetDeletionJobs.storageKey, storageKey))).length, 0);
+});
+
 test(
   "parallel upload reservations consume one remaining slot exactly once",
   integrationOptions,

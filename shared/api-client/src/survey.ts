@@ -322,15 +322,19 @@ export const createSurveyApi = ({
     );
   },
 
-  getPublicSurveys: async (options?: { page?: number; pageSize?: number; query?: string }): Promise<PublicSurveyListResponse> => {
+  getPublicSurveys: async (options?: import("@soc/contracts").PublicListFilters & { page?: number; pageSize?: number; query?: string; publicList?: boolean; signal?: AbortSignal }): Promise<PublicSurveyListResponse> => {
     const params = new URLSearchParams();
     if (options?.page !== undefined) params.set("page", String(options.page));
     if (options?.pageSize !== undefined) params.set("pageSize", String(options.pageSize));
     if (options?.query?.trim()) params.set("q", options.query.trim());
+    if (options?.publicList) params.set("publicList", "true");
+    if (options?.state) params.set("state", options.state);
+    if (options?.from) params.set("from", options.from);
+    if (options?.to) params.set("to", options.to);
     const query = params.toString();
     return requestJson<PublicSurveyListResponse>(
       `${surveyBaseUrl}/list/public${query ? `?${query}` : ""}`,
-      { method: "GET" },
+      { method: "GET", signal: options?.signal },
     );
   },
 });

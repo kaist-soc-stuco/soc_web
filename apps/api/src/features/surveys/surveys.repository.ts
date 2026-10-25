@@ -1,5 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import type { PublicListFilters, PublicListStateCounts } from "@soc/contracts";
+import { publicListDateFilter, publicListStateFields, publicListStateFilter, publicListStateRank } from "../../shared/public-list";
 import { isoToDate, msToIso, nowDate } from "@soc/shared";
 
 import {
@@ -325,12 +327,22 @@ export class SurveysRepository {
     page: number;
     pageSize: number;
     query?: string;
-  }): Promise<{ items: SurveyRecord[]; total: number }> {
+    publicList?: boolean;
+  } & PublicListFilters): Promise<{ items: SurveyRecord[]; total: number; stateCounts?: PublicListStateCounts }> {
     const offset = (input.page - 1) * input.pageSize;
     const query = input.query?.trim();
+    const now = nowDate();
+    const state = sql<string>`CASE
+      WHEN NOT ${surveys.isPublished} OR NOT ${surveys.acceptingResponses} THEN 'closed'
+      WHEN ${surveys.isAlwaysOpen} THEN 'open'
+      WHEN ${surveys.openAt} > ${now} THEN 'before_open'
+      WHEN ${surveys.closeAt} <= ${now} THEN 'closed'
+      ELSE 'open' END`;
     const whereClause = and(
       eq(surveys.lifecycleStatus, "PUBLISHED"),
       eq(surveys.showOnList, true),
+      input.publicList ? isNull(surveys.connectedArticleId) : undefined,
+      input.publicList ? publicListDateFilter(sql`${surveys.openAt}`, sql`${surveys.closeAt}`, input) : undefined,
       query
         ? or(
             ilike(surveys.titleKo, `%${query}%`),
@@ -340,10 +352,13 @@ export class SurveysRepository {
           )
         : undefined,
     );
-    const [countRow] = await this.db
+    const stateCounts = input.publicList ? (await this.db.select(publicListStateFields(state))
+      .from(surveys).where(whereClause))[0] : undefined;
+    const selectedFilter = and(whereClause, input.publicList ? publicListStateFilter(state, input) : undefined);
+    const [countRow] = stateCounts ? [] : await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(surveys)
-      .where(whereClause);
+      .where(selectedFilter);
     const rows = await this.db
       .select({
         survey: surveys,
@@ -351,8 +366,8 @@ export class SurveysRepository {
         derivedVersionCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM "survey" AS child WHERE child."previous_version_id" = ${surveys.surveyId}), 0)`,
       })
       .from(surveys)
-      .where(whereClause)
-      .orderBy(desc(surveys.createdAt))
+      .where(selectedFilter)
+      .orderBy(...(input.publicList ? [publicListStateRank(state), sql`coalesce(${surveys.openAt}, ${surveys.closeAt}) DESC NULLS LAST`, desc(surveys.surveyId)] : [desc(surveys.createdAt)]))
       .limit(input.pageSize)
       .offset(offset);
     return {
@@ -361,7 +376,8 @@ export class SurveysRepository {
         responseCount: r.responseCount,
         derivedVersionCount: r.derivedVersionCount,
       })),
-      total: Number(countRow?.count ?? 0),
+      total: stateCounts ? stateCounts[input.state ?? "all"] : Number(countRow?.count ?? 0),
+      stateCounts,
     };
   }
 }

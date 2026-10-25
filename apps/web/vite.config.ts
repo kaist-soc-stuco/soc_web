@@ -67,7 +67,7 @@ export default defineConfig(({ mode }) => {
               return "vendor-time";
             }
 
-            return "vendor-misc";
+            return undefined;
           },
         },
       },

@@ -109,6 +109,7 @@ export const createBoardApi = ({
       `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles${buildListQuery(options)}`,
       {
         method: "GET",
+        signal: options?.signal,
       },
       {
         retryOnUnauthorized: true,

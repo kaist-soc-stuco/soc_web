@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { PublicListStateCounts } from "./public-list.js";
 import type { FaqCategory } from "../faq.js";
 import type {
   ArticleAssetRequestSchema,
@@ -121,6 +122,7 @@ export interface ArticleListItem {
 }
 
 export interface ArticleListResponse {
+  stateCounts?: PublicListStateCounts;
   page: number;
   limit: number;
   total: number;
