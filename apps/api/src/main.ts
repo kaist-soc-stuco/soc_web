@@ -10,7 +10,6 @@ import path from 'node:path';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 
-import { RequestRateLimitService } from './infrastructure/redis/request-rate-limit.service';
 import { createTrustedProxyCheck } from './infrastructure/http/trusted-proxy';
 import {
   AUTH_ACCESS_COOKIE_NAME,
@@ -107,26 +106,6 @@ async function bootstrap(): Promise<void> {
   });
 
   app.use(cookieParser());
-
-  const requestRateLimitService = app.get(RequestRateLimitService);
-  app.use(async (request: Request, response: Response, next: NextFunction) => {
-    const result = await requestRateLimitService.check(request);
-    if (result.category && result.limit !== null) {
-      response.setHeader('RateLimit-Limit', String(result.limit));
-      response.setHeader('RateLimit-Remaining', String(result.remaining ?? 0));
-    }
-    if (result.unavailable) {
-      response.setHeader('Retry-After', String(result.retryAfterSeconds ?? 5));
-      response.status(503).json({ message: 'rate_limit_unavailable' });
-      return;
-    }
-    if (!result.allowed) {
-      response.setHeader('Retry-After', String(result.retryAfterSeconds ?? 1));
-      response.status(429).json({ message: 'rate_limit_exceeded' });
-      return;
-    }
-    next();
-  });
 
   const allowedOrigins = allowedCorsOrigins;
 

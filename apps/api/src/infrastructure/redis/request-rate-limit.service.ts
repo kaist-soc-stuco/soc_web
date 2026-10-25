@@ -15,8 +15,6 @@ import { REDIS_CLIENT } from "./redis.provider";
 
 type RateCategory = "auth" | "auth_read" | "search" | "calendar" | "survey" | "upload" | "receipt";
 
-type RateScope = "ip" | "user";
-
 interface RateBudget {
   limit: number;
   windowSeconds: number;
@@ -25,9 +23,7 @@ interface RateBudget {
 
 const BUDGETS: Record<RateCategory, RateBudget> = {
   auth: { limit: 30, windowSeconds: 60, failClosed: true },
-  // Session summaries are polled by several authenticated UI surfaces during
-  // a normal login/account switch. Keep them IP-bound and fail-closed, but do
-  // not let read-only polling consume the smaller token-issuing budget.
+  // Read-only polling does not consume the smaller token-issuing budget.
   auth_read: { limit: 60, windowSeconds: 60, failClosed: true },
   search: { limit: 90, windowSeconds: 60, failClosed: false },
   calendar: { limit: 90, windowSeconds: 60, failClosed: false },
@@ -48,32 +44,8 @@ export class RequestRateLimitService {
 
   constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
 
-  async check(request: Request): Promise<{
-    category: RateCategory | null;
-    allowed: boolean;
-    unavailable: boolean;
-    limit: number | null;
-    remaining: number | null;
-    retryAfterSeconds: number | null;
-  }> {
-    const category = classifyPath(request.path);
-    if (!category) {
-      return {
-        category: null,
-        allowed: true,
-        unavailable: false,
-        limit: null,
-        remaining: null,
-        retryAfterSeconds: null,
-      };
-    }
-
-    const ip = request.ip || request.socket.remoteAddress || "unknown";
-    return this.consume(category, "ip", ip, BUDGETS[category]);
-  }
-
   /**
-   * Applies the second, authenticated budget. The caller supplies an identity
+   * Applies the authenticated budget. The caller supplies an identity
    * only after a session has been verified; raw cookies and Authorization
    * headers never reach this method.
    */
@@ -90,7 +62,7 @@ export class RequestRateLimitService {
       };
     }
 
-    return this.consume(category, "user", userId, BUDGETS[category]);
+    return this.consume(category, userId, BUDGETS[category]);
   }
 
   async enforceAuthenticated(request: Request, userId: string): Promise<void> {
@@ -105,11 +77,10 @@ export class RequestRateLimitService {
 
   private async consume(
     category: RateCategory,
-    scope: RateScope,
     identity: string,
     budget: RateBudget,
   ) {
-    const key = `soc:rate:v2:${category}:${scope}:${this.identityKey(identity)}`;
+    const key = `soc:rate:v2:${category}:user:${this.identityKey(identity)}`;
     try {
       const count = Number(await this.redis.eval(
         INCREMENT_WITH_TTL,
@@ -154,7 +125,7 @@ export class RequestRateLimitService {
     bucket.count += 1;
 
     // Redis outages must not turn attacker-controlled identities into an
-    // unbounded in-process cache. Keys are only IPs or verified user IDs and
+    // unbounded in-process cache. Keys are only verified user IDs and
     // the map has a hard bound even when every entry is still live.
     if (!existing && this.localBuckets.size >= 10_000) {
       for (const [bucketKey, value] of this.localBuckets) {

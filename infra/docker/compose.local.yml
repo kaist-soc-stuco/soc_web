@@ -11,10 +11,12 @@ services:
       REDIS_URL: redis://redis:6379
       ASSET_UPLOAD_DIR: /app/apps/api/uploads/assets
       ASSET_ORPHAN_CLEANUP_ENABLED: ${ASSET_ORPHAN_CLEANUP_ENABLED:-false}
+      STUDENT_FEE_BOOTSTRAP_PATH: /run/secrets/student-fee-bootstrap.json
     ports:
       - '${API_PORT:-3000}:3000'
     volumes:
       - ../../apps/api/uploads:/app/apps/api/uploads
+      - ../../secrets/student-fee-bootstrap.json:/run/secrets/student-fee-bootstrap.json:ro
       - type: bind
         source: ../../secrets/google-calendar-service-account.json
         target: /run/secrets/google-calendar-service-account.json

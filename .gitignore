@@ -57,8 +57,14 @@ images/
 
 # Local documentation drafts
 /docs/
+/README.md
+/Note-Form.md
+/apps/api/src/features/users/entities/README.md
+/apps/api/src/features/users/repositories/README.md
+/apps/api/test/README.md
 
 # Local Google credentials
 secrets/google-calendar-service-account.json
 secrets/google-oauth-client.json
 secrets/google-oauth-token.json
+/secrets/student-fee-bootstrap.json

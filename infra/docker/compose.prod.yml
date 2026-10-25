@@ -25,6 +25,7 @@ services:
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
       ASSET_UPLOAD_DIR: /app/apps/api/uploads/assets
       ASSET_ORPHAN_CLEANUP_ENABLED: ${ASSET_ORPHAN_CLEANUP_ENABLED:-false}
+      STUDENT_FEE_BOOTSTRAP_PATH: /run/secrets/student-fee-bootstrap.json
     expose:
       - "3000"
     init: true
@@ -50,6 +51,7 @@ services:
       start_period: 20s
     volumes:
       - ../../apps/api/uploads:/app/apps/api/uploads
+      - ../../secrets/student-fee-bootstrap.json:/run/secrets/student-fee-bootstrap.json:ro
       - type: bind
         source: ../../secrets/google-calendar-service-account.json
         target: /run/secrets/google-calendar-service-account.json
