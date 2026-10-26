@@ -390,6 +390,8 @@ export class CalendarSyncService {
           eq(boards.isActive, true),
           eq(articles.status, "PUBLISHED"),
           eq(articles.visibilityScope, "PUBLIC"),
+          eq(boards.allowGuestRead, true),
+          eq(articles.isSecret, false),
           isNull(articles.deletedAt),
           isNotNull(articles.eventStartDate),
           isNotNull(articles.eventEndDate),

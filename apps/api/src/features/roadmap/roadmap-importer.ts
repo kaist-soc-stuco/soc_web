@@ -264,7 +264,9 @@ function parseTerm(yearValue: unknown, semesterValue: unknown): string | null {
 
 function parseInteger(value: unknown): number | null {
   if (typeof value === "number" && Number.isInteger(value)) return value;
-  const numeric = Number(normalizeText(value).replace(/,/g, ""));
+  const text = normalizeText(value).replace(/,/g, "");
+  if (!text) return null;
+  const numeric = Number(text);
   return Number.isInteger(numeric) ? numeric : null;
 }
 

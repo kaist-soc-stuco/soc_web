@@ -6,7 +6,7 @@ const {
   parseRoadmapWorkbook,
 } = require("../dist/apps/api/src/features/roadmap/roadmap-importer.js");
 
-function buildWorkbook() {
+function buildWorkbook(capacity = 40, enrolled = 20) {
   const sheet = XLSX.utils.aoa_to_sheet([
     [
       "개설년도",
@@ -41,8 +41,8 @@ function buildWorkbook() {
       "3.0 : 0.0 : 3.0",
       "담당 교수",
       "Y",
-      40,
-      20,
+      capacity,
+      enrolled,
       "월 10:30~12:00",
       "E3-1",
       "대면",
@@ -158,4 +158,13 @@ test("roadmap import keeps eligible rows and preserves raw columns", () => {
     term: "2026-spring",
     time: "월 10:30~12:00",
   });
+});
+
+test("blank capacity and enrollment cells remain unknown instead of becoming zero", () => {
+  for (const empty of [null, "", "   "]) {
+    const [row] = parseRoadmapWorkbook(buildWorkbook(empty, empty), "synthetic.xlsx").rows;
+    assert.equal(row.capacity, null); assert.equal(row.enrolled, null);
+  }
+  const [zero] = parseRoadmapWorkbook(buildWorkbook(0, 0), "synthetic.xlsx").rows;
+  assert.equal(zero.capacity, 0); assert.equal(zero.enrolled, 0);
 });

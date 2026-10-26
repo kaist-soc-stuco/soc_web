@@ -468,32 +468,10 @@ export class CalendarService {
       throw new BadRequestException("ics_event_not_found");
     }
 
-    const uids = parsed.flatMap((item) => (item.sourceUid ? [item.sourceUid] : []));
-    const existing = uids.length
-      ? await this.db
-          .select({ sourceUid: calendarEvents.sourceUid })
-          .from(calendarEvents)
-          .where(inArray(calendarEvents.sourceUid, uids))
-      : [];
-    const existingUids = new Set(existing.map((item) => item.sourceUid).filter(Boolean));
-    const newItems = parsed.filter((item) => !item.sourceUid || !existingUids.has(item.sourceUid));
-
-    if (newItems.length === 0) {
-      const result = { importedCount: 0, skippedCount: parsed.length, items: [] };
-      await this.auditLogService?.record({
-        action: "calendar_event.import",
-        actorUserId: audit?.actorUserId ?? userId,
-        ipAddress: audit?.ipAddress ?? null,
-        payload: { importedCount: result.importedCount, skippedCount: result.skippedCount },
-        targetType: "calendar_event",
-      });
-      return result;
-    }
-
     const rows = await this.db
       .insert(calendarEvents)
       .values(
-        newItems.map((item) => ({
+        parsed.map((item) => ({
           titleKo: item.titleKo,
           titleEn: item.titleEn ?? null,
           descriptionKo: item.descriptionKo ?? null,
@@ -507,6 +485,7 @@ export class CalendarService {
           createdByUserId: userId,
         })),
       )
+      .onConflictDoNothing({ target: [calendarEvents.sourceType, calendarEvents.sourceUid] })
       .returning();
 
     const items = rows.map((row) => this.mapManualEvent(row));
@@ -863,6 +842,8 @@ export class CalendarService {
           eq(boards.isActive, true),
           eq(articles.status, "PUBLISHED"),
           eq(articles.visibilityScope, "PUBLIC"),
+          eq(boards.allowGuestRead, true),
+          eq(articles.isSecret, false),
           ...(titleFilter ? [titleFilter] : []),
           ...(from && to
             ? [
