@@ -57,6 +57,8 @@ images/
 
 # Local documentation drafts
 /docs/
+/artifacts/
+/output/
 /README.md
 /Note-Form.md
 /apps/api/src/features/users/entities/README.md
