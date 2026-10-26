@@ -49,6 +49,7 @@ import { ARTICLE_STATUS, COMMENT_STATUS } from "../board.constants";
 import { isoToDate, msToIso, nowDate, nowMs } from "@soc/shared";
 import { toAssetReference } from "../../asset/asset-reference";
 import { areArticleAssetsAttachable } from "../article-asset-access";
+import { secretArticleFilter } from "../article-query-access";
 
 const getConnectedSurveyState = (survey: typeof surveys.$inferSelect): "before_open" | "open" | "closed" => {
   if (!survey.isPublished) return "closed";
@@ -108,19 +109,6 @@ const connectedSurveyFields = {
     )
   end`,
 };
-
-const secretArticleFilter = (
-  viewerUserId?: string,
-  allowSecretStaff = false,
-) =>
-  or(
-    eq(articles.isSecret, false),
-    allowSecretStaff
-      ? eq(articles.isSecret, true)
-      : viewerUserId
-        ? eq(articles.authorUserId, viewerUserId)
-        : sql`false`,
-  );
 
 const mapConnectedSurvey = (
   row: ConnectedSurveyFields,
@@ -191,6 +179,7 @@ export class ArticleRepository {
     includeContentPreview = false,
     searchBy: "title" | "title_content" = "title",
     publicList?: PublicListFilters,
+    allowSecretStaff = false,
   ): Promise<{ items: ArticleListItem[]; total: number; stateCounts?: PublicListStateCounts }> {
     const offset = (page - 1) * limit;
     const normalizedQuery = query?.trim();
@@ -221,6 +210,7 @@ export class ArticleRepository {
       eq(articles.status, ARTICLE_STATUS.PUBLISHED),
       inArray(articles.visibilityScope, visibilityScopes),
       searchFilter,
+      normalizedQuery ? secretArticleFilter(viewerUserId, allowSecretStaff) : undefined,
       publicList ? publicListDateFilter(sql`${articles.eventStartDate}`, sql`${articles.eventEndDate}`, publicList) : undefined,
     );
 
@@ -362,6 +352,7 @@ export class ArticleRepository {
       includeContentPreview?: boolean;
       visibilityScopes: VisibilityScope[];
       viewerUserId?: string;
+      allowSecretStaff?: boolean;
     },
   ): Promise<{ items: ArticleListItem[]; total: number }> {
     if (boardIds.length === 0) {
@@ -372,9 +363,9 @@ export class ArticleRepository {
     const normalizedQuery = params.query?.trim();
     const searchFilter = normalizedQuery
       ? params.searchBy === "author"
-        ? or(
-            ilike(users.nameKo, `%${normalizedQuery}%`),
-            ilike(users.nameEn, `%${normalizedQuery}%`),
+        ? and(
+            eq(articles.isAnonymous, false),
+            or(ilike(users.nameKo, `%${normalizedQuery}%`), ilike(users.nameEn, `%${normalizedQuery}%`)),
           )
         : params.searchBy === "title_content"
           ? or(
@@ -397,6 +388,7 @@ export class ArticleRepository {
       eq(articles.status, ARTICLE_STATUS.PUBLISHED),
       inArray(articles.visibilityScope, params.visibilityScopes),
       searchFilter,
+      normalizedQuery ? secretArticleFilter(params.viewerUserId, params.allowSecretStaff) : undefined,
       cutoffFilter,
     );
 

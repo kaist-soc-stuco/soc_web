@@ -39,6 +39,7 @@ import type { UserRecord } from "../entities/user";
 import { hashStudentFeePaymentPayload } from "../fee-payment-idempotency";
 import { getStudentFeeBootstrap } from "../student-fee-bootstrap-loader";
 import { effectiveFeeStatusSql } from "../fee-status";
+import { readableArticleFilter } from "../../board/article-query-access";
 import type {
   StudentFeePolicy,
   AdminUserListResponse,
@@ -1751,6 +1752,7 @@ export class UsersRepository {
     limit: number,
     offset: number,
     query?: string,
+    permission = 0,
   ): Promise<MyCommentItem[]> {
     const normalizedQuery = query?.trim();
     const searchFilter = normalizedQuery
@@ -1784,7 +1786,7 @@ export class UsersRepository {
       .from(comments)
       .innerJoin(articles, eq(comments.articleId, articles.articleId))
       .innerJoin(boards, eq(articles.boardId, boards.boardId))
-      .where(and(eq(comments.authorUserId, userId), eq(comments.status, 'PUBLISHED'), eq(articles.status, 'PUBLISHED'), searchFilter))
+      .where(and(eq(comments.authorUserId, userId), eq(comments.status, 'PUBLISHED'), eq(articles.status, 'PUBLISHED'), readableArticleFilter(userId, permission), searchFilter))
       .as("ranked_comments");
     const rows = await this.db.select().from(ranked).where(eq(ranked.rank, 1))
       .orderBy(desc(ranked.createdAt), desc(ranked.commentId)).limit(limit).offset(offset);
@@ -1805,7 +1807,7 @@ export class UsersRepository {
     }));
   }
 
-  async countMyComments(userId: string, query?: string): Promise<number> {
+  async countMyComments(userId: string, query?: string, permission = 0): Promise<number> {
     const normalizedQuery = query?.trim();
     const searchFilter = normalizedQuery
       ? or(
@@ -1818,7 +1820,8 @@ export class UsersRepository {
       .select({ count: sql<number>`COUNT(DISTINCT ${comments.articleId})` })
       .from(comments)
       .innerJoin(articles, eq(comments.articleId, articles.articleId))
-      .where(and(eq(comments.authorUserId, userId), eq(comments.status, "PUBLISHED"), eq(articles.status, "PUBLISHED"), searchFilter));
+      .innerJoin(boards, eq(articles.boardId, boards.boardId))
+      .where(and(eq(comments.authorUserId, userId), eq(comments.status, "PUBLISHED"), eq(articles.status, "PUBLISHED"), readableArticleFilter(userId, permission), searchFilter));
 
     return Number(rows[0]?.count ?? 0);
   }
@@ -1884,6 +1887,7 @@ export class UsersRepository {
     limit: number,
     offset: number,
     query?: string,
+    permission = 0,
   ): Promise<{ items: MyActivityItem[]; total: number }> {
     type MyActivityRow = {
       activityType: "survey" | "post" | "comment" | "scrap";
@@ -1963,6 +1967,7 @@ export class UsersRepository {
         WHERE ${comments.authorUserId} = ${userId}
           AND ${comments.status} = 'PUBLISHED'
           AND ${articles.status} = 'PUBLISHED'
+          AND ${readableArticleFilter(userId, permission)}
           ${commentSearch}
 
         UNION ALL
@@ -1985,6 +1990,7 @@ export class UsersRepository {
         WHERE ${articleEngagements.userId} = ${userId}
           AND ${articleEngagements.kind} = 'SCRAP'
           AND ${articles.status} = 'PUBLISHED'
+          AND ${readableArticleFilter(userId, permission)}
           ${postSearch}
 
         UNION ALL
@@ -2044,6 +2050,7 @@ export class UsersRepository {
     limit: number,
     offset: number,
     query?: string,
+    permission = 0,
   ): Promise<MyScrapItem[]> {
     const rows = await this.db
       .select({
@@ -2068,6 +2075,7 @@ export class UsersRepository {
           eq(articleEngagements.userId, userId),
           eq(articleEngagements.kind, "SCRAP"),
           eq(articles.status, "PUBLISHED"),
+          readableArticleFilter(userId, permission),
           query?.trim() ? or(ilike(articles.titleKo, `%${query.trim()}%`), ilike(articles.titleEn, `%${query.trim()}%`), ilike(articles.contentKo, `%${query.trim()}%`), ilike(articles.contentEn, `%${query.trim()}%`)) : undefined,
         ),
       )
@@ -2091,16 +2099,18 @@ export class UsersRepository {
     }));
   }
 
-  async countMyScraps(userId: string, query?: string): Promise<number> {
+  async countMyScraps(userId: string, query?: string, permission = 0): Promise<number> {
     const rows = await this.db
       .select({ count: sql<number>`COUNT(*)` })
       .from(articleEngagements)
       .innerJoin(articles, eq(articleEngagements.articleId, articles.articleId))
+      .innerJoin(boards, eq(articles.boardId, boards.boardId))
       .where(
         and(
           eq(articleEngagements.userId, userId),
           eq(articleEngagements.kind, "SCRAP"),
           eq(articles.status, "PUBLISHED"),
+          readableArticleFilter(userId, permission),
           query?.trim() ? or(ilike(articles.titleKo, `%${query.trim()}%`), ilike(articles.titleEn, `%${query.trim()}%`), ilike(articles.contentKo, `%${query.trim()}%`), ilike(articles.contentEn, `%${query.trim()}%`)) : undefined,
         ),
       );

@@ -7,10 +7,11 @@ import { UsersModule } from "../users/users.module";
 import { SiteContentController } from "./site-content.controller";
 import { SiteContentRepository } from "./site-content.repository";
 import { SiteContentService } from "./site-content.service";
+import { AssetRepository } from "../asset/repositories/asset.repository";
 
 @Module({
   imports: [AuditLogModule, AuthModule, PostgresModule, UsersModule],
   controllers: [SiteContentController],
-  providers: [SiteContentRepository, SiteContentService],
+  providers: [AssetRepository, SiteContentRepository, SiteContentService],
 })
 export class SiteContentModule {}

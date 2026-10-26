@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable } from "@nestjs/common";
 import type {
   ContentBlockRecord,
   CreateContentBlockRequest,
@@ -17,6 +17,7 @@ import {
 } from "../../infrastructure/postgres/postgres.provider";
 import type { PostgresTransaction } from "../../infrastructure/postgres/postgres.provider";
 import { assets, contentBlocks, siteContents } from "../../infrastructure/postgres/postgres.schema";
+import { AssetRepository } from "../asset/repositories/asset.repository";
 
 const ASSET_REFERENCE_PATTERN = /(?:asset:|\/assets\/)(\d+)(?:\/content)?/g;
 
@@ -43,10 +44,15 @@ const collectAssetIds = (...values: unknown[]): number[] => {
 
 @Injectable()
 export class SiteContentRepository {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
+  constructor(
+    @Inject(DRIZZLE_DB) private readonly db: PostgresDatabase,
+    private readonly assetRepository: AssetRepository = new AssetRepository(db),
+  ) {}
 
   private async lockAssetReferences(
     tx: PostgresTransaction,
+    actorUserId: string,
+    retainedAssetIds: number[],
     ...values: unknown[]
   ): Promise<void> {
     const assetIds = collectAssetIds(...values);
@@ -55,12 +61,19 @@ export class SiteContentRepository {
       .select({ assetId: assets.assetId, uploadStatus: assets.uploadStatus })
       .from(assets)
       .where(inArray(assets.assetId, assetIds))
+      .orderBy(asc(assets.assetId))
       .for("update");
     if (
       rows.length !== assetIds.length ||
       rows.some((asset) => asset.uploadStatus !== "COMPLETED")
     ) {
       throw new BadRequestException("asset_reference_not_found");
+    }
+    for (const assetId of assetIds) {
+      if (!retainedAssetIds.includes(assetId) &&
+          !await this.assetRepository.canUseAsContentReference(String(assetId), actorUserId, tx)) {
+        throw new ForbiddenException("content_asset_not_owned");
+      }
     }
   }
 
@@ -172,7 +185,7 @@ export class SiteContentRepository {
 
   async createContentBlock(input: CreateContentBlockRequest, actorUserId: string): Promise<ContentBlockRecord> {
     return this.db.transaction(async (tx) => {
-      await this.lockAssetReferences(tx, input.imageUrl, input.imageUrlEn);
+      await this.lockAssetReferences(tx, actorUserId, [], input.imageUrl, input.imageUrlEn);
       const [row] = await tx
         .insert(contentBlocks)
         .values({
@@ -212,7 +225,13 @@ export class SiteContentRepository {
     if (input.sortOrder !== undefined) values.sortOrder = input.sortOrder;
 
     return this.db.transaction(async (tx) => {
-      await this.lockAssetReferences(tx, input.imageUrl, input.imageUrlEn);
+      const [before] = await tx.select().from(contentBlocks)
+        .where(eq(contentBlocks.contentBlockId, contentBlockId)).for("update");
+      if (!before) return null;
+      await this.lockAssetReferences(tx, actorUserId,
+        collectAssetIds(before.imageUrl, before.imageUrlEn),
+        input.imageUrl === undefined ? before.imageUrl : input.imageUrl,
+        input.imageUrlEn === undefined ? before.imageUrlEn : input.imageUrlEn);
       const [row] = await tx
         .update(contentBlocks)
         .set(values)

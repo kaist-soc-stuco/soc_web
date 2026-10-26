@@ -77,7 +77,7 @@ export class UsersController {
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
       query,
-    });
+    }, req.user!.permission);
   }
 
   @Get("me/survey-responses")
@@ -107,7 +107,7 @@ export class UsersController {
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
       query,
-    });
+    }, req.user!.permission);
   }
 
   @Get("me/scraps")
@@ -122,7 +122,7 @@ export class UsersController {
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
       query,
-    });
+    }, req.user!.permission);
   }
 
   /**

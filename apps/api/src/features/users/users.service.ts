@@ -591,11 +591,12 @@ export class UsersService {
   async getMyComments(
     userId: string,
     options: { page: number; limit: number; query?: string },
+    permission = 0,
   ): Promise<MyCommentListResponse> {
     const { limit, offset, page } = this.normalizeListOptions(options);
     const [items, total] = await Promise.all([
-      this.usersRepository.getMyComments(userId, limit, offset, options.query),
-      this.usersRepository.countMyComments(userId, options.query),
+      this.usersRepository.getMyComments(userId, limit, offset, options.query, permission),
+      this.usersRepository.countMyComments(userId, options.query, permission),
     ]);
 
     return { items, limit, page, total };
@@ -617,6 +618,7 @@ export class UsersService {
   async getMyActivities(
     userId: string,
     options: { page: number; limit: number; query?: string },
+    permission = 0,
   ): Promise<MyActivityListResponse> {
     const { limit, offset, page } = this.normalizeListOptions(options);
     const result = await this.usersRepository.getMyActivities(
@@ -624,6 +626,7 @@ export class UsersService {
       limit,
       offset,
       options.query,
+      permission,
     );
 
     return { items: result.items, limit, page, total: result.total };
@@ -632,11 +635,12 @@ export class UsersService {
   async getMyScraps(
     userId: string,
     options: { page: number; limit: number; query?: string },
+    permission = 0,
   ): Promise<MyScrapListResponse> {
     const { limit, offset, page } = this.normalizeListOptions(options);
     const [items, total] = await Promise.all([
-      this.usersRepository.getMyScraps(userId, limit, offset, options.query),
-      this.usersRepository.countMyScraps(userId, options.query),
+      this.usersRepository.getMyScraps(userId, limit, offset, options.query, permission),
+      this.usersRepository.countMyScraps(userId, options.query, permission),
     ]);
 
     return { items, limit, page, total };

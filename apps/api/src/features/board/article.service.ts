@@ -137,6 +137,7 @@ export class ArticleService {
       params.includeContentPreview,
       params.searchBy === "title_content" ? "title_content" : "title",
       code === "_EVENT" && params.publicList ? params : undefined,
+      canReadSecretArticles(currentUser),
     );
 
     const visibleItems = result.items.map((item) =>
@@ -204,6 +205,7 @@ export class ArticleService {
         includeContentPreview: params.includeContentPreview,
         visibilityScopes: readableScopes,
         viewerUserId: currentUser.user?.id,
+        allowSecretStaff: canReadSecretArticles(currentUser),
       },
     );
 

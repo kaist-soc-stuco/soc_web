@@ -481,25 +481,28 @@ export class AssetRepository {
       .select({ articleAssetId: articleAssets.articleAssetId })
       .from(articleAssets)
       .innerJoin(articles, eq(articleAssets.articleId, articles.articleId))
+      .innerJoin(boards, eq(articles.boardId, boards.boardId))
       .where(and(
         eq(articleAssets.assetId, Number(assetId)),
         eq(articles.status, "PUBLISHED"),
         eq(articles.visibilityScope, "PUBLIC"),
         eq(articles.isSecret, false),
+        eq(boards.isActive, true),
+        eq(boards.allowGuestRead, true),
       ))
       .limit(1);
 
     if (publicArticle) return true;
 
-    const assetReference = `asset:${assetId}`;
+    const assetReferencePattern = `^asset:0*${Number(assetId)}$`;
     const [publicContent] = await db
       .select({ contentBlockId: contentBlocks.contentBlockId })
       .from(contentBlocks)
       .where(and(
         eq(contentBlocks.status, "PUBLISHED"),
         or(
-          eq(contentBlocks.imageUrl, assetReference),
-          eq(contentBlocks.imageUrlEn, assetReference),
+          sql`${contentBlocks.imageUrl} ~ ${assetReferencePattern}`,
+          sql`${contentBlocks.imageUrlEn} ~ ${assetReferencePattern}`,
         ),
       ))
       .limit(1);
@@ -507,6 +510,13 @@ export class AssetRepository {
     if (publicContent) return true;
 
     return this.findSurveyImageReference(assetId, { publishedOnly: true }, tx);
+  }
+
+  async canUseAsContentReference(assetId: string, actorUserId: string, tx: PostgresTransaction): Promise<boolean> {
+    if (await this.canUseAsVoteReference(assetId, actorUserId, undefined, tx)) return true;
+    const [avatar] = await tx.select({ id: executiveContacts.id }).from(executiveContacts)
+      .where(eq(executiveContacts.avatarStorageKey, `asset:${assetId}`)).limit(1);
+    return Boolean(avatar);
   }
 
   async findLocalAssets(limit: number): Promise<
