@@ -1,4 +1,4 @@
-import { PageHeader, PageShell } from "@/components/ui/page-layout";
+import { PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import {
   SearchForm,
   SearchFilterTabs,
@@ -23,6 +23,7 @@ export function SearchPage() {
     lang,
     loading,
     retrySearch,
+    resetSearch,
     query,
     setInputValue,
     setFilter,
@@ -39,9 +40,10 @@ export function SearchPage() {
   return (
     <PageShell className="mobile-white-page">
 
-      <PageHeader title={lang === "ko" ? "통합검색" : "Search"} />
+      <PageMain>
+      <PageHeader title={lang === "ko" ? "통합검색" : "Search"} containerClassName="max-w-5xl" />
 
-      <main className="mobile-search-results mx-auto flex w-full max-w-5xl flex-1 flex-col gap-5 px-4 py-8 md:px-8">
+      <PageContainer className="mobile-search-results flex max-w-5xl flex-col gap-5 py-8">
         <SearchForm
           inputValue={inputValue}
           lang={lang}
@@ -65,6 +67,7 @@ export function SearchPage() {
           visible={Boolean(query)}
         />
         <SearchStatus
+          error={error}
           lang={lang}
           loading={loading}
           query={query}
@@ -84,12 +87,14 @@ export function SearchPage() {
           lang={lang}
           loading={loading}
           onRetry={retrySearch}
+          onReset={resetSearch}
           query={query}
           surveys={surveys}
           totalCount={totalCount}
           votes={votes}
         />
-      </main>
+      </PageContainer>
+      </PageMain>
 
     </PageShell>
   );

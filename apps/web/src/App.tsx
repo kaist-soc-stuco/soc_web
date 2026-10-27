@@ -365,11 +365,12 @@ function PublicLayout() {
   const isMobile = useMediaQuery("(width < 768px)");
   const articleRoute = /^\/board\/[^/]+\/[^/]+\/?$/.test(pathname) || /^\/events\/[^/]+\/?$/.test(pathname);
   const isArticleDetail = articleRoute && !/\/(write|new|edit)\/?$/.test(pathname);
+  const isEditorRoute = /\/(write|edit)\/?$/.test(pathname);
   return (
     <div className={`public-site-layout flex min-h-screen flex-col ${isArticleDetail ? "public-article-detail-layout" : ""}`}>
       <Header variant={pathname === "/" ? "home" : "default"} />
       <div className="public-site-content flex flex-1 flex-col">
-        <Suspense key={isMobile ? pathname : undefined} fallback={isArticleDetail ? <ArticleLoading /> : <div className="flex-1" aria-busy="true" />}>
+        <Suspense key={isEditorRoute || isMobile ? pathname : undefined} fallback={isArticleDetail ? <ArticleLoading /> : <div className="flex-1" aria-busy="true" />}>
           <Outlet />
         </Suspense>
       </div>
@@ -395,9 +396,10 @@ function AppLayout() {
 }
 
 const router = createBrowserRouter(createRoutesFromElements(
-  <Route element={<AppLayout />} errorElement={<RouteErrorPage />}>
+  <Route element={<AppLayout />} errorElement={<RouteErrorPage withHeader />}>
 
         <Route element={<PublicLayout />}>
+          <Route errorElement={<RouteErrorPage />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/life/roadmap" element={<RoadmapPage />} />
@@ -450,6 +452,7 @@ const router = createBrowserRouter(createRoutesFromElements(
           <Route path="/votes" element={<VoteListPage />} />
           <Route path="/mypage" element={<MyPage />} />
           <Route path="*" element={<NotFoundPage />} />
+          </Route>
         </Route>
           <Route path="/survey/:id" element={<SurveyPage />} />
           <Route path="/votes/:id" element={<VotePage />} />

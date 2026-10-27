@@ -1,7 +1,6 @@
 import { ResponseMobileNavigation, ResponsePageMain } from "@/features/survey/response-layout";
 import { useEffect, useRef } from "react";
-import { OPERATIONAL_SURVEY_IDS } from "@soc/contracts";
-import { Navigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { ArrowLeft, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SurveyResponseForm } from "@/features/survey/survey-response-form";
@@ -20,11 +19,6 @@ import { ErrorState } from "@/components/ui/data-state";
 import { useToast } from "@/components/ui/toast";
 
 export function SurveyPage() {
-  const { id } = useParams<{ id: string }>();
-  return id === OPERATIONAL_SURVEY_IDS.corporatePartnership ? <Navigate to="/about#partnership" replace /> : <ActiveSurveyPage />;
-}
-
-function ActiveSurveyPage() {
   const { id } = useParams<{ id: string }>();
   const {
     answers,
@@ -83,13 +77,14 @@ function ActiveSurveyPage() {
         {!isPreview && <ResponseMobileNavigation to="/surveys" lang={lang} />}
         <ResponsePageMain className="survey-response-page">
           <ErrorState
-            className="rounded-xl border border-slate-200 bg-white shadow-none"
+            headingAs="h1"
             description={
               lang === "ko"
-                ? "일시적인 네트워크 오류일 수 있습니다. 잠시 후 다시 시도해 주세요."
+                ? "일시적인 네트워크 오류일 수 있습니다.\n잠시 후 다시 시도해 주세요."
                 : "This may be a temporary network issue. Please try again in a moment."
             }
             onRetry={retryLoad}
+            retryLabel={lang === "ko" ? "다시 시도" : "Try again"}
             title={lang === "ko" ? "설문을 불러오지 못했습니다." : "We couldn't load this survey."}
           />
         </ResponsePageMain>
@@ -105,7 +100,6 @@ function ActiveSurveyPage() {
           lang={lang}
           resultVisibility={survey.resultVisibility}
           surveyId={id!}
-          submittedAt={responseSubmittedAt}
         />
       );
     }
@@ -178,7 +172,7 @@ function ActiveSurveyPage() {
   };
 
   return (
-    <PageShell className="mobile-card-response">
+    <PageShell className="mobile-card-response mobile-state-page">
       {!isPreview && <ResponseMobileNavigation to="/surveys" lang={lang} />}
       {isPreview && <header className="survey-preview-header flex min-h-16 items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 sm:px-8">
         <a href={`/admin/surveys/${id}/edit`} className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap text-sm"><ArrowLeft className="size-4 shrink-0" />{lang === "ko" ? "미리보기" : "Preview"}</a>

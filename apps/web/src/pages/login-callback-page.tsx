@@ -2,6 +2,7 @@ import { createApiClient } from "@soc/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { ArrowLeft, CircleAlert } from "lucide-react";
 
 import {
   clearStoredAuthState,
@@ -12,7 +13,9 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { useLanguage } from "@/hooks/use-language";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { IconButton } from "@/components/ui/icon-button";
 import { useToast } from "@/components/ui/toast";
+import { ResponseStateCard, responseStateActionClassName } from "@/features/survey/response-state-card";
 
 type LoginStatus = "idle" | "starting" | "processing" | "failed";
 
@@ -85,6 +88,13 @@ export function LoginCallbackPage() {
 
     const searchParams = new URLSearchParams(location.search);
     const loginStatus = searchParams.get("status");
+
+    // Inspect the otherwise unused failure UI without starting an SSO transaction.
+    if (import.meta.env.DEV && searchParams.get("preview") === "failed") {
+      setStatus("failed");
+      setErrorMessage(lang === "ko" ? "로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요." : "An error occurred while signing in. Please try again shortly.");
+      return;
+    }
 
     const startLogin = async () => {
       if (loginStartingRef.current) return;
@@ -213,9 +223,24 @@ export function LoginCallbackPage() {
   };
 
   const isProcessing = status !== "failed" && !pendingConsentToken;
+  const leaveFailurePage = () => {
+    const returnPath = consumeAuthReturnPath();
+    if (returnPath && !returnPath.startsWith("//") && !returnPath.startsWith("/login")) {
+      navigate(returnPath, { replace: true });
+    } else if (typeof window.history.state?.idx === "number" && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate("/", { replace: true });
+    }
+  };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-white px-6 text-kaist-black">
+    <main className={`relative flex min-h-svh items-center justify-center bg-white px-4 py-20 text-kaist-black sm:px-6 md:min-h-screen ${status === "failed" ? "md:bg-[var(--ui-surface-canvas)]" : ""}`}>
+      {status === "failed" ? <header className="absolute inset-x-0 top-0 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] md:hidden">
+        <IconButton tone="navigation" aria-label={lang === "ko" ? "뒤로가기" : "Go back"} onClick={leaveFailurePage} className="!size-11 !rounded-full">
+          <ArrowLeft aria-hidden="true" className="size-6" />
+        </IconButton>
+      </header> : null}
       {isProcessing ? (
         <span
           className="login-processing-spinner"
@@ -223,24 +248,18 @@ export function LoginCallbackPage() {
           aria-label={lang === "ko" ? "로그인 처리 중" : "Signing you in"}
         />
       ) : status === "failed" ? (
-        <section className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-          <p className="text-sm font-semibold text-kaist-darkgreen">
-            {lang === "ko" ? "로그인 실패" : "Sign-in failed"}
-          </p>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-            {errorMessage ??
-              (lang === "ko"
-                ? "잠시 후 다시 시도해 주세요."
-                : "Please try again shortly.")}
-          </p>
-          <Button variant="ghost"
+        <ResponseStateCard icon={CircleAlert} headingAs="h1" role="alert"
+          className="mobile-login-state max-md:min-h-0 max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0"
+          title={lang === "ko" ? "로그인 실패" : "Sign-in failed"}
+          description={errorMessage ?? (lang === "ko" ? "잠시 후 다시 시도해 주세요." : "Please try again shortly.")}
+          actions={<Button
             type="button"
             onClick={() => window.location.assign("/login")}
-            className="mt-5 min-h-11 rounded-lg bg-kaist-darkgreen px-4 py-2 text-xs font-semibold text-white"
+            className={`${responseStateActionClassName} max-md:!h-12 max-md:!min-h-12 max-md:!w-full`}
           >
             {lang === "ko" ? "다시 로그인" : "Try again"}
-          </Button>
-        </section>
+          </Button>}
+        />
       ) : null}
 
       {pendingConsentToken ? (

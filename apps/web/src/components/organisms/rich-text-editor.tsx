@@ -30,6 +30,7 @@ import {
   Palette,
   Quote,
   Redo2,
+  RemoveFormatting,
   Strikethrough,
   Underline as UnderlineIcon,
   Unlink,
@@ -191,6 +192,7 @@ function handleEditorShortcut({
 
   if (key === "k") {
     event.preventDefault();
+    if ((event.target as HTMLElement).matches("[data-editor-title]")) return;
     promptForLink(editor, lang);
     return;
   }
@@ -692,6 +694,12 @@ function MoreFormattingMenu({
           active: false,
           run: () => editor.chain().focus().unsetLink().run(),
         },
+        {
+          icon: RemoveFormatting,
+          label: lang === "ko" ? "서식 지우기" : "Clear formatting",
+          active: false,
+          run: () => editor.chain().focus().unsetAllMarks().clearNodes().run(),
+        },
       ].map((item) => {
         const ItemIcon = item.icon as LucideIcon;
 
@@ -724,6 +732,7 @@ function RichTextToolbar({
   toolbarVariant = "default",
   toolbarSuffix,
   uploading,
+  formattingDisabled = false,
   variableLabel,
   variableToken,
   variableOptions,
@@ -736,6 +745,7 @@ function RichTextToolbar({
   toolbarVariant?: "default" | "email";
   toolbarSuffix?: ReactNode;
   uploading: boolean;
+  formattingDisabled?: boolean;
   variableLabel?: string;
   variableToken?: string;
   variableOptions?: ReadonlyArray<RichTextVariableOption>;
@@ -846,7 +856,7 @@ function RichTextToolbar({
 
   return (
     <div className="rich-text-toolbar flex min-w-0 max-w-full items-center justify-between gap-3 bg-slate-50/60 px-3 py-2">
-      <div className="flex min-w-0 max-w-full flex-1 flex-wrap items-center gap-1.5">
+      <fieldset disabled={formattingDisabled} aria-label={lang === "ko" ? "본문 서식" : "Body formatting"} className="m-0 flex min-w-0 max-w-full flex-1 flex-wrap items-center gap-1.5 border-0 p-0">
       <label className="sr-only" htmlFor={`${editorId}-font-size`}>
         {lang === "ko" ? "글자 크기" : "Font size"}
       </label>
@@ -1093,7 +1103,7 @@ function RichTextToolbar({
       >
         <CircleHelp />
       </ToolbarButton>
-      </div>
+      </fieldset>
       {linkDialog && <EditorLinkDialog anchor={linkButtonRef.current} getAnchorRect={() => editor.view.coordsAtPos(linkSelection.current.from)} initialText={linkDialog.text} initialUrl={linkDialog.url} onApply={saveLink} onClose={() => { flushSync(() => setLinkDialog(null));editor.commands.focus(); }} />}
       {linkPreview && <EditorLinkPopover link={linkPreview} onClose={() => setLinkPreview(null)} onEdit={() => { setLinkDialog({text:linkPreview.text,url:linkPreview.url});setLinkPreview(null); }} onUnlink={() => { editor.chain().focus().setTextSelection(linkSelection.current).unsetLink().run();setLinkPreview(null); }} />}
       {toolbarSuffix ? <div className="shrink-0">{toolbarSuffix}</div> : null}
@@ -1117,9 +1127,10 @@ function EditorPane({
   titleLabel: string;
 }) {
   return (
-    <section className="min-w-0 px-4 py-4 md:px-6 md:py-5" onFocusCapture={onFocus}>
+    <section className="flex min-w-0 flex-1 flex-col px-4 py-4 md:px-6 md:py-5" onFocusCapture={onFocus}>
       <input
         type="text"
+        data-editor-title
         spellCheck={false}
         aria-label={titleLabel}
         placeholder={placeholder}
@@ -1127,8 +1138,8 @@ function EditorPane({
         onChange={(event) => onTitleChange(event.target.value)}
         className="min-h-[var(--ui-control-height-mobile)] w-full border-0 border-b border-slate-100 bg-transparent px-0 py-2 text-lg font-semibold leading-7 text-slate-800 outline-none placeholder:text-slate-300"
       />
-      <div className="tiptap-container mt-4 min-w-0 max-w-none prose prose-slate">
-        <EditorContent editor={editor} />
+      <div className="tiptap-container mt-4 flex min-w-0 max-w-none flex-1 flex-col prose prose-slate">
+        <EditorContent editor={editor} className="flex flex-1 flex-col [&>.tiptap]:flex-1" />
       </div>
     </section>
   );
@@ -1158,6 +1169,7 @@ export function RichTextEditor({
   onSave,
   onSubmit,
 }: RichTextEditorProps) {
+  const [titleFocused, setTitleFocused] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const editor = useTiptapEditor({
     content,
@@ -1176,6 +1188,11 @@ export function RichTextEditor({
   return (
     <div
       aria-disabled={disabled}
+      onFocusCapture={(event) => {
+        const target = event.target as HTMLElement;
+        if (target.matches("[data-editor-title]")) setTitleFocused(true);
+        else if (target.closest(".tiptap")) setTitleFocused(false);
+      }}
       onKeyDownCapture={(event) => {
         if (disabled) return;
         handleEditorShortcut({
@@ -1195,6 +1212,7 @@ export function RichTextEditor({
     >
       <RichTextToolbar
         editor={editor}
+        formattingDisabled={titleFocused}
         fileInputRef={fileInputRef}
         lang={lang}
         onImageUpload={onImageUpload}
@@ -1211,6 +1229,7 @@ export function RichTextEditor({
           <>
             <input
               type="text"
+              data-editor-title
               aria-label={lang === "ko" ? "제목" : "Title"}
               placeholder={titlePlaceholder || (lang === "ko" ? "제목을 입력하세요" : "Enter a title")}
               value={title}
@@ -1263,10 +1282,11 @@ export function BilingualRichTextEditor({
   onSave,
   onSubmit,
 }: BilingualRichTextEditorProps) {
+  const [titleFocused, setTitleFocused] = useState(false);
   const koreanEditor = useTiptapEditor({
     content: contentKo,
     disabled,
-    editorMinHeight: "min-h-[300px]",
+    editorMinHeight: "min-h-[300px] lg:min-h-[28rem]",
     onImageUpload,
     onChange: onContentKoChange,
     placeholder: lang === "ko" ? "내용을 입력하세요" : "Enter content in Korean",
@@ -1275,7 +1295,7 @@ export function BilingualRichTextEditor({
   const englishEditor = useTiptapEditor({
     content: contentEn,
     disabled,
-    editorMinHeight: "min-h-[300px]",
+    editorMinHeight: "min-h-[300px] lg:min-h-[28rem]",
     onImageUpload,
     onChange: onContentEnChange,
     placeholder: lang === "ko" ? "영문 내용을 입력하세요" : "Enter content",
@@ -1305,6 +1325,11 @@ export function BilingualRichTextEditor({
   return (
     <div
       aria-disabled={disabled}
+      onFocusCapture={(event) => {
+        const target = event.target as HTMLElement;
+        if (target.matches("[data-editor-title]")) setTitleFocused(true);
+        else if (target.closest(".tiptap")) setTitleFocused(false);
+      }}
       onKeyDownCapture={(event) => {
         if (disabled) return;
         handleEditorShortcut({
@@ -1318,20 +1343,21 @@ export function BilingualRichTextEditor({
         });
       }}
       className={cn(
-        "mx-auto w-full min-w-0 max-w-none bg-white",
+        "mx-auto flex w-full min-w-0 max-w-none flex-1 flex-col bg-white",
         disabled && "pointer-events-none opacity-65",
       )}
     >
       <RichTextToolbar
         editor={activeEditor}
+        formattingDisabled={titleFocused}
         fileInputRef={fileInputRef}
         lang={lang}
         onImageUpload={onImageUpload}
         onShortcutHelp={() => setShortcutHelpOpen(true)}
         uploading={uploading}
       />
-      <div className={cn("grid min-w-0", (viewMode ? viewMode === "split" : !isKoreanOnly) && "md:grid-cols-2")}>
-        <div className={viewMode === "en" ? "hidden" : "min-w-0"}>
+      <div className={cn("grid min-w-0 flex-1", (viewMode ? viewMode === "split" : !isKoreanOnly) && "md:grid-cols-2")}>
+        <div className={viewMode === "en" ? "hidden" : "flex min-w-0 flex-col"}>
         <EditorPane
           editor={koreanEditor}
 
@@ -1343,7 +1369,7 @@ export function BilingualRichTextEditor({
         />
         </div>
         {(viewMode || !isKoreanOnly) ? (
-          <div className={cn("min-w-0", viewMode === "ko" && "hidden", (viewMode === "split" || !viewMode) && "border-t border-slate-200 md:border-l md:border-t-0")}>
+          <div className={cn("min-w-0", viewMode === "ko" ? "hidden" : "flex flex-col", (viewMode === "split" || !viewMode) && "border-t border-slate-200 md:border-l md:border-t-0")}>
             <EditorPane
               editor={englishEditor}
 

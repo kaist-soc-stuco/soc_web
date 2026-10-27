@@ -2,6 +2,28 @@ import { localDate } from "@soc/shared";
 
 import type { Language } from "@/hooks/use-language";
 import type { CalendarEvent } from "@/lib/events-surveys";
+import { formatNumericDate } from "@/lib/date-display";
+
+export function getCalendarEventLocation(event: CalendarEvent, lang: Language) {
+  return event.kind === "EVENT" ? (lang === "en" ? event.locationEn || event.location : event.location)?.trim() || "" : "";
+}
+
+export function formatCalendarScheduleText(event: CalendarEvent, lang: Language, includeAllDayDate = false) {
+  if (event.isAlways) return lang === "ko" ? "상시" : "Always";
+  const start = event.startAt ?? event.date, end = event.endAt ?? event.date;
+  const sameDay = isSameDay(start, end);
+  const formatDate = (date: Date) => `${formatNumericDate(date)} (${new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", { weekday: "short" }).format(date)})`;
+  const startText = formatDate(start), endText = formatDate(end);
+  if (event.isAllDay || event.sourceType === "KAIST_ACADEMIC") {
+    const label = lang === "ko" ? "하루 종일" : "All day";
+    return sameDay ? includeAllDayDate ? `${startText} ${label}` : label : `${startText} ～ ${endText} ${label}`;
+  }
+  const time = new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const startTime = time.format(start), endTime = time.format(end);
+  return sameDay
+    ? startTime === endTime ? `${startText} ${startTime}` : `${startText} ${startTime} ～ ${endTime}`
+    : `${startText} ${startTime} ～ ${endText} ${endTime}`;
+}
 
 export interface CalendarCell {
   date: Date;

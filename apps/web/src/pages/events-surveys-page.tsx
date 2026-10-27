@@ -8,7 +8,7 @@ import { useEventsSurveysPageController } from "@/features/events-surveys/use-ev
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
-import { Pagination } from "@/components/ui/pagination";
+import { EventsSurveysLoadMore } from "@/features/events-surveys/events-surveys-load-more";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { Permissions } from "@/lib/permissions";
 import {
@@ -28,7 +28,9 @@ function getEmptyStateMessage(
   if (lang !== "ko") {
     const subject = view === "survey" ? "surveys" : "events";
     const status =
-      stateFilter === "before_open"
+      stateFilter === "active"
+        ? "upcoming or ongoing"
+        : stateFilter === "before_open"
         ? "upcoming"
         : stateFilter === "open"
           ? "ongoing"
@@ -39,15 +41,17 @@ function getEmptyStateMessage(
   }
 
   if (view === "survey") {
+    if (stateFilter === "active") return "예정되거나 진행 중인 설문이 없습니다.";
     if (stateFilter === "before_open") return "시작 예정인 설문이 없습니다.";
     if (stateFilter === "open") return "진행 중인 설문이 없습니다.";
-    if (stateFilter === "closed") return "마감된 설문이 없습니다.";
+    if (stateFilter === "closed") return "종료된 설문이 없습니다.";
     return "등록된 설문이 없습니다.";
   }
 
+  if (stateFilter === "active") return "예정되거나 진행 중인 행사가 없습니다.";
   if (stateFilter === "before_open") return "시작 예정인 행사가 없습니다.";
   if (stateFilter === "open") return "진행 중인 행사가 없습니다.";
-  if (stateFilter === "closed") return "마감된 행사가 없습니다.";
+  if (stateFilter === "closed") return "지난 행사가 없습니다.";
   return "등록된 행사가 없습니다.";
 }
 
@@ -62,7 +66,11 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
     calendarEvents,
     isCalendarFetching,
     calendarQuery,
-    currentPage,
+    hasMore,
+    loadingMore,
+    loadMoreError,
+    isListUpdating,
+    loadMore,
     currentDate,
     dateFrom,
     dateTo,
@@ -75,7 +83,6 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
     selectedDate,
     setCurrentDate,
     setCalendarQuery,
-    setCurrentPage,
     setDateRange,
     setListFilters,
     resetListFilters,
@@ -86,7 +93,6 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
     stateCounts,
     stateFilter,
     totalItems,
-    totalPages,
     visibleItems,
   } = useEventsSurveysPageController({
     currentTab,
@@ -109,12 +115,12 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
 
 
   return (
-    <PageShell className="mobile-white-page">
+    <PageShell className={`mobile-white-page${currentTab === "calendar" ? "" : " discovery-page"}`}>
 
 
       <PageMain>
         <PageHeader
-          containerClassName={currentTab === "calendar" ? "mobile-calendar-page-heading events-list-page-heading pt-4" : "events-list-page-heading"}
+          containerClassName={currentTab === "calendar" ? "mobile-calendar-page-heading events-list-page-heading pt-4 sm:items-center" : "events-list-page-heading"}
           actions={
             currentTab === "calendar" ? (
               <CalendarSubscriptionButton feedUrl={calendarFeedUrl} lang={lang} />
@@ -144,6 +150,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
         <PageContainer className="pb-8">
           {currentTab !== "calendar" && !loading ? (
             <EventsSurveysFilterBar
+              isSurvey={currentTab === "survey"}
               lang={lang}
               onQueryChange={setItemQuery}
               onDateRangeChange={setDateRange}
@@ -158,17 +165,12 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
           ) : null}
 
           {loading ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-20">
-              <div className="h-8 w-8 animate-spin rounded-full border-3 border-brand-primary border-t-transparent" />
-              <p className="text-xs font-semibold text-slate-400">
-                {lang === "ko" ? "불러오는 중..." : "Loading..."}
-              </p>
-            </div>
+            <div className="min-h-48" aria-busy="true" aria-label={lang === "ko" ? "목록 로딩" : "Loading list"} />
           ) : error ? (
             <ErrorState
               description={
                 lang === "ko"
-                  ? "일시적인 네트워크 오류일 수 있습니다. 잠시 후 다시 시도해 주세요."
+                  ? "일시적인 네트워크 오류일 수 있습니다.\n잠시 후 다시 시도해 주세요."
                   : "This may be a temporary network issue. Please try again."
               }
               onRetry={retry}
@@ -209,24 +211,17 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
             </EmptyState>
           ) : (
             <>
-              <EventsSurveysGrid
-                engagementSubmitting={engagementSubmitting}
-                isAuthenticated={Boolean(session?.canUsePersistentFeatures)}
-                items={visibleItems}
-                lang={lang}
-                onEngagementToggle={handleSetEngagement}
-              />
-              <Pagination
-                className="mt-6 hidden md:flex"
-                currentPage={currentPage}
-                onPageChange={setCurrentPage}
-                range={lang === "ko" ? `총 ${totalItems}건` : `${totalItems} total`}
-                totalPages={totalPages}
-                lang={lang}
-              />
-              {currentPage < totalPages && <Button variant="ghost" className="mt-4 min-h-11 w-full md:hidden" onClick={() => setCurrentPage(currentPage + 1)}>
-                {lang === "ko" ? `${currentTab === "survey" ? "설문" : "행사"} 더보기 +` : "Load more +"}
-              </Button>}
+              <div className="discovery-list" aria-busy={isListUpdating} inert={isListUpdating || undefined}>
+                <EventsSurveysGrid
+                  hideDate={currentTab === "survey" && stateFilter === "always"}
+                  engagementSubmitting={engagementSubmitting}
+                  isAuthenticated={Boolean(session?.canUsePersistentFeatures)}
+                  items={visibleItems}
+                  lang={lang}
+                  onEngagementToggle={handleSetEngagement}
+                />
+              </div>
+              <EventsSurveysLoadMore hasMore={hasMore} loading={loadingMore} failed={loadMoreError} onLoadMore={loadMore} lang={lang} />
             </>
           )}
         </PageContainer>

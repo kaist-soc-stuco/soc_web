@@ -55,6 +55,8 @@ export function BoardPage() {
         />
 
         <BoardArticleTable
+          searchQuery={searchQuery}
+          onResetSearch={() => setSearchQuery("")}
           toolbar={
             <BoardDataControls
               lang={lang}

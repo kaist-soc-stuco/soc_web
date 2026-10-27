@@ -1,8 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
-import { CommentComposer } from "@/components/ui/comment-section";
-import { rememberAuthReturnPath } from "@/lib/auth-storage";
+import { CommentComposer, CommentLoginInput } from "@/components/ui/comment-section";
 
 export function MobileCommentComposer({ inputRef, loginRef, authenticated, canCreate, submitting, value, error, lang, onChange, onSubmit }: {
   inputRef: RefObject<HTMLTextAreaElement | null>; loginRef: RefObject<HTMLAnchorElement | null>;
@@ -10,7 +7,6 @@ export function MobileCommentComposer({ inputRef, loginRef, authenticated, canCr
   onChange: (value: string) => void; onSubmit: () => Promise<void>;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
-  const location = useLocation();
   useEffect(() => {
     document.body.classList.add("site-mobile-comment-open");
     return () => document.body.classList.remove("site-mobile-comment-open");
@@ -46,6 +42,6 @@ export function MobileCommentComposer({ inputRef, loginRef, authenticated, canCr
     {authenticated ? canCreate ? <>
       {error && <p role="alert" className="mb-2 text-xs text-rose-600">{error}</p>}
       <CommentComposer inputRef={inputRef} mobile ariaLabel={lang === "ko" ? "댓글 입력" : "Comment input"} submitLabel={lang === "ko" ? "댓글 등록" : "Post comment"} disabled={submitting} isSubmitting={submitting} value={value} onChange={onChange} onSubmit={onSubmit} placeholder={lang === "ko" ? "댓글을 입력하세요" : "Write a comment"} />
-    </> : <p className="py-3 text-center text-sm text-slate-500">{lang === "ko" ? "댓글을 작성할 권한이 없습니다." : "You cannot comment on this post."}</p> : <Link ref={loginRef} className="mobile-comment-login" to="/login" onClick={() => rememberAuthReturnPath(`${location.pathname}${location.search}${location.hash}`)}><span>{lang === "ko" ? "로그인하고 댓글 쓰기" : "Sign in to write a comment"}</span><ArrowRight aria-hidden="true" /></Link>}
+    </> : <p className="py-3 text-center text-sm text-slate-500">{lang === "ko" ? "댓글을 작성할 권한이 없습니다." : "You cannot comment on this post."}</p> : <CommentLoginInput lang={lang} mobile loginRef={loginRef} />}
   </div>;
 }

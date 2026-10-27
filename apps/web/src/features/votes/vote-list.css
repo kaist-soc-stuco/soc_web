@@ -1,0 +1,13 @@
+.vote-list-description {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  margin-top: .5rem;
+  color: var(--discovery-muted);
+  font-size: var(--discovery-detail-size);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.vote-list-card .discovery-card-date { white-space: normal; }
+.vote-list-card.is-upcoming:hover { border-color: var(--discovery-rule); }

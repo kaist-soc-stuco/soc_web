@@ -303,6 +303,7 @@ export function BoardWriteEventFields({
           <UiInput
             type="checkbox"
             checked={isAllDay}
+            disabled={isEventAlwaysOpen}
             onChange={(event) => onAllDayChange(event.target.checked)}
           />
           <span className="text-sm font-medium text-slate-600">

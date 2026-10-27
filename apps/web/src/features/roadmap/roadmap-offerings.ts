@@ -54,7 +54,7 @@ export function groupRoadmapOfferings(
   for (const offering of offerings) {
     const courseCode = normalizeRoadmapCourseCode(offering.courseCode);
     const current = grouped.get(courseCode) ?? [];
-    current.push({ ...offering, courseCode });
+    current.push({ ...offering, courseCode, currentCode: normalizeRoadmapDisplayCode(offering.currentCode) });
     grouped.set(courseCode, current);
   }
   return grouped;

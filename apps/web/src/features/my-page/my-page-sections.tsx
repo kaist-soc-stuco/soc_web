@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArticleListTitle } from "@/components/ui/article-list-title";
 import type { CurrentUserResponse, MyScrapItem } from "@soc/contracts";
 import { isoToMs, nowMs } from "@soc/shared";
-import { Clock3, User, type LucideIcon } from "lucide-react";
+import { Bookmark, Clock3, FileText, LockKeyhole, MessageCircle, RefreshCw, RotateCcw, SearchX, ShieldCheck, User, WifiOff, type LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { EmptyState, ErrorState } from "@/components/ui/data-state";
+import { ListState, ListStateAction } from "@/components/ui/data-state";
+import { ResponseStateCard, responseStateActionClassName } from "@/features/survey/response-state-card";
 import { Pagination } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageSearchField } from "@/components/ui/page-layout";
@@ -143,23 +144,11 @@ interface UnavailableStateProps {
 
 export function MyPageUnavailableState({ authenticated, lang }: UnavailableStateProps) {
   return (
-    <div className="w-full rounded-xl border border-slate-200 bg-white p-6 text-center sm:p-8">
-      <p className="text-xs font-semibold text-slate-500 leading-relaxed">
-        {authenticated
-          ? lang === "ko"
-            ? "마이페이지는 개인정보 저장 동의가 완료된 계정에서 이용할 수 있습니다."
-            : "My Page is available after you consent to saving your account information."
-          : lang === "ko"
-            ? "로그인이 필요합니다."
-            : "You need to sign in."}
-      </p>
-      <Link
-        to="/login"
-        className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-kaist-darkgreen px-4 py-2 text-xs font-bold text-kaist-darkgreen hover:bg-kaist-darkgreen/5 select-none"
-      >
-        {lang === "ko" ? "로그인 페이지로 이동" : "Go to sign in"}
-      </Link>
-    </div>
+    <ResponseStateCard icon={authenticated ? ShieldCheck : LockKeyhole} headingAs="h1"
+      title={lang === "ko" ? authenticated ? "개인정보 제공 동의가 필요합니다" : "로그인이 필요합니다" : authenticated ? "Consent is required" : "Sign in to use My Page"}
+      description={lang === "ko" ? authenticated ? <><span className="md:hidden">다시 로그인해 동의를 완료해 주세요.</span><span className="hidden md:inline">마이페이지를 이용하려면 다시 로그인해 동의를 완료해 주세요.</span></> : "내 정보와 활동 내역을 확인하려면 로그인해 주세요." : authenticated ? "To use My Page, sign in again and complete the consent process." : "Sign in to view your profile and activity."}
+      actions={<Button asChild className={responseStateActionClassName}><Link to="/login">{lang === "ko" ? authenticated ? "다시 로그인" : "로그인" : authenticated ? "Sign in again" : "Sign in"}</Link></Button>}
+    />
   );
 }
 
@@ -366,15 +355,22 @@ export function MyPageActivityPanel({
   }, [activeTab]);
   const renderCollection = () => {
 
-    if (error) return <ErrorState className="min-h-[360px] rounded-none border-0 bg-transparent px-0 py-10 shadow-none" title={error} onRetry={onRetry} />;
-    if (activityQuery.trim() && (contentTab === "scraps" ? visibleScraps.length === 0 : activities.length === 0)) return <div className="py-10 text-center text-sm text-slate-500"><p>{lang === "ko" ? "검색 결과가 없습니다." : "No results found."}</p><Button variant="ghost" onClick={() => onQueryChange("")}>{lang === "ko" ? "검색어 지우기" : "Clear search"}</Button></div>;
+    if (error) return <ListState role="alert" icon={WifiOff} title={error}
+      description={lang === "ko" ? "잠시 후 다시 시도해 주세요." : "Please try again shortly."}
+      action={<ListStateAction icon={RefreshCw} onClick={onRetry}>{lang === "ko" ? "다시 시도" : "Try again"}</ListStateAction>}
+    />;
+    if (activityQuery.trim() && (contentTab === "scraps" ? visibleScraps.length === 0 : activities.length === 0)) return <ListState icon={SearchX}
+      title={lang === "ko" ? "검색 결과가 없습니다" : "No results found"}
+      description={lang === "ko" ? "다른 검색어로 다시 검색하거나 검색어를 초기화해 주세요." : "Try a different keyword or clear your search."}
+      action={<ListStateAction icon={RotateCcw} onClick={() => onQueryChange("")}>{lang === "ko" ? "검색어 초기화" : "Clear search"}</ListStateAction>}
+    />;
 
     if (contentTab === "scraps") {
       if (visibleScraps.length === 0) {
         return (
-          <EmptyState
-            message={lang === "ko" ? "스크랩한 콘텐츠가 없습니다." : "No saved content."}
-            minHeightClassName="min-h-[360px]"
+          <ListState icon={Bookmark}
+            title={lang === "ko" ? "스크랩한 콘텐츠가 없습니다" : "No saved content"}
+            description={lang === "ko" ? "게시글이나 행사에서 스크랩한 콘텐츠가 여기에 표시됩니다." : "Posts and events you save will appear here."}
           />
         );
       }
@@ -388,9 +384,9 @@ export function MyPageActivityPanel({
 
     if (activities.length === 0) {
       return (
-        <EmptyState
-          message={lang === "ko" ? "내역이 없습니다." : "No activity found."}
-          minHeightClassName="min-h-[360px]"
+        <ListState icon={contentTab === "comment" ? MessageCircle : contentTab === "post" ? FileText : Clock3}
+          title={lang === "ko" ? ({ all: "아직 활동 내역이 없습니다", post: "작성한 게시글이 없습니다", comment: "댓글을 남긴 게시글이 없습니다", survey: "참여한 설문이 없습니다", scraps: "스크랩한 콘텐츠가 없습니다" }[contentTab]) : ({ all: "No activity yet", post: "No posts yet", comment: "No commented posts", survey: "No survey responses yet", scraps: "No saved content" }[contentTab])}
+          description={lang === "ko" ? ({ all: "게시글·댓글·설문 응답·스크랩 내역이 여기에 표시됩니다.", post: "작성한 게시글이 여기에 표시됩니다.", comment: "댓글을 남긴 게시글을 여기에서 다시 확인할 수 있습니다.", survey: "설문에 참여하면 응답 내역이 여기에 표시됩니다.", scraps: "스크랩한 콘텐츠가 여기에 표시됩니다." }[contentTab]) : ({ all: "Your posts, comments, survey responses and saved content will appear here.", post: "Posts you write will appear here.", comment: "Posts you comment on will appear here.", survey: "Your survey responses will appear here.", scraps: "Saved content will appear here." }[contentTab])}
         />
       );
     }
@@ -444,7 +440,7 @@ export function MyPageActivityPanel({
           />
         </div>
 
-        <div aria-busy={loading} className="min-h-[360px] flex-1 divide-y divide-slate-100">{collection}</div>
+        <div aria-busy={loading} className="min-h-72 flex-1 divide-y divide-slate-100">{collection}</div>
 
         {!loading && !error && totalPages > 1 && (
           <div className="border-t border-slate-100 pt-4 mt-4 flex justify-center select-none">

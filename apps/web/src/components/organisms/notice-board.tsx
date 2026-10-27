@@ -38,9 +38,7 @@ export function NoticeBoard() {
         </h2>
       </header>
       {noticesQuery.isPending ? (
-        <p className="home-editorial-placeholder" role="status">
-          {lang === "ko" ? "공지를 불러오는 중입니다." : "Loading notices…"}
-        </p>
+        <div className="home-editorial-placeholder" aria-busy="true" aria-label={lang === "ko" ? "공지 로딩" : "Loading notices"} />
       ) : noticesQuery.isError ? (
         <div className="home-data-error" role="alert">
           <p>{lang === "ko" ? "게시글을 불러오지 못했습니다." : "We couldn't load posts."}</p>

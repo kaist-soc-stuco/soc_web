@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { IconButton } from "@/components/ui/icon-button";
+import { useToast } from "@/components/ui/toast";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
@@ -15,7 +16,11 @@ import {
   shutdownChannelTalk,
   hideChannelTalk as hideMessenger,
   onChannelTalkVisibilityChange,
+  showChannelTalk,
 } from "./channel-talk";
+
+const ChannelTalkSupportContext = createContext<() => void>(() => {});
+export function useOpenChannelTalk() { return useContext(ChannelTalkSupportContext); }
 
 function updateChannelTalkLauncherLayer(offsetBottom: boolean, hideLauncher: boolean) {
   if (typeof document === "undefined") return;
@@ -106,10 +111,15 @@ function updateChannelTalkLauncherLayer(offsetBottom: boolean, hideLauncher: boo
 }
 
 export function ChannelTalkProvider({ children }: PropsWithChildren) {
+  const { toast } = useToast();
+  const [supportPath, setSupportPath] = useState<string | null>(null);
+  const pendingSupportRef = useRef(false);
   const isMobile = useMediaQuery("(max-width: 767px)");
   const [messengerOpen, setMessengerOpen] = useState(false);
   const needsMobileCloseBar = isMobile && messengerOpen && document.querySelector("#ch-plugin-script")?.classList.contains("ch-desk-messenger");
   const location = useLocation();
+  const supportRequested = supportPath === location.pathname;
+  useEffect(() => { setSupportPath(null); pendingSupportRef.current = false; }, [location.pathname]);
   const isAdminRoute = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
   const hideChannelTalk =
     location.pathname.startsWith("/survey/") ||
@@ -140,6 +150,16 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
     // memberId/memberHash instead of reusing an earlier identity's config.
     staleTime: 0,
   });
+
+  const openSupport = () => {
+    if (!data?.enabled || !data.pluginKey) {
+      toast({ type: "error", message: data?.language === "en" ? "Chat is currently unavailable. Please try again later." : "지금은 상담을 연결할 수 없습니다. 잠시 후 다시 시도해 주세요." });
+      return;
+    }
+    if (hasBootedRef.current) { showChannelTalk(); return; }
+    pendingSupportRef.current = true;
+    setSupportPath(location.pathname);
+  };
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -199,7 +219,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
   }, [channelTalkIdentity, isSessionPending]);
 
   useEffect(() => {
-    if (isAdminRoute || hideChannelTalk) {
+    if (isAdminRoute || (hideChannelTalk && !supportRequested)) {
       if (hasBootedRef.current) {
         shutdownChannelTalk();
         hasBootedRef.current = false;
@@ -226,6 +246,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
           setMessengerOpen(false);
         }
         bootChannelTalk({
+          hideChannelButtonOnBoot: hideChannelTalk,
           hidePopup: window.matchMedia("(max-width: 767px)").matches,
           language: config.language,
           memberHash: config.memberHash,
@@ -236,7 +257,11 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
           // Route-specific bottom spacing and modal/menu body states prevent
           // the launcher from competing with fixed controls.
           zIndex: 55,
-        }, () => { if (!cancelled) onChannelTalkVisibilityChange(setMessengerOpen); });
+        }, () => {
+          if (cancelled) return;
+          onChannelTalkVisibilityChange(setMessengerOpen);
+          if (pendingSupportRef.current) { pendingSupportRef.current = false; showChannelTalk(); }
+        });
         hasBootedRef.current = true;
       } catch (error) {
         console.warn("Channel Talk could not be initialized.", error);
@@ -248,9 +273,9 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, [data, hideChannelTalk, isAdminRoute]);
+  }, [data, hideChannelTalk, isAdminRoute, supportRequested]);
 
-  return <>{children}{needsMobileCloseBar && createPortal(
+  return <ChannelTalkSupportContext.Provider value={openSupport}>{children}{needsMobileCloseBar && createPortal(
     <div className="channel-mobile-close-bar"><IconButton className="channel-mobile-close" aria-label={data?.language === "en" ? "Close chat" : "상담 창 닫기"} onClick={hideMessenger}><X /></IconButton></div>, document.body,
-  )}</>;
+  )}</ChannelTalkSupportContext.Provider>;
 }

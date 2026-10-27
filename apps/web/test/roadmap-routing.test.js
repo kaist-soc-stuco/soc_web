@@ -1,6 +1,29 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { roundedPath, uniqueRoutePaths } = require('../dist/test-src/features/roadmap/roadmap-routing.js');
+const { createRoadmapRouter, routeConnection, roundedPath, uniqueRoutePaths } = require('../dist/test-src/features/roadmap/roadmap-routing.js');
+
+test('layout router reuses ordered routes and preserves obstacle avoidance', () => {
+  const source = { id: 'source', x: 0, y: 0 };
+  const target = { id: 'target', x: 500, y: 0 };
+  const obstacle = { id: 'obstacle', x: 250, y: 0 };
+  const cards = [source, target, obstacle];
+  const route = createRoadmapRouter(cards);
+  const forward = route(source.id, target.id);
+  assert.ok(forward);
+  assert.deepEqual(forward, routeConnection(source, target, cards));
+  assert.strictEqual(route(source.id, target.id), forward, 'repeat selections reuse the same route');
+  for (let i = 1; i < forward.points.length; i++) {
+    const a = forward.points[i - 1], b = forward.points[i];
+    const crosses = a.x === b.x
+      ? a.x > obstacle.x && a.x < obstacle.x + 184 && Math.max(a.y, b.y) > obstacle.y && Math.min(a.y, b.y) < obstacle.y + 108
+      : a.y > obstacle.y && a.y < obstacle.y + 108 && Math.max(a.x, b.x) > obstacle.x && Math.min(a.x, b.x) < obstacle.x + 184;
+    assert.equal(crosses, false, 'routed edge must stay outside another course');
+  }
+  assert.deepEqual(route(target.id, source.id), routeConnection(target, source, cards));
+  assert.equal(route('filtered-out-course', target.id), null);
+  const unobstructed = createRoadmapRouter([source, target])(source.id, target.id);
+  assert.notDeepEqual(unobstructed.points, forward.points, 'new layouts must not inherit old obstacles');
+});
 
 test('successor routes keep shared buses dashed by drawing each shared segment once', () => {
   const routes = [

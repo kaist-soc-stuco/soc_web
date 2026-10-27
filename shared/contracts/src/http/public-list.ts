@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 export const PublicListFiltersSchema = z.object({
-  state: z.enum(["all", "before_open", "open", "closed"]).optional(),
+  state: z.enum(["all", "active", "before_open", "open", "closed", "always"]).optional(),
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
 });
 export type PublicListFilters = z.infer<typeof PublicListFiltersSchema>;
-export type PublicListStateCounts = Record<"all" | "before_open" | "open" | "closed", number>;
+export type PublicListStateCounts = Record<"all" | "active" | "before_open" | "open" | "closed", number> & { always?: number };

@@ -19,7 +19,7 @@ import {
 import { z } from "zod";
 import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { htmlDatetimeLocalToIso, isoToDate, isoToHtmlDatetimeLocal, isoToMs } from "@soc/shared";
+import { isoToDate, isoToHtmlDatetimeLocal, isoToMs } from "@soc/shared";
 import {
   closestCenter,
   DndContext,
@@ -91,6 +91,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { IconButton } from "@/components/ui/icon-button";
 import { useToast } from "@/components/ui/toast";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
+import { buildSurveySchedule } from "@/lib/survey-schedule";
 
 import { SurveyResponsesPanel } from "./survey-responses-panel";
 
@@ -873,6 +874,7 @@ export function SurveyEditorPage() {
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
   const { toast } = useToast();
 
+  const rememberedAllDayRef = useRef(false);
   const form = useForm<SurveySettingsFormValues>({
     resolver: zodResolver(SurveySettingsSchema),
     defaultValues: {
@@ -1140,9 +1142,8 @@ export function SurveyEditorPage() {
 
   const buildSurveyBody = (
     values: SurveySettingsFormValues,
-    options?: { allowPlaceholder?: boolean; publish?: boolean },
+    options?: { publish?: boolean },
   ): CreateSurveyRequest => {
-    const allowPlaceholder = options?.allowPlaceholder ?? false;
     const maxResponseCount = values.maxResponseCount?.trim()
       ? Number(values.maxResponseCount)
       : undefined;
@@ -1172,25 +1173,9 @@ export function SurveyEditorPage() {
       isPublished: options?.publish ?? values.isPublished,
       showOnList: values.showOnList ?? true,
       showOnCalendar: values.showOnCalendar,
-      isAlwaysOpen: values.isAlwaysOpen || (allowPlaceholder && !values.openAt),
+      ...buildSurveySchedule(values),
       resultVisibility: values.resultVisibility,
       maxResponseCount,
-      openAt: values.isAlwaysOpen || (allowPlaceholder && !values.openAt)
-        ? null
-        : values.openAt
-          ? htmlDatetimeLocalToIso(
-              values.isAllDay && !values.openAt.includes("T")
-                ? `${values.openAt}T00:00`
-                : values.openAt,
-            )
-          : undefined,
-      closeAt: values.isAlwaysOpen || !values.closeAt
-        ? null
-        : htmlDatetimeLocalToIso(
-            values.isAllDay && !values.closeAt.includes("T")
-              ? `${values.closeAt}T23:59`
-              : values.closeAt,
-          ),
       connectedArticleId: values.connectedArticleId?.trim() || null,
     };
   };
@@ -1204,7 +1189,7 @@ export function SurveyEditorPage() {
       setSectionOrderError(null);
       try {
         const created = await client.createSurvey(
-          buildSurveyBody(form.getValues(), { allowPlaceholder: true, publish: false }),
+          buildSurveyBody(form.getValues(), { publish: false }),
         );
         const draftValues = form.getValues();
         const section = await client.createSection(created.id, {
@@ -1238,7 +1223,7 @@ export function SurveyEditorPage() {
           };
           if (createdQuestionId) await client.updateQuestion(created.id, section.id, createdQuestionId, questionBody);
           else createdQuestionId = (await client.createQuestion(created.id, section.id, questionBody)).id;
-          await client.updateSurvey(created.id, buildSurveyBody(values, { allowPlaceholder: true, publish: false }));
+          await client.updateSurvey(created.id, buildSurveyBody(values, { publish: false }));
           detail = await client.getSurveyDetail(created.id);
           if (signature === JSON.stringify({ question: firstQuestionRef.current, values: form.getValues() })) break;
         }
@@ -1358,7 +1343,7 @@ export function SurveyEditorPage() {
       const values = pending; pending = null;
       autoSaveQueue.current = autoSaveQueue.current.catch(() => undefined).then(async () => {
         setSaveState("saving");
-        try { const { isPublished: _publication, ...body } = buildSurveyBody(values, { allowPlaceholder: true }); await client.updateSurvey(loadedSurveyId, body); autoSaveError.current = null; setSaveState("saved"); }
+        try { const { isPublished: _publication, ...body } = buildSurveyBody(values); await client.updateSurvey(loadedSurveyId, body); autoSaveError.current = null; setSaveState("saved"); }
         catch (error) { autoSaveError.current = error; setSaveState("error"); toast({ type: "error", message: getErrorMessage(error, "자동 저장에 실패했습니다. 연결을 확인하고 다시 수정해 주세요.") }); }
       });
     };
@@ -1406,7 +1391,7 @@ export function SurveyEditorPage() {
       } else {
         const values = direction === "undo" ? entry.before : entry.after;
         const current = form.getValues();
-        const { isPublished: _publication, ...body } = buildSurveyBody(values, { allowPlaceholder: true });
+        const { isPublished: _publication, ...body } = buildSurveyBody(values);
         await client.updateSurvey(loadedSurveyId, body);
         suppressAutoSave.current = true;
         form.reset({ ...values, isPublished: current.isPublished });
@@ -2437,6 +2422,7 @@ export function SurveyEditorPage() {
           {!loadError && !surveyLoading && tab === "delivery" && (
             <FormProvider {...form}>
               <SurveySettingsForm
+                rememberedAllDayRef={rememberedAllDayRef}
                 mode="delivery"
                 isOngoing={isOngoing}
                 articleSearchResults={articleSearchResults}

@@ -19,6 +19,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, 
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useNavigationIndicator } from "@/hooks/use-navigation-indicator";
 
 import { Logo } from "@/components/atoms/logo";
 import { Badge } from "@/components/ui/badge";
@@ -383,6 +384,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                 href: operationalSurveyPath(OPERATIONAL_SURVEY_IDS.cohortChatInvitation),
                 newTab: true,
               },
+              { label: "채팅방 홍보 요청", href: operationalSurveyPath(OPERATIONAL_SURVEY_IDS.externalPromotionPostRequest), newTab: true },
             ],
           },
           {
@@ -436,6 +438,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                 href: operationalSurveyPath(OPERATIONAL_SURVEY_IDS.cohortChatInvitation),
                 newTab: true,
               },
+              { label: "Chat Promotion Request", href: operationalSurveyPath(OPERATIONAL_SURVEY_IDS.externalPromotionPostRequest), newTab: true },
             ],
           },
           {
@@ -496,13 +499,9 @@ export function Header({ variant = "default" }: HeaderProps) {
     ? navItems[activeNavIndex]?.href ?? navItems[0]?.href
     : expandedMobileSection;
   const indicatorIndex = indicatorHoverIndex ?? activeNavIndex;
-  const indicatorOffset = Array.from(
-    { length: Math.max(0, indicatorIndex) },
-    () => "var(--ui-nav-column-width)",
-  ).join(" + ");
-  const indicatorLeft = indicatorOffset
-    ? `calc(2rem + ${indicatorOffset})`
-    : "2rem";
+  const { rootRef: navRef, indicatorRef } = useNavigationIndicator<HTMLElement>(
+    indicatorIndex >= 0 ? `[data-nav-index="${indicatorIndex}"] > a` : null, lang,
+  );
 
   return (
     <header
@@ -525,6 +524,7 @@ export function Header({ variant = "default" }: HeaderProps) {
           </div>
 
           <nav
+            ref={navRef}
             className="site-primary-nav select-none hidden items-stretch xl:flex"
             aria-label={lang === "ko" ? "주요 메뉴" : "Primary navigation"}
             onMouseMove={(event) => {
@@ -570,7 +570,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                           : "text-slate-900 hover:text-kaist-darkgreen-main"
                     }`}
                   >
-                    <span>{item.label}</span>
+                    <span data-nav-label>{item.label}</span>
                     <ChevronDown
                       aria-hidden="true"
                       className={`ml-1 h-3.5 w-3.5 transition-transform duration-200 ease-out ${
@@ -641,10 +641,8 @@ export function Header({ variant = "default" }: HeaderProps) {
             })}
             <span
               aria-hidden="true"
-              className={`site-nav-indicator ${indicatorIndex >= 0 ? "opacity-100" : "opacity-0"}`}
-              style={{
-                left: indicatorLeft,
-              }}
+              ref={indicatorRef}
+              className="site-nav-indicator"
             />
           </nav>
         </div>
@@ -986,6 +984,9 @@ export function Header({ variant = "default" }: HeaderProps) {
             </nav>
 
           <div className="mobile-nav-account shrink-0 grid gap-3 border-t border-slate-100 bg-white px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
+            <Button type="button" variant="ghost" className="mobile-nav-language justify-between" onClick={() => setLanguage(lang === "ko" ? "en" : "ko")} aria-label={lang === "ko" ? "영어로 전환" : "Switch to Korean"}>
+              <span>{lang === "ko" ? "언어" : "Language"}</span><span>{lang === "ko" ? "English" : "한국어"}</span>
+            </Button>
             {user ? (
               <div
                 className={`grid items-center gap-2 ${

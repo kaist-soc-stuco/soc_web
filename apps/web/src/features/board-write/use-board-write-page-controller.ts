@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/toast";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
+import { useScheduleMode } from "@/hooks/use-schedule-mode";
 import { canWriteBoardFromMetadata } from "@/lib/board-metadata";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
@@ -96,8 +97,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
   const [eventLocationEn, setEventLocationEn] = useState("");
   const [eventDescriptionKo, setEventDescriptionKo] = useState("");
   const [eventDescriptionEn, setEventDescriptionEn] = useState("");
-  const [isAllDay, setIsAllDay] = useState(false);
-  const [isEventAlwaysOpen, setIsEventAlwaysOpen] = useState(false);
+  const { isAllDay, setIsAllDay, isAlwaysOpen: isEventAlwaysOpen, setIsAlwaysOpen: setIsEventAlwaysOpen } = useScheduleMode();
   const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
   const [selectedSurveyId, setSelectedSurveyId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);

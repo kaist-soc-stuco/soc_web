@@ -1,23 +1,23 @@
-import { ClosedView } from "@/features/survey/survey-state-views";
 import { ResponseMobileNavigation, ResponsePageMain, ResponseHeaderCard } from "@/features/survey/response-layout";
 import { SurveyParticipationNotice } from "@/features/survey/survey-participation-notice";
 import { SurveyQuestionCard } from "@/features/survey/survey-question-card";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 import { useToast } from "@/components/ui/toast";
 import { VoteTurnout } from "@/components/organisms/vote-progress";
+import { VoteNoticeState, VoteResponseState } from "@/features/votes/vote-response-state";
 import { createApiClient, ApiClientHttpError } from "@soc/api-client";
 import type { VoteDetailResponse, VoteResultsResponse } from "@soc/contracts";
 import { isoToMs, nowMs, meetsVoteQuorum } from "@soc/shared";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
-import { PageContainer, PageMain, PageShell } from "@/components/ui/page-layout";
+import { PageShell } from "@/components/ui/page-layout";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { formatVotePeriod } from "@/lib/vote-display";
+import { formatVotePeriod, getVoteListState } from "@/lib/vote-display";
 import { useLanguage } from "@/hooks/use-language";
 
 export function VotePage() {
@@ -26,7 +26,10 @@ export function VotePage() {
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "1";
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const [vote, setVote] = useState<VoteDetailResponse | null>(null);
+  const [notStarted, setNotStarted] = useState(false);
   const [results, setResults] = useState<VoteResultsResponse | null>(null);
+  const [resultsLoading, setResultsLoading] = useState(false);
+  const [resultsError, setResultsError] = useState(false);
   const { toast } = useToast();
   const [validationAttempted, setValidationAttempted] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
@@ -41,26 +44,48 @@ export function VotePage() {
   const t = lang === "ko" ? {
     submitted: "투표가 제출되었습니다.",
     verify: "접수 확인", verified: "정상 접수 확인됨",
-    results: "투표 결과", ballots: "표", notStarted: "아직 투표가 시작되지 않았습니다.", ended: "투표가 종료되었습니다. 결과는 공개 후 확인할 수 있습니다.",
+    results: "투표 결과", ballots: "표", notStarted: "아직 투표가 시작되지 않았습니다.", ended: "투표가 종료되었습니다.",
     loginHelp: "투표 자격 확인을 위해 로그인해 주세요.", login: "로그인", ineligible: "이 투표의 참여 대상이 아닙니다.",
     voted: "이미 투표를 제출했습니다.", submit: "투표 제출", required: "모든 안건에 기표해 주세요.",
     confirmTitle: "투표를 제출할까요?", confirmDescription: "제출한 뒤에는 선택을 확인하거나 수정할 수 없습니다.", confirmLabel: "제출", loadFailed: "투표를 불러오지 못했습니다.", retry: "다시 시도",
   } : {
     submitted: "Your ballot was submitted.",
     verify: "Verify receipt", verified: "Receipt verified",
-    results: "Results", ballots: "ballots", notStarted: "Voting has not started yet.", ended: "Voting has ended. Results will appear after publication.",
+    results: "Results", ballots: "ballots", notStarted: "Voting has not started yet.", ended: "Voting has ended.",
     loginHelp: "Sign in to verify your eligibility.", login: "Sign in", ineligible: "You are not eligible to participate in this vote.",
     voted: "You have already submitted a ballot.", submit: "Submit ballot", required: "Please vote on every agenda item.",
     confirmTitle: "Submit this ballot?", confirmDescription: "You cannot review or change your selections after submission.", confirmLabel: "Submit", loadFailed: "Failed to load this vote.", retry: "Try again",
   };
 
   useEffect(() => {
+    let active = true;
     setError(null);
+    setVote(null);
+    setResults(null);
+    setResultsLoading(false);
+    setResultsError(false);
+    setNotStarted(false);
     void client.getVote(id).then((data) => {
+      if (!active) return;
+      if (!isPreview && getVoteListState(data, nowMs()) === "upcoming") {
+        setNotStarted(true);
+        return;
+      }
       setVote(data);
-      if (data.resultsPublishedAt) void client.getVoteResults(id).then(setResults).catch(() => undefined);
-    }).catch(() => setError(t.loadFailed));
-  }, [client, id, reloadKey, t.loadFailed]);
+      if (data.resultsPublishedAt) {
+        setResultsLoading(true);
+        void client.getVoteResults(id)
+          .then(result => { if (active) setResults(result); })
+          .catch(() => { if (active) setResultsError(true); })
+          .finally(() => { if (active) setResultsLoading(false); });
+      }
+    }).catch(caught => {
+      if (!active) return;
+      if (caught instanceof ApiClientHttpError && caught.code === "vote_not_started") setNotStarted(true);
+      else setError(t.loadFailed);
+    });
+    return () => { active = false; };
+  }, [client, id, reloadKey, isPreview, t.loadFailed]);
 
   const selectionError = (item: VoteDetailResponse["items"][number]) => {
     const count = answers[item.id]?.length ?? 0;
@@ -117,8 +142,21 @@ export function VotePage() {
     }
   };
 
-  if (error && !vote) return <PageShell className="mobile-flat-response">{!isPreview && <ResponseMobileNavigation to="/votes" lang={lang} />}<main className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-24 text-center text-sm text-rose-600" role="alert"><p>{error}</p><Button type="button" variant="ghost" size="sm" onClick={() => setReloadKey((current) => current + 1)}>{t.retry}</Button></main></PageShell>;
-  if (!vote) return <PageShell className="mobile-flat-response">{!isPreview && <ResponseMobileNavigation to="/votes" lang={lang} />}<main className="flex-1 py-24 text-center text-sm text-[#344054]">불러오는 중...</main></PageShell>;
+  const copyReceipt = async () => {
+    if (!receipt) return;
+    try {
+      await navigator.clipboard.writeText(receipt);
+      toast({ type: "success", message: lang === "ko" ? "접수 번호를 복사했습니다." : "Receipt number copied." });
+    } catch {
+      toast({ type: "error", message: lang === "ko" ? "복사하지 못했습니다." : "Could not copy." });
+    }
+  };
+
+  if ((error && !vote) || notStarted) return <PageShell className="mobile-flat-response mobile-state-page">
+    {!isPreview && <ResponseMobileNavigation to="/votes" lang={lang} />}
+    <ResponsePageMain className="vote-response-page vote-standalone-notice"><VoteNoticeState kind={notStarted ? "upcoming" : "failed"} lang={lang} onRetry={() => setReloadKey(current => current + 1)} /></ResponsePageMain>
+  </PageShell>;
+  if (!vote) return <PageShell className="mobile-flat-response">{!isPreview && <ResponseMobileNavigation to="/votes" lang={lang} />}<main className="min-h-48 flex-1" aria-busy="true" aria-label={lang === "ko" ? "투표 로딩" : "Loading vote"} /></PageShell>;
 
   const now = nowMs();
   const isOpen = vote.status === "PUBLISHED" && now >= isoToMs(vote.startsAt) && now < isoToMs(vote.endsAt);
@@ -127,30 +165,27 @@ export function VotePage() {
     (vote.status === "CLOSED" || vote.status === "TALLIED" || now >= isoToMs(vote.endsAt));
 
   const canParticipate = isOpen && vote.eligibility === "ELIGIBLE";
+  const hasVoted = !isPreview && Boolean(receipt || vote.eligibility === "ALREADY_VOTED");
 
   return (
-    <PageShell className="mobile-flat-response">
+    <PageShell className="mobile-flat-response mobile-state-page">
       {!isPreview && <ResponseMobileNavigation to="/votes" lang={lang} />}
       {isPreview && <header className="flex min-h-16 items-center border-b border-slate-200 bg-white px-6"><Link to={`/admin/votes/${id}`} className="inline-flex items-center gap-3 text-sm"><ArrowLeft className="size-4" />미리보기</Link></header>}
       <ResponsePageMain className="vote-response-page">
-          <ResponseHeaderCard title={lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo}>
-            <p className="mt-2 text-sm tabular-nums text-slate-600">{formatVotePeriod(vote.startsAt, vote.endsAt)}</p>
-            {(vote.descriptionKo || vote.descriptionEn) && <RichTextContent content={lang === "en" && vote.descriptionEn ? vote.descriptionEn : vote.descriptionKo ?? ""} className="mt-3 text-sm leading-6 text-slate-600" />}
+          <ResponseHeaderCard className="vote-summary-card" title={lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo}>
+            <p className="vote-summary-period mt-2 text-sm tabular-nums text-slate-600">{formatVotePeriod(vote.startsAt, vote.endsAt)}</p>
+            {!hasVoted && (vote.descriptionKo || vote.descriptionEn) && <RichTextContent content={lang === "en" && vote.descriptionEn ? vote.descriptionEn : vote.descriptionKo ?? ""} className="vote-summary-description mt-3 text-sm leading-6 text-slate-600" />}
             <div className="vote-summary-metadata mt-4 border-t border-slate-100 pt-4"><VoteTurnout vote={vote} lang={lang} /></div>
           </ResponseHeaderCard>
 
-          <div className="min-w-0">
+          <div className="vote-state-content min-w-0" aria-busy={resultsLoading}>
           {showClosedNotice ? (
-            <ClosedView lang={lang} subject="vote" />
+            <VoteNoticeState kind="closed" lang={lang} />
           ) : !isPreview && receipt ? (
-            <section className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/50 p-8 text-center">
-              <Check className="mx-auto size-8 text-emerald-700" />
-              <h2 className="mt-3 text-xl font-semibold text-[#172033]">{t.submitted}</h2>
-              <p className="mt-5 text-sm text-slate-500">{lang === "ko" ? "접수 번호" : "Receipt number"}</p>
-              <code className="mt-2 inline-block max-w-full break-all rounded-lg border border-emerald-200 bg-white px-4 py-3 text-sm font-normal text-[#172033]">{receipt}</code>
-              <div className="mt-4 flex justify-center gap-2"><Button variant="ghost" size="sm" onClick={async () => { try { await navigator.clipboard.writeText(receipt); toast({ type: "success", message: lang === "ko" ? "접수 번호를 복사했습니다." : "Receipt number copied." }); } catch { toast({ type: "error", message: lang === "ko" ? "복사하지 못했습니다." : "Could not copy." }); } }}>{lang === "ko" ? "복사" : "Copy"}</Button><Button type="button" variant="outline" size="sm" loading={verifyingReceipt} disabled={verifyingReceipt || receiptVerified} onClick={() => void verifyReceipt()}>{receiptVerified ? t.verified : t.verify}</Button></div>
-            </section>
-          ) : !isPreview && results ? (
+            <VoteResponseState receipt={receipt} lang={lang} verifying={verifyingReceipt} verified={receiptVerified} onCopy={() => void copyReceipt()} onVerify={() => void verifyReceipt()} />
+          ) : !isPreview && resultsError ? (
+            <VoteNoticeState kind="results-failed" lang={lang} onRetry={() => setReloadKey(current => current + 1)} />
+          ) : !isPreview && resultsLoading ? null : !isPreview && results ? (
             <section className="mt-5 space-y-5 rounded-xl border border-slate-200 bg-white p-4 sm:p-6 md:p-8">
               <h2 className="text-xl font-semibold text-[#172033]">{t.results}</h2>
               <div className="rounded-xl bg-slate-50 p-4"><p className="font-semibold">{lang === "ko" ? "최종 투표율" : "Final turnout"} {vote.eligibleCount ? (100 * results.totalBallots / vote.eligibleCount).toFixed(1) : "0.0"}% ({results.totalBallots}/{vote.eligibleCount})</p>{vote.quorumPercent !== null ? <span className="mt-2 inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs">{meetsVoteQuorum(vote.eligibleCount, results.totalBallots, vote.quorumPercent, vote.quorumInclusive) ? "개표 정족수 충족" : "개표 정족수 미달"}</span> : null}</div>
@@ -172,15 +207,13 @@ export function VotePage() {
           ) : (
             <>
             {!isPreview && !isOpen ? (
-            <div className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-14 text-center text-sm font-normal text-[#344054]">
-              {now < isoToMs(vote.startsAt) ? t.notStarted : t.ended}
-            </div>
+            <VoteNoticeState kind={now < isoToMs(vote.startsAt) ? "upcoming" : "closed"} lang={lang} />
           ) : !isPreview && vote.eligibility === "LOGIN_REQUIRED" ? (
             <SurveyParticipationNotice eligibility={{ status: "LOGIN_REQUIRED", reasons: ["LOGIN_REQUIRED"] }} lang={lang} subject="vote" />
           ) : !isPreview && vote.eligibility === "NOT_ELIGIBLE" ? (
             <SurveyParticipationNotice eligibility={{ status: "NOT_ELIGIBLE", reasons: [] }} lang={lang} subject="vote" description={t.ineligible} />
           ) : !isPreview && vote.eligibility === "ALREADY_VOTED" ? (
-            <div className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-14 text-center text-sm font-normal text-[#344054]">{t.voted}</div>
+            <VoteResponseState lang={lang} verifying={false} verified={false} onCopy={() => {}} onVerify={() => {}} />
           ) : null}
             {isPreview || canParticipate ? (
               <section className="space-y-5">

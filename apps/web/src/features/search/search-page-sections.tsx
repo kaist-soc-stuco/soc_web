@@ -12,8 +12,8 @@ import type {
   PublicSurveyRecord,
   VoteRecord,
 } from "@soc/contracts";
-import { ArrowRight, Loader2, Search } from "lucide-react";
-import { MobileEmptyState } from "@/components/ui/mobile-empty-state";
+import { ArrowRight, Loader2, RefreshCw, RotateCcw, SearchX, WifiOff } from "lucide-react";
+import { ListState, ListStateAction } from "@/components/ui/data-state";
 
 import { PageActionButton, PageSearchField, PageTabButton, PageTabs } from "@/components/ui/page-layout";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
 import { formatShortDate } from "@/lib/date-display";
 
 import type { AboutSearchItem, SearchFilter } from "./search-utils";
+
 
 function formatDate(value: string, lang: string) {
   return formatShortDate(value, lang);
@@ -201,11 +202,13 @@ export function SearchFilterTabs({
 export function SearchStatus({
   lang,
   loading,
+  error,
   query,
   totalCount,
 }: {
   lang: string;
   loading: boolean;
+  error: string | null;
   query: string;
   totalCount: number;
 }) {
@@ -224,7 +227,7 @@ export function SearchStatus({
           <>Results for &quot;{query}&quot;</>
         )}
       </span>
-      {!loading ? <span className="hidden md:inline">{lang === "ko" ? `표시된 결과 ${totalCount}건` : `${totalCount} results shown`}</span> : null}
+      {!loading && !error ? <span className="hidden md:inline">{lang === "ko" ? `표시된 결과 ${totalCount}건` : `${totalCount} results shown`}</span> : null}
     </div>
   );
 }
@@ -243,6 +246,7 @@ export function SearchResults({
   lang,
   loading,
   onRetry,
+  onReset,
   query,
   surveys,
   totalCount,
@@ -266,6 +270,7 @@ export function SearchResults({
   lang: string;
   loading: boolean;
   onRetry?: () => void;
+  onReset: () => void;
   query: string;
   surveys: PublicSurveyRecord[];
   totalCount: number;
@@ -282,14 +287,15 @@ export function SearchResults({
 
   if (error) {
     return (
-      <div className="flex flex-col items-start gap-3 px-1 py-6 text-sm font-normal text-red-600" role="alert">
-        <p>{error}</p>
-        {onRetry ? (
-          <Button type="button" variant="ghost" size="sm" onClick={onRetry}>
-            {lang === "ko" ? "다시 시도" : "Retry"}
-          </Button>
-        ) : null}
-      </div>
+      <ListState
+        role="alert"
+        icon={WifiOff}
+        title={lang === "ko" ? "검색 결과를 불러오지 못했습니다" : "Could not load search results"}
+        description={lang === "ko" ? "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요." : "A temporary error occurred. Please try again shortly."}
+        action={onRetry ? <ListStateAction icon={RefreshCw} onClick={onRetry}>
+          {lang === "ko" ? "다시 시도" : "Try again"}
+        </ListStateAction> : undefined}
+      />
     );
   }
 
@@ -309,20 +315,27 @@ export function SearchResults({
   const visibleErrors = partialErrors.filter(kind => filter === "all" || filter === kind);
   if (query && visibleCount === 0 && visibleErrors.length === 0) {
     return (
-      <><MobileEmptyState icon={Search} message={lang === "ko" ? "검색 결과가 없습니다." : "No results found."} />
-      <p className="hidden px-1 py-10 text-center text-sm font-normal text-slate-500 md:block" role="status">
-        {lang === "ko" ? "검색 결과가 없습니다." : "No results found."}
-      </p></>
+      <ListState
+        icon={SearchX}
+        title={lang === "ko" ? "검색 결과가 없습니다" : "No results found"}
+        description={lang === "ko" ? "입력하신 키워드가 정확한지 확인하거나, 다른 검색어로 다시 시도해 보세요." : "Check your spelling or try searching with a different keyword."}
+        action={<ListStateAction icon={RotateCcw} onClick={onReset}>
+          {lang === "ko" ? "검색어 초기화" : "Clear search"}
+        </ListStateAction>}
+      />
     );
   }
 
   const showAll = filter === "all";
   return (
     <div className="space-y-9">
-      {visibleErrors.map(kind => <div key={kind} role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4 text-sm text-slate-600">
-        <p>{lang === "ko" ? `${kind === "faq" ? "FAQ" : "투표"} 검색 결과를 불러오지 못했습니다.` : `Could not load ${kind === "faq" ? "FAQ" : "vote"} results.`}</p>
-        <Button variant="ghost" disabled={retryingPart !== null} aria-busy={retryingPart === kind} onClick={() => void onRetryPart(kind)}>{lang === "ko" ? "다시 시도" : "Retry"}</Button>
-      </div>)}
+      {visibleErrors.map(kind => <ListState key={kind} role="alert" icon={WifiOff}
+        title={lang === "ko" ? `${kind === "faq" ? "FAQ" : "투표"} 검색 결과를 불러오지 못했습니다` : `Could not load ${kind === "faq" ? "FAQ" : "vote"} results`}
+        description={lang === "ko" ? "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요." : "A temporary error occurred. Please try again shortly."}
+        action={<ListStateAction icon={RefreshCw} disabled={retryingPart !== null} loading={retryingPart === kind} onClick={() => void onRetryPart(kind)}>
+          {lang === "ko" ? "다시 시도" : "Try again"}
+        </ListStateAction>}
+      />)}
       {filter === "board" || showAll ? (
         <ArticleResults articles={boardArticles} boardById={boardById} lang={lang} query={query} />
       ) : null}

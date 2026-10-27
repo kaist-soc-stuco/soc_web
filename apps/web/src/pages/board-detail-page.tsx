@@ -4,7 +4,6 @@ import { useRef, useState } from "react";
 import { CommentSection } from "@/components/ui/comment-section";
 import {
   BoardDetailArticleCard,
-  BoardDetailBackLink,
 } from "@/features/board-detail/board-detail-sections";
 import { useBoardDetailPageController } from "@/features/board-detail/use-board-detail-page-controller";
 import { PageShell } from "@/components/ui/page-layout";
@@ -151,14 +150,6 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
 
       <main className="flex-1 w-full mx-auto pb-28">
         <div className="mobile-article-container mx-auto flex w-full max-w-[72rem] flex-col gap-3 px-4 pb-16 pt-6 min-[360px]:px-5 min-[640px]:px-6 lg:px-8">
-          {!isMobile && <>
-          <BoardDetailBackLink
-            category={category}
-            lang={lang}
-            to={publicBasePath}
-          />
-          </>}
-
           <BoardDetailArticleCard
             article={article}
             adjacentBasePath={publicBasePath ?? `/board/${category}`}
@@ -168,6 +159,8 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
             canModerate={canModerate}
             editHref={publicBasePath ? `${publicBasePath}/${article.articleId}/edit` : undefined}
             category={category}
+            boardTitle={category === "_EVENT" ? (lang === "ko" ? "행사" : "Events") : boardTitle}
+            listHref={backTo}
             content={content}
             isAuthenticated={Boolean(session?.canUsePersistentFeatures)}
             lang={lang}

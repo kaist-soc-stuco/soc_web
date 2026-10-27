@@ -1,0 +1,5 @@
+@media (min-width: 1024px) {
+  .board-editor-card { min-height: 46rem; }
+  .board-editor-columns > .board-editor-card { min-height: max(46rem, var(--board-editor-initial-height, 46rem)); }
+  .board-editor-details > * { min-height: 46rem; }
+}

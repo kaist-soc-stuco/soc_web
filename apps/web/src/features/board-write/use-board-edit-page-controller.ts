@@ -11,6 +11,7 @@ import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
+import { useScheduleMode } from "@/hooks/use-schedule-mode";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { hasAdminPermission } from "@/lib/permissions";
@@ -84,15 +85,15 @@ export function useBoardEditPageController(forcedCategory?: string) {
   const [eventLocationEn, setEventLocationEn] = useState("");
   const [eventDescriptionKo, setEventDescriptionKo] = useState("");
   const [eventDescriptionEn, setEventDescriptionEn] = useState("");
-  const [isAllDay, setIsAllDay] = useState(false);
-  const [isEventAlwaysOpen, setIsEventAlwaysOpen] = useState(false);
+  const { isAllDay, setIsAllDay, isAlwaysOpen: isEventAlwaysOpen, setIsAlwaysOpen: setIsEventAlwaysOpen } = useScheduleMode();
   const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
   const [selectedSurveyId, setSelectedSurveyId] = useState("");
   const [initialSurveyId, setInitialSurveyId] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [articleLoadFailed, setArticleLoadFailed] = useState(false);
+  const error = articleLoadFailed ? (lang === "ko" ? "게시글 정보를 불러오는 데 실패했습니다." : "Failed to load the article details.") : null;
   const [serverDraftId, setServerDraftId] = useState<string | null>(null);
   const [serverDraftVersion, setServerDraftVersion] = useState<number>();
   const [draftStatus, setDraftStatus] = useState<
@@ -112,11 +113,13 @@ export function useBoardEditPageController(forcedCategory?: string) {
 
   useEffect(() => {
     if (!articleId) return;
+    let cancelled = false;
 
     setLoading(true);
     apiClient
       .getArticle(category, articleId)
       .then((res) => {
+        if (cancelled) return;
         setTitleKo(res.titleKo);
         setFaqCategory(resolveFaqCategory(res));
         setTitleEn(res.titleEn || "");
@@ -171,19 +174,16 @@ export function useBoardEditPageController(forcedCategory?: string) {
         );
         initialFingerprintRef.current = null;
         lastDraftFingerprintRef.current = null;
-        setError(null);
+        setArticleLoadFailed(false);
       })
       .catch(() => {
-        setError(
-          lang === "ko"
-            ? "게시글 정보를 불러오는 데 실패했습니다."
-            : "Failed to load the article details.",
-        );
+        if (!cancelled) setArticleLoadFailed(true);
       })
       .finally(() => {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       });
-  }, [category, articleId, apiClient, lang]);
+    return () => { cancelled = true; };
+  }, [category, articleId, apiClient]);
 
   useEffect(() => {
     apiClient

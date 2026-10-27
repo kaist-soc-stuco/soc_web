@@ -61,7 +61,7 @@ export function HomeParticipation() {
         <h3 className="mt-1 line-clamp-2 text-sm font-semibold text-slate-900">{item.title}</h3>
         <p className="mt-1 text-xs text-slate-600">{Number.isFinite(item.end) ? `${new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", { month: "short", day: "numeric", timeZone: "Asia/Seoul" }).format(item.end)} ${lang === "ko" ? "마감" : "deadline"}` : lang === "ko" ? "상시" : "Always open"} · {lang === "ko" ? "참여 조건 확인 →" : "View participation details →"}</p>
       </Link>)}
-      {!items.length ? <p role="status" className="py-4 text-sm text-slate-600">{loading ? (lang === "ko" ? "불러오는 중…" : "Loading…") : failed ? (lang === "ko" ? "참여 목록을 불러오지 못했습니다." : "Could not load participation items.") : (lang === "ko" ? "현재 진행 중인 항목이 없습니다." : "No activities are currently open.")}</p> : null}
+      {!items.length ? <p role="status" className={loading ? "sr-only" : "py-4 text-sm text-slate-600"}>{loading ? (lang === "ko" ? "불러오는 중…" : "Loading…") : failed ? (lang === "ko" ? "참여 목록을 불러오지 못했습니다." : "Could not load participation items.") : (lang === "ko" ? "현재 진행 중인 항목이 없습니다." : "No activities are currently open.")}</p> : null}
     </div>
     <Link to="/events" className="mt-4 inline-block text-sm font-medium text-brand-primary">{lang === "ko" ? "전체 일정 보기 →" : "View all events →"}</Link>
   </section>;

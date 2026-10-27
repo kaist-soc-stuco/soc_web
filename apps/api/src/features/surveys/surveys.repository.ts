@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import type { PublicListFilters, PublicListStateCounts } from "@soc/contracts";
-import { publicListDateFilter, publicListStateFields, publicListStateFilter, publicListStateRank } from "../../shared/public-list";
+import { publicListDateFilter, publicListStateFields, publicListStateFilter } from "../../shared/public-list";
 import { isoToDate, msToIso, nowDate } from "@soc/shared";
 
 import {
@@ -342,7 +342,7 @@ export class SurveysRepository {
       eq(surveys.lifecycleStatus, "PUBLISHED"),
       eq(surveys.showOnList, true),
       input.publicList ? isNull(surveys.connectedArticleId) : undefined,
-      input.publicList ? publicListDateFilter(sql`${surveys.openAt}`, sql`${surveys.closeAt}`, input) : undefined,
+      input.publicList && input.state !== "always" ? publicListDateFilter(sql`${surveys.openAt}`, sql`${surveys.closeAt}`, input) : undefined,
       query
         ? or(
             ilike(surveys.titleKo, `%${query}%`),
@@ -352,9 +352,17 @@ export class SurveysRepository {
           )
         : undefined,
     );
-    const stateCounts = input.publicList ? (await this.db.select(publicListStateFields(state))
+    const stateCounts = input.publicList ? (await this.db.select({
+      ...publicListStateFields(state),
+      active: sql<number>`count(*) FILTER (WHERE NOT ${surveys.isAlwaysOpen} AND ${state} IN ('before_open', 'open'))::int`,
+      before_open: sql<number>`count(*) FILTER (WHERE NOT ${surveys.isAlwaysOpen} AND ${state} = 'before_open')::int`,
+      open: sql<number>`count(*) FILTER (WHERE NOT ${surveys.isAlwaysOpen} AND ${state} = 'open')::int`,
+      closed: sql<number>`count(*) FILTER (WHERE NOT ${surveys.isAlwaysOpen} AND ${state} = 'closed')::int`,
+      always: sql<number>`count(*) FILTER (WHERE ${surveys.isAlwaysOpen})::int`,
+    })
       .from(surveys).where(whereClause))[0] : undefined;
-    const selectedFilter = and(whereClause, input.publicList ? publicListStateFilter(state, input) : undefined);
+    const selectedFilter = and(whereClause, input.publicList && input.state === "always" ? eq(surveys.isAlwaysOpen, true)
+      : input.publicList ? and(input.state && input.state !== "all" ? eq(surveys.isAlwaysOpen, false) : undefined, publicListStateFilter(state, input)) : undefined);
     const [countRow] = stateCounts ? [] : await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(surveys)
@@ -367,7 +375,12 @@ export class SurveysRepository {
       })
       .from(surveys)
       .where(selectedFilter)
-      .orderBy(...(input.publicList ? [publicListStateRank(state), sql`coalesce(${surveys.openAt}, ${surveys.closeAt}) DESC NULLS LAST`, desc(surveys.surveyId)] : [desc(surveys.createdAt)]))
+      .orderBy(...(input.publicList ? [
+        sql`CASE WHEN ${state} = 'closed' THEN 2 WHEN NOT ${surveys.isAlwaysOpen} AND ${surveys.closeAt} IS NOT NULL THEN 0 ELSE 1 END`,
+        sql`CASE WHEN ${state} <> 'closed' AND NOT ${surveys.isAlwaysOpen} THEN ${surveys.closeAt} ELSE NULL END ASC NULLS LAST`,
+        sql`CASE WHEN ${state} = 'closed' THEN coalesce(${surveys.closeAt}, ${surveys.updatedAt}) ELSE NULL END DESC NULLS LAST`,
+        desc(surveys.createdAt), desc(surveys.surveyId),
+      ] : [desc(surveys.createdAt)]))
       .limit(input.pageSize)
       .offset(offset);
     return {
@@ -376,7 +389,7 @@ export class SurveysRepository {
         responseCount: r.responseCount,
         derivedVersionCount: r.derivedVersionCount,
       })),
-      total: stateCounts ? stateCounts[input.state ?? "all"] : Number(countRow?.count ?? 0),
+      total: stateCounts ? stateCounts[input.state ?? "all"] ?? 0 : Number(countRow?.count ?? 0),
       stateCounts,
     };
   }

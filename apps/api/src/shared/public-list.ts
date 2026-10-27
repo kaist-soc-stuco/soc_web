@@ -11,6 +11,7 @@ export function parsePublicListFilters(input: PublicListFilters): PublicListFilt
 
 export const publicListStateFields = (state: SQL) => ({
   all: sql<number>`count(*)::int`,
+  active: sql<number>`count(*) FILTER (WHERE ${state} IN ('before_open', 'open'))::int`,
   before_open: sql<number>`count(*) FILTER (WHERE ${state} = 'before_open')::int`,
   open: sql<number>`count(*) FILTER (WHERE ${state} = 'open')::int`,
   closed: sql<number>`count(*) FILTER (WHERE ${state} = 'closed')::int`,
@@ -26,7 +27,8 @@ export function publicListDateFilter(start: SQL, end: SQL, filters: PublicListFi
 }
 
 export const publicListStateFilter = (state: SQL, filters: PublicListFilters) =>
-  filters.state && filters.state !== "all" ? eq(state, filters.state) : undefined;
+  filters.state === "active" ? sql`${state} IN ('before_open', 'open')`
+    : filters.state && filters.state !== "all" ? eq(state, filters.state) : undefined;
 
 export const publicListStateRank = (state: SQL) =>
   sql`CASE ${state} WHEN 'open' THEN 0 WHEN 'before_open' THEN 1 ELSE 2 END`;

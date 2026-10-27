@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import type { PublicListFilters, PublicListStateCounts } from "@soc/contracts";
-import { publicListDateFilter, publicListStateFields, publicListStateFilter, publicListStateRank } from "../../../shared/public-list";
+import { publicListDateFilter, publicListStateFields, publicListStateFilter } from "../../../shared/public-list";
 import {
   and,
   asc,
@@ -52,7 +52,7 @@ import { areArticleAssetsAttachable } from "../article-asset-access";
 import { secretArticleFilter } from "../article-query-access";
 
 const getConnectedSurveyState = (survey: typeof surveys.$inferSelect): "before_open" | "open" | "closed" => {
-  if (!survey.isPublished) return "closed";
+  if (!survey.isPublished || !survey.acceptingResponses) return "closed";
   if (survey.isAlwaysOpen) return "open";
 
   const now = nowMs();
@@ -89,6 +89,7 @@ const connectedSurveyFields = {
   surveyDescriptionEn: surveys.descriptionEn,
   surveyComputedState: sql<string | null>`case
     when ${surveys.surveyId} is null then null
+    when not ${surveys.acceptingResponses} then 'closed'
     when ${surveys.isAlwaysOpen} then 'open'
     when ${surveys.openAt} is not null and ${surveys.openAt} > now() then 'before_open'
     when ${surveys.closeAt} is not null and ${surveys.closeAt} <= now() then 'closed'
@@ -281,9 +282,15 @@ export class ArticleRepository {
       .where(selectedFilter)
       .orderBy(
         ...(publicList ? [
-          publicListStateRank(eventState),
-          sql`CASE WHEN ${eventState} = 'before_open' THEN ${articles.eventStartDate} ELSE NULL END ASC NULLS LAST`,
+          sql`CASE WHEN ${eventState} = 'closed' THEN 3
+            WHEN ${connectedSurveyFields.surveyComputedState} = 'closed'
+              OR (${surveys.maxResponseCount} > 0 AND ${connectedSurveyFields.surveyResponseCount} >= ${surveys.maxResponseCount}) THEN 2
+            WHEN ${connectedSurveyFields.surveyComputedState} = 'open' AND NOT ${surveys.isAlwaysOpen} AND ${surveys.closeAt} IS NOT NULL THEN 0
+            ELSE 1 END`,
+          sql`CASE WHEN ${eventState} <> 'closed' AND ${connectedSurveyFields.surveyComputedState} = 'open' AND NOT ${surveys.isAlwaysOpen}
+            THEN ${surveys.closeAt} ELSE NULL END ASC NULLS LAST`,
           sql`CASE WHEN ${eventState} = 'closed' THEN coalesce(${articles.eventEndDate}, ${articles.eventStartDate}) ELSE NULL END DESC NULLS LAST`,
+          sql`CASE WHEN ${eventState} <> 'closed' THEN ${articles.eventStartDate} ELSE NULL END ASC NULLS LAST`,
           sql`coalesce(${articles.eventEndDate}, ${articles.eventStartDate}) ASC NULLS LAST`,
           desc(articles.articleId),
         ] : [desc(articles.isPinned), asc(sql`coalesce(${articles.pinOrder}, 2147483647)`), desc(articles.postedAt)]),
@@ -292,7 +299,7 @@ export class ArticleRepository {
       .offset(offset);
 
     return {
-      total: stateCounts ? stateCounts[publicList?.state ?? "all"] : Number(totalResult?.[0]?.count ?? 0),
+      total: stateCounts ? publicList?.state === "always" ? 0 : stateCounts[publicList?.state ?? "all"] : Number(totalResult?.[0]?.count ?? 0),
       stateCounts,
       items: rows.map((row) => ({
         articleId: String(row.articleId),

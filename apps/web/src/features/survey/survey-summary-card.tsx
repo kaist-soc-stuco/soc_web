@@ -33,7 +33,7 @@ export function SurveySummaryCard({ lang, survey }: SurveySummaryCardProps) {
   const hasInlineDescriptionImage = /<img\b/i.test(description);
 
   return (
-    <ResponseHeaderCard title={getLocalizedText(lang, survey.titleKo, survey.titleEn)}>
+    <ResponseHeaderCard className="survey-summary-card" title={getLocalizedText(lang, survey.titleKo, survey.titleEn)}>
       {description && (
         <RichTextContent
           content={description}

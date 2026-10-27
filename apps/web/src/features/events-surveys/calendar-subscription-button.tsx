@@ -1,4 +1,4 @@
-import { CalendarPlus, Check, Copy, Download, EllipsisVertical } from "lucide-react";
+import { ArrowUpRight, CalendarPlus, Check, Copy, EllipsisVertical } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { useToast } from "@/components/ui/toast";
@@ -22,6 +22,9 @@ export function CalendarSubscriptionButton({
   const containerRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
   const absoluteFeedUrl = toAbsoluteUrl(feedUrl);
+  const appleCalendarUrl = absoluteFeedUrl.replace(/^https?:/i, "webcal:");
+  const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(absoluteFeedUrl)}`;
+  const actionClassName = "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30";
 
   useEffect(() => () => {
     if (copyTimer.current) clearTimeout(copyTimer.current);
@@ -54,30 +57,29 @@ export function CalendarSubscriptionButton({
       setCopied(true);
       if (copyTimer.current) clearTimeout(copyTimer.current);
       copyTimer.current = setTimeout(() => setCopied(false), 1400);
-      toast({ type: "success", message: lang === "ko" ? "구독 주소를 복사했습니다." : "Subscription URL copied." });
+      toast({ type: "success", message: lang === "ko" ? "iCal 주소를 복사했습니다." : "iCal URL copied." });
     } catch {
       toast({ type: "error", message: lang === "ko" ? "주소를 복사하지 못했습니다. 다시 시도해 주세요." : "Could not copy the URL. Please try again." });
     }
   };
 
-  const content = <div className="calendar-subscription-content space-y-3">
-    <p className="text-sm font-normal leading-5 text-slate-600">
-      {lang === "ko" ? "캘린더 앱에 등록해 실시간으로 일정을 받아보세요." : "Add this calendar to your app to receive schedule updates."}
-    </p>
-    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
-      <code className="min-w-0 flex-1 truncate text-xs leading-4 text-slate-600">{absoluteFeedUrl}</code>
-      <Button type="button" variant="ghost" size="icon" className="shrink-0"
-        aria-label={copied ? (lang === "ko" ? "복사됨" : "Copied") : (lang === "ko" ? "구독 주소 복사" : "Copy subscription URL")}
-        onClick={() => void copyFeedUrl()}>
-        {copied ? <Check aria-hidden="true" className="text-brand-primary" /> : <Copy aria-hidden="true" />}
-      </Button>
-    </div>
-    <div className="border-t border-slate-100 pt-2">
-      <a className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
-        download="soc-calendar.ics" href={absoluteFeedUrl} rel="noreferrer" target="_blank">
-        <Download aria-hidden="true" className="size-3.5 opacity-70" />
-        {lang === "ko" ? ".ics 파일 다운로드" : "Download .ics file"}
-      </a>
+  const content = <div className="calendar-subscription-content space-y-1">
+    {!isMobile && <p className="px-3 pb-1 pt-2 text-xs font-medium text-slate-500">{lang === "ko" ? "캘린더에 추가" : "Add to calendar"}</p>}
+    <a href={googleCalendarUrl} target="_blank" rel="noopener noreferrer" className={actionClassName}>
+      <img src="/icons/google-calendar.svg" alt="" aria-hidden="true" className="size-5 shrink-0" />
+      <span className="min-w-0 flex-1">{lang === "ko" ? "Google 캘린더에 추가" : "Add to Google Calendar"}</span>
+      <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+    </a>
+    <a href={appleCalendarUrl} className={actionClassName}>
+      <img src="/icons/apple.svg" alt="" aria-hidden="true" className="size-5 shrink-0" />
+      <span className="min-w-0 flex-1">{lang === "ko" ? "Apple 캘린더에 추가" : "Add to Apple Calendar"}</span>
+      <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+    </a>
+    <div className="border-t border-slate-100 pt-1">
+      <button type="button" className={actionClassName} onClick={() => void copyFeedUrl()}>
+        {copied ? <Check aria-hidden="true" className="size-5 shrink-0 text-brand-primary" /> : <Copy aria-hidden="true" className="size-5 shrink-0 text-slate-500" />}
+        <span>{copied ? (lang === "ko" ? "복사 완료" : "Copied") : (lang === "ko" ? "iCal 주소 복사" : "Copy iCal URL")}</span>
+      </button>
     </div>
   </div>;
 
@@ -96,7 +98,7 @@ export function CalendarSubscriptionButton({
         {isMobile ? <EllipsisVertical aria-hidden="true" /> : <><CalendarPlus aria-hidden="true" />{lang === "ko" ? "캘린더 연동" : "Connect calendar"}</>}
       </Button>
       {isMobile ? <FilterSheet className="mobile-filter-sheet mobile-calendar-subscription" open={open} onClose={() => setOpen(false)} title={lang === "ko" ? "캘린더 연동" : "Connect calendar"} closeLabel={lang === "ko" ? "캘린더 연동 닫기" : "Close calendar connection"}>{content}</FilterSheet> : open ? (
-        <PopoverPanel id={panelId} className="left-0 top-full mt-2 w-[min(25rem,calc(100vw-3rem))] p-4 sm:left-auto sm:right-0">
+        <PopoverPanel id={panelId} className="left-0 top-full mt-2 w-[min(20rem,calc(100vw-3rem))] p-2 sm:left-auto sm:right-0">
           {content}
         </PopoverPanel>
       ) : null}

@@ -1,4 +1,11 @@
 import { isoToMs } from "@soc/shared";
+import type { VoteRecord } from "@soc/contracts";
+
+export function getVoteListState(vote: Pick<VoteRecord, "status" | "startsAt" | "endsAt">, now: number): "upcoming" | "open" | "ended" {
+  if (vote.status !== "PUBLISHED") return "ended";
+  if (now < isoToMs(vote.startsAt)) return "upcoming";
+  return now < isoToMs(vote.endsAt) ? "open" : "ended";
+}
 
 const voteDateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Seoul",

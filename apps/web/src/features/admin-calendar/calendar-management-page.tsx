@@ -64,6 +64,7 @@ interface EventDraft {
   endAt: string;
   isAllDay: boolean;
   isAlways: boolean;
+  rememberedAllDay?: boolean;
   location: string;
   category: CategoryDraft;
   visibility: "visible" | "hidden";
@@ -113,7 +114,8 @@ const draftFromEvent = (event: CalendarEventRecord): EventDraft => ({
   descriptionEn: event.descriptionEn ?? "",
   startAt: toCalendarDateInput(event.startAt, event.isAllDay),
   endAt: toCalendarDateInput(event.endAt, event.isAllDay),
-  isAllDay: event.isAllDay,
+  isAllDay: event.isAlways ? false : event.isAllDay,
+  rememberedAllDay: event.isAllDay,
   isAlways: event.isAlways,
   location: event.location ?? "",
   category: event.categoryOverride ?? event.category,
@@ -558,6 +560,7 @@ function CalendarManagementContent() {
                     <UiInput
                       type="checkbox"
                       checked={draft.isAllDay}
+                      disabled={draft.isAlways}
                       onChange={(event) => {
                         const isAllDay = event.currentTarget.checked;
                         setDraft((current) => ({
@@ -575,7 +578,16 @@ function CalendarManagementContent() {
                     <UiInput
                       type="checkbox"
                       checked={draft.isAlways}
-                      onChange={(event) => { const checked = event.currentTarget.checked; setDraft((current) => ({ ...current, isAlways: checked })); }}
+                      onChange={(event) => {
+                        const checked = event.currentTarget.checked;
+                        setDraft(current => {
+                          const isAllDay = checked ? false : current.rememberedAllDay ?? false;
+                          return { ...current, isAlways: checked, isAllDay,
+                            rememberedAllDay: checked ? current.isAllDay : current.rememberedAllDay,
+                            startAt: switchCalendarDateInput(current.startAt, isAllDay),
+                            endAt: switchCalendarDateInput(current.endAt, isAllDay, true) };
+                        });
+                      }}
                       className="size-4 accent-[#007a4d]"
                     />
                     상시

@@ -7,6 +7,9 @@ import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useOpenChannelTalk } from "@/features/channel-talk/channel-talk-provider";
+import { ResponseStateCard, responseStateActionClassName } from "./response-state-card";
+import { SurveyListAction, VoteListAction } from "./response-layout";
 
 interface SurveyParticipationNoticeProps {
   eligibility: SurveyParticipationEligibility;
@@ -29,7 +32,7 @@ const reasonLabels: Record<
     en: "Your academic status does not meet this survey's requirement.",
   },
   FEE_PAYER_REQUIRED: {
-    ko: "과비 납부가 확인되지 않았습니다.",
+    ko: "과비 납부 내역이 확인되지 않습니다.",
     en: "Your student-fee payment could not be verified.",
   },
 };
@@ -46,6 +49,7 @@ export function SurveyParticipationNotice({
   subject = "survey",
   description,
 }: SurveyParticipationNoticeProps) {
+  const openSupport = useOpenChannelTalk();
   if (
     eligibility.status !== "LOGIN_REQUIRED" &&
     eligibility.status !== "NOT_ELIGIBLE"
@@ -58,6 +62,31 @@ export function SurveyParticipationNotice({
     (reason): reason is Exclude<SurveyParticipationEligibilityReason, "LOGIN_REQUIRED"> =>
       reason !== "LOGIN_REQUIRED",
   );
+
+  const reasonList = !isLoginRequired && reasons.length > 0 ? (
+    <ul className={cn("survey-eligibility-reasons max-w-full space-y-1.5 rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-3 text-left text-sm font-normal leading-5 text-amber-900", compact ? "w-full" : "w-fit")}>
+      {reasons.map(reason => <li key={reason} className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="flex min-w-0 flex-1 items-start gap-2">
+          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <span className="break-keep">{getReasonLabel(reason, lang)}</span>
+        </span>
+        {reason === "FEE_PAYER_REQUIRED" ? <button type="button" onClick={openSupport}
+          className="ml-auto shrink-0 rounded-sm text-[length:var(--ui-text-body-sm-size)] font-medium text-amber-900 underline underline-offset-4 hover:text-amber-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-700">
+          {lang === "ko" ? "이미 납부하셨나요?" : "Already paid?"}
+        </button> : null}
+      </li>)}
+    </ul>
+  ) : null;
+
+  if (!compact) return <ResponseStateCard className="survey-participation-notice"
+    icon={isLoginRequired ? LockKeyhole : ShieldAlert} tone={isLoginRequired ? "neutral" : "warning"}
+    title={lang === "ko" ? isLoginRequired ? `로그인이 필요한 ${subject === "vote" ? "투표" : "설문"}입니다` : "참여 조건을 충족하지 않습니다" : isLoginRequired ? "Login required" : "You are not eligible to participate"}
+    description={description ?? (lang === "ko" ? isLoginRequired ? "참여하려면 KAIST 계정으로 로그인해 주세요." : "아래 사유로 참여할 수 없습니다." : isLoginRequired ? "Sign in with your KAIST account to participate." : "You cannot participate for the following reasons.")}
+    actions={isLoginRequired ? <Button asChild className={responseStateActionClassName}><Link to="/login">{lang === "ko" ? "로그인" : "Sign in"}</Link></Button> : undefined}
+    mobileAction={!isLoginRequired ? subject === "vote" ? <VoteListAction lang={lang} /> : <SurveyListAction lang={lang} /> : undefined}
+  >
+    {reasonList}
+  </ResponseStateCard>;
 
   return (
     <div
@@ -106,16 +135,7 @@ export function SurveyParticipationNotice({
         </div>
       </div>
 
-      {!isLoginRequired && reasons.length > 0 ? (
-        <ul className="space-y-1.5 rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-3 text-sm font-normal leading-5 text-amber-900">
-          {reasons.map((reason) => (
-            <li key={reason} className="flex items-start gap-2">
-              <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-              <span>{getReasonLabel(reason, lang)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {reasonList}
 
       {isLoginRequired ? (
         <Button asChild size={compact ? "sm" : "default"} className={cn(!compact && "w-full")}>

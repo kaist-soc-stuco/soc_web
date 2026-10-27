@@ -2,6 +2,7 @@ import type { KoreanHolidayRecord } from "@soc/contracts";
 import { localDate, msToDate } from "@soc/shared";
 import { createPortal } from "react-dom";
 import { useState, type CSSProperties } from "react";
+import { MapPin } from "lucide-react";
 
 import type { Language } from "@/hooks/use-language";
 import { formatShortDate } from "@/lib/date-display";
@@ -13,6 +14,8 @@ import {
 } from "@/lib/events-surveys";
 import {
   getCalendarEventStyles,
+  formatCalendarScheduleText,
+  getCalendarEventLocation,
   getEventLabelSegment,
   isSameDay,
   toDateKey,
@@ -148,6 +151,9 @@ function getCalendarEventKey(event: CalendarEvent) {
 }
 
 function formatCalendarEventRange(event: CalendarEvent, lang: Language) {
+  if (!event.sourceType || event.sourceType === "ARTICLE" || event.sourceType === "SURVEY" || event.sourceType === "VOTE") {
+    return formatCalendarScheduleText(event, lang, true);
+  }
   const start = event.startAt ?? event.date;
   const end = event.endAt ?? event.date;
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -175,7 +181,7 @@ function getTooltipPosition({ x, y }: Pick<CalendarTooltipState, "x" | "y">) {
     left: isMobile
       ? Math.max(8, Math.min(x + 14, viewportWidth - tooltipWidth - 8))
       : Math.min(x + 14, Math.max(8, viewportWidth - 304)),
-    top: Math.min(y + 18, Math.max(8, viewportHeight - 96)),
+    top: Math.max(8, Math.min(y + 18, viewportHeight - 184)),
   };
 }
 
@@ -251,7 +257,7 @@ export function EventsSurveysCalendarGrid({
   return (
     <div className="min-w-0 overflow-visible">
       <div className="min-w-0 w-full">
-        <div className="grid grid-cols-7 border-b border-slate-200 text-center text-[length:var(--ui-text-caption-size)] font-semibold text-slate-400">
+        <div className="grid grid-cols-7 border-b border-slate-200 pb-1 text-center text-[length:var(--ui-text-caption-size)] font-semibold text-slate-400">
           {weekHeaders.map((header, index) => (
             <div
               className={`flex min-h-6 items-center justify-center ${index === 0 ? "text-rose-500" : ""} ${
@@ -393,7 +399,7 @@ export function EventsSurveysCalendarGrid({
                         key={`${event.id}-${event.dateType}-${laneIndex}`}
                       >
                         <span
-                          aria-label={`${titleText}, ${formatCalendarEventRange(event, lang)}`}
+                          aria-label={[titleText, formatCalendarEventRange(event, lang), getCalendarEventLocation(event, lang)].filter(Boolean).join(", ")}
                           className={`group relative ${labelSegment ? "z-30" : "z-10"} flex h-5 min-h-5 items-center overflow-visible rounded-md px-2 py-0.5 text-[length:var(--ui-text-micro-size)] font-normal leading-4 transition-[background-color] ${cell.isCurrentMonth ? "" : "opacity-40"} focus:outline-none focus-visible:outline-none ${segmentWidthClass} ${
                             isStart || cellIndex % 7 === 0 ? "rounded-l-md" : "rounded-l-none"
                           } ${isEnd || isWeekEnd ? "rounded-r-md" : "rounded-r-none"} ${
@@ -416,10 +422,10 @@ export function EventsSurveysCalendarGrid({
                         >
                           {labelSegment ? (
                             <span
-                              className="pointer-events-none absolute inset-y-0 flex min-w-0 items-center justify-center overflow-hidden px-2"
+                              className="pointer-events-none absolute inset-y-0 flex min-w-0 items-center justify-center overflow-hidden px-1"
                               style={{
                                 left: `calc(-${labelSegment.offsetDays * 100}%)`,
-                                width: `calc(${labelSegment.dayCount * 100}% - var(--calendar-label-gap, 0.5rem))`,
+                                width: `${labelSegment.dayCount * 100}%`,
                               } satisfies CSSProperties}
                             >
                               <span className="calendar-bar-title min-w-0 max-w-full truncate whitespace-nowrap">
@@ -450,7 +456,7 @@ export function EventsSurveysCalendarGrid({
       {tooltip && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="calendar-tooltip pointer-events-none fixed z-[2000] flex max-w-[calc(100vw-1rem)] -translate-y-0 flex-col rounded-lg border border-slate-200 bg-white px-3 py-2 text-left shadow-md"
+              className="calendar-tooltip pointer-events-none fixed z-[2000] flex w-max max-w-[min(19rem,calc(100vw-1rem))] -translate-y-0 flex-col rounded-lg border border-slate-200 bg-white px-3 py-2 text-left shadow-md"
               data-calendar-tooltip="true"
               role="tooltip"
               style={getTooltipPosition(tooltip)}
@@ -469,9 +475,13 @@ export function EventsSurveysCalendarGrid({
                   {stripCalendarPrefix(tooltip.event.title)}
                 </span>
               </span>
-              <span className="mt-1 whitespace-nowrap text-[length:var(--ui-text-micro-size)] font-medium text-slate-400">
+              <span className="mt-1 whitespace-normal break-words text-[length:var(--ui-text-micro-size)] font-medium leading-4 text-slate-500">
                 {formatCalendarEventRange(tooltip.event, lang)}
               </span>
+              {getCalendarEventLocation(tooltip.event, lang) && <span className="mt-1 flex items-start gap-1 text-[length:var(--ui-text-micro-size)] leading-4 text-slate-500">
+                <MapPin aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+                <span className="min-w-0 break-words">{getCalendarEventLocation(tooltip.event, lang)}</span>
+              </span>}
             </div>,
             document.body,
           )

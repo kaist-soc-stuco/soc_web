@@ -13,6 +13,8 @@ export type EventsSurveysTab = "event" | "survey" | "calendar";
 export type EventsSurveysSortKey = "latest" | "deadline";
 export type EventsSurveysStateFilter =
   | "all"
+  | "active"
+  | "always"
   | ComputedSurveyState;
 export type UnifiedItemKind = PublicSurveyRecord["kind"] | "EVENT";
 
@@ -50,6 +52,8 @@ export interface UnifiedItem {
   viewerHasScrapped?: boolean;
   allowLike?: boolean;
   linkedSurveyState?: ComputedSurveyState | null;
+  linkedSurveyClosesAt?: string | null;
+  linkedSurveyAlwaysOpen?: boolean;
   linkedSurveyFeePayersOnly?: boolean;
   linkedSurveyMaxResponses?: number | null;
   linkedSurveyResponseCount?: number;
@@ -159,6 +163,97 @@ export const getCardPeriodText = (item: UnifiedItem, lang: "ko" | string = "ko")
 
   return formatEventCardPeriod(item.opensAt, item.closesAt, lang);
 };
+
+export function getDiscoveryPeriod(item: UnifiedItem, lang: string) {
+  if (item.isAlwaysOpen) return lang === "ko" ? "상시" : "Always open";
+  const labelDate = (value: string) => {
+    const date = isoToDate(value);
+    const parts = msToTimeObj(date.getTime(), EVENT_TIME_ZONE);
+    const current = msToTimeObj(nowMs(), EVENT_TIME_ZONE);
+    const year = parts.year === current.year ? "" : `${parts.year}${lang === "ko" ? "년 " : " "}`;
+    if (lang !== "ko") return year + new Intl.DateTimeFormat("en-US", { timeZone: EVENT_TIME_ZONE, month: "short", day: "numeric", weekday: "short" }).format(date);
+    const weekday = new Intl.DateTimeFormat("ko-KR", { timeZone: EVENT_TIME_ZONE, weekday: "short" }).format(date);
+    return `${year}${parts.month}월 ${parts.day}일 (${weekday})`;
+  };
+  if (!item.opensAt) return item.closesAt ? `${labelDate(item.closesAt)} ${lang === "ko" ? "마감" : "deadline"}` : lang === "ko" ? "일정 미정" : "Date to be announced";
+  const start = isoToDate(item.opensAt);
+  const end = item.closesAt ? isoToDate(item.closesAt) : null;
+  if (end && !isSameLocalDay(start, end)) return `${labelDate(item.opensAt)} – ${labelDate(item.closesAt!)}`;
+  return labelDate(item.opensAt);
+}
+
+export function getDiscoveryTime(item: UnifiedItem, lang: string, startOnly = false) {
+  if (item.isAlwaysOpen) return "";
+  const start = item.opensAt ? isoToDate(item.opensAt) : null;
+  const end = item.closesAt ? isoToDate(item.closesAt) : null;
+  if (start && end && isAllDayRange(start, end)) return lang === "ko" ? "종일" : "All day";
+  const format = (date: Date) => {
+    const { hour, minute } = msToTimeObj(date.getTime(), EVENT_TIME_ZONE);
+    const time = `${hour % 12 || 12}:${String(minute).padStart(2, "0")}`;
+    return lang === "ko" ? `${hour < 12 ? "오전" : "오후"} ${time}` : `${time} ${hour < 12 ? "AM" : "PM"}`;
+  };
+  if (!start) return end ? `${format(end)} ${lang === "ko" ? "마감" : "deadline"}` : "";
+  return !startOnly && end && format(start) !== format(end) ? `${format(start)} – ${format(end)}` : format(start);
+}
+
+export function getDiscoveryDateTime(item: UnifiedItem, lang: string) {
+  const period = getDiscoveryPeriod(item, lang);
+  const time = getDiscoveryTime(item, lang, true);
+  if (!time) return period;
+  if (time === "종일" || time === "All day") return `${period} · ${time}`;
+  const start = { ...item, opensAt: item.opensAt ?? item.closesAt, closesAt: null };
+  if (item.opensAt && item.closesAt && !isSameLocalDay(isoToDate(item.opensAt), isoToDate(item.closesAt))) {
+    const end = { ...item, opensAt: item.closesAt, closesAt: null };
+    return `${getDiscoveryPeriod(start, lang)} ${time} – ${getDiscoveryPeriod(end, lang)} ${getDiscoveryTime(end, lang)}`;
+  }
+  return `${getDiscoveryPeriod(start, lang)} ${time}`;
+}
+
+export function getDiscoveryBadge(item: UnifiedItem, lang: string, currentMs = nowMs()) {
+  const ko = lang === "ko";
+  const badge = (label: string, tone = "neutral", deadline?: string | null) => ({ label, tone, deadline: deadline ?? null });
+  const kstDay = (ms: number) => Math.floor((ms + 9 * 3600000) / 86400000);
+  const datedBadge = (label: string, target: string, tone = "neutral") => {
+    const days = kstDay(isoToMs(target)) - kstDay(currentMs);
+    const dDay = days === 0 ? "D-Day" : days > 0 ? `D-${days}` : `D+${-days}`;
+    return badge(`${label} ${dDay}`, tone, target);
+  };
+  const event = item.kind === "EVENT";
+  const full = event
+    ? Boolean(item.linkedSurveyMaxResponses && (item.linkedSurveyResponseCount ?? 0) >= item.linkedSurveyMaxResponses)
+    : Boolean(item.maxResponses && (item.responseCount ?? 0) >= item.maxResponses);
+  if (full && (!event || item.computedState !== "closed")) return badge(ko ? "정원 마감" : "At capacity", "closed");
+  if (item.computedState === "closed") {
+    const end = item.closesAt;
+    return end && !item.isAlwaysOpen && isoToMs(end) <= currentMs
+      ? datedBadge(ko ? event ? "행사 종료" : "응답 마감" : event ? "Event ended" : "Response deadline", end, "closed")
+      : badge(ko ? event ? "지난 행사" : "응답 중단" : event ? "Past event" : "Responses stopped", "closed");
+  }
+  const state = item.kind === "EVENT" ? item.linkedSurveyState : item.computedState;
+  const deadline = item.kind === "EVENT" ? item.linkedSurveyClosesAt : item.closesAt;
+  const alwaysOpen = item.kind === "EVENT" ? item.linkedSurveyAlwaysOpen : item.isAlwaysOpen;
+  if (event && state === "closed") {
+    return deadline && !alwaysOpen && isoToMs(deadline) <= currentMs
+      ? datedBadge(ko ? "신청 마감" : "Registration deadline", deadline, "closed")
+      : badge(ko ? "신청 중단" : "Registration stopped", "closed");
+  }
+  if (!event && state === "before_open" && item.opensAt) return datedBadge(ko ? "접수 시작" : "Opens", item.opensAt);
+  if ((state === "open" || state === "before_open") && deadline && !alwaysOpen) {
+    const end = isoToMs(deadline);
+    if (event) {
+      if (end <= currentMs) return badge(ko ? "신청 마감" : "Registration closed", "closed", deadline);
+      if (kstDay(end) === kstDay(currentMs)) return badge(ko ? "오늘 마감" : "Closes today", "today", deadline);
+      return datedBadge(ko ? "신청 마감" : "Registration deadline", deadline, "deadline");
+    }
+    return datedBadge(ko ? event ? "신청 마감" : "응답 마감" : event ? "Registration deadline" : "Response deadline", deadline,
+      end <= currentMs ? "closed" : end - currentMs < 3 * 86400000 ? "urgent" : "open");
+  }
+  if (state === "open") return badge(ko ? alwaysOpen ? "상시 접수" : "접수 중" : alwaysOpen ? "Always open" : "Open", "open");
+  if (event) return badge("");
+  const target = item.computedState === "open" ? item.closesAt : item.opensAt;
+  if (target) return datedBadge(ko ? item.computedState === "open" ? "행사 종료" : "행사" : item.computedState === "open" ? "Event ends" : "Event", target);
+  return badge(ko ? "일정 미정" : "Date to be announced");
+}
 
 export function formatEventCardPeriod(
   startValue: string | null,
@@ -302,6 +397,8 @@ export const buildUnifiedItems = (
       surveyId: event.surveyId ?? event.survey?.surveyId ?? null,
       linkedSurveyState:
         (linkedSurvey?.computedState as ComputedSurveyState | undefined) ?? null,
+      linkedSurveyClosesAt: event.survey?.closeAt ?? (linkedSurvey && "closesAt" in linkedSurvey ? linkedSurvey.closesAt : null) ?? null,
+      linkedSurveyAlwaysOpen: linkedSurvey?.isAlwaysOpen ?? false,
       linkedSurveyFeePayersOnly:
         event.survey
           ? event.survey.feeRequirementPolicy === "PAID_ONLY"
@@ -362,6 +459,10 @@ export const sortVisibleItems = (
           : true
         : stateFilter === "all"
           ? true
+          : stateFilter === "always"
+            ? Boolean(item.isAlwaysOpen)
+          : stateFilter === "active"
+            ? item.computedState !== "closed"
           : item.computedState === stateFilter,
     )
     .sort((a, b) => {

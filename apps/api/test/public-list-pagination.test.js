@@ -49,6 +49,7 @@ before(async () => {
     survey("future", { openAt: new Date(now + 72 * hour), closeAt: new Date(now + 73 * hour) }),
     survey("closed", { closeAt: new Date(now - hour) }),
     survey("stopped", { acceptingResponses: false, isAlwaysOpen: true }),
+    survey("always", { isAlwaysOpen: true, openAt: null, closeAt: null }),
     survey("linked", { connectedArticleId: created[0].articleId }),
     survey("hidden", { showOnList: false }),
     survey("draft", { lifecycleStatus: "DRAFT", isPublished: false }),
@@ -73,8 +74,8 @@ test("event pages are bounded, disjoint, sorted and exclude private/draft rows",
   assert.equal(second.items.length, 6);
   assert.equal(first.total, 15);
   assert.equal(new Set([...first.items, ...second.items].map(item => item.articleId)).size, 15);
-  assert.deepEqual(first.stateCounts, { all: 15, open: 13, before_open: 1, closed: 1 });
-  assert.deepEqual(first.items.slice(0, 2).map(item => item.titleKo), [`${prefix}-no-start`, `${prefix}-0`]);
+  assert.deepEqual(first.stateCounts, { all: 15, active: 14, open: 13, before_open: 1, closed: 1 });
+  assert.deepEqual(first.items.slice(0, 2).map(item => item.titleKo), [`${prefix}-0`, `${prefix}-1`]);
   const selected = await events(1, { state: "before_open" });
   assert.equal(selected.total, 1);
   assert.equal(selected.items[0].titleKo, `${prefix}-future`);
@@ -86,20 +87,26 @@ test("event date filters use Korean day boundaries and interval overlap before p
   const result = await events(1, { from: day, to: day });
   assert.equal(result.total, 12);
   assert.equal(result.items.length, 9);
-  assert.deepEqual(result.stateCounts, { all: 12, open: 12, before_open: 0, closed: 0 });
+  assert.deepEqual(result.stateCounts, { all: 12, active: 12, open: 12, before_open: 0, closed: 0 });
   assert.equal((await events(1, { from: "2100-01-02", to: "2100-01-01" })).total, 0);
 });
 
 test("survey pages filter linked, hidden and draft surveys and preserve state counts", opts, async () => {
   const first = await surveyPage(1), second = await surveyPage(2);
   assert.equal(first.items.length, 9);
-  assert.equal(second.items.length, 6);
-  assert.equal(first.total, 15);
-  assert.equal(new Set([...first.items, ...second.items].map(item => item.id)).size, 15);
-  assert.deepEqual(first.stateCounts, { all: 15, open: 12, before_open: 1, closed: 2 });
+  assert.equal(second.items.length, 7);
+  assert.equal(first.total, 16);
+  assert.equal(new Set([...first.items, ...second.items].map(item => item.id)).size, 16);
+  assert.deepEqual(first.stateCounts, { all: 16, active: 13, open: 12, before_open: 1, closed: 1, always: 2 });
   const closed = await surveyPage(1, { state: "closed" });
-  assert.equal(closed.total, 2);
+  assert.equal(closed.total, 1);
   assert.deepEqual(closed.stateCounts, first.stateCounts);
+  const always = await surveyPage(1, { state: "always" });
+  assert.equal(always.total, 2);
+  assert.ok(always.items.every(item => item.isAlwaysOpen));
+  const active = await surveyPage(1, { state: "active" });
+  assert.equal(active.total, 13);
+  assert.ok(active.items.every(item => !item.isAlwaysOpen));
   assert.equal((await surveyPage(1, { from: "2100-01-01" })).total, 0);
 });
 
@@ -107,4 +114,40 @@ test("public list query rejects invalid dates and states", () => {
   assert.throws(() => parsePublicListFilters({ state: "invalid" }), /invalid_public_list_filters/);
   assert.throws(() => parsePublicListFilters({ from: "2026-02-30" }), /invalid_public_list_filters/);
   assert.deepEqual(parsePublicListFilters({ state: "open", from: "2026-10-25" }), { state: "open", from: "2026-10-25" });
+  assert.deepEqual(parsePublicListFilters({ state: "active" }), { state: "active" });
+  assert.deepEqual(parsePublicListFilters({ state: "always" }), { state: "always" });
+});
+
+test("active events sort by registration deadline across pages and retain closed registration", opts, async () => {
+  const names = ["soon", "later", "walk-in", "always", "stopped", "past"];
+  const starts = [168, 72, 24, 48, 48, -48];
+  const created = await db.insert(schema.articles).values(names.map((name,i) => ({
+    boardId,authorUserId:userId,titleKo:`${prefix}-deadline-event-${name}`,contentKo:"합성 행사",
+    eventStartDate:new Date(now+starts[i]*hour),eventEndDate:new Date(now+(starts[i]+2)*hour),
+  }))).returning();
+  await db.insert(schema.surveys).values([0,1,3,4,5].map(i => ({
+    creatorId:userId,kind:"APPLICATION",titleKo:`${prefix}-registration-${names[i]}`,
+    connectedArticleId:created[i].articleId,lifecycleStatus:"PUBLISHED",isPublished:true,
+    acceptingResponses:i!==4,isAlwaysOpen:i===3,
+    openAt:new Date(now-72*hour),closeAt:i===3?null:new Date(now+(i===0?1:i===1?3:-1)*hour),
+  })));
+  const page = n => articles.listByBoardId(boardId,n,2,["PUBLIC"],`${prefix}-deadline-event`,undefined,false,"title",{state:"active"});
+  const first=await page(1),second=await page(2),third=await page(3);
+  assert.equal(first.total,5);
+  assert.equal(first.stateCounts.active,5);
+  assert.equal(first.stateCounts.closed,1);
+  assert.deepEqual([...first.items,...second.items,...third.items].map(row=>row.titleKo),names.slice(0,5).map(name=>`${prefix}-deadline-event-${name}`));
+  assert.equal(third.items[0].survey.computedState,"closed");
+});
+
+test("survey deadlines are sorted before pagination with always-open forms last", opts, async () => {
+  const names=["later","soon","always","closed","upcoming"];
+  await db.insert(schema.surveys).values(names.map((name,i)=>({
+    creatorId:userId,kind:"SURVEY",titleKo:`${prefix}-deadline-survey-${name}`,lifecycleStatus:"PUBLISHED",isPublished:true,
+    isAlwaysOpen:i===2,openAt:new Date(now+(i===4?1:-2)*hour),closeAt:i===2?null:new Date(now+[8,2,0,-1,5][i]*hour),
+  })));
+  const page=n=>surveys.findPublished({page:n,pageSize:2,query:`${prefix}-deadline-survey`,publicList:true,state:"active"});
+  const first=await page(1),second=await page(2);
+  assert.equal(first.total,3);
+  assert.deepEqual([...first.items,...second.items].map(row=>row.titleKo),["soon","upcoming","later"].map(name=>`${prefix}-deadline-survey-${name}`));
 });

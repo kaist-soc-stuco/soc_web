@@ -50,6 +50,7 @@ export interface SurveySettingsFormValues {
 }
 
 interface SurveySettingsFormProps {
+  rememberedAllDayRef?: { current: boolean };
   mode?: "all" | "basic" | "delivery";
   isOngoing?: boolean;
   articleSearchResults: ArticleListItem[];
@@ -288,6 +289,7 @@ function ArticleCombobox({
 }
 
 export function SurveySettingsForm({
+  rememberedAllDayRef,
   mode = "all",
   isOngoing = false,
   articleSearchResults,
@@ -317,6 +319,8 @@ export function SurveySettingsForm({
   const showOnCalendar = Boolean(watch("showOnCalendar"));
   const isAlwaysOpen = Boolean(watch("isAlwaysOpen"));
   const isAllDay = Boolean(watch("isAllDay"));
+  const localRememberedAllDay = useRef(false);
+  const rememberedAllDay = rememberedAllDayRef ?? localRememberedAllDay;
   const connectedArticleId = watch("connectedArticleId") ?? "";
   const openAt = watch("openAt") ?? "";
   const closeAt = watch("closeAt") ?? "";
@@ -355,9 +359,20 @@ export function SurveySettingsForm({
 
   useEffect(() => {
     if (!isAlwaysOpen) return;
+    if (isAllDay) setValue("isAllDay", false);
     setValue("openAt", "");
     setValue("closeAt", "");
-  }, [isAlwaysOpen, setValue]);
+  }, [isAlwaysOpen, isAllDay, setValue]);
+
+  const handleAlwaysOpenChange = (checked: boolean) => {
+    if (checked) {
+      rememberedAllDay.current = Boolean(watch("isAllDay"));
+      setValue("isAllDay", false, { shouldDirty: true });
+    } else {
+      setValue("isAllDay", rememberedAllDay.current, { shouldDirty: true });
+    }
+    setValue("isAlwaysOpen", checked, { shouldDirty: true });
+  };
 
   const toDateOnly = (value: string) =>
     /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : "";
@@ -497,10 +512,10 @@ export function SurveySettingsForm({
                   checked={isAlwaysOpen}
                   disabled={isOngoing}
                   label="상시 설문"
-                  onChange={(checked) => setValue("isAlwaysOpen", checked, { shouldDirty: true })}
+                  onChange={handleAlwaysOpenChange}
                 />
                 <SettingCheckbox
-                  checked={isAllDay}
+                  checked={isAllDay && !isAlwaysOpen}
                   disabled={isOngoing || isAlwaysOpen}
                   label="종일"
                   onChange={handleAllDayChange}

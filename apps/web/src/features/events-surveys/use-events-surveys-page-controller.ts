@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery, type InfiniteData } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import type { ArticleEngagementKind, KoreanHolidayRecord, PublicListStateCounts } from "@soc/contracts";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
@@ -17,9 +17,8 @@ import {
   type UnifiedItem,
 } from "@/lib/events-surveys";
 import { buildCalendarGrid } from "./events-surveys-calendar-utils";
-import { useMediaQuery } from "@/hooks/use-media-query";
 
-const PUBLIC_ITEMS_PAGE_SIZE = 9;
+const PUBLIC_ITEMS_PAGE_SIZE = 12;
 type PublicItemsPage = {
   items: UnifiedItem[];
   total: number;
@@ -42,18 +41,16 @@ export function useEventsSurveysPageController({
   lang: string;
   selectedParam: string | null;
 }) {
-  const isMobile = useMediaQuery("(max-width: 767px)");
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
   const [params, setParams] = useSearchParams();
-  const stateFilter: EventsSurveysStateFilter = (["all", "before_open", "open", "closed"] as const).find(value => value === params.get("state")) ?? "all";
+  const requestedState = params.get("state");
+  const stateFilter: EventsSurveysStateFilter = requestedState === "all" || requestedState === "closed" || (requestedState === "always" && currentTab === "survey") ? requestedState : "active";
   const itemQuery = params.get("q") ?? "";
   const dateFrom = params.get("from") ?? "";
   const dateTo = params.get("to") ?? "";
-  const requestedPage = Number(params.get("page"));
-  const requestedCurrentPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const updateFilters = useCallback((changes: Record<string, string>, preserveScroll = false, flushSync = false) => {
     setParams(previous => {
       const next = new URLSearchParams(previous);
@@ -63,17 +60,10 @@ export function useEventsSurveysPageController({
       return next;
     }, { replace: true, state: { preserveScroll }, flushSync });
   }, [setParams]);
-  const setStateFilter = (value: EventsSurveysStateFilter) => updateFilters({ state: value === "all" ? "" : value, page: "" });
+  const setStateFilter = (value: EventsSurveysStateFilter) => updateFilters({ state: value === "active" ? "" : value, page: "", ...(value === "always" ? { from: "", to: "" } : {}) }, true);
   const setItemQuery = (value: string) => updateFilters({ q: value, page: "" }, true);
   const setDateRange = ({ from, to }: { from: string; to: string }) => updateFilters({ from, to, page: "" }, true, true);
-  const setListFilters = ({ state, from, to }: { state: EventsSurveysStateFilter; from: string; to: string }) => updateFilters({ state: state === "all" ? "" : state, from, to, page: "" }, true, true);
-  const setCurrentPage = (page: number) => {
-    if (!isMobile) { updateFilters({ page: page > 1 ? String(page) : "" }); return; }
-    if (listQuery.isFetchingNextPage) return;
-    void listQuery.fetchNextPage().then(result => {
-      if (result.isError) toast({ type: "error", message: lang === "ko" ? "추가 목록을 불러오지 못했습니다. 다시 시도해 주세요." : "Could not load more items. Please try again." });
-    });
-  };
+  const setListFilters = ({ state, from, to }: { state: EventsSurveysStateFilter; from: string; to: string }) => updateFilters({ state: state === "active" ? "" : state, from: state === "always" ? "" : from, to: state === "always" ? "" : to, page: "" }, true, true);
   const resetListFilters = () => updateFilters({ q: "", from: "", to: "", state: "", page: "" });
   const [currentDate, setCurrentDate] = useState(() => {
     const selected = parseSelectedCalendarDate(selectedParam);
@@ -96,6 +86,7 @@ export function useEventsSurveysPageController({
     Record<string, Partial<UnifiedItem>>
   >({});
   const { data: session } = useCurrentSession();
+  const listViewerKey = session?.draftNamespace ?? session?.userId ?? "anonymous";
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -129,10 +120,12 @@ export function useEventsSurveysPageController({
   const calendarRangeFrom = calendarRange.from.toISOString();
   const calendarRangeTo = calendarRange.to.toISOString();
 
-  const listQuery = useInfiniteQuery({
-    queryKey: ["events-surveys", "list", currentTab, session?.draftNamespace ?? session?.userId ?? "anonymous", session?.permission,
-      itemQuery.trim(), stateFilter, dateFrom, dateTo, isMobile ? "mobile" : requestedCurrentPage],
-    initialPageParam: isMobile ? 1 : requestedCurrentPage,
+  const listQuery = useInfiniteQuery<PublicItemsPage, Error, InfiniteData<PublicItemsPage>, readonly unknown[], number>({
+    queryKey: ["events-surveys", "list", currentTab, listViewerKey, session?.permission,
+      itemQuery.trim(), stateFilter, dateFrom, dateTo],
+    initialPageParam: 1,
+    placeholderData: (previous, previousQuery) => previousQuery?.queryKey[2] === currentTab
+      && previousQuery.queryKey[3] === listViewerKey && previousQuery.queryKey[4] === session?.permission ? previous : undefined,
     queryFn: async ({ pageParam: page, signal }): Promise<PublicItemsPage> => {
       const filters = { page, publicList: true, state: stateFilter, from: dateFrom || undefined, to: dateTo || undefined, signal };
       if (currentTab === "survey") {
@@ -226,21 +219,16 @@ export function useEventsSurveysPageController({
     [calendarEventsQuery.data?.items, lang],
   );
 
-  const currentPage = isMobile ? listQuery.data?.pages.at(-1)?.page ?? 1 : requestedCurrentPage;
   const totalItems = listQuery.data?.pages[0]?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalItems / PUBLIC_ITEMS_PAGE_SIZE));
-
-  useEffect(() => {
-    if (!isMobile && listQuery.isSuccess && !listQuery.isFetching && currentTab !== "calendar" && currentPage > totalPages) {
-      updateFilters({ page: totalPages > 1 ? String(totalPages) : "" }, true);
-    }
-  }, [isMobile, currentPage, currentTab, listQuery.isSuccess, listQuery.isFetching, totalPages, updateFilters]);
+  const fetchNextPage = listQuery.fetchNextPage;
+  const loadMore = useCallback(() => { void fetchNextPage(); }, [fetchNextPage]);
 
   const visibleItems = useMemo(() => {
     return (listQuery.data?.pages ?? []).flatMap(page => page.items).map(item => ({ ...item, ...(engagementOverrides[item.id] ?? {}) }));
   }, [listQuery.data, engagementOverrides]);
 
-  const stateCounts = listQuery.data?.pages[0]?.stateCounts ?? { all: 0, before_open: 0, open: 0, closed: 0 };
+  const counts = listQuery.data?.pages[0]?.stateCounts;
+  const stateCounts = counts ? { ...counts, always: counts.always ?? 0, active: counts.active ?? counts.before_open + counts.open } : { all: 0, active: 0, before_open: 0, open: 0, closed: 0, always: 0 };
 
   const handleSetEngagement = async (
     item: UnifiedItem,
@@ -368,12 +356,15 @@ export function useEventsSurveysPageController({
     retry,
     selectedDate,
     calendarQuery,
-    currentPage,
+    hasMore: listQuery.hasNextPage && !listQuery.isPlaceholderData,
+    loadingMore: listQuery.isFetchingNextPage,
+    loadMoreError: listQuery.isFetchNextPageError,
+    isListUpdating: listQuery.isPlaceholderData && listQuery.isFetching,
+    loadMore,
     engagementSubmitting,
     handleSetEngagement,
     setCurrentDate: handleCurrentDateChange,
     setCalendarQuery,
-    setCurrentPage,
     setDateRange,
     setListFilters,
     resetListFilters,
@@ -384,7 +375,6 @@ export function useEventsSurveysPageController({
     stateCounts,
     stateFilter,
     totalItems,
-    totalPages,
     visibleItems,
   };
 }

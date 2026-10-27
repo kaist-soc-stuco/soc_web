@@ -91,7 +91,6 @@ export function CommentSection({
   replyTargetId,
   replyText,
 }: CommentSectionProps) {
-  const location = useLocation();
   const topLevelComments = comments.filter((comment) => !comment.parentCommentId);
   const repliesByParent = new Map<string, CommentItem[]>();
   comments
@@ -210,11 +209,7 @@ export function CommentSection({
       ) : null}
 
       <div className={cn("mt-3", hideComposerOnMobile && "hidden md:block")}>
-        {!isAuthenticated ? <Button asChild variant="outline" className="w-full justify-center">
-          <Link to="/login" onClick={() => rememberAuthReturnPath(`${location.pathname}${location.search}${location.hash}`)}>
-            {lang === "ko" ? "로그인하고 댓글 쓰기" : "Sign in to write a comment"}
-          </Link>
-        </Button> : <CommentComposer
+        {!isAuthenticated ? <CommentLoginInput lang={lang} /> : <CommentComposer
           ariaLabel={lang === "ko" ? "댓글 입력" : "Comment input"}
           disabled={!isAuthenticated || !canCreateComment}
           isSubmitting={commentSubmitting}
@@ -559,6 +554,16 @@ function CommentRow({
       </div>
     </article>
   );
+}
+
+export function CommentLoginInput({ lang, mobile = false, loginRef }: { lang: string; mobile?: boolean; loginRef?: Ref<HTMLAnchorElement> }) {
+  const location = useLocation();
+  const placeholder = lang === "ko" ? "로그인 후 댓글을 작성할 수 있습니다" : "Sign in to write a comment";
+  return <div className="relative w-full" data-comment-login-input>
+    <UiTextarea autoResize={false} rows={1} wrap="off" readOnly tabIndex={-1} aria-hidden="true" value="" placeholder={placeholder} className={cn(COMMENT_TEXTAREA_CLASS, "pointer-events-none min-h-[var(--ui-control-height-mobile)] overflow-hidden pr-14 font-medium")} />
+    {mobile && <span aria-hidden="true" className="pointer-events-none absolute bottom-0 right-0.5 flex size-11 items-center justify-center text-brand-primary opacity-50"><Send className="size-5" /></span>}
+    <Link ref={loginRef} to="/login" aria-label={placeholder} className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-brand-primary focus-visible:outline-offset-2" onClick={() => rememberAuthReturnPath(`${location.pathname}${location.search}${location.hash}`)} />
+  </div>;
 }
 
 export function CommentComposer({

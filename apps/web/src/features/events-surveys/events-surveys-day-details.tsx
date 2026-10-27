@@ -2,13 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, ChevronRight, EyeOff, MoreHorizontal, Pencil } from "lucide-react";
+import { CalendarDays, ChevronRight, EyeOff, MapPin, MoreHorizontal, Pencil } from "lucide-react";
 import { MobileEmptyState } from "@/components/ui/mobile-empty-state";
 
 import type { Language } from "@/hooks/use-language";
-import { formatNumericDate } from "@/lib/date-display";
 import { stripCalendarPrefix, type CalendarEvent } from "@/lib/events-surveys";
-import { getCalendarEventStyles } from "./events-surveys-calendar-utils";
+import { formatCalendarScheduleText, getCalendarEventLocation, getCalendarEventStyles } from "./events-surveys-calendar-utils";
 import { AdminActionMenuDivider, AdminActionMenuItem, AdminActionMenuPanel } from "@/components/ui/admin-action-menu";
 import { IconButton } from "@/components/ui/icon-button";
 import { useToast } from "@/components/ui/toast";
@@ -143,7 +142,8 @@ export function EventsSurveysDayDetails({
               event.category,
             );
             const shortTitle = stripCalendarPrefix(event.title);
-            const scheduleText = formatScheduleText(event, lang);
+            const scheduleText = formatCalendarScheduleText(event, lang);
+            const location = getCalendarEventLocation(event, lang);
             const eventHref = getCalendarEventHref(event);
             const showAdminMenu =
               !eventHref &&
@@ -156,11 +156,11 @@ export function EventsSurveysDayDetails({
               <>
                 <div className="calendar-agenda-event flex items-start gap-2.5">
                   <span
-                    className={`calendar-agenda-marker mt-0.5 h-7 w-[3px] shrink-0 rounded-full ${style.bullet}`}
+                    className={`calendar-agenda-marker my-0.5 w-[3px] shrink-0 self-stretch rounded-full ${style.bullet}`}
                     aria-hidden="true"
                   />
                   <div className="min-w-0 flex-1">
-                    <h4 className="break-words text-[0.9375rem] font-medium leading-5 text-slate-800">
+                    <h4 className="break-words text-[0.9375rem] font-medium leading-5 tracking-tight text-slate-800">
                       {shortTitle}
                     </h4>
                     {event.description && (
@@ -168,9 +168,13 @@ export function EventsSurveysDayDetails({
                         {event.description}
                       </p>
                     )}
-                    <div className="mt-1.5 flex items-center gap-2 text-xs font-normal text-slate-600 select-none">
+                    <div className="mt-2 flex items-center gap-2 text-xs font-normal text-slate-600 select-none">
                       <span className="min-w-0 break-words whitespace-normal">{scheduleText}</span>
                     </div>
+                    {location && <div className="mt-1 flex items-start gap-1 text-xs font-normal leading-4 text-slate-600">
+                      <MapPin aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+                      <span className="min-w-0 break-words">{location}</span>
+                    </div>}
                   </div>
                   {eventHref ? (
                     <ChevronRight
@@ -232,55 +236,4 @@ function getCalendarEventHref(event: CalendarEvent) {
     return `/survey/${event.surveyId}`;
   }
   return null;
-}
-
-function formatDetailDate(date: Date, lang: Language) {
-  const weekday = new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", {
-    weekday: "short",
-  }).format(date);
-  return `${formatNumericDate(date)} (${weekday})`;
-}
-
-function formatDetailTime(date: Date, lang: Language) {
-  return new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-}
-
-function formatScheduleText(event: CalendarEvent, lang: Language) {
-  const startDate = event.startAt ?? event.date;
-  const endDate = event.endAt ?? event.date;
-  const sameDay = isSameLocalDay(startDate, endDate);
-  const startText = formatDetailDate(startDate, lang);
-  const endText = formatDetailDate(endDate, lang);
-
-  if (event.isAlways) {
-    return lang === "ko" ? "상시" : "Always";
-  }
-
-  if (event.isAllDay || event.sourceType === "KAIST_ACADEMIC") {
-    return sameDay
-      ? (lang === "ko" ? "하루 종일" : "All day")
-      : `${startText} ～ ${endText} ${lang === "ko" ? "하루 종일" : "All day"}`;
-  }
-
-  const startTime = formatDetailTime(startDate, lang);
-  const endTime = formatDetailTime(endDate, lang);
-  if (sameDay) {
-    return startTime === endTime
-      ? `${startText} ${startTime}`
-      : `${startText} ${startTime} ～ ${endTime}`;
-  }
-
-  return `${startText} ${startTime} ～ ${endText} ${endTime}`;
-}
-
-function isSameLocalDay(first: Date, second: Date) {
-  return (
-    first.getFullYear() === second.getFullYear() &&
-    first.getMonth() === second.getMonth() &&
-    first.getDate() === second.getDate()
-  );
 }

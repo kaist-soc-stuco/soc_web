@@ -278,6 +278,13 @@ export function useSearchPageController() {
     loading,
     query,
     retrySearch: () => setRetryKey((current) => current + 1),
+    resetSearch: () => {
+      setInputValue("");
+      const next = new URLSearchParams(searchParams);
+      next.delete("q");
+      next.delete("type");
+      setSearchParams(next, { replace: true, state: { preserveScroll: true } });
+    },
     setInputValue,
     setFilter,
     searchBy,

@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { AdminActionMenuPanel } from "@/components/ui/admin-action-menu";
 import { useSearchParams } from "react-router-dom";
@@ -13,6 +14,7 @@ import {
 } from "@/features/roadmap/roadmap-data";
 import { useLocalizedSiteContent } from "@/features/site-content/site-content";
 import { useLanguage } from "@/hooks/use-language";
+import "@/features/roadmap/roadmap-page.css";
 
 export function RoadmapPage() {
   const { lang } = useLanguage();
@@ -24,21 +26,24 @@ export function RoadmapPage() {
       ? normalizeRoadmapCourseCode(selectedCourseParam)
       : null;
 
-  const updateSelectedCourse = (courseCode: string | null) => {
-    const next = new URLSearchParams(searchParams);
-    if (courseCode) next.set("course", courseCode);
-    else next.delete("course");
-    setSearchParams(next, { replace: true, state: { preserveScroll: window.matchMedia("(max-width: 767px)").matches } });
-  };
+  const updateSelectedCourse = useCallback((courseCode: string | null) => {
+    setSearchParams(current => {
+      const next = new URLSearchParams(current);
+      if (courseCode) next.set("course", courseCode);
+      else next.delete("course");
+      return next;
+    }, { replace: true, state: { preserveScroll: window.matchMedia("(max-width: 767px)").matches } });
+  }, [setSearchParams]);
 
   return (
-    <PageShell className="mobile-white-page overflow-x-hidden">
+    <PageShell className="roadmap-page mobile-white-page overflow-x-hidden">
 
-      <PageMain>
+      <PageMain className="roadmap-page-main">
         <PageHeader
+          className="roadmap-page-heading"
           title={title}
           titleId="roadmap-page-title"
-          containerClassName="mobile-roadmap-heading max-w-[100rem]"
+          containerClassName="mobile-roadmap-heading max-w-[100rem] sm:items-center"
           actions={
             <>
             <div className="md:hidden">
@@ -48,29 +53,35 @@ export function RoadmapPage() {
                   <AdminActionMenuPanel className="!w-52">
                     <DropdownMenu.Item asChild><a className="flex min-h-11 items-center justify-between gap-2 rounded-md px-3 text-sm text-slate-700 outline-none data-[highlighted]:bg-slate-50" href={ROADMAP_SOURCE.url} target="_blank" rel="noreferrer">{lang === "ko" ? "원본 로드맵" : "Source roadmap"}<ExternalLink className="size-4" /></a></DropdownMenu.Item>
                     <DropdownMenu.Item asChild><a className="flex min-h-11 items-center justify-between gap-2 rounded-md px-3 text-sm text-slate-700 outline-none data-[highlighted]:bg-slate-50" href="https://bulletin.kaist.ac.kr/" target="_blank" rel="noreferrer">{lang === "ko" ? "KAIST 학사요람" : "Academic Bulletin"}<ExternalLink className="size-4" /></a></DropdownMenu.Item>
+                    <DropdownMenu.Item asChild><a className="flex min-h-11 items-center justify-between gap-2 rounded-md px-3 text-sm text-slate-700 outline-none data-[highlighted]:bg-slate-50" href="https://erp.kaist.ac.kr" target="_blank" rel="noopener noreferrer">KAIST ERP<ExternalLink className="size-4" /></a></DropdownMenu.Item>
                   </AdminActionMenuPanel>
                 </DropdownMenu.Content></DropdownMenu.Portal>
               </DropdownMenu.Root>
             </div>
-            <div className="hidden flex-wrap items-center gap-x-5 gap-y-1 md:flex">
-            <a
+            <div className="hidden flex-wrap items-center gap-1 md:flex">
+            <Button asChild variant="ghost" size="sm"><a
               href={ROADMAP_SOURCE.url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-10 shrink-0 items-center gap-1.5 text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-500 transition-colors hover:text-kaist-darkgreen hover:underline"
+              className="text-slate-500"
             >
               {lang === "ko" ? "2025.04.22 원본 로드맵" : "Source roadmap · 2025.04.22"}
               <ExternalLink aria-hidden="true" className="size-3.5" />
-            </a>
-            <a href="https://bulletin.kaist.ac.kr/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-500 transition-colors hover:text-kaist-darkgreen hover:underline">
+            </a></Button>
+            <span aria-hidden="true" className="h-3.5 w-px shrink-0 bg-slate-300" />
+            <Button asChild variant="ghost" size="sm"><a href="https://bulletin.kaist.ac.kr/" target="_blank" rel="noopener noreferrer" className="text-slate-500">
               {lang === "ko" ? "KAIST 학사요람" : "KAIST Academic Bulletin"}<ExternalLink aria-hidden="true" className="size-3.5" />
-            </a>
+            </a></Button>
+            <span aria-hidden="true" className="h-3.5 w-px shrink-0 bg-slate-300" />
+            <Button asChild variant="ghost" size="sm"><a href="https://erp.kaist.ac.kr" target="_blank" rel="noopener noreferrer" className="text-slate-500">
+              KAIST ERP<ExternalLink aria-hidden="true" className="size-3.5" />
+            </a></Button>
             </div>
             </>
           }
         />
 
-        <PageContainer className="max-w-[100rem] pb-16">
+        <PageContainer className="roadmap-page-body max-w-[100rem] pb-16">
           <RoadmapGraph
             lang={lang}
             selectedCourseCode={selectedCourseCode}

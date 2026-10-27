@@ -3,7 +3,7 @@ import type { KoreanHolidayRecord } from "@soc/contracts";
 import { localDate, nowDate } from "@soc/shared";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FilterSheet } from "@/components/ui/filter-sheet";
+import { DatePicker } from "@/components/ui/date-picker";
 
 import type { Language } from "@/hooks/use-language";
 import { formatShortDateWithWeekday } from "@/lib/date-display";
@@ -98,9 +98,9 @@ export function EventsSurveysCalendar({
     holidays={holidays} isFetching={isFetching} />;
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-4">
-        <div className="flex h-full min-w-0 flex-col rounded-lg border border-card-border-subtle bg-white px-4 py-3 sm:px-5 sm:py-3 lg:col-span-3">
-          <div className="calendar-header mb-1 grid min-w-0 grid-cols-1 items-center gap-1.5 border-b border-slate-200 pb-1 select-none sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[minmax(0,1fr)_calc(25%+2rem)]">
+        <div className="flex h-full min-w-0 flex-col rounded-lg border border-card-border-subtle bg-white px-4 py-3 sm:px-5 sm:py-3">
+          <div className="calendar-header grid min-w-0 grid-cols-1 items-center gap-1.5 pb-1 select-none sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
             <div
               className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--ui-text-caption-size)] font-semibold text-slate-500"
               aria-label={lang === "ko" ? "캘린더 공급원 안내" : "Calendar sources"}
@@ -190,9 +190,7 @@ export function EventsSurveysCalendar({
 function MobileWeekAgenda({ calendarEvents, lang, onCurrentDateChange, onSelectedDateChange, selectedDate,
   holidays, isFetching }: EventsSurveysCalendarProps) {
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const dateValue = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  const [pickerMonth, setPickerMonth] = useState(localDate(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
   const weekStart = localDate(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - selectedDate.getDay());
   const days = Array.from({ length: 7 }, (_, index) => localDate(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + index));
   const weekdays = lang === "ko" ? ["일", "월", "화", "수", "목", "금", "토"] : ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -213,7 +211,7 @@ function MobileWeekAgenda({ calendarEvents, lang, onCurrentDateChange, onSelecte
     <div className="mobile-calendar-navigation flex items-center justify-between gap-1">
       <div className="mobile-calendar-month-group">
       <IconButton tone="outline" className="mobile-calendar-step" aria-label={lang === "ko" ? "이전 달" : "Previous month"} onClick={() => moveMonth(-1)}><ChevronLeft /></IconButton>
-      <h2 className="min-w-0 text-lg font-semibold text-slate-900"><Button variant="outline" className="mobile-calendar-month-trigger" aria-haspopup="dialog" aria-expanded={datePickerOpen} onClick={() => { setPickerMonth(localDate(selectedDate.getFullYear(), selectedDate.getMonth(), 1)); setDatePickerOpen(true); }}><span>{formatMonthTitle(selectedDate.getFullYear(), selectedDate.getMonth(), lang)}</span><ChevronDown className="size-4 shrink-0" aria-hidden="true" /></Button></h2>
+      <h2 className="min-w-0 text-lg font-semibold text-slate-900"><DatePicker value={selectedDate} onChange={selectDate} lang={lang}><Button type="button" variant="outline" className="mobile-calendar-month-trigger"><span>{formatMonthTitle(selectedDate.getFullYear(), selectedDate.getMonth(), lang)}</span><ChevronDown className="size-4 shrink-0" aria-hidden="true" /></Button></DatePicker></h2>
       <IconButton tone="outline" className="mobile-calendar-step" aria-label={lang === "ko" ? "다음 달" : "Next month"} onClick={() => moveMonth(1)}><ChevronRight /></IconButton>
       </div>
       <Button variant="outline" className="mobile-calendar-today" onClick={() => selectDate(nowDate())}>{lang === "ko" ? "오늘" : "Today"}</Button>
@@ -240,21 +238,6 @@ function MobileWeekAgenda({ calendarEvents, lang, onCurrentDateChange, onSelecte
       <h3 className="text-base font-semibold text-slate-900">{selectedDateStr}</h3>
       {isFetching && events.length === 0 ? <div className="min-h-40" aria-busy="true" /> : <EventsSurveysDayDetails events={events} lang={lang} selectedDateStr={selectedDateStr} embedded />}
     </div>
-    <FilterSheet className="mobile-filter-sheet mobile-date-picker" bodyClassName="mobile-date-picker-body" open={datePickerOpen} onClose={() => setDatePickerOpen(false)} title={lang === "ko" ? "날짜 선택" : "Choose a date"} closeLabel={lang === "ko" ? "날짜 선택 닫기" : "Close date picker"} footer={<Button variant="outline" onClick={() => { selectDate(nowDate()); setDatePickerOpen(false); }}>{lang === "ko" ? "오늘로 이동" : "Go to today"}</Button>}>
-      <div className="mobile-date-picker-navigation">
-        <IconButton aria-label={lang === "ko" ? "이전 달" : "Previous month"} onClick={() => setPickerMonth(previous => localDate(previous.getFullYear(), previous.getMonth() - 1, 1))}><ChevronLeft /></IconButton>
-        <h3 aria-live="polite">{formatMonthTitle(pickerMonth.getFullYear(), pickerMonth.getMonth(), lang)}</h3>
-        <IconButton aria-label={lang === "ko" ? "다음 달" : "Next month"} onClick={() => setPickerMonth(previous => localDate(previous.getFullYear(), previous.getMonth() + 1, 1))}><ChevronRight /></IconButton>
-      </div>
-      <div className="mobile-date-picker-grid" aria-label={formatMonthTitle(pickerMonth.getFullYear(), pickerMonth.getMonth(), lang)}>
-        {weekdays.map((day, index) => <span key={day} className="mobile-date-picker-weekday" data-tone={index === 0 ? "red" : index === 6 ? "blue" : undefined}>{day}</span>)}
-        {buildCalendarGrid(pickerMonth.getFullYear(), pickerMonth.getMonth()).map(cell => {
-          const holiday = holidayMap.get(toDateKey(cell.date));
-          const holidayName = holiday?.isHoliday ? getKoreanHolidayName(holiday.dateName, lang) : "";
-          const tone = holiday?.isHoliday || cell.date.getDay() === 0 ? "red" : cell.date.getDay() === 6 ? "blue" : undefined;
-          return <button key={dateValue(cell.date)} type="button" data-date={dateValue(cell.date)} data-outside-month={!cell.isCurrentMonth} data-tone={tone} aria-pressed={dateValue(cell.date) === dateValue(selectedDate)} aria-current={dateValue(cell.date) === dateValue(nowDate()) ? "date" : undefined} aria-label={`${formatShortDateWithWeekday(cell.date, lang)}${holidayName ? `, ${holidayName}` : ""}`} onClick={() => { selectDate(cell.date); setDatePickerOpen(false); }}>{cell.day}</button>;
-        })}
-      </div>
-    </FilterSheet>
+
   </section>;
 }

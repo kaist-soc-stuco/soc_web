@@ -15,7 +15,7 @@ export function Footer() {
       <div className="home-footer-inner mx-auto w-full max-w-7xl px-4 md:px-8">
         <div className="home-footer-brand">
           <Link to="/about#intro" className="rounded-sm transition-colors hover:text-brand-primary">
-            {lang === "ko" ? "KAIST 전산학부 집행위원회" : "KAIST SoC Executive Committee"}
+            {lang === "ko" ? "KAIST 전산학부 집행위원회" : "KAIST SoC Student Council"}
           </Link>
           <div className="home-footer-contact">
             <span className="home-footer-address">

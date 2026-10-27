@@ -2,9 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useLanguage } from "@/hooks/use-language";
-import { useMediaQuery } from "@/hooks/use-media-query";
 
-export const ABOUT_SECTION_IDS = ["intro", "work", "people", "partnership"] as const;
+export const ABOUT_SECTION_IDS = ["intro", "programs", "work", "people", "partnership"] as const;
 export type AboutSectionId = (typeof ABOUT_SECTION_IDS)[number];
 
 const LEGACY_ABOUT_SECTIONS: Record<string, AboutSectionId> = {
@@ -20,6 +19,7 @@ function isAboutSectionId(value: string | null | undefined): value is AboutSecti
 
 function resolveAboutSectionId(value: string | null | undefined): AboutSectionId | null {
   if (!value) return null;
+  if (["program-life", "program-careers", "program-connections"].includes(value)) return "programs";
   if (isAboutSectionId(value)) return value;
   return LEGACY_ABOUT_SECTIONS[value] ?? null;
 }
@@ -37,6 +37,10 @@ function getSectionTargetId(sectionId: AboutSectionId) {
 
 function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+export function scrollToAboutElement(target: HTMLElement, behavior: ScrollBehavior = "smooth") {
+  window.scrollTo({ top: sectionScrollTop(target), behavior: prefersReducedMotion() ? "instant" : behavior });
 }
 
 function sectionScrollTop(target: HTMLElement) {
@@ -59,7 +63,6 @@ export function useAboutPageController() {
   const [searchParams] = useSearchParams();
   const legacyTab = searchParams.get("tab");
   const { lang } = useLanguage();
-  const isMobile = useMediaQuery("(width < 768px)");
   const requestedSection = useMemo(() => {
     const hashSection = location.hash.replace(/^#/, "");
     const resolvedHash = resolveAboutSectionId(hashSection);
@@ -68,17 +71,12 @@ export function useAboutPageController() {
   }, [legacyTab, location.hash]);
 
   const [activeSection, setActiveSection] = useState<AboutSectionId>(requestedSection ?? "intro");
+  const activeSectionRef = useRef(activeSection);
   const suppressScrollSpyUntilRef = useRef(
     requestedSection ? performance.now() + 2500 : 0,
   );
 
   const scrollToSection = useCallback((sectionId: AboutSectionId, behavior: ScrollBehavior = "smooth") => {
-    if (isMobile) {
-      setActiveSection(sectionId);
-      replaceSectionHash(sectionId);
-      window.scrollTo({ top: 0, behavior: "instant" });
-      return;
-    }
     const target = document.getElementById(getSectionTargetId(sectionId));
     if (!target) return;
     // Native smooth-scroll duration grows with travel distance. Keep the
@@ -86,22 +84,16 @@ export function useAboutPageController() {
     // requested hash with an intermediate section on the way down.
     suppressScrollSpyUntilRef.current = performance.now() + (behavior === "smooth" ? 1800 : 120);
     setActiveSection(sectionId);
+    activeSectionRef.current = sectionId;
     replaceSectionHash(sectionId);
-    window.scrollTo({ top: sectionScrollTop(target), behavior: prefersReducedMotion() ? "auto" : behavior });
-  }, [isMobile]);
+    scrollToAboutElement(target, behavior);
+  }, []);
 
   useEffect(() => {
     if (!requestedSection) return;
 
-    if (isMobile) {
-      setActiveSection(requestedSection);
-      if (legacyTab) navigate(`/about#${requestedSection === "work" ? "pledges" : requestedSection}`, { replace: true });
-      window.scrollTo({ top: 0, behavior: "instant" });
-      return;
-    }
-
     if (legacyTab) {
-      navigate(`/about#${requestedSection}`, { replace: true });
+      navigate(`/about#${getSectionTargetId(requestedSection)}`, { replace: true });
     } else if (!resolveAboutSectionId(location.hash.replace(/^#/, ""))) {
       replaceSectionHash(requestedSection);
     }
@@ -110,7 +102,7 @@ export function useAboutPageController() {
     let userInterrupted = false;
     let animationFrame = 0;
     const correctionDeadline = performance.now() + 2200;
-    const target = document.getElementById(getSectionTargetId(requestedSection));
+    const target = document.getElementById(location.hash.replace(/^#/, "")) ?? document.getElementById(getSectionTargetId(requestedSection));
     const content = document.querySelector<HTMLElement>("[data-about-content]");
     if (!target) return;
 
@@ -129,6 +121,7 @@ export function useAboutPageController() {
             correctionDeadline + 100,
           );
           setActiveSection(requestedSection);
+          activeSectionRef.current = requestedSection;
           replaceSectionHash(requestedSection);
           window.scrollTo({ top: sectionScrollTop(target), behavior: "auto" });
         });
@@ -157,10 +150,9 @@ export function useAboutPageController() {
       window.removeEventListener("pointerdown", stopCorrections);
       window.removeEventListener("keydown", stopCorrections);
     };
-  }, [legacyTab, location.hash, navigate, requestedSection, isMobile]);
+  }, [legacyTab, location.hash, navigate, requestedSection]);
 
   useEffect(() => {
-    if (isMobile) return;
     let animationFrame = 0;
     const updateActiveSection = () => {
       animationFrame = 0;
@@ -182,11 +174,11 @@ export function useAboutPageController() {
         nextSection = ABOUT_SECTION_IDS[ABOUT_SECTION_IDS.length - 1];
       }
 
-      setActiveSection((current) => {
-        if (current === nextSection) return current;
+      if (activeSectionRef.current !== nextSection) {
+        activeSectionRef.current = nextSection;
+        setActiveSection(nextSection);
         replaceSectionHash(nextSection);
-        return nextSection;
-      });
+      }
     };
     const onScroll = () => {
       if (!animationFrame) animationFrame = requestAnimationFrame(updateActiveSection);
@@ -199,12 +191,11 @@ export function useAboutPageController() {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [isMobile]);
+  }, []);
 
   return {
     activeSection,
     lang,
-    isMobile,
     scrollToSection,
   };
 }

@@ -377,6 +377,7 @@ const REFERENCE_FAQ_SEEDS: ReferenceFaqSeed[] = [
 ];
 
 type ReferencePledgeSeed = {
+  legacyTitleKo?: string;
   titleKo: string;
   titleEn: string;
   bodyKo: string;
@@ -387,58 +388,61 @@ type ReferencePledgeSeed = {
 const REFERENCE_PLEDGE_SEEDS: readonly ReferencePledgeSeed[] = [
   {
     titleKo: "전산학부 학생회 웹사이트 개발",
-    titleEn: "Development of the SoC Student Council website",
-    bodyKo: "현재 학생회 웹사이트의 ver 1.0이 이렇게 배포 되었습니다! 앞으로 추가적인 기능 개발과 지속적인 유지 보수를 할 예정이니, 혹시 사이트를 이용하면서 불편하신점이나, 버그가 있다면 편하게 아래 채널톡 등을 통해 연락해 주시기 바랍니다.",
-    bodyEn: "Version 1.0 of the Student Council website is now live! We plan to continue developing features and maintaining the site. If you experience any inconvenience or find a bug, please contact us through Channel Talk or one of the channels below.",
+    titleEn: "SoC Student Council website development",
+    bodyKo: "학생회 웹사이트 1.0을 공개했습니다. 앞으로 기능을 추가하고 사이트를 꾸준히 관리할 예정입니다. 이용 중 불편한 점이나 오류를 발견하면 채널톡으로 알려 주세요.",
+    bodyEn: "Version 1.0 of the Student Council website is live. We plan to add features and maintain the site. If you have trouble using the site or find a bug, please let us know through Channel Talk.",
     pledgeStatus: "COMPLETED",
   },
   {
-    titleKo: "사업 전문화를 위한 집행위원회 구조 개편",
-    titleEn: "Restructuring the executive committee for specialized operations",
-    bodyKo: "사업의 전문화와 원활한 업무 분배를 위해 기존의 부서 + 팀체계에서 온전한 부서 체계로 개편하였으며, 외부 기업 및 타학교 교류 업무를 위한 대외소통부, 웹사이트 개발 등의 업무를 위한 전산관리부를 새롭게 신설하였습니다. 자세한 조직도는 웹사이트 학생회 소개에서 보실 수 있습니다.",
-    bodyEn: "To specialize our work and distribute responsibilities smoothly, we reorganized the former department-and-team structure into a full department structure. We newly established the External Communications Division for exchanges with companies and other schools, and the IT Administration Division for website development and related work. See the Student Council Introduction page for the detailed organization chart.",
+    legacyTitleKo: "사업 전문화를 위한 집행위원회 구조 개편",
+    titleKo: "사업 전문화를 위한 집행위원회 조직 개편",
+    titleEn: "Student Council restructuring",
+    bodyKo: "부서별 전문성과 업무 분담을 강화하기 위해, 부서와 팀을 함께 두던 조직을 부서 중심으로 개편했습니다. 기업 및 다른 학교와의 교류를 맡는 대외소통부와 웹사이트 개발 등을 맡는 전산관리부를 신설했습니다. 자세한 구성은 이 페이지의 조직도에서 확인할 수 있습니다.",
+    bodyEn: "We reorganized the Student Council from a mix of departments and teams into a department-based structure to clarify responsibilities and support more specialized work. We established the External Communications Division for exchanges with companies and other universities, and the IT Administration Division for website development and related work. See the organization chart on this page for details.",
     pledgeStatus: "COMPLETED",
   },
   {
     titleKo: "과목별 겹강톡 개설",
-    titleEn: "Opening course-specific chat rooms",
-    bodyKo: "2026년 봄학기, 담당 교수님께 운영 계획을 안내하고 동의를 받은 과목의 겹강톡을 개설했습니다. 교수·조교 없이 수강생만 익명으로 참여하며, 개설 과목과 참여 코드는 안내 스프레드시트에서 확인할 수 있습니다.",
-    bodyEn: "In spring 2026, we opened course-specific group chats for courses whose instructors agreed to the operating plan. Enrolled students could join anonymously without professors or TAs, with the course list and access codes provided in the announcement spreadsheet.",
+    titleEn: "Course group chats",
+    bodyKo: "2026년 봄학기, 운영 계획을 안내하고 담당 교수님의 동의를 받은 과목에 겹강톡을 개설했습니다. 수강생만 익명으로 참여하며 교수와 조교는 참여하지 않습니다. 개설 과목과 참여 코드는 안내 스프레드시트에서 확인할 수 있습니다.",
+    bodyEn: "In spring 2026, we opened course group chats after explaining the operating plan to the instructors and obtaining their approval. Only enrolled students participate, anonymously; professors and teaching assistants do not join. The course list and access codes are available in the announcement spreadsheet.",
     pledgeStatus: "COMPLETED",
   },
   {
     titleKo: "타 학교, 타 학과와의 교류 행사 추진",
-    titleEn: "Pursuing exchange events with other schools and departments",
-    bodyKo: "타 학교의 전산학부(컴퓨터공학부)와 교류 할 수 있는 행사 기획을 준비 중입니다.",
-    bodyEn: "We are preparing an event to exchange ideas and experiences with the School of Computing or Computer Engineering departments at other schools.",
+    titleEn: "Events with other universities and departments",
+    bodyKo: "다른 학교의 전산학부나 컴퓨터공학과 학생들과 교류하는 행사를 기획하고 있습니다.",
+    bodyEn: "We are planning an event with computing and computer engineering students at other universities.",
     pledgeStatus: "IN_PROGRESS",
   },
   {
     titleKo: "진로 탐색 기회 확장",
-    titleEn: "Expanding career exploration opportunities",
-    bodyKo: "진로콘서트를 토크콘서트로 개편하며 더 다양한 분야의 연사 분들을 모셔 강연을 진행하였습니다. 이번 학기 중 진행할 기업체 탐방도 더 다양한 기업들을 탐방 할 수 있도록 노력 중입니다.",
-    bodyEn: "We redesigned the Career Concert as a talk concert and invited speakers from a wider range of fields. We are also working to visit a more diverse range of companies during this semester's company tour.",
+    titleEn: "More opportunities to explore careers",
+    bodyKo: "진로콘서트를 토크콘서트로 개편하고, 더 다양한 분야의 연사를 초청해 강연을 진행했습니다. 이번 학기 기업체 탐방에서도 더 다양한 기업을 방문하고자 준비하고 있습니다.",
+    bodyEn: "We redesigned the Career Concert as the Talk Concert and invited speakers from more fields. We are also working to broaden the range of companies included in this semester’s visits.",
     pledgeStatus: "IN_PROGRESS",
   },
   {
     titleKo: "스승의 날 행사 개최",
-    titleEn: "Holding a Teachers' Day event",
-    bodyKo: "기존에 사라졌던 사업인 '스승의 날 행사'를 다시 진행하였습니다. 전산학부 교수님들께 감사한 마음을 글로 전달할 수 있는 소중한 기회가 되었습니다.",
-    bodyEn: "We brought back the previously discontinued Teachers' Day event. It was a valuable opportunity to express our gratitude to the School of Computing faculty in writing.",
+    titleEn: "Teachers’ Day event",
+    bodyKo: "중단되었던 스승의 날 행사를 다시 열었습니다. 학우들이 전산학부 교수님들께 글로 감사의 마음을 전하는 행사입니다.",
+    bodyEn: "We brought back the Teachers’ Day event, giving students a chance to send written messages of thanks to SoC faculty.",
     pledgeStatus: "COMPLETED",
   },
   {
-    titleKo: "전산학부 OTL 수강 후기 이벤트 진행",
-    titleEn: "Running an SoC OTL course-review event",
-    bodyKo: "전산학부의 전공 수강 계획에 도움이 되는 양질의 OTL 수강 후기를 제공해 드리기 위해 OTL 수강후기 이벤트를 봄학기 종강 이후 진행하였습니다. 가을 학기에도 동일한 행사를 진행 예정입니다.",
-    bodyEn: "To provide high-quality OTL course reviews that help students plan their major courses, we ran an OTL course-review event after the spring semester ended. We plan to hold the same event in the fall semester as well.",
+    legacyTitleKo: "전산학부 OTL 수강 후기 이벤트 진행",
+    titleKo: "전산학부 OTL 수강 후기 이벤트",
+    titleEn: "SoC OTL course-review event",
+    bodyKo: "전공 수강 계획에 참고할 수 있는 수강 후기를 모으기 위해 봄학기 종강 후 OTL 수강 후기 이벤트를 진행했습니다. 가을학기에도 같은 행사를 열 예정입니다.",
+    bodyEn: "After the spring semester ended, we ran an OTL course-review event to gather reviews that help students plan their major courses. We plan to hold the event again in the fall semester.",
     pledgeStatus: "COMPLETED",
   },
   {
-    titleKo: "공약이행상황판 제작",
-    titleEn: "Creating the pledge progress board",
-    bodyKo: "전산학부 학생회장단의 공약이행상황을 학우분들과 공유하고자 이번 웹사이트에 공약이행상황판을 만들게 되었습니다.",
-    bodyEn: "We created this pledge progress board on the website to share the SoC Student Council leadership's pledge progress with students.",
+    legacyTitleKo: "공약이행상황판 제작",
+    titleKo: "공약 이행 상황판 제작",
+    titleEn: "Pledge progress board",
+    bodyKo: "학생회장단의 공약 이행 현황을 이 페이지에서 확인할 수 있습니다.",
+    bodyEn: "This page shows progress on the pledges made by the SoC Student Council leadership.",
     pledgeStatus: "COMPLETED",
   },
 ];
@@ -446,6 +450,8 @@ const REFERENCE_PLEDGE_SEEDS: readonly ReferencePledgeSeed[] = [
 type ReferenceAboutWorkContentSeed = {
   key:
     | "about.hero.description"
+    | "about.work.title"
+    | "about.intro.body"
     | "about.nav.intro"
     | "about.work.card.1.title"
     | "about.work.card.1.description"
@@ -468,13 +474,32 @@ type ReferenceAboutWorkContentSeed = {
  */
 const REFERENCE_ABOUT_WORK_CONTENT_SEEDS: readonly ReferenceAboutWorkContentSeed[] = [
   {
+    key: "about.work.title",
+    legacyKo: "주요 사업",
+    valueKo: "주요 사업",
+    valueEn: "Our programs",
+  },
+  {
     key: "about.hero.description",
     legacyKo: [
       "KAIST 전산학부 학부생을 대표하는 학생자치기구 집행위원회입니다.",
       "전산학부 학우들을 위한 사업을 기획하고 진행하는 학생자치기구, 집행위원회입니다.",
+      "전산학부 학우들을 위한 사업을 기획하고 집행하는 학생자치기구, 전산학부 집행위원회입니다.",
+      "학우들의 일상과 진로, 교류를 잇습니다.\n아이디어를 실제 사업으로 옮겨, 함께할 경험과 기회를 만듭니다.",
     ],
-    valueKo: "전산학부 학우들을 위한 사업을 기획하고 집행하는 학생자치기구, 전산학부 집행위원회입니다.",
-    valueEn: "The SoC Student Council plans and runs programs for students in KAIST's School of Computing.",
+    valueKo: "Together Rooted, Endlessly Expanding",
+    valueEn: "Together Rooted, Endlessly Expanding",
+  },
+  {
+    key: "about.intro.body",
+    legacyKo: [
+      "전산학부 학생회는 학우들의 권익을 대변하며, 학업과 진로에 필요한 경험과 교류의 기회를 마련하는 학생자치기구입니다.\n집행위원회는 사업의 기획부터 준비, 실행까지 맡습니다. 시험기간 간식, 진로 행사, 문화·교류 프로그램 등 학우들이 체감할 수 있는 혜택을 만듭니다.\n2026 집행위원회 TREE는 ‘Together Rooted, Endlessly Expanding’을 슬로건으로, 학생과 학교, 기업을 연결하며 함께 성장하고자 합니다.",
+      "KAIST 전산학부 집행위원회는 학우들의 권익을 대변하고 더 나은 학업·문화 환경을 만들어가는 학생자치기구입니다. 소통 창구 운영부터 진로 세미나, 문화·복지 행사까지 학우들에게 실질적으로 필요한 일들을 고민하고 실행합니다.",
+      "전산학부 학생회는 학우들이 학부 공동체 안에서 서로 연결되고, 학업과 진로에 필요한 다양한 경험과 기회를 얻을 수 있도록 돕는 학생자치기구입니다.\n집행위원회는 학생회의 아이디어가 실제 사업으로 이어질 수 있도록 기획부터 준비, 실행까지의 전 과정을 직접 담당합니다. 학우들의 일상과 진로, 교류에 실질적인 도움이 되는 경험과 혜택을 꾸준히 만들어가고 있습니다.\n2026 전산학부 집행위원회 TREE는 ‘Together Rooted, Endlessly Expanding’이라는 슬로건처럼 학생과 학교, 기업을 연결하고, 그 관계를 바탕으로 함께 성장하며 더 넓은 가능성으로 나아가고자 합니다.",
+      "전산학부 학생회는 학우들의 권익을 대변하며, 학업과 진로에 필요한 경험과 교류의 기회를 마련하는 학생자치기구입니다.\n집행위원회는 사업의 기획부터 준비, 실행까지 맡습니다. 시험기간 간식, 진로 행사, 문화·교류 프로그램 등 학우들이 체감할 수 있는 혜택을 만듭니다.\nTREE는 학생과 학교, 기업을 연결하며 그 관계를 바탕으로 함께 성장하고자 합니다.",
+    ],
+    valueKo: "전산학부 학생회는 학우들이 학부 공동체 안에서 서로 교류하고, 학업과 진로에 필요한 경험과 기회를 얻도록 돕는 학생자치기구입니다.\n집행위원회는 학생회의 아이디어를 사업으로 구체화하고, 기획부터 준비와 실행까지 맡습니다. 학우들의 일상과 진로, 교류에 도움이 되는 경험과 혜택을 꾸준히 제공하고 있습니다.\n2026 전산학부 집행위원회 TREE는 “Together Rooted, Endlessly Expanding”이라는 슬로건처럼 학생과 학교, 기업을 연결하고, 그 관계를 바탕으로 함께 성장하며 더 넓은 가능성을 찾아가고자 합니다.",
+    valueEn: "The School of Computing Student Council is a student-run organization that helps students connect within the SoC community and find opportunities related to their studies and careers.\nWe put ideas into practice by planning, preparing, and running programs that support students’ everyday lives, careers, and connections with one another.\nThe 2026 SoC Student Council, TREE, aims to connect students, the university, and companies so they can grow together and explore new possibilities, guided by its slogan, “Together Rooted, Endlessly Expanding.”",
   },
   {
     key: "about.nav.intro",
@@ -526,15 +551,21 @@ const REFERENCE_ABOUT_WORK_CONTENT_SEEDS: readonly ReferenceAboutWorkContentSeed
   },
   {
     key: "about.partnership.description",
-    legacyKo: "전산학부 학우들과 함께할 기업 채용 설명회, 기술 세미나(Tech Talk), 행사 후원 등 다양한 제휴 제안을 기다립니다. 담당자 연락처와 함께 문의해 주시면 검토 후 회신드리겠습니다.",
-    valueKo: "전산학부 학우들과 함께할 채용 설명회, 기술 세미나(Tech Talk), 행사 후원 등의 제휴를 기다립니다. 제안 내용을 보내 주시면 검토 후 회신드리겠습니다.",
-    valueEn: "We welcome partnerships for recruiting sessions, technical seminars (Tech Talks), and event sponsorship with School of Computing students. Send us your proposal and we will review it and get back to you.",
+    legacyKo: [
+      "전산학부 학우들과 함께할 기업 채용 설명회, 기술 세미나(Tech Talk), 행사 후원 등 다양한 제휴 제안을 기다립니다. 담당자 연락처와 함께 문의해 주시면 검토 후 회신드리겠습니다.",
+      "전산학부 학우들과 함께할 채용 설명회, 기술 세미나(Tech Talk), 행사 후원 등의 제휴를 기다립니다. 제안 내용을 보내 주시면 검토 후 회신드리겠습니다.",
+    ],
+    valueKo: "전산학부 학우들을 위한 채용 설명회와 기술 세미나, 행사 후원 등의 제안을 받습니다. 제안 내용을 보내 주시면 검토 후 답변드리겠습니다.",
+    valueEn: "We welcome proposals for recruiting sessions, tech talks, and sponsorship of events for SoC students. Send us your proposal, and we will review it and reply.",
   },
   {
     key: "about.partnership.cta",
-    legacyKo: "후원·제휴 문의하기",
+    legacyKo: [
+      "후원·제휴 문의하기",
+      "제휴 문의",
+    ],
     valueKo: "제휴 문의",
-    valueEn: "Partnership inquiry",
+    valueEn: "Contact us",
   },
 ];
 
@@ -946,6 +977,36 @@ type OperationalSurveySeed = {
 };
 
 const OPERATIONAL_SURVEY_SEEDS: OperationalSurveySeed[] = [
+  {
+    surveyId: OPERATIONAL_SURVEY_IDS.corporatePartnership,
+    sectionId: "7a120000-0000-4000-8000-000000000003",
+    sectionTitleKo: "후원 및 제휴 제안",
+    sectionTitleEn: "Sponsorship and partnership proposal",
+    kind: "SURVEY",
+    titleKo: "기업 후원 및 제휴 문의",
+    titleEn: "Sponsorship and Partnership Inquiry",
+    descriptionKo: "KAIST 전산학부 학생회와 함께할 행사 후원, 채용 설명회, 기술 세미나 및 제휴를 제안해 주세요. 담당자가 제안 내용을 검토한 후 입력하신 이메일로 회신드립니다.",
+    descriptionEn: "Propose event sponsorship, recruiting sessions, technical talks, or partnerships with the KAIST School of Computing Student Council. We will review your proposal and reply to the email address provided.",
+    eligibleSocAffiliations: [],
+    academicEligibility: "ANY",
+    allowAnonymous: true,
+    allowMultipleResponses: true,
+    questions: [
+      { id: "7a130000-0000-4000-8000-000000000301", titleKo: "기업·기관명", titleEn: "Company or organization", questionType: "short_text", sortOrder: 0 },
+      { id: "7a130000-0000-4000-8000-000000000302", titleKo: "담당자 성함", titleEn: "Contact person's name", questionType: "short_text", sortOrder: 1 },
+      { id: "7a130000-0000-4000-8000-000000000303", titleKo: "회신 이메일", titleEn: "Contact email", questionType: "short_text", answerRegex: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", config: { validationType: "regex", validationErrorMessage: "올바른 이메일 주소를 입력해 주세요." }, sortOrder: 2 },
+      { id: "7a130000-0000-4000-8000-000000000304", titleKo: "제안 유형", titleEn: "Proposal type", questionType: "dropdown", options: [
+        { value: "sponsorship", labelKo: "행사·물품 후원", labelEn: "Event or in-kind sponsorship" },
+        { value: "recruiting", labelKo: "채용 설명회", labelEn: "Recruiting session" },
+        { value: "tech-talk", labelKo: "기술 세미나", labelEn: "Technical talk" },
+        { value: "partnership", labelKo: "제휴", labelEn: "Partnership" },
+        { value: "other", labelKo: "기타", labelEn: "Other" },
+      ], sortOrder: 3 },
+      { id: "7a130000-0000-4000-8000-000000000305", titleKo: "제안 내용", titleEn: "Proposal details", questionType: "long_text", descriptionKo: "제안 목적, 협력 방식과 학생들에게 제공할 내용을 알려 주세요.", descriptionEn: "Describe the purpose, proposed collaboration, and what students would receive.", sortOrder: 4 },
+      { id: "7a130000-0000-4000-8000-000000000306", titleKo: "희망 일정", titleEn: "Preferred schedule", questionType: "short_text", isRequired: false, sortOrder: 5 },
+      { id: "7a130000-0000-4000-8000-000000000307", titleKo: "회사 소개 및 참고 자료 링크", titleEn: "Company information and supporting links", questionType: "long_text", isRequired: false, sortOrder: 6 },
+    ],
+  },
   {
     surveyId: OPERATIONAL_SURVEY_IDS.cohortChatInvitation,
     sectionId: "7a120000-0000-4000-8000-000000000001",
@@ -2356,7 +2417,8 @@ async function seedReferenceAboutPageContent() {
       updatedAt: new Date(),
       updatedBy: referenceAuthor.userId,
     };
-    const contentBlockId = existingPledgesByTitle.get(seed.titleKo);
+    const contentBlockId = existingPledgesByTitle.get(seed.titleKo)
+      ?? (seed.legacyTitleKo ? existingPledgesByTitle.get(seed.legacyTitleKo) : undefined);
     if (contentBlockId) {
       await db
         .update(contentBlocks)
@@ -2370,7 +2432,7 @@ async function seedReferenceAboutPageContent() {
     }
   }
 
-  const referencePledgeTitles = new Set(REFERENCE_PLEDGE_SEEDS.map((item) => item.titleKo));
+  const referencePledgeTitles = new Set(REFERENCE_PLEDGE_SEEDS.flatMap((item) => [item.titleKo, ...(item.legacyTitleKo ? [item.legacyTitleKo] : [])]));
   for (const existing of existingPledges) {
     if (referencePledgeTitles.has(existing.titleKo)) continue;
     await db
@@ -2597,7 +2659,7 @@ async function seedOperationalSurveys() {
           isDeepStrictEqual(row.config, definition.config ?? null) &&
           row.answerRegex === (definition.answerRegex ?? null);
       });
-      if (unchanged && existing.descriptionKo === seed.descriptionKo && existing.descriptionEn === seed.descriptionEn &&
+      if (unchanged && existing.showOnList && existing.descriptionKo === seed.descriptionKo && existing.descriptionEn === seed.descriptionEn &&
         JSON.stringify(existing.eligibleSocAffiliations) === JSON.stringify(seed.eligibleSocAffiliations)) continue;
       const pristine = existing.creatorId === null && !response &&
         existing.createdAt.getTime() === existing.updatedAt.getTime() &&
@@ -2617,6 +2679,7 @@ async function seedOperationalSurveys() {
         await tx.delete(surveyQuestions).where(eq(surveyQuestions.sectionId, seed.sectionId));
         await tx.update(surveys).set({
           titleKo: seed.titleKo, titleEn: seed.titleEn,
+          showOnList: true,
           descriptionKo: seed.descriptionKo, descriptionEn: seed.descriptionEn,
           eligibleSocAffiliations: seed.eligibleSocAffiliations,
         }).where(eq(surveys.surveyId, seed.surveyId));
@@ -2645,7 +2708,7 @@ async function seedOperationalSurveys() {
         isKoreanOnly: false,
         isPublished: true,
         lifecycleStatus: "PUBLISHED",
-        showOnList: seed.surveyId !== OPERATIONAL_SURVEY_IDS.corporatePartnership,
+        showOnList: true,
         showOnCalendar: false,
         resultVisibility: "PRIVATE",
         isAlwaysOpen: true,
@@ -3985,6 +4048,14 @@ async function main() {
   console.log("Using database:", DATABASE_URL.replace(/:[^:@]+@/, ":****@"));
   console.log("Seed mode:", seedMode);
   try {
+    if (process.env.SEED_ABOUT_CONTENT_ONLY === "true") {
+      await seedReferenceAboutWorkContent();
+      return;
+    }
+    if (process.env.SEED_OPERATIONAL_SURVEYS_ONLY === "true") {
+      await seedOperationalSurveys();
+      return;
+    }
     if (process.env.SEED_VOTES_ONLY === "true") {
       if (process.env.NODE_ENV === "production") throw new Error("demo_seed_is_forbidden_in_production");
       await seedOngoingVote();

@@ -6,7 +6,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { ArticleListItem } from "@soc/contracts";
 import { isoToDate, isoToMs, nowMs } from "@soc/shared";
-import { Paperclip, SquarePen } from "lucide-react";
+import { FileText, Paperclip, Pin, RotateCcw, SearchX, SquarePen } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
@@ -16,7 +16,7 @@ import {
   type BoardMetadata,
 } from "@/lib/board-metadata";
 
-import { EmptyState, ErrorState } from "@/components/ui/data-state";
+import { ListState, ListStateAction, ErrorState } from "@/components/ui/data-state";
 import { Button } from "@/components/ui/button";
 import {
   PageActionLink,
@@ -196,6 +196,8 @@ interface BoardArticleTableProps {
   hasMoreArticles: boolean;
   isLoadingMore: boolean;
   onLoadMore: () => void;
+  searchQuery: string;
+  onResetSearch: () => void;
 }
 
 function BoardTableSkeleton({ columns }: { columns: number }) {
@@ -222,6 +224,8 @@ export function BoardArticleTable({
   hasMoreArticles,
   isLoadingMore,
   onLoadMore,
+  searchQuery,
+  onResetSearch,
 }: BoardArticleTableProps) {
   const rangeStart = totalCount === 0 ? 0 : (currentPage - 1) * postsPerPage + 1;
   const rangeEnd = Math.min(totalCount, currentPage * postsPerPage);
@@ -251,16 +255,17 @@ export function BoardArticleTable({
           className={`grid min-w-0 w-full grid-cols-1 gap-1.5 md:items-center md:gap-3 ${tableGridClass}`}
         >
           {!category ? (
-            <div className="hidden shrink-0 justify-start text-left md:flex">
-              <span className={`text-[length:var(--ui-text-caption-size)] font-medium select-none ${pinned ? "text-kaist-darkgreen" : "text-slate-500"}`}>
+            <div className="hidden shrink-0 items-center justify-start text-left md:flex">
+              <span className={`relative -top-[0.5px] text-[length:var(--ui-text-caption-size)] font-medium leading-5 select-none ${pinned ? "text-kaist-darkgreen" : "text-slate-500"}`}>
                 {getBoardLabelFromMetadata(postBoard, postCategory, lang)}
               </span>
             </div>
           ) : null}
           <div className={`flex min-w-0 items-center gap-2 text-left text-[length:var(--ui-text-section-size)] leading-5 tracking-tight text-app-text-strong ${pinned ? "font-semibold" : "font-medium"}`}>
             {postCategory === "promotions" && <PromotionStatus start={post.eventStartDate} end={post.eventEndDate} lang={lang} />}
-            {pinned ? <span aria-label={lang === "ko" ? "고정 공지" : "Pinned notice"} className="shrink-0 text-sm">📌</span> : null}
-            <ArticleListTitle className="mobile-board-title">{lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}</ArticleListTitle>
+            {pinned ? <Pin role="img" aria-label={lang === "ko" ? "고정 공지" : "Pinned notice"} className="size-3.5 shrink-0 self-center rotate-45 fill-kaist-darkgreen/15 text-kaist-darkgreen" strokeWidth={1.7} /> : null}
+            {/* Compensate for Pretendard's visible glyph center without moving the row or icons. */}
+            <ArticleListTitle className="relative -top-px mobile-board-title">{lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}</ArticleListTitle>
             {post.commentCount > 0 ? (
               <span
                 aria-label={
@@ -356,10 +361,10 @@ export function BoardArticleTable({
             ) : articles.length > 0
               ? articles.map((post) => renderArticleRow(post, post.isPinned))
               : !showInitialSkeleton ? (
-                <EmptyState
-                  className="min-h-48 rounded-none border-0 bg-transparent"
-                  message={lang === "ko" ? "등록된 게시글이 없습니다." : "No posts available."}
-                  minHeightClassName="min-h-48"
+                <ListState icon={searchQuery.trim() ? SearchX : FileText}
+                  title={lang === "ko" ? searchQuery.trim() ? "조건에 맞는 게시글이 없습니다" : "등록된 게시글이 없습니다" : searchQuery.trim() ? "No matching posts" : "No posts yet"}
+                  description={lang === "ko" ? searchQuery.trim() ? "다른 검색어로 다시 검색하거나 검색어를 초기화해 주세요." : "새 게시글이 등록되면 여기에 표시됩니다." : searchQuery.trim() ? "Try a different keyword or clear your search." : "New posts will appear here."}
+                  action={searchQuery.trim() ? <ListStateAction icon={RotateCcw} onClick={onResetSearch}>{lang === "ko" ? "검색어 초기화" : "Clear search"}</ListStateAction> : undefined}
                 />
               ) : null}
           </div>

@@ -1,0 +1,88 @@
+/* Keep shadcn/ui's neutral palette scoped to date pickers. */
+.shadcn-datepicker,
+.shadcn-datepicker-calendar {
+  --primary: #171717;
+  --primary-foreground: #fff;
+  --accent: #f5f5f5;
+  --accent-foreground: #171717;
+  --foreground: #171717;
+  --popover: #fff;
+  --popover-foreground: #171717;
+  --muted-foreground: #737373;
+  --border: #e5e5e5;
+  --ring: #a3a3a3;
+}
+
+/* The visible controls carry the border; their layout wrapper stays undecorated. */
+.shadcn-datepicker-control {
+  background: #fff;
+  border-color: var(--ui-border-subtle);
+  box-shadow: none;
+}
+.shadcn-datepicker-control:hover:not(:disabled) { background: #fff; border-color: #cbd5e1; }
+.shadcn-datepicker .shadcn-datepicker-control[data-state="open"][aria-expanded="true"] { background: #fff; }
+[data-slot="date-picker-input"] .shadcn-datepicker-control {
+  height: var(--ui-control-height);
+  min-height: var(--ui-control-height);
+  padding-block: 0;
+  font-weight: 400;
+}
+.shadcn-datepicker-control:focus-visible {
+  border-color: #a3a3a3;
+  outline: 2px solid #a3a3a34d;
+  outline-offset: 1px;
+  box-shadow: none;
+}
+.shadcn-time-picker [role="option"] { height: 2rem; min-height: 2rem; border: 0; box-shadow: none; color: var(--foreground); }
+.shadcn-time-picker [role="option"]:hover { background: var(--accent); }
+.shadcn-time-picker [role="option"][aria-selected="true"] { background: var(--primary); color: var(--primary-foreground); }
+.shadcn-time-picker [role="option"]:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.shadcn-datepicker-calendar button {
+  color: inherit;
+}
+.shadcn-datepicker-calendar button:hover {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+.shadcn-datepicker-calendar button:is([data-selected-single="true"], [data-range-start="true"], [data-range-end="true"]) {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* Today uses a small dot; keyboard focus and selected dates keep their styles. */
+.shadcn-datepicker-calendar button[data-today="true"] { position: relative; }
+.shadcn-datepicker-calendar button[data-today="true"]::after {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translateX(-50%);
+}
+.shadcn-datepicker-calendar button[data-today="true"]:not(:focus-visible) {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Existing app buttons have a shared height; calendar cells use shadcn's cell size. */
+.shadcn-datepicker-calendar [data-slot="button"],
+.shadcn-datepicker-calendar :is(.rdp-button_previous, .rdp-button_next) {
+  height: var(--cell-size);
+  min-height: var(--cell-size);
+  padding: 0;
+}
+
+/* Keep every mobile utility reachable; language selection lives in the mobile menu. */
+@media (max-width: 767px) {
+  [data-site-header] .site-header-main > div:first-child { min-width: 0; }
+  [data-site-header] .site-header-main .site-header-brand {
+    width: clamp(8rem, calc(100vw - 11.5rem), 9.5rem) !important;
+    min-width: 0;
+    padding-inline: .5rem .25rem !important;
+  }
+  [data-site-header] .site-header-main .home-header-utilities { flex-shrink: 0; gap: 0 !important; padding-right: .25rem !important; }
+  [data-site-header] .site-header-main .site-header-language { display: none !important; }
+}

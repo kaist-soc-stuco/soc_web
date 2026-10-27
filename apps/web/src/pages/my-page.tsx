@@ -10,6 +10,7 @@ import {
 } from "@/features/my-page/my-page-sections";
 import { useMyPageController } from "@/features/my-page/use-my-page-controller";
 import { PageShell } from "@/components/ui/page-layout";
+import { MobileDetailHeader } from "@/components/ui/mobile-detail-header";
 
 export function MyPage() {
   const {
@@ -41,9 +42,8 @@ export function MyPage() {
   } = useMyPageController();
 
   return (
-    <PageShell className="text-slate-950">
-
-
+    <PageShell className="mobile-state-page text-slate-950">
+      {!initialLoading && !canUseMyPage ? <MobileDetailHeader title="" backTo="/" lang={lang} /> : null}
       <main className="mx-auto flex min-w-0 w-full max-w-7xl flex-1 flex-col items-stretch gap-6 px-4 py-6 sm:px-6 md:flex-row md:items-start md:gap-8 md:px-8 md:py-8">
         {canUseMyPage ? (
           <>

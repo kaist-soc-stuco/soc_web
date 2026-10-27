@@ -1,375 +1,87 @@
-import type {
-  ArticleEngagementKind,
-} from "@soc/contracts";
-import { isoToDate, localDate, nowDate } from "@soc/shared";
-import { ChevronRight, ClipboardList, Clock, LockKeyhole, MapPin } from "lucide-react";
+import type { ArticleEngagementKind } from "@soc/contracts";
+import { ArrowRight, Bookmark, LockKeyhole, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { ArticleEngagementActions } from "@/components/ui/article-engagement-actions";
 import { stripRichText } from "@/components/ui/rich-text-content";
-import {
-  getCardPeriodText,
-  isClosedItem,
-  type UnifiedItem,
-} from "@/lib/events-surveys";
+import { formatCompactDateTime, getCardPeriodText, getDiscoveryBadge, getDiscoveryDateTime, isClosedItem, type UnifiedItem } from "@/lib/events-surveys";
 import { resolveAssetUrl } from "@/lib/asset-url";
-import { EventCardFallback } from "@/components/organisms/event-card-fallback";
-import { useMediaQuery } from "@/hooks/use-media-query";
-import { formatNumericDate } from "@/lib/date-display";
+import "./events-surveys-cards.css";
 
 interface EventsSurveysGridProps {
   isAuthenticated: boolean;
   items: UnifiedItem[];
   lang: string;
+  hideDate?: boolean;
   engagementSubmitting?: string | null;
-  onEngagementToggle?: (
-    item: UnifiedItem,
-    kind: ArticleEngagementKind,
-    active: boolean,
-  ) => void;
+  onEngagementToggle?: (item: UnifiedItem, kind: ArticleEngagementKind, active: boolean) => void;
 }
 
-const getItemHref = (item: UnifiedItem) => {
-  if (item.kind === "EVENT") {
-    return `/events/${item.id}`;
-  }
-  return isClosedItem(item) && item.resultVisibility === "PUBLIC"
-    ? `/survey/${item.id}/results`
-    : `/survey/${item.id}`;
-};
+const DEFAULT_IMAGE = "/discovery-placeholder.svg";
 
-function getDayDifference(value: string | null, now = nowDate()) {
-  if (!value) return null;
-  const target = isoToDate(value);
-  if (Number.isNaN(target.getTime())) return null;
-
-  const today = localDate(now.getFullYear(), now.getMonth(), now.getDate());
-  const targetDay = localDate(
-    target.getFullYear(),
-    target.getMonth(),
-    target.getDate(),
-  );
-  return Math.ceil(
-    (targetDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-  );
+function CardImage({ imageUrl }: { imageUrl?: string | null }) {
+  const source = imageUrl?.trim() ? resolveAssetUrl(imageUrl.trim()) : DEFAULT_IMAGE;
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [source]);
+  return <img className="discovery-card-image" src={failed ? DEFAULT_IMAGE : source} onError={() => setFailed(true)} alt="" aria-hidden="true" loading="lazy" />;
 }
 
-function getStatusText(item: UnifiedItem, lang: string) {
-  const target =
-    item.computedState === "before_open" ? item.opensAt : item.closesAt;
-  const dayDifference = getDayDifference(target);
-
-  if (item.computedState === "before_open") {
-    if (dayDifference !== null && dayDifference > 0) {
-      return `D-${dayDifference}`;
-    }
-    if (dayDifference === 0) return "D-Day";
-    return lang === "ko" ? "시작 예정" : "Upcoming";
-  }
-
-  if (item.computedState === "closed") {
-    return lang === "ko" ? "마감" : "Closed";
-  }
-
-  return lang === "ko" ? "진행 중" : "Ongoing";
+function audienceText(item: UnifiedItem, lang: string) {
+  const ko = lang === "ko";
+  if (item.kind === "EVENT" ? item.linkedSurveyFeePayersOnly : item.feePayersOnly) return ko ? "과비 납부자만" : "Fee-paying members";
+  if (item.visibilityScope === "STAFF_ONLY") return ko ? "운영진 전용" : "Staff only";
+  if (item.kind === "EVENT" ? item.visibilityScope === "MEMBERS" : !item.allowAnonymous) return ko ? "로그인 필요" : "Login required";
+  if (item.isKoreanOnly) return ko ? "한국어 전용" : "Korean only";
+  return "";
 }
 
-interface CardBadge {
-  label: string;
-  tone: "open" | "closed" | "neutral";
-  locked?: boolean;
-}
-
-function getCardBadges(item: UnifiedItem, lang: string): CardBadge[] {
-  const applicationClosed = isApplicationFull(item) || item.linkedSurveyState === "closed";
-  const badges: CardBadge[] = [
-    {
-      label: getStatusText(item, lang),
-      tone: item.computedState === "open" ? "open" : item.computedState === "closed" ? "closed" : "neutral",
-    },
-    {
-      label: getApplicationText(item, lang) ?? "",
-      tone: applicationClosed ? "closed" : item.linkedSurveyState === "open" ? "open" : "neutral",
-    },
-    { label: getAudienceText(item, lang), tone: "neutral", locked: item.kind === "EVENT" ? Boolean(item.linkedSurveyFeePayersOnly || item.visibilityScope === "STAFF_ONLY" || item.visibilityScope === "MEMBERS") : !item.allowAnonymous },
-  ];
-
-  return badges
-    .filter((badge) => badge.label)
-    .filter(
-      (badge, index, allBadges) =>
-        allBadges.findIndex((candidate) => candidate.label === badge.label) ===
-        index,
-    );
-}
-
-function isApplicationFull(item: UnifiedItem) {
-  return Boolean(
-    item.linkedSurveyMaxResponses &&
-      item.linkedSurveyMaxResponses > 0 &&
-      (item.linkedSurveyResponseCount ?? 0) >= item.linkedSurveyMaxResponses,
-  );
-}
-
-function getApplicationText(item: UnifiedItem, lang: string) {
-  if (item.kind !== "EVENT" || !item.surveyId || isClosedItem(item)) {
-    return null;
-  }
-  if (isApplicationFull(item)) {
-    return lang === "ko" ? "신청 마감" : "Applications closed";
-  }
-  if (item.linkedSurveyState === "closed") {
-    return lang === "ko" ? "신청 마감" : "Applications closed";
-  }
-  if (item.linkedSurveyState === "open") {
-    return item.computedState === "before_open"
-      ? lang === "ko"
-        ? "사전 신청"
-        : "Pre-registration"
-      : lang === "ko"
-        ? "신청중"
-        : "Applications open";
-  }
-  if (item.linkedSurveyState === "before_open") {
-    return lang === "ko" ? "신청 예정" : "Registration opens soon";
-  }
-  return null;
-}
-
-function getAudienceText(item: UnifiedItem, lang: string) {
-  const audience =
-    item.kind === "EVENT"
-      ? item.linkedSurveyFeePayersOnly
-        ? lang === "ko"
-          ? "과비 납부자만"
-          : "Fee-paying members only"
-        : item.visibilityScope === "STAFF_ONLY"
-          ? lang === "ko"
-            ? "운영진 전용"
-            : "Staff only"
-          : item.visibilityScope === "MEMBERS"
-            ? lang === "ko"
-              ? "로그인 필요"
-              : "Login required"
-            : ""
-      : item.feePayersOnly
-        ? lang === "ko"
-          ? "과비 납부자만"
-          : "Fee-paying members only"
-        : item.allowAnonymous
-          ? ""
-        : lang === "ko"
-          ? "로그인 필요"
-          : "Login required";
-
-  const audienceText = audience;
-  const languageText = item.isKoreanOnly
-    ? lang === "ko"
-      ? "한국어 전용"
-      : "Korean only"
-    : "";
-
-  return [audienceText, languageText].filter(Boolean).join(" · ");
-}
-
-function CardMedia({
-  imageUrl,
-  isSurvey,
-}: {
-  imageUrl: string | null | undefined;
-  isSurvey: boolean;
-}) {
-  const normalizedImageUrl = imageUrl?.trim() || null;
-  const mediaUrl = normalizedImageUrl ? resolveAssetUrl(normalizedImageUrl) : null;
-  const [imageFailed, setImageFailed] = useState(false);
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [mediaUrl]);
-
-  if (!mediaUrl || imageFailed) {
-    if (!isSurvey) return <EventCardFallback />;
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-50 via-white to-emerald-50">
-        <ClipboardList
-          aria-hidden="true"
-          className="h-8 w-8 text-emerald-600/60"
-        />
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={mediaUrl}
-      alt=""
-      aria-hidden="true"
-      onError={() => setImageFailed(true)}
-      className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.02]"
-    />
-  );
-}
-
-function MobileSurveyList({ items, lang }: { items: UnifiedItem[]; lang: string }) {
-  const groups = [
-    { state: "open", label: lang === "ko" ? "참여 가능" : "Open" },
-    { state: "before_open", label: lang === "ko" ? "시작 예정" : "Upcoming" },
-    { state: "closed", label: lang === "ko" ? "종료" : "Closed" },
-  ] as const;
-
-  return <div className="mobile-survey-list">
-    {groups.map(group => {
-      const entries = items.filter(item => item.computedState === group.state);
-      if (!entries.length) return null;
-      return <section key={group.state} aria-label={group.label}>
-        <h2 className="mobile-survey-group-heading">{group.label}</h2>
-        {entries.map(item => {
-          const title = stripRichText(lang === "ko" ? item.titleKo : item.titleEn || item.titleKo);
-          const start = formatNumericDate(item.opensAt);
-          const end = formatNumericDate(item.closesAt);
-          const timing = item.isAlwaysOpen ? "" : start && end ? `${start} ~ ${end}` : end ? `~${end}` : start ? `${start}~` : "";
-          const badges = getCardBadges(item, lang).filter(badge => badge.label !== getStatusText(item, lang));
-
-          return <Link key={item.id} to={getItemHref(item)} target="_blank" rel="noopener noreferrer" className={`mobile-survey-list-row${isClosedItem(item) ? " is-closed" : ""}`}>
-            <div className="mobile-survey-copy">
-              <h3><span>{title}</span></h3>
-              {badges.length > 0 && <div className="home-portal-event-badges mobile-survey-badges">
-                {badges.map(badge => <span key={badge.label} className={`home-portal-event-badge is-${badge.tone}`}>{badge.label}</span>)}
-              </div>}
-              {timing && <p className="mobile-survey-period">{timing}</p>}
-            </div>
-            <ChevronRight className="mobile-survey-chevron" aria-hidden="true" />
-          </Link>;
-        })}
-      </section>;
-    })}
-  </div>;
-}
-
-export function EventsSurveysGrid({
-  isAuthenticated,
-  items,
-  lang,
-  engagementSubmitting,
-  onEngagementToggle,
-}: EventsSurveysGridProps) {
-  const isMobile = useMediaQuery("(max-width: 767px)");
-  if (isMobile && items.every(item => item.kind !== "EVENT")) return <MobileSurveyList items={items} lang={lang} />;
-  return (
-    <div className="events-surveys-card-grid grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {items.map((item) => {
-        const title = stripRichText(lang === "ko" ? item.titleKo : item.titleEn || item.titleKo);
-        const desc = stripRichText(
-          lang === "ko"
-            ? item.descriptionKo
-            : item.descriptionEn || item.descriptionKo,
-        );
-        const closed = isClosedItem(item);
-        const href = getItemHref(item);
-        const isSurvey = item.kind !== "EVENT";
-        const isHomeEventCard = item.kind === "EVENT";
-        const period = getCardPeriodText(item, lang);
-        const location = (lang === "en" ? item.locationEn || item.location : item.location)?.trim() || null;
-        const badges = getCardBadges(item, lang);
-        const canEngage = item.kind === "EVENT" && onEngagementToggle;
-        const submitting =
-          engagementSubmitting === `${item.id}:SCRAP` ? "SCRAP" : null;
-
-        return (
-          <div
-            key={item.id}
-            className={
-              isHomeEventCard
-                ? `event-survey-card home-portal-event-card select-none group${closed ? " is-closed" : ""}${!item.imageUrl ? " event-card-no-image" : ""}`
-                : `event-survey-card${closed ? " is-closed" : ""} interaction-card select-none group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-none transition-[transform,border-color] duration-180 ease-out hover:-translate-y-0.5 ${closed ? "border-slate-200" : "border-gray-200"}`
-            }
-          >
-            <div
-              className={
-                isHomeEventCard
-                  ? "home-portal-event-media"
-                  : "relative aspect-video shrink-0 overflow-hidden border-b border-slate-100 bg-slate-50"
-              }
-            >
-              <Link
-                aria-label={title}
-                to={href} target={item.kind === "EVENT" ? undefined : "_blank"} rel="noopener noreferrer"
-                className={`absolute inset-0 block ${closed ? "grayscale opacity-60" : ""}`}
-              >
-                <CardMedia imageUrl={item.imageUrl} isSurvey={isSurvey} />
-              </Link>
-              {canEngage ? (
-                <div className="absolute right-3 top-3 z-20">
-                  <ArticleEngagementActions
-                    allowLike={false}
-                    compact
-                    isAuthenticated={isAuthenticated}
-                    lang={lang}
-                    likeCount={item.likeCount ?? 0}
-                    scrapCount={item.scrapCount ?? 0}
-                    scrapIconOnly
-                    scrapClassName="event-card-scrap"
-                    submitting={submitting}
-                    viewerHasLiked={item.viewerHasLiked ?? false}
-                    viewerHasScrapped={item.viewerHasScrapped ?? false}
-                    onToggle={(kind, active) =>
-                      onEngagementToggle(item, kind, active)
-                    }
-                  />
+export function EventsSurveysGrid({ isAuthenticated, items, lang, hideDate = false, engagementSubmitting, onEngagementToggle }: EventsSurveysGridProps) {
+  return <div className="events-surveys-card-grid discovery-grid">
+    {items.map(item => {
+      const event = item.kind === "EVENT";
+      const title = stripRichText(lang === "ko" ? item.titleKo : item.titleEn || item.titleKo);
+      const description = stripRichText(lang === "ko" ? item.descriptionKo : item.descriptionEn || item.descriptionKo);
+      const href = event ? `/events/${item.id}` : isClosedItem(item) && item.resultVisibility === "PUBLIC" ? `/survey/${item.id}/results` : `/survey/${item.id}`;
+      const dateTime = getDiscoveryDateTime(item, lang);
+      const badge = getDiscoveryBadge(item, lang);
+      const audience = audienceText(item, lang);
+      const surveyBadges = [
+        !item.allowAnonymous && (lang === "ko" ? "로그인 필요" : "Login required"),
+        item.allowAnonymous && (lang === "ko" ? "익명 설문" : "Anonymous survey"),
+        item.feePayersOnly && (lang === "ko" ? "과비 납부자만" : "Fee-paying members"),
+        item.isKoreanOnly && (lang === "ko" ? "한국어 전용" : "Korean only"),
+      ].filter((label): label is string => Boolean(label));
+      const cta = isClosedItem(item)
+        ? lang === "ko" ? item.resultVisibility === "PUBLIC" ? "결과 보기" : "설문 보기" : item.resultVisibility === "PUBLIC" ? "View results" : "View survey"
+        : lang === "ko" ? "설문 참여" : "Take survey";
+      const location = (lang === "en" ? item.locationEn || item.location : item.location)?.trim();
+      const saved = isAuthenticated && Boolean(item.viewerHasScrapped);
+      const submitting = engagementSubmitting === `${item.id}:SCRAP`;
+      return <article key={item.id} className={`discovery-card${event ? "" : " is-survey"}${saved ? " is-saved" : ""}${submitting ? " is-saving" : ""}`}>
+        <Link to={href} target={event ? undefined : "_blank"} rel={event ? undefined : "noopener noreferrer"} className="discovery-card-link">
+          <div className="discovery-card-copy">
+            {!hideDate && <p className="discovery-card-date" title={getCardPeriodText(item, lang) || dateTime}>{dateTime}</p>}
+            <h3 className="discovery-card-title">{title}</h3>
+            <div className="discovery-card-footer">
+              <p className="discovery-card-detail">
+                {event ? <><MapPin aria-hidden="true" /><span>{location || (lang === "ko" ? "장소 미정" : "Location to be announced")}</span></> : <span>{description || (lang === "ko" ? "설문 내용을 확인하고 참여해 주세요." : "View the survey and take part.")}</span>}
+              </p>
+              <div className="discovery-card-bottom">
+                <div className="discovery-card-badges">
+                  {badge.label && (event || !item.isAlwaysOpen || badge.tone === "closed") && <span className={`discovery-badge is-${badge.tone}`} title={badge.deadline ? `${formatCompactDateTime(badge.deadline)} (KST)` : undefined}>{badge.label}</span>}
+                  {event ? audience && <span className="discovery-audience"><LockKeyhole aria-hidden="true" />{audience}</span>
+                    : surveyBadges.map(label => <span key={label} className="discovery-badge is-audience">{label}</span>)}
                 </div>
-              ) : null}
-            </div>
-
-            <div className="home-portal-event-body break-keep">
-              {badges.length > 0 ? (
-                <div className="home-portal-event-badges">
-                  {badges.map((badge) => (
-                    <span key={badge.label} className={`home-portal-event-badge is-${badge.tone}`}>
-                      {badge.locked && <LockKeyhole aria-hidden="true" className="size-3 shrink-0" strokeWidth={1.5} />}
-                      {badge.label}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-              <Link aria-label={title} to={href} target={item.kind === "EVENT" ? undefined : "_blank"} rel="noopener noreferrer" className="min-w-0">
-                <h3 className="line-clamp-2">{title}</h3>
-                {desc ? <p className="line-clamp-2">{desc}</p> : null}
-              </Link>
-              <div className="home-portal-event-meta">
-                {period ? (
-                  <Link
-                    aria-label={`${title} ${period}`}
-                    to={href} target={item.kind === "EVENT" ? undefined : "_blank"} rel="noopener noreferrer"
-                    className="home-portal-event-time"
-                  >
-                    <Clock
-                      aria-hidden="true"
-                      className="size-3.5 shrink-0 text-slate-400"
-                    />
-                    <span className="truncate">{period}</span>
-                  </Link>
-                ) : null}
-                {item.kind === "EVENT" ? (
-                  <div className="home-portal-event-location flex min-w-0 items-center gap-1.5">
-                    <MapPin
-                      aria-hidden="true"
-                      className={
-                        location
-                          ? "size-3.5 shrink-0 text-slate-400"
-                          : "size-3.5 shrink-0 text-slate-300"
-                      }
-                    />
-                    <span className="truncate text-slate-600">
-                      {location ?? (lang === "ko" ? "장소 미정" : "Location TBD")}
-                    </span>
-                  </div>
-                ) : null}
+                {!event && <span className="discovery-survey-cta">{cta}<ArrowRight aria-hidden="true" /></span>}
               </div>
             </div>
           </div>
-        );
-      })}
-    </div>
-  );
+          {event && <CardImage imageUrl={item.imageUrl} />}
+        </Link>
+        {event && onEngagementToggle && <button type="button" className="discovery-card-save" aria-label={lang === "ko" ? saved ? "스크랩 해제" : "스크랩" : saved ? "Remove bookmark" : "Bookmark"} aria-pressed={saved} aria-busy={submitting} disabled={submitting} onClick={() => onEngagementToggle(item, "SCRAP", !saved)}>
+          <Bookmark aria-hidden="true" fill={saved ? "currentColor" : "none"} strokeWidth={saved ? 0 : 1.6} />
+        </button>}
+      </article>;
+    })}
+  </div>;
 }

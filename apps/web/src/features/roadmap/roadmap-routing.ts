@@ -9,6 +9,31 @@ const CORNER_RADIUS = 9;
 const TURN_PENALTY = 150;
 
 type Direction = 0 | 1 | 2 | 3;
+type RoutingGrid = { xs: number[]; ys: number[]; blocked: Map<string, boolean> };
+
+function createRoutingGrid(cards: Card[]): RoutingGrid {
+  return {
+    xs: [...new Set(cards.flatMap(c => [c.x - CLEAR, c.x + W + CLEAR]))],
+    ys: [...new Set(cards.flatMap(c => [c.y - CLEAR, c.y + H + CLEAR]))],
+    blocked: new Map(),
+  };
+}
+
+// A router belongs to one immutable layout. Filtering/rearranging the cards
+// creates a new router, so cached geometry can never cross layout boundaries.
+export function createRoadmapRouter(cards: Card[]) {
+  const cardById = new Map(cards.map(card => [card.id, card]));
+  const grid = createRoutingGrid(cards);
+  const routes = new Map<string, ReturnType<typeof routeConnection>>();
+  return (sourceId: string, targetId: string) => {
+    const key = JSON.stringify([sourceId, targetId]);
+    if (routes.has(key)) return routes.get(key)!;
+    const source = cardById.get(sourceId), target = cardById.get(targetId);
+    const route = source && target ? routeConnection(source, target, cards, grid) : null;
+    routes.set(key, route);
+    return route;
+  };
+}
 
 function directionForSide(side: Side): Direction {
   if (side === "right") return 0;
@@ -84,7 +109,7 @@ function popQueue(queue: QueueItem[]): QueueItem {
 
 // Route through card gutters, never through a course rectangle. Group backgrounds
 // remain traversable so long connections resemble the original poster's buses.
-export function routeConnection(source: Card, target: Card, cards: Card[]) {
+export function routeConnection(source: Card, target: Card, cards: Card[], grid = createRoutingGrid(cards)) {
   const dx = target.x - source.x, dy = target.y - source.y;
   const horizontal = Math.abs(dx) >= W;
   const sourceSide: Side = horizontal ? (dx > 0 ? "right" : "left") : (dy > 0 ? "bottom" : "top");
@@ -93,11 +118,20 @@ export function routeConnection(source: Card, target: Card, cards: Card[]) {
   const start = port(source, sourceSide), end = port(target, targetSide);
   const a = movePoint(start, sourceSide, stubDistance(start, sourceSide, source, cards));
   const b = movePoint(end, targetSide, stubDistance(end, targetSide, target, cards));
-  const xs = [...new Set([a.x, b.x, ...cards.flatMap(c => [c.x - CLEAR, c.x + W + CLEAR])])].sort((a,b)=>a-b);
-  const ys = [...new Set([a.y, b.y, ...cards.flatMap(c => [c.y - CLEAR, c.y + H + CLEAR])])].sort((a,b)=>a-b);
-  const blocked = (p: Point, q: Point) => cards.some(c => p.x === q.x
-    ? p.x > c.x - CLEAR + .1 && p.x < c.x + W + CLEAR - .1 && Math.max(p.y,q.y) > c.y - CLEAR + .1 && Math.min(p.y,q.y) < c.y + H + CLEAR - .1
-    : p.y > c.y - CLEAR + .1 && p.y < c.y + H + CLEAR - .1 && Math.max(p.x,q.x) > c.x - CLEAR + .1 && Math.min(p.x,q.x) < c.x + W + CLEAR - .1);
+  const xs = [...new Set([a.x, b.x, ...grid.xs])].sort((a,b)=>a-b);
+  const ys = [...new Set([a.y, b.y, ...grid.ys])].sort((a,b)=>a-b);
+  const blocked = (p: Point, q: Point) => {
+    const key = p.x === q.x
+      ? `v:${p.x}:${Math.min(p.y, q.y)}:${Math.max(p.y, q.y)}`
+      : `h:${p.y}:${Math.min(p.x, q.x)}:${Math.max(p.x, q.x)}`;
+    const cached = grid.blocked.get(key);
+    if (cached !== undefined) return cached;
+    const result = cards.some(c => p.x === q.x
+      ? p.x > c.x - CLEAR + .1 && p.x < c.x + W + CLEAR - .1 && Math.max(p.y,q.y) > c.y - CLEAR + .1 && Math.min(p.y,q.y) < c.y + H + CLEAR - .1
+      : p.y > c.y - CLEAR + .1 && p.y < c.y + H + CLEAR - .1 && Math.max(p.x,q.x) > c.x - CLEAR + .1 && Math.min(p.x,q.x) < c.x + W + CLEAR - .1);
+    grid.blocked.set(key, result);
+    return result;
+  };
   const index = (p: Point) => ys.indexOf(p.y) * xs.length + xs.indexOf(p.x);
   const point = (i: number) => ({ x: xs[i % xs.length], y: ys[Math.floor(i / xs.length)] });
   const first = index(a), last = index(b);

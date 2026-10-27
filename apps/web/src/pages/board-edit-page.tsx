@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BoardEditorColumns } from "@/features/board-write/board-editor-columns";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -216,7 +217,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     />
   );
   const editorCard = (includeSettings: boolean) => (
-    <DataViewCard>
+    <DataViewCard className="board-editor-card flex flex-col">
       <BoardEditHeaderControls
         editorView={editorView}
         onEditorViewChange={setEditorView}
@@ -240,7 +241,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
           ) : null}</>}
       />
 
-      <div className="min-h-[450px]">
+      <div className="board-editor-content flex min-h-[450px] flex-1 flex-col lg:min-h-[34rem]">
         <BoardWriteEditorFields
           editorView={editorView}
           contentEn={contentEn}
@@ -313,7 +314,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
           {loading ? (
             <div className="bg-white border border-slate-200 rounded-xl p-16 shadow-[0_10px_35px_rgba(15,23,42,0.05)] flex flex-col items-center justify-center gap-4">
               <Loader2 className="w-10 h-10 text-kaist-darkgreen animate-spin" />
-              <p className="text-xs font-semibold text-slate-400">
+              <p className="sr-only">
                 {lang === "ko"
                   ? "게시글을 불러오는 중입니다..."
                   : "Loading article..."}
@@ -341,13 +342,12 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
               />
 
               {isEvent ? (
-                <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
-                  {editorCard(false)}
+                <BoardEditorColumns editor={editorCard(false)} details={
                   <DataViewCard className="min-w-0">
                     {eventFields}
                     {postSettings}
                   </DataViewCard>
-                </div>
+                } />
               ) : (
                 editorCard(true)
               )}

@@ -119,6 +119,9 @@ export class VotesService {
     if (!vote || (vote.status === "DRAFT" && !isManager)) {
       throw new NotFoundException("vote_not_found");
     }
+    if (vote.status === "PUBLISHED" && nowMs() < vote.startsAt.valueOf() && !isManager) {
+      throw new ForbiddenException("vote_not_started");
+    }
     let eligibility: VoteDetailResponse["eligibility"] = "LOGIN_REQUIRED";
     if (caller) {
       const voter = await this.repo.findVoter(id, caller.id);

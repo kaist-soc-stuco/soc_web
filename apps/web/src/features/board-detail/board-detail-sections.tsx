@@ -1,12 +1,12 @@
 import { PromotionStatus } from "@/components/ui/promotion-period";
-import { BackToListLink } from "@/components/ui/back-to-list-link";
 import type {
   ArticleDetailResponse,
   ArticleAssetItem,
   ArticleEngagementKind,
 } from "@soc/contracts";
-import { ArrowUpRight, Bookmark, Heart, MessageCircle, Check, ChevronUp, ChevronDown, ClipboardCheck, Edit2, EllipsisVertical, Eye, EyeOff, Share2, Trash2 } from "lucide-react";
-import { isoToDate } from "@soc/shared";
+import { ArrowUpRight, Bookmark, Heart, MessageCircle, Check, ChevronUp, ChevronDown, Edit2, EllipsisVertical, Eye, EyeOff, Share2, Trash2 } from "lucide-react";
+import { isoToDate, isoToMs, nowMs } from "@soc/shared";
+import { useEffect, useReducer } from "react";
 import { Link } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
@@ -42,6 +42,8 @@ interface ArticleCardProps {
   canEdit: boolean;
   canModerate: boolean;
   category: string;
+  boardTitle: string;
+  listHref: string;
   content: string;
   editHref?: string;
   isAuthenticated: boolean;
@@ -71,6 +73,8 @@ export function BoardDetailArticleCard({
   canEdit,
   canModerate,
   category,
+  boardTitle,
+  listHref,
   content,
   editHref,
   isAuthenticated,
@@ -83,7 +87,6 @@ export function BoardDetailArticleCard({
   posterAsset,
   posterStorageKey,
   shareCopied,
-  surveyDescription,
   surveyTitle,
   submitting,
   title,
@@ -92,10 +95,27 @@ export function BoardDetailArticleCard({
   onCommentClick,
 }: ArticleCardProps) {
   const isMobile = useMediaQuery("(width < 768px)");
+  const [deadlineTick, refreshDeadline] = useReducer((tick: number) => tick + 1, 0);
+  const closeMs = article.survey?.closeAt && !article.survey.isAlwaysOpen
+    ? isoToMs(article.survey.closeAt) : Number.NaN;
+  const registrationClosed = article.survey?.computedState === "closed" || closeMs <= nowMs();
+  useEffect(() => {
+    const remaining = closeMs - nowMs();
+    if (!Number.isFinite(remaining) || remaining <= 0) return;
+    const timer = window.setTimeout(refreshDeadline, Math.min(remaining, 2_147_483_647));
+    return () => window.clearTimeout(timer);
+  }, [closeMs, deadlineTick]);
   return (
     <article className={article.status === "HIDDEN"
       ? "mobile-flat-article w-full rounded-xl border border-amber-200 bg-white px-4 py-5 shadow-card min-[640px]:px-5 md:py-6 lg:px-[52px] lg:py-[32px]"
       : "mobile-flat-article w-full rounded-xl border border-card-border-subtle bg-white px-4 py-5 shadow-card min-[640px]:px-5 md:py-6 lg:px-[52px] lg:py-[32px]"}>
+      <nav aria-label={lang === "ko" ? "페이지 경로" : "Breadcrumb"} className="article-breadcrumb mb-4 flex flex-wrap items-center gap-2 text-xs font-normal leading-5 text-slate-500">
+        {category !== "_EVENT" && <>
+          <Link to="/board" className="hover:text-slate-700">{lang === "ko" ? "게시판" : "Boards"}</Link>
+          <span aria-hidden="true" className="text-slate-300">/</span>
+        </>}
+        <Link to={listHref} className="hover:text-slate-700">{lang === "ko" && category === "notice" && boardTitle === "공지" ? "공지사항" : boardTitle}</Link>
+      </nav>
       {article.status === "HIDDEN" ? (
         <div
           role="status"
@@ -199,11 +219,11 @@ export function BoardDetailArticleCard({
           <p role="note" className="mb-5 rounded-md bg-slate-50 px-4 py-2 text-sm font-normal text-slate-500">This post is only available in Korean.</p>
         ) : null}
         {posterStorageKey ? (
-          <figure className="w-full mb-6 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+          <figure className="mx-auto mb-6 w-fit max-w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
             <img
               src={resolveAssetUrl(posterStorageKey)}
               alt={posterAsset?.originalFilename ?? title}
-              className="mx-auto max-h-[520px] w-full object-contain"
+              className="block h-auto w-auto max-h-[min(70svh,40rem)] max-w-full object-contain"
             />
           </figure>
         ) : null}
@@ -221,36 +241,17 @@ export function BoardDetailArticleCard({
       />
 
       {article.survey && (
-        <Link
-          to={`/survey/${article.survey.surveyId}`} target="_blank" rel="noopener noreferrer"
-          aria-label={lang === "ko" ? `${surveyTitle} 설문조사 참여하기 (새 탭)` : `Take the ${surveyTitle} survey (opens in a new tab)`}
-          className="group mt-6 block rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-4 transition-colors duration-150 hover:bg-slate-50 hover:border-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
-        >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center text-slate-500">
-                <ClipboardCheck className="h-4.5 w-4.5" />
-              </span>
-              <div className="min-w-0">
-                <h2 className="line-clamp-2 break-words text-[length:var(--ui-text-body-size)] font-semibold leading-snug tracking-tight text-app-text-strong">
-                  {surveyTitle}
-                </h2>
-                {surveyDescription && (
-                  <RichTextContent
-                    content={surveyDescription}
-                    className="mt-1 line-clamp-2 text-sm font-normal leading-relaxed text-app-text-muted"
-                  />
-                )}
-              </div>
-            </div>
-            <span
-              className="inline-flex shrink-0 items-center justify-center gap-1.5 min-h-9 rounded-md bg-brand-primary px-3.5 py-1.5 text-sm font-medium text-white transition-colors duration-150 group-hover:bg-[#006b3e]"
-            >
-              <span>{lang === "ko" ? "설문조사 참여하기" : "Take Survey"}</span>
-              <ArrowUpRight aria-hidden="true" className="size-3.5" />
-            </span>
-          </div>
-        </Link>
+        <div className="mt-6 flex justify-start" data-survey-cta>
+          {registrationClosed ? <Button type="button" variant="secondary" disabled className="w-auto bg-slate-100 text-slate-500 disabled:opacity-100">
+            {lang === "ko" ? "신청이 마감되었습니다" : "Registration is closed"}
+          </Button> : <Button asChild className="w-auto">
+            <Link to={`/survey/${article.survey.surveyId}`} target="_blank" rel="noopener noreferrer"
+              aria-label={lang === "ko" ? `${surveyTitle} ${category === "_EVENT" ? "참가 신청하기" : "설문 참여하기"} (새 탭)` : `${category === "_EVENT" ? "Register for" : "Take"} ${surveyTitle} (opens in a new tab)`}>
+              {lang === "ko" ? category === "_EVENT" ? "참가 신청하기" : "설문 참여하기" : category === "_EVENT" ? "Register" : "Take survey"}
+              <ArrowUpRight aria-hidden="true" className="size-4" />
+            </Link>
+          </Button>}
+        </div>
       )}
 
       {isMobile ? (allowEngagement || canComment) && <div className="mobile-article-engagement" style={{ gridTemplateColumns: `repeat(${(allowEngagement ? 2 : 0) + (canComment ? 1 : 0)},minmax(0,1fr))` }}>
@@ -261,7 +262,7 @@ export function BoardDetailArticleCard({
         {allowEngagement &&
           <EngagementActionButton active={isAuthenticated && article.viewerHasScrapped} count={article.scrapCount} icon={<Bookmark className="size-5" fill={isAuthenticated && article.viewerHasScrapped ? "currentColor" : "none"} />} label={lang === "ko" ? "스크랩" : "Save"} loading={submitting === "SCRAP"} onClick={() => onToggle("SCRAP", !article.viewerHasScrapped)} className="mobile-detail-engagement-action" tone="scrap" showLabel />
         }
-      </div> : <div className="mt-8 flex items-center justify-start gap-2 border-t border-slate-100 pt-4">
+      </div> : <div className="article-desktop-engagement mt-6 flex min-h-14 items-center justify-start gap-2 py-2">
         <ArticleEngagementActions
           allowLike={allowEngagement}
           allowScrap={allowEngagement}
@@ -307,18 +308,6 @@ export function BoardDetailArticleCard({
   );
 }
 
-export function BoardDetailBackLink({
-  category,
-  lang,
-  to,
-}: {
-  category: string;
-  lang: string;
-  to?: string;
-}) {
-  return <BackToListLink to={to ?? `/board/${category}`} lang={lang} />;
-}
-
 type AdjacentArticle = NonNullable<ArticleDetailResponse["prevArticle"]>;
 
 export function BoardDetailAdjacentNav({
@@ -343,7 +332,7 @@ export function BoardDetailAdjacentNav({
         {article ? (lang === "ko" ? article.titleKo : article.titleEn || article.titleKo) : (lang === "ko" ? `${label}이 없습니다.` : `No ${direction === "prev" ? "previous" : "next"} post.`)}
       </span>
     </>;
-    const className = "grid min-h-14 min-w-0 grid-cols-[5rem_minmax(0,1fr)] items-center gap-3 py-3 sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-4";
+    const className = "grid min-h-14 min-w-0 grid-cols-[5rem_minmax(0,1fr)] items-center gap-3 px-4 py-3 sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-4";
     return article ? (
       <Link key={direction} to={`${toBase}/${article.articleId}`} className={`${className} transition-colors hover:bg-slate-50`}>
         {content}
@@ -354,7 +343,7 @@ export function BoardDetailAdjacentNav({
   return (
     <nav
       aria-label={lang === "ko" ? "게시글 이동" : "Post navigation"}
-      className="article-adjacent-navigation mt-6 w-full divide-y divide-slate-100 border-t border-slate-200"
+      className="article-adjacent-navigation mt-6 w-full divide-y divide-slate-100 border-t border-slate-100"
     >
       {renderRow(prevArticle, "prev")}
       {renderRow(nextArticle, "next")}

@@ -2,6 +2,7 @@ import * as React from "react";
 import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { DatePickerInput } from "./date-picker";
 
 const textControlClassName =
   "interaction-control select-text h-[var(--ui-control-height)] !rounded-[var(--ui-control-radius)] border border-slate-200 bg-white px-3 text-[length:var(--ui-control-font-size)] [font-weight:var(--ui-control-font-weight)] leading-[var(--ui-control-line-height)] text-[#172033] outline-none placeholder:font-normal placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-70";
@@ -19,7 +20,9 @@ const unstyledInputTypes = new Set([
 export const UiInput = React.forwardRef<
   HTMLInputElement,
   React.InputHTMLAttributes<HTMLInputElement>
->(({ className, type = "text", ...props }, ref) => (
+>(({ className, type = "text", ...props }, ref) => type === "date" || type === "datetime-local" ? (
+  <DatePickerInput ref={ref} type={type} className={className} {...props} />
+) : (
   <input
     ref={ref}
     type={type}

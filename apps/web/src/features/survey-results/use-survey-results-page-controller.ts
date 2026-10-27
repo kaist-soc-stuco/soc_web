@@ -21,15 +21,22 @@ export function useSurveyResultsPageController() {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<SurveyResultsError>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     if (!id) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setAnalytics(null);
     apiClient
       .getSurveyAnalytics(id)
       .then((data) => {
+        if (cancelled) return;
         setAnalytics(data);
       })
       .catch((err: unknown) => {
+        if (cancelled) return;
         if (err instanceof ApiClientHttpError && err.status === 403) {
           setError("forbidden");
         } else {
@@ -37,15 +44,17 @@ export function useSurveyResultsPageController() {
         }
       })
       .finally(() => {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       });
-  }, [id, apiClient]);
+    return () => { cancelled = true; };
+  }, [id, apiClient, retryKey]);
 
   return {
     analytics,
     error,
     lang,
     loading,
+    retry: () => setRetryKey(value => value + 1),
     navigateBack: () => navigate(-1),
   };
 }

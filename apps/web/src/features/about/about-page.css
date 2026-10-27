@@ -1,0 +1,195 @@
+@font-face {
+  font-family: 'Lora Slogan';
+  src: url('/about/lora-slogan-italic.woff2') format('woff2');
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+}
+
+/* About is a readable activity report. Keep all visual changes inside this route. */
+.about-tree-page {
+  --tree-ink: #172033;
+  --tree-muted: #46534b;
+  --tree-accent: var(--color-brand-primary, #007a4b);
+  --tree-field: #f3f6f4;
+  --tree-soft: #e6ede8;
+  --tree-quote-font: 'Lora Slogan', Georgia, serif;
+  --tree-nav-height: 3.5rem;
+  --tree-sticky-top: calc(var(--ui-header-height) + var(--tree-nav-height) + 1.5rem);
+  color: var(--tree-ink);
+  background: #fff;
+}
+.has-public-top-banner .about-tree-page { --tree-sticky-top: calc(var(--ui-header-height) + var(--tree-nav-height) + 4.25rem); }
+.about-tree-page .tree-container { width: min(calc(100% - 6rem), 76rem); margin-inline: auto; }
+.about-tree-page :is(h1, h2, h3, h4, p, figure) { margin: 0; }
+.about-tree-page :is(h1, h2, h3, h4) { color: var(--tree-ink); letter-spacing: -.035em; word-break: keep-all; overflow-wrap: anywhere; text-wrap: balance; }
+.about-tree-page p { word-break: keep-all; overflow-wrap: anywhere; }
+.about-tree-page :is(a, button, summary):focus-visible { outline: 2px solid var(--tree-accent); outline-offset: 4px; }
+.about-tree-page .tree-section { padding-block: 5rem; scroll-margin-top: var(--tree-sticky-top); }
+.about-tree-page :is(.tree-intro, .tree-program-group) { scroll-margin-top: var(--tree-sticky-top); }
+.about-tree-page .tree-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; margin-bottom: 2.5rem; }
+.about-tree-page h2 { font-size: clamp(1.75rem, 2.4vw, 2.25rem); font-weight: 700; line-height: 1.3; }
+.about-tree-page .about-section-nav { height: var(--tree-nav-height); border: 0; background: rgb(255 255 255 / .9); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.about-tree-page .tree-section-nav-inner { position: relative; display: flex; align-items: center; gap: 2rem; height: 100%; }
+.about-tree-page .about-section-nav a { display: inline-flex; align-items: center; height: 100%; min-height: 2.75rem; padding: 0; color: var(--tree-muted); font-size: .875rem; font-weight: 600; white-space: nowrap; transition: color 180ms ease; }
+.about-tree-page .about-section-nav a:first-child { margin-left: 0; }
+.about-tree-page .about-section-nav a::after { display: none; }
+.about-tree-page .about-section-nav a:is(:hover, [aria-current]) { color: var(--tree-accent); }
+.about-tree-page .tree-nav-indicator { position: absolute; left: 0; bottom: 0; width: 1px; height: .125rem; background: var(--tree-accent); opacity: 0; pointer-events: none; transform-origin: left center; transition: transform 360ms cubic-bezier(.22, 1, .36, 1), width 360ms cubic-bezier(.22, 1, .36, 1), opacity 180ms ease; }
+.about-tree-page .tree-nav-short { display: none; }
+.about-tree-page .tree-intro { padding: 0; }
+.about-tree-page .tree-hero-band { position: relative; isolation: isolate; overflow: clip; padding-block: 3.5rem 2.5rem; }
+.about-tree-page .tree-hero-band::before { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; background-image: radial-gradient(circle, rgb(23 32 51 / .13) .0625rem, transparent .075rem); background-size: 1.5rem 1.5rem; mask-image: linear-gradient(to bottom, #000 0%, #000 64%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 64%, transparent 100%); } /* taste-skill-ignore: user-requested hero dot pattern and bottom fade. */
+.about-tree-page .tree-hero-band > .tree-container { position: relative; z-index: 1; }
+.about-tree-page .tree-hero { display: grid; grid-template-columns: 1fr 1.15fr; align-items: center; gap: 3.5rem; }
+.about-tree-page .tree-hero h1 { font-size: clamp(2rem, 3.2vw, 3rem); font-weight: 750; line-height: 1.18; }
+.about-tree-page .tree-hero h1 > span { display: block; }
+.about-tree-page .tree-hero-lead { margin: 1.5rem 0 0; max-width: 30rem; padding: 0; border: 0; color: var(--tree-muted); font-family: var(--tree-quote-font); font-size: clamp(1.5rem, 2.1vw, 1.875rem); font-style: italic; line-height: 1.45; letter-spacing: -.025em; text-wrap: balance; }
+.about-tree-page .tree-hero-lead p { font-weight: 500; }
+.about-tree-page .tree-hero-photo { min-width: 0; overflow: hidden; border-radius: .5rem; background: var(--tree-field); }
+.about-tree-page .tree-hero-photo img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: contain; }
+.about-tree-page .tree-intro-body { display: grid; grid-template-columns: 1fr 1.6fr; gap: 3.5rem; margin-top: 2.5rem; }
+.about-tree-page .tree-intro-body h2 { font-size: 1.5rem; }
+.about-tree-page .tree-intro-body p { color: var(--tree-muted); font-size: 1.125rem; line-height: 1.9; }
+.about-tree-page .tree-intro-body p + p { margin-top: 1.25rem; }
+.about-tree-page .tree-intro-body strong { color: var(--tree-ink); font-weight: 650; }
+.about-tree-page .tree-program-layout { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 4rem; align-items: start; }
+.about-tree-page .tree-program-index { display: grid; gap: .5rem; }
+.about-tree-page .tree-program-index button { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-width: 0; min-height: 3.5rem; padding: .75rem 1rem; border-radius: .375rem; color: var(--tree-muted); background: transparent; font-size: 1rem; font-weight: 500; text-align: left; word-break: keep-all; transition: background-color 180ms ease, color 180ms ease; }
+.about-tree-page .tree-program-index button:hover { color: var(--tree-accent); background: var(--tree-field); }
+.about-tree-page .tree-program-index button[aria-selected="true"] { color: var(--tree-accent); background: #eaf2ed; font-weight: 650; }
+.about-tree-page .tree-program-index svg { width: 1rem; height: 1rem; flex-shrink: 0; }
+.about-tree-page .tree-program-groups { display: grid; min-width: 0; }
+/* All panels size the same grid cell; changing tabs never moves the sections below. */
+.about-tree-page .tree-program-group { grid-area: 1 / 1; min-width: 0; }
+.about-tree-page .tree-program-group[aria-hidden="false"] { animation: tree-content-enter 240ms ease; }
+.about-tree-page .tree-program-group[aria-hidden="true"] { visibility: hidden; pointer-events: none; }
+.about-tree-page .tree-program-group:focus-visible { outline: 2px solid var(--tree-accent); outline-offset: 4px; }
+.about-tree-page .tree-program-group > header { margin-bottom: 1.5rem; }
+.about-tree-page .tree-program-group h3 { font-size: 1.5rem; font-weight: 700; line-height: 1.4; }
+.about-tree-page .tree-program-group > header p { margin-top: .5rem; color: var(--tree-muted); font-size: 1rem; line-height: 1.7; }
+.about-tree-page .tree-program-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.about-tree-page .tree-program-pair article { min-width: 0; overflow: hidden; border: 1px solid rgb(23 32 51 / .1); border-radius: .5rem; background: #fff; box-shadow: 0 2px 8px rgb(23 32 51 / .04); transition: transform 200ms ease-out; } /* taste-skill-ignore: user-requested single white media card with a fine border and soft shadow. */
+.about-tree-page .tree-program-media { position: relative; overflow: hidden; aspect-ratio: 16 / 9; background: var(--tree-soft); }
+.about-tree-page .tree-program-media img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 200ms ease-out; }
+.about-tree-page .tree-program-copy { padding: 1.5rem; }
+.about-tree-page .tree-program-pair h4 { margin-bottom: .75rem; font-size: 1.125rem; font-weight: 650; line-height: 1.5; }
+.about-tree-page .tree-program-pair p { color: var(--tree-muted); font-size: 1rem; line-height: 1.8; }
+.about-tree-page .tree-program-pair p + p { margin-top: 1rem; }
+.about-tree-page summary { cursor: pointer; list-style: none; }
+.about-tree-page summary::-webkit-details-marker { display: none; }
+.about-tree-page summary > svg { width: 1rem; height: 1rem; flex-shrink: 0; transition: transform 180ms ease; }
+.about-tree-page details[open] > summary > svg { transform: rotate(180deg); }
+.about-tree-page .tree-pledges-section { background: var(--tree-field); }
+.about-tree-page .tree-pledges { display: grid; grid-template-columns: 16rem minmax(0, 1fr); gap: 4rem; align-items: start; }
+.about-tree-page .tree-pledge-overview { position: sticky; top: var(--tree-sticky-top); }
+.about-tree-page .tree-pledge-overview > p { color: var(--tree-ink); font-size: 1rem; line-height: 1.7; }
+.about-tree-page .tree-pledge-overview strong { display: block; margin-top: .5rem; color: var(--tree-accent); font-size: 4rem; line-height: 1.2; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.about-tree-page .tree-progress-track { display: flex; gap: .25rem; height: .375rem; margin-top: 1rem; }
+.about-tree-page .tree-progress-track span { display: block; flex: 1; min-width: 0; height: 100%; border-radius: .125rem; background: #d9e3dd; }
+.about-tree-page .tree-progress-track span[data-completed="true"] { background: var(--tree-accent); }
+.about-tree-page .tree-pledge-overview .tree-pledge-note { margin-top: 1.25rem; color: var(--tree-muted); font-size: .875rem; }
+.about-tree-page .tree-pledge-filters { display: flex; gap: .5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.about-tree-page .tree-pledge-filters button { display: inline-flex; align-items: center; gap: .5rem; min-height: 2.75rem; padding: .5rem 1rem; border-radius: .375rem; color: var(--tree-muted); background: transparent; font-size: .875rem; transition: color 180ms ease, background-color 180ms ease; }
+.about-tree-page .tree-pledge-count { display: inline-flex; align-items: center; justify-content: center; min-width: 1.25rem; height: 1.25rem; padding-inline: .3125rem; border-radius: 1rem; background: var(--tree-soft); font-size: .75rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.about-tree-page .tree-pledge-filters button:is(:hover, [aria-pressed="true"]) { color: var(--tree-ink); background: #fff; }
+.about-tree-page .tree-pledge-filters button[aria-pressed="true"] { font-weight: 650; }
+.about-tree-page .tree-pledge-list { display: grid; gap: .5rem; }
+.about-tree-page .tree-pledge-item { padding: .25rem 1.25rem; background: #fff; border-radius: .375rem; }
+.about-tree-page .tree-pledge-item > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: .75rem; min-height: 3.5rem; padding-block: .75rem; }
+.about-tree-page .tree-pledge-item h3 { font-size: 1rem; font-weight: 550; line-height: 1.65; }
+.about-tree-page .tree-pledge-status { height: 1.5rem; padding-inline: .5rem; font-size: .8125rem; font-weight: 500; white-space: nowrap; }
+.about-tree-page .tree-pledge-item > div { padding-block: .25rem 1rem; }
+.about-tree-page .tree-pledge-item p { font-size: 1rem; color: var(--tree-muted); line-height: 1.85; white-space: pre-line; }
+.about-tree-page .tree-pledge-item[open] > div { animation: tree-content-enter 200ms ease; }
+.about-tree-page .tree-empty { color: var(--tree-muted); padding-block: 1rem; font-size: 1rem; }
+.about-tree-page .tree-org-image { width: min(100%, 60rem); margin-inline: auto; }
+.about-tree-page .tree-org-image img { display: block; width: auto; max-width: 100%; height: auto; max-height: 30rem; margin-inline: auto; object-fit: contain; }
+/* The supplied bitmap has blank margins; only its empty perimeter is clipped. */
+.about-tree-page .tree-org-image[data-default-chart="true"] { position: relative; aspect-ratio: 1384 / 328.5; overflow: hidden; }
+.about-tree-page .tree-org-image[data-default-chart="true"] img { position: absolute; width: 115.60694%; max-width: none; max-height: none; left: -6.35838%; top: -80.82192%; margin: 0; }
+.about-tree-page .tree-partnership { background: var(--tree-field); padding-block: 3.5rem; }
+.about-tree-page .tree-partnership-inner { display: flex; align-items: center; justify-content: space-between; gap: 3rem; }
+.about-tree-page .tree-partnership h2 { font-size: 1.75rem; }
+.about-tree-page .tree-partnership p { max-width: 44rem; margin-top: .75rem; color: var(--tree-muted); font-size: 1rem; line-height: 1.8; white-space: pre-line; }
+.about-tree-page .tree-primary-link { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: .75rem; min-height: 2.75rem; padding: .75rem 1.25rem; border-radius: .375rem; color: #fff; background: var(--tree-accent); font-size: 1rem; font-weight: 600; transition: background-color 180ms ease, transform 180ms ease; }
+.about-tree-page .tree-primary-link:hover { background: #00643d; }
+.about-tree-page .tree-primary-link:active { transform: translateY(1px); }
+.about-tree-page .tree-primary-link svg { width: 1rem; height: 1rem; }
+.about-tree-page .tree-partner-logos { margin-top: 2.5rem; }
+.about-tree-page .tree-partner-caption { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.about-tree-page .tree-partner-caption p { margin: 0; font-size: .875rem; font-weight: 500; line-height: 1.6; }
+.about-tree-page .tree-partner-window { overflow: hidden; padding-block: 1.25rem; mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent); } /* taste-skill-ignore: user-requested edge fade for the moving logos, not a surface fill. */
+.about-tree-page .tree-partner-track { display: flex; width: max-content; animation: tree-partner-marquee 40s linear infinite; }
+.about-tree-page .tree-partner-group { display: flex; align-items: center; gap: 4rem; flex-shrink: 0; margin: 0; padding: 0 4rem 0 0; list-style: none; }
+.about-tree-page .tree-partner-group li { display: flex; align-items: center; justify-content: center; flex: 0 0 10rem; width: 10rem; height: 3.5rem; }
+.about-tree-page .tree-partner-logo { display: block; width: auto; max-width: min(100%, 10rem); height: auto; max-height: 2.5rem; object-fit: contain; filter: grayscale(1); opacity: .62; }
+.about-tree-page .tree-partner-logo--inverted { filter: grayscale(1) invert(1); }
+.about-tree-page .tree-partner-logo--silhouette { filter: brightness(0); }
+.about-tree-page .tree-partner-logos[data-running="false"] .tree-partner-track { animation-play-state: paused; }
+.about-tree-page .home-footer-brand > a { color: #526257; }
+.about-tree-page .home-footer-copyright { color: #526257; }
+@media (hover: hover) and (pointer: fine) {
+  .about-tree-page .tree-program-pair article:hover { transform: translateY(-3px); }
+  .about-tree-page .tree-program-pair article:hover .tree-program-media img { transform: scale(1.04); }
+}
+@keyframes tree-partner-marquee { to { transform: translateX(-50%); } }
+@keyframes tree-content-enter { from { opacity: .3; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (width < 1024px) {
+  .about-tree-page .tree-container { width: calc(100% - 3rem); }
+  .about-tree-page .tree-hero { gap: 2rem; grid-template-columns: 1fr 1fr; }
+  .about-tree-page .tree-hero h1 { font-size: 2rem; }
+  .about-tree-page .tree-program-layout { grid-template-columns: 12rem minmax(0, 1fr); gap: 2rem; }
+  .about-tree-page .tree-program-pair { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+  .about-tree-page .tree-intro-body { grid-template-columns: 1fr 1.7fr; gap: 2rem; }
+  .about-tree-page .tree-pledges { grid-template-columns: 12rem minmax(0, 1fr); gap: 2rem; }
+}
+@media (width < 768px) {
+  .about-tree-page { --tree-nav-height: 3rem; }
+  .about-tree-page .tree-container { width: calc(100% - 2.5rem); }
+  .about-tree-page .tree-section { padding-block: 3.5rem; }
+  .about-tree-page .tree-section-heading { display: block; margin-bottom: 1.75rem; }
+  .about-tree-page h2 { font-size: 1.75rem; }
+  .about-tree-page .tree-section-nav-inner { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; }
+  .about-tree-page .about-section-nav a { justify-content: center; font-size: .8125rem; }
+  .about-tree-page .tree-nav-short { display: inline; }
+  .about-tree-page .tree-nav-full { display: none; }
+  .about-tree-page .tree-hero-band { padding-block: 2rem 1.5rem; }
+  .about-tree-page .tree-hero { grid-template-columns: minmax(0, 1fr); gap: 1.75rem; }
+  .about-tree-page .tree-hero h1 { font-size: clamp(1.75rem, 7.2vw, 2.25rem); }
+  .about-tree-page .tree-hero-lead { margin-top: 1rem; font-size: 1.625rem; }
+  .about-tree-page .tree-intro-body { margin-top: 2rem; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+  .about-tree-page .tree-intro-body h2 { font-size: 1.25rem; }
+  .about-tree-page .tree-intro-body p { font-size: 1.0625rem; }
+  .about-tree-page .tree-program-layout { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+  .about-tree-page .tree-program-index { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .25rem; }
+  .about-tree-page .tree-program-index button { justify-content: center; padding: .75rem .5rem; font-size: .875rem; text-align: center; }
+  .about-tree-page .tree-program-index svg { display: none; }
+  .about-tree-page .tree-program-group > header { margin-bottom: 1.25rem; }
+  .about-tree-page .tree-program-group h3 { font-size: 1.375rem; }
+  .about-tree-page .tree-program-pair { gap: 1rem; }
+  .about-tree-page .tree-program-pair h4 { margin-bottom: .5rem; }
+  .about-tree-page .tree-program-copy { padding: 1.25rem; }
+  .about-tree-page .tree-pledges { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+  .about-tree-page .tree-pledge-overview { position: static; max-width: 24rem; }
+  .about-tree-page .tree-pledge-overview .tree-pledge-note { margin-top: 1rem; }
+  .about-tree-page .tree-pledge-item { padding-inline: 1rem; }
+  .about-tree-page .tree-pledge-item > summary { gap: .5rem; }
+  .about-tree-page .tree-pledge-item h3 { font-size: .9375rem; }
+  .about-tree-page .tree-partnership { padding-block: 2rem; }
+  .about-tree-page .tree-partnership-inner { flex-direction: column; align-items: start; gap: 1.5rem; }
+  .about-tree-page .tree-partner-logos { margin-top: 1.75rem; }
+  .about-tree-page .tree-partner-group { gap: 2.5rem; padding-right: 2.5rem; }
+  .about-tree-page .tree-partner-group li { flex-basis: 8rem; width: 8rem; }
+  .about-tree-page .tree-partner-logo { max-height: 2rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .about-tree-page *, .about-tree-page *::before, .about-tree-page *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .about-tree-page .tree-program-pair article:hover, .about-tree-page .tree-program-pair article:hover .tree-program-media img { transform: none; }
+  .about-tree-page .tree-partner-window { mask-image: none; -webkit-mask-image: none; }
+  .about-tree-page .tree-partner-track { width: 100%; }
+  .about-tree-page .tree-partner-group { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; padding: 0; gap: 1.5rem; }
+  .about-tree-page .tree-partner-group li { width: 100%; min-width: 0; }
+  .about-tree-page .tree-partner-group[aria-hidden="true"] { display: none; }
+}

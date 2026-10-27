@@ -23,6 +23,7 @@ import {
 } from "@/lib/board-metadata";
 import { Permissions } from "@/lib/permissions";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { getArticleImageLayout } from "@/lib/article-image-layout";
 
 const COMMENT_PAGE_SIZE = 10;
 
@@ -135,26 +136,9 @@ export function useBoardDetailPageController(forcedCategory?: string) {
         Permissions.has(session?.permission ?? 0, Permissions.WRITE_REPLY)),
   );
 
-  const posterAsset = useMemo(
-    () =>
-      article?.assets?.find(
-        (asset) => asset.storageKey === article?.thumbnailStorageKey,
-      ) ??
-      article?.assets?.find(
-        (asset) => asset.usageType === "THUMBNAIL" || asset.usageType === "IMAGE",
-      ),
-    [article],
+  const { posterAsset, posterStorageKey, attachmentAssets } = useMemo(
+    () => getArticleImageLayout(article ?? {}), [article],
   );
-
-  const attachmentAssets = useMemo(
-    () =>
-      article?.assets?.filter(
-        (asset) => asset.assetId !== posterAsset?.assetId,
-      ) ?? [],
-    [article, posterAsset],
-  );
-
-  const posterStorageKey = article?.thumbnailStorageKey ?? posterAsset?.storageKey ?? null;
 
   useEffect(() => {
     if (!articleId) return;

@@ -22,6 +22,8 @@ import {
 
 import { sortChoiceResults } from "@/lib/survey-results-display";
 import { RichTextContent } from "@/components/ui/rich-text-content";
+import { Button } from "@/components/ui/button";
+import { ResponseStateCard, responseStateActionClassName } from "@/features/survey/response-state-card";
 import { formatSurveyPeriod } from "@/features/survey/survey-answer-utils";
 
 import type { SurveyResultsError } from "./use-survey-results-page-controller";
@@ -345,11 +347,13 @@ export function SurveyResultsContent({
   error,
   lang,
   loading,
+  onRetry,
 }: {
   analytics: SurveyAnalyticsResponse | null;
   error: SurveyResultsError;
   lang: string;
   loading: boolean;
+  onRetry: () => void;
 }) {
   if (loading) {
     return null;
@@ -357,38 +361,21 @@ export function SurveyResultsContent({
 
   if (error === "forbidden") {
     return (
-      <ResultShell className="mx-auto my-10 flex max-w-md flex-col items-center p-6 text-center sm:p-10">
-        <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-rose-100 bg-rose-50 text-rose-500">
-          <Lock className="h-8 w-8" />
-        </div>
-        <h2 className="mb-3 text-2xl font-bold text-slate-950">
-          {lang === "ko" ? "결과 비공개 설문" : "Private Survey Results"}
-        </h2>
-        <p className="mb-6 text-sm font-medium leading-relaxed text-slate-500">
-          {lang === "ko"
-            ? "이 설문의 결과는 비공개로 설정되어 있습니다. 관리자 권한을 가진 사용자만 조회할 수 있습니다."
-            : "This survey's results are private. Only administrators are allowed to view the analytics."}
-        </p>
-        <Link
-          to="/surveys"
-          className="mx-auto inline-flex w-fit items-center justify-center rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-md shadow-kaist-darkgreen/15 transition hover:bg-kaist-darkgreen/90"
-        >
-          {lang === "ko" ? "목록으로" : "Back to surveys"}
-        </Link>
-      </ResultShell>
+      <ResponseStateCard className="survey-result-state" icon={Lock}
+        title={lang === "ko" ? "결과가 공개되지 않은 설문입니다" : "Results have not been published for this survey"}
+        description={lang === "ko" ? "다른 설문은 목록에서 확인해 주세요." : "You can find other surveys in the list."}
+        actions={<Button asChild className={responseStateActionClassName}><Link to="/surveys"><span className="md:hidden">{lang === "ko" ? "설문 목록으로" : "Back to surveys"}</span><span className="hidden md:inline">{lang === "ko" ? "목록으로" : "Back to surveys"}</span></Link></Button>}
+      />
     );
   }
 
   if (error || !analytics) {
     return (
-      <ResultShell className="flex flex-col items-center gap-3 p-6 text-center text-sm font-semibold text-rose-500 sm:p-10" role="alert">
-        <AlertCircle className="h-10 w-10" />
-        <span>
-          {lang === "ko"
-            ? "결과 데이터를 조회하지 못했습니다."
-            : "Failed to load survey results."}
-        </span>
-      </ResultShell>
+      <ResponseStateCard className="survey-result-state" role="alert" icon={AlertCircle}
+        title={lang === "ko" ? "설문 결과를 불러오지 못했습니다" : "Could not load survey results"}
+        description={lang === "ko" ? "일시적인 오류일 수 있습니다. 잠시 후 다시 시도해 주세요." : "This may be a temporary issue. Please try again shortly."}
+        actions={<Button type="button" className={responseStateActionClassName} onClick={onRetry}>{lang === "ko" ? "다시 시도" : "Try again"}</Button>}
+      />
     );
   }
 

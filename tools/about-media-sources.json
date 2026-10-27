@@ -1,0 +1,96 @@
+{
+  "verifiedOn": "2026-10-27",
+  "organizationEnglishName": "SoC Student Council",
+  "collaborationScope": "Past corporate visits and exchanges; not a claim that every company is a current financial sponsor.",
+  "collaborationRecords": [
+    "https://docs.google.com/document/d/1JJCyI71HoWmIKmdnhg2nqPdPQlZiwJdLpEWgbZ2e9mE/edit",
+    "https://docs.google.com/document/d/1aF0WaM-rwanjYBhsANwqYykGUzrtnda4yJJs08pPMn4/edit"
+  ],
+  "partners": [
+    {
+      "name": "Channel Talk",
+      "website": "https://channel.io/ko",
+      "logo": "apps/web/public/about/partners/channel.svg",
+      "source": "Official homepage header SVG"
+    },
+    {
+      "name": "Toss",
+      "website": "https://toss.im/",
+      "logo": "apps/web/public/about/partners/toss.png",
+      "source": "https://static.toss.im/assets/toss-im/asset/navigation/logo-toss-blue@2x.png"
+    },
+    {
+      "name": "Devsisters",
+      "website": "https://www.devsisters.com/",
+      "logo": "apps/web/public/about/partners/devsisters.svg",
+      "source": "Official homepage wordmark SVG, geometry preserved"
+    },
+    {
+      "name": "LG AI Research",
+      "website": "https://www.lgresearch.ai/",
+      "logo": "apps/web/public/about/partners/lg-ai.png",
+      "source": "https://www.lgresearch.ai/img/common/logo_ko.png"
+    },
+    {
+      "name": "Elice",
+      "website": "https://elice.io/ko",
+      "logo": "apps/web/public/about/partners/elice.png",
+      "source": "https://elice.io/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Felice-brand.131cc564.png&w=3840&q=75"
+    },
+    {
+      "name": "Selectstar",
+      "website": "https://selectstar.ai/",
+      "logo": "apps/web/public/about/partners/selectstar-wordmark.webp",
+      "source": "https://selectstar.ai/wp-content/uploads/2023/08/%ED%91%B8%ED%84%B0%EB%A1%9C%EA%B3%A0.webp"
+    }
+  ],
+  "programImages": [
+    {
+      "program": "Exam-period meals and snacks",
+      "asset": "apps/web/public/about/exam-snack-event.png",
+      "source": "User-supplied 2026 TREE fall midterm snack event poster (codex-clipboard-447e3857-3077-4ad2-aea1-5b1d68464d17.png)",
+      "usage": "Food portion extracted and reframed to 16:9 with the built-in image editing tool; poster copy and screenshot UI removed. Editing prompt recorded in output/about-copy-review/snack-image-edit.txt."
+    },
+    {
+      "program": "SoC Happy Hour",
+      "asset": "apps/web/public/about/happy-hour.jpg",
+      "source": "https://drive.google.com/file/d/1lNQcT1MwcnKS7vT1bFW3wPcWnHL9Y2sI/view",
+      "usage": "Council newsletter event photograph"
+    },
+    {
+      "program": "Talk Concert",
+      "asset": "apps/web/public/about/talk-concert.jpg",
+      "source": "https://drive.google.com/file/d/170ae8na_0ZKHZ9VXcnoqPYYhl0YwpQty/view",
+      "usage": "Council newsletter event photograph"
+    },
+    {
+      "program": "Company visits",
+      "asset": "apps/web/public/about/company-visit-example.jpg",
+      "creator": "Creatopy",
+      "source": "https://unsplash.com/photos/a-group-of-people-sitting-around-a-laptop-computer-otxg1OvPLZw",
+      "license": "Unsplash License",
+      "usage": "Illustrative workplace photo; source and creator recorded here, image overlay removed at the user’s request."
+    },
+    {
+      "program": "SoC clothing and merchandise",
+      "asset": "apps/web/public/about/merchandise.jpg",
+      "source": "https://drive.google.com/file/d/16uDBnSyS7bGVqcuAXuvvkPeJzkHnZ3Rk/view",
+      "usage": "Council newsletter merchandise photograph, supplied face obscuring preserved"
+    },
+    {
+      "program": "SoC Student Council website",
+      "asset": "apps/web/public/about/student-council-website.png",
+      "source": "http://localhost:5173/",
+      "usage": "Actual student council homepage screenshot, restored at the user’s request."
+    }
+  ],
+  "sloganTypeface": {
+    "name": "Lora",
+    "style": "Italic 500",
+    "asset": "apps/web/public/about/lora-slogan-italic.woff2",
+    "source": "https://fonts.google.com/specimen/Lora",
+    "license": "SIL Open Font License 1.1",
+    "licenseFile": "apps/web/public/about/Lora-OFL.txt",
+    "subset": "Only the official slogan characters; the rest of the site keeps its existing typeface"
+  }
+}

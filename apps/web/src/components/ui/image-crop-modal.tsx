@@ -10,6 +10,7 @@ import { nowMs } from "@soc/shared";
 import { Minus, Plus, RotateCcw, RotateCw, Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { useLanguage } from "@/hooks/use-language";
@@ -264,6 +265,7 @@ export function ImageCropModal({
       }}
       showClose={!processing}
       title={ko ? "이미지 자르기" : "Crop image"}
+      headerActions={<Badge className="h-6 whitespace-nowrap px-2 text-xs tabular-nums">{exportWidth} × {exportHeight}px</Badge>}
       size="wide"
       bodyClassName="space-y-4"
       footer={
@@ -411,7 +413,7 @@ export function ImageCropModal({
             {dragging ? (
               <div
                 data-crop-grid
-                className="absolute inset-0 grid grid-cols-3 grid-rows-3"
+                className="absolute inset-0 grid grid-cols-3 grid-rows-3 [filter:drop-shadow(0_0_1px_#000)]"
               >
                 {Array.from({ length: 9 }, (_, index) => (
                   <div
@@ -423,29 +425,13 @@ export function ImageCropModal({
             ) : null}
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
           <div className="flex shrink-0 items-center gap-1">
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="size-8"
-              aria-label={
-                ko ? "오른쪽으로 90도 회전" : "Rotate 90 degrees clockwise"
-              }
-              disabled={processing}
-              onClick={() => {
-                setRotation((value) => (value + 1) % 4);
-                setOffset({ x: 0, y: 0 });
-              }}
-            >
-              <RotateCw className="size-4" aria-hidden="true" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8"
+              className="size-8 border border-slate-200"
               aria-label={ko ? "초기화" : "Reset"}
               disabled={
                 processing ||
@@ -462,8 +448,22 @@ export function ImageCropModal({
             >
               <RotateCcw aria-hidden="true" className="size-4" />
             </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8 border border-slate-200"
+              aria-label={ko ? "오른쪽으로 90도 회전" : "Rotate 90 degrees clockwise"}
+              disabled={processing}
+              onClick={() => {
+                setRotation(value => (value + 1) % 4);
+                setOffset({ x: 0, y: 0 });
+              }}
+            >
+              <RotateCw className="size-4" aria-hidden="true" />
+            </Button>
           </div>
-          <div className="order-last flex min-w-0 basis-full items-center gap-2 rounded-lg bg-slate-50 px-2 py-1 sm:order-none sm:max-w-sm sm:flex-1 sm:basis-40">
+          <div className="flex min-w-0 flex-1 items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 sm:max-w-sm sm:gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -486,7 +486,7 @@ export function ImageCropModal({
               value={zoom}
               disabled={processing}
               onChange={(event) => setZoom(Number(event.currentTarget.value))}
-              className="crop-zoom-slider min-w-12 flex-1"
+              className="crop-zoom-slider min-w-6 flex-1 sm:min-w-12"
             />
             <Button
               type="button"
@@ -501,13 +501,10 @@ export function ImageCropModal({
             >
               <Plus aria-hidden="true" className="size-3.5" />
             </Button>
-            <span className="w-10 shrink-0 text-center tabular-nums">
+            <span className="w-8 shrink-0 text-center tabular-nums sm:w-10">
               {Math.round(zoom * 100)}%
             </span>
           </div>
-          <span className="shrink-0 font-mono text-xs text-slate-400">
-            {exportWidth} × {exportHeight}px
-          </span>
         </div>
         <div
           className="flex flex-wrap items-center justify-center gap-2 text-xs"
