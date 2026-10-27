@@ -82,7 +82,7 @@
 .about-tree-page details[open] > summary > svg { transform: rotate(180deg); }
 .about-tree-page .tree-pledges-section { background: var(--tree-field); }
 .about-tree-page .tree-pledges { display: grid; grid-template-columns: 16rem minmax(0, 1fr); gap: 4rem; align-items: start; }
-.about-tree-page .tree-pledge-overview { position: sticky; top: var(--tree-sticky-top); }
+.about-tree-page .tree-pledge-overview { position: sticky; top: calc(var(--tree-sticky-top) + .5rem); }
 .about-tree-page .tree-pledge-overview > p { color: var(--tree-ink); font-size: 1rem; line-height: 1.7; }
 .about-tree-page .tree-pledge-overview strong { display: block; margin-top: .5rem; color: var(--tree-accent); font-size: 4rem; line-height: 1.2; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 .about-tree-page .tree-progress-track { display: flex; gap: .25rem; height: .375rem; margin-top: 1rem; }

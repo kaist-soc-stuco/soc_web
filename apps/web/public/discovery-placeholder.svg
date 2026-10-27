@@ -1,4 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <rect width="256" height="256" rx="16" fill="#edf2ee"/>
-  <text x="128" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="52" font-weight="600" letter-spacing="-2" fill="#527362">SoC</text>
+  <title>TREE student council event</title>
+  <rect width="256" height="256" fill="#edf5eb"/>
+  <g transform="translate(60 37) scale(.85)">
+    <path d="M80 8C57 33 17 83 17 132a63 63 0 0 0 126 0C143 83 103 33 80 8Z" fill="#8fbd4e"/>
+    <path d="M80 8v187a63 63 0 0 0 63-63C143 83 103 33 80 8Z" fill="#26976d"/>
+    <path d="M80 8C57 33 17 83 17 132a63 63 0 0 0 20 46C17 125 46 72 80 8Z" fill="#b0d479"/>
+    <path d="M80 195v-58m0 0-29-29m29 29 34-35" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <g fill="#fff"><circle cx="51" cy="108" r="8"/><circle cx="80" cy="137" r="8"/><circle cx="114" cy="102" r="8"/></g>
+  </g>
 </svg>

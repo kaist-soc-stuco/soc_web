@@ -62,7 +62,7 @@
 .discovery-load-more { display: flex; justify-content: center; min-height: 1px; color: var(--discovery-muted); font-size: .8125rem; }
 .discovery-load-more.is-loading { padding: 1rem; }
 
-.discovery-card.is-survey .discovery-card-link { display: flex; }
+.discovery-card.is-survey .discovery-card-link { display: flex; align-items: stretch; height: 100%; }
 .discovery-card.is-survey .discovery-card-copy { width: 100%; }
 .discovery-card.is-survey .discovery-card-detail > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; }
 .discovery-card.is-survey .discovery-card-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: .75rem; }

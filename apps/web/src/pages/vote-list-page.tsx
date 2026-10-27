@@ -37,11 +37,11 @@ function VoteCard({ vote, lang, now }: { vote: VoteRecord; lang: string; now: nu
     <h3 className="discovery-card-title">{title}</h3>
     {description && <p className="vote-list-description">{description}</p>}
     <div className="discovery-card-footer">
-      <p className="discovery-card-detail tabular-nums">
-        <span>{lang === "ko" ? "참여" : "Participation"} {vote.votedCount}/{vote.eligibleCount}{lang === "ko" ? "명" : " voters"}</span>
-      </p>
       <div className="discovery-card-bottom">
-        <div className="discovery-card-badges"><span className={`discovery-badge is-${open ? "open" : "closed"}`}>{status}</span></div>
+        <div className="discovery-card-badges">
+          <span className={`discovery-badge is-${open ? "open" : "closed"}`}>{status}</span>
+          <span className="vote-list-participants tabular-nums">{lang === "ko" ? "참여" : "Participation"} {vote.votedCount}/{vote.eligibleCount}{lang === "ko" ? "명" : " voters"}</span>
+        </div>
         {!upcoming && <span className="discovery-survey-cta">{lang === "ko" ? open ? "투표 참여" : "결과 보기" : open ? "Vote" : "View results"}<ArrowRight aria-hidden="true" /></span>}
       </div>
     </div>

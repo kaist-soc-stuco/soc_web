@@ -1,5 +1,5 @@
 import type { ArticleEngagementKind } from "@soc/contracts";
-import { ArrowRight, Bookmark, LockKeyhole, MapPin } from "lucide-react";
+import { ArrowRight, Bookmark, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -69,7 +69,7 @@ export function EventsSurveysGrid({ isAuthenticated, items, lang, hideDate = fal
               <div className="discovery-card-bottom">
                 <div className="discovery-card-badges">
                   {badge.label && (event || !item.isAlwaysOpen || badge.tone === "closed") && <span className={`discovery-badge is-${badge.tone}`} title={badge.deadline ? `${formatCompactDateTime(badge.deadline)} (KST)` : undefined}>{badge.label}</span>}
-                  {event ? audience && <span className="discovery-audience"><LockKeyhole aria-hidden="true" />{audience}</span>
+                  {event ? audience && <span className="discovery-badge is-audience">{audience}</span>
                     : surveyBadges.map(label => <span key={label} className="discovery-badge is-audience">{label}</span>)}
                 </div>
                 {!event && <span className="discovery-survey-cta">{cta}<ArrowRight aria-hidden="true" /></span>}

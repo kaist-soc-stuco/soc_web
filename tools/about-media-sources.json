@@ -65,11 +65,9 @@
     },
     {
       "program": "Company visits",
-      "asset": "apps/web/public/about/company-visit-example.jpg",
-      "creator": "Creatopy",
-      "source": "https://unsplash.com/photos/a-group-of-people-sitting-around-a-laptop-computer-otxg1OvPLZw",
-      "license": "Unsplash License",
-      "usage": "Illustrative workplace photo; source and creator recorded here, image overlay removed at the user’s request."
+      "asset": "apps/web/public/about/company-visit.png",
+      "source": "Company visit photograph supplied by the student council on 2026-10-27",
+      "usage": "User-provided company visit photograph"
     },
     {
       "program": "SoC clothing and merchandise",

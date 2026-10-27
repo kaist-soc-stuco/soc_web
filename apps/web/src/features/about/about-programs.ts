@@ -55,9 +55,9 @@ export const ABOUT_PROGRAM_GROUPS = [
       {
         titleKo: "기업체 탐방",
         titleEn: "Company visits",
-        image: "/about/company-visit-example.jpg",
-        imageAltKo: "노트북 앞에 모여 업무를 논의하는 기업 구성원들, 업무 환경 예시 사진",
-        imageAltEn: "Colleagues discussing work around a laptop, an illustrative workplace photo",
+        image: "/about/company-visit.png",
+        imageAltKo: "기업체 탐방 현장에서 설명을 듣고 있는 전산학부 학생들",
+        imageAltEn: "School of Computing students attending a presentation during a company visit",
         imagePosition: "50% 50%",
         summaryKo: "학우들의 수요조사를 바탕으로 선정한 국내 기업을 방문해 현장 강연, 사내 견학, 취업 관련 질의응답에 참여합니다.",
         summaryEn: "Visit Korean companies selected through student interest surveys for talks, office tours, and career Q&A.",

@@ -10,4 +10,5 @@
   overflow-wrap: anywhere;
 }
 .vote-list-card .discovery-card-date { white-space: normal; }
+.vote-list-participants { color: var(--discovery-muted); font-size: var(--discovery-badge-size); line-height: 1.5; }
 .vote-list-card.is-upcoming:hover { border-color: var(--discovery-rule); }
