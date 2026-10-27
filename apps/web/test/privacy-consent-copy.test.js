@@ -29,7 +29,8 @@ test("privacy policy names configured processors", () => {
     "utf8",
   );
 
-  assert.match(source, /label: t\("SPARCS"/);
-  assert.match(source, /label: t\("Google Sheets\(선택 기능\)"/);
-  assert.match(source, /성별, 학적 상태, 신분코드/);
+  assert.match(source, /SPARCS: 서비스 운영 서버 및 데이터베이스 인프라 호스팅 관리/);
+  assert.match(source, /Channel Corporation \(Channel Talk\):/);
+  assert.match(source, /label:\s*t\(\s*"SSO 연동 정보"/);
+  assert.doesNotMatch(source, /label:\s*t\(\s*"(?:필수 항목|선택 항목)"/);
 });

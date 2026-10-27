@@ -34,6 +34,7 @@ type LegalDocument = Readonly<{
 const t = (ko: string, en: string): LegalText => ({ ko, en });
 
 const EFFECTIVE_DATE = "2026.08.29";
+const PRIVACY_EFFECTIVE_DATE = "2026.10.27";
 const OPERATOR_NAME = "KAIST 전산학부 집행위원회";
 const OPERATOR_NAME_EN = "SoC Student Council, School of Computing, KAIST";
 const CONTACT_EMAIL = "kaist.helloworld@gmail.com";
@@ -323,85 +324,93 @@ const privacySections: readonly LegalSection[] = [
   {
     id: "privacy-overview",
     number: 1,
-    title: t("개인정보처리자와 적용 범위", "Controller and scope"),
+    title: t(
+      "개인정보처리자와 적용 범위",
+      "Controller and scope",
+    ),
     paragraphs: [
       t(
-        `KAIST 전산학부 집행위원회(${OPERATOR_NAME_EN}, 이하 ‘운영자’)는 서비스 이용자의 개인정보를 보호하고 관련 법령을 준수하기 위해 이 개인정보처리방침을 공개합니다. 이 방침은 웹사이트의 게시판, 행사·일정, 설문·투표, 학생회비 관리, 마이페이지와 관리자 기능에 적용됩니다.`,
-        `The SoC Student Council of KAIST (the “Operator”) publishes this Privacy Policy to protect Service Users’ personal information and comply with applicable law. It applies to the website’s boards, events and schedules, surveys and votes, student-fee administration, My Page, and operator features.`,
+        "KAIST 전산학부 집행위원회(SoC Student Council, School of Computing, KAIST, 이하 ‘운영자’)는 서비스 이용자의 개인정보를 보호하고 관련 법령을 준수하기 위해 이 개인정보처리방침을 공개합니다. 이 방침은 웹사이트의 게시판, 행사·일정, 설문·투표, 학생회비 관리, 마이페이지와 관리자 기능에 적용됩니다.",
+        "The SoC Student Council of KAIST (the “Operator”) publishes this Privacy Policy to protect Service Users’ personal information and comply with applicable law. It applies to the website’s boards, events and schedules, surveys and votes, student-fee administration, My Page, and operator features.",
       ),
       t(
-        `시행일: ${EFFECTIVE_DATE} · 문의: ${CONTACT_EMAIL}`,
-        `Effective date: ${EFFECTIVE_DATE} · Contact: ${CONTACT_EMAIL}`,
+        `시행일: ${PRIVACY_EFFECTIVE_DATE} · 문의: kaist.helloworld@gmail.com`,
+        `Effective date: ${PRIVACY_EFFECTIVE_DATE} · Contact: kaist.helloworld@gmail.com`,
       ),
     ],
   },
   {
     id: "privacy-items",
     number: 2,
-    title: t("처리하는 개인정보 항목과 수집 방법", "Personal information items and collection methods"),
+    title: t(
+      "처리하는 개인정보 항목과 수집 방법",
+      "Personal information items and collection methods",
+    ),
     paragraphs: [
       t(
-        "운영자는 서비스 제공에 필요한 범위에서 다음 정보를 처리합니다. SSO 응답에 포함되어 제공되는 선택 정보는 실제 서비스 목적에 필요한 범위에서만 사용하며, 운영 환경이나 기능이 변경되면 이 방침도 함께 갱신합니다.",
-        "The Operator processes the following information to the extent needed to provide the Service. Optional information included in an SSO response is used only for actual Service purposes, and this Policy is updated when the operating environment or features change.",
+        "운영자는 서비스 제공에 필요한 범위에서 다음 정보를 처리합니다. SSO 응답에 포함되어 제공되는 정보는 실제 서비스 목적에 필요한 범위에서만 사용하며, 운영 환경이나 기능이 변경되면 이 방침도 함께 갱신합니다.",
+        "The Operator processes the following information to the extent needed to provide the Service. Information included in an SSO response is used only for actual Service purposes, and this Policy is updated when the operating environment or features change.",
       ),
     ],
     groups: [
       {
-        kind: "required",
-        label: t("필수 항목", "Required items"),
+        label: t(
+          "SSO 연동 정보",
+          "SSO-linked information",
+        ),
         value: t(
-          "KAIST UID, 성명(한글·영문), 학번, 이메일, 소속 학과, 주전공(SSO 연동 및 권한·회원 식별용). 수집 방법: KAIST SSO 로그인과 동의 후 계정 연계.",
-          "KAIST UID, Korean and English names, student number, email address, department, and primary major (for SSO linking and Member or permission identification). Method: KAIST SSO sign-in and account linking after consent.",
+          "KAIST UID, 성명(한글·영문), 학번, 이메일, 소속 학과, 주전공, 신분코드 중 KAIST SSO에서 제공되는 항목을 회원 식별, 계정 연계 및 회원 권한 확인을 위해 처리합니다. (수집 방법: KAIST SSO 로그인 및 계정 연계 동의)",
+          "The Operator processes the KAIST UID, Korean and English names, student number, email address, department, primary major, and member code supplied by KAIST SSO for Member identification, account linking, and verification of Member permissions. (Collection method: KAIST SSO sign-in and consent to account linking)",
         ),
       },
       {
-        kind: "optional",
-        label: t("선택 항목", "Optional items"),
-        value: t(
-          "성별, 학적 상태, 신분코드(SSO에서 제공되고 이용자가 동의한 경우에만 처리).",
-          "Gender, academic status, and member code (processed only when provided by SSO and consented to by the User).",
+        label: t(
+          "동의·세션 정보",
+          "Consent and session information",
         ),
-      },
-      {
-        label: t("동의·세션 정보", "Consent and session information"),
         value: t(
           "개인정보 저장 동의 시각, 로그인 진행 상태, 로그인·세션 쿠키 식별자, 임시 로그인 토큰, 최근 로그인 시각. 수집 방법: 로그인·동의·세션 유지 과정에서 자동 생성.",
           "Privacy-consent timestamp, login-in-progress state, session and login cookie identifiers, temporary login token, and last-login time. Method: generated during sign-in, consent, and session maintenance.",
         ),
       },
       {
-        label: t("게시판·커뮤니티 정보", "Board and community information"),
+        label: t(
+          "게시판·커뮤니티 정보",
+          "Board and community information",
+        ),
         value: t(
           "게시글·댓글·대댓글의 제목, 본문, 작성자 식별 정보, 공개·비밀·익명 설정, 좋아요·스크랩·조회 기록, 신고·숨김 처리에 관한 내용, 임시저장글과 첨부파일. 수집 방법: 이용자가 직접 작성·선택·업로드.",
           "Titles and bodies of posts, comments, and replies; author identifiers; public, secret, and anonymous settings; like, scrap, and view records; report or moderation details; drafts; and attachments. Method: entered, selected, or uploaded by the User.",
         ),
       },
       {
-        label: t("설문·투표 정보", "Survey and voting information"),
+        label: t(
+          "설문·투표 정보",
+          "Survey and voting information",
+        ),
         value: t(
           "설문 응답·문항별 답변·응답 상태·제출 시각, 투표 참여 자격 명부의 이름·학번·이메일·주전공·회비 상태, 암호화된 투표용지와 집계 결과. 수집 방법: 이용자의 설문·투표 참여 및 운영자의 자격 명부 생성.",
           "Survey responses, question-level answers, response status, and submission time; name, student number, email, primary major and fee status in voter-eligibility lists; encrypted ballots; and tallies. Method: User participation and eligibility-list creation by the Operator.",
         ),
       },
       {
-        label: t("학생회비 납부 정보", "Student-fee information"),
+        label: t(
+          "학생회비 납부 정보",
+          "Student-fee information",
+        ),
         value: t(
           "수납액, 납부 유형, 결제 수단, 적용 시작 학기, 적용 학기 수, 납부 일자, 비고, 확인 담당자와 확인 시각. 수집 방법: 운영자가 계좌이체·현금 등 외부 납부 내역을 확인하여 입력·수정.",
           "Amount received, payment type, payment method, effective starting semester, covered semesters, payment date, notes, verifying administrator, and verification time. Method: entered or corrected by the Operator after checking external transfers or cash payments.",
         ),
       },
       {
-        label: t("운영·보안 기록", "Operational and security records"),
+        label: t(
+          "운영·보안 기록",
+          "Operational and security records",
+        ),
         value: t(
           "관리자 변경·실행 내역, 대상·변경 내용, 접속 IP 주소, 생성 시각, 계정 및 권한 변경 기록, 파일 업로드 메타데이터. 수집 방법: 관리자 기능과 보안·감사 로그에서 자동 생성.",
           "Administrator changes and actions, target and change details, IP address, creation time, account and permission changes, and file-upload metadata. Method: generated by operator features and security or audit logs.",
-        ),
-      },
-      {
-        label: t("메일 발송 정보", "Email delivery information"),
-        value: t(
-          "관리자가 선택한 수신 대상의 이메일, 메일 제목·본문, 첨부파일 식별자, 발송 상태·예약 시각·오류 내용. 수집 방법: 관리자용 일괄 메일 작성·예약·발송 기능.",
-          "Recipient email addresses selected by an administrator, email subject and body, attachment identifiers, delivery status, scheduled time, and error details. Method: administrator bulk-email composition, scheduling, and delivery.",
         ),
       },
     ],
@@ -409,21 +418,48 @@ const privacySections: readonly LegalSection[] = [
   {
     id: "privacy-purposes",
     number: 3,
-    title: t("개인정보의 처리 목적", "Purposes of processing"),
+    title: t(
+      "개인정보의 처리 목적",
+      "Purposes of processing",
+    ),
     bullets: [
-      t("KAIST SSO 기반 본인 확인, 회원 계정 생성·갱신·로그인·로그아웃 및 세션 관리", "Identity verification through KAIST SSO, account creation and updates, sign-in, sign-out, and session management"),
-      t("게시글·댓글·첨부파일·좋아요·스크랩·신고 등 커뮤니티 기능 제공과 공개 범위 적용", "Providing community features such as posts, comments, attachments, likes, scraps, and reports, and applying visibility settings"),
-      t("행사·일정 안내, 설문·투표 참여 자격 확인, 응답·투표 저장·집계·결과 제공", "Providing event and schedule information, checking survey and voting eligibility, storing and tallying responses and ballots, and presenting results"),
-      t("학생회비 납부 상태와 학기별 혜택 자격 확인, 수납·회계·감사 원장 관리", "Checking student-fee status and semester benefit eligibility, and managing payment, accounting, and audit ledgers"),
-      t("관리자 권한, 구성원, 사이트 콘텐츠, 일정, 메일 및 보안·운영 로그 관리", "Managing administrator permissions, members, site content, schedules, email, and security or operational logs"),
-      t("문의·민원·분쟁·권리 침해 신고 대응, 부정 이용 방지와 서비스 보안 유지", "Responding to inquiries, complaints, disputes, and rights reports, preventing abuse, and maintaining Service security"),
-      t("법령상 의무 이행과 권리·재산 보호에 필요한 조치", "Taking measures required by law and necessary to protect rights and property"),
+      t(
+        "KAIST SSO 기반 본인 확인, 회원 계정 생성·갱신·로그인·로그아웃 및 세션 관리",
+        "Identity verification through KAIST SSO, account creation and updates, sign-in, sign-out, and session management",
+      ),
+      t(
+        "게시글·댓글·첨부파일·좋아요·스크랩·신고 등 커뮤니티 기능 제공과 공개 범위 적용",
+        "Providing community features such as posts, comments, attachments, likes, scraps, and reports, and applying visibility settings",
+      ),
+      t(
+        "행사·일정 안내, 설문·투표 참여 자격 확인, 응답·투표 저장·집계·결과 제공",
+        "Providing event and schedule information, checking survey and voting eligibility, storing and tallying responses and ballots, and presenting results",
+      ),
+      t(
+        "학생회비 납부 상태와 학기별 혜택 자격 확인, 수납·회계·감사 원장 관리",
+        "Checking student-fee status and semester benefit eligibility, and managing payment, accounting, and audit ledgers",
+      ),
+      t(
+        "관리자 권한, 구성원, 사이트 콘텐츠, 일정 및 보안·운영 로그 관리",
+        "Managing administrator permissions, members, site content, schedules, and security or operational logs",
+      ),
+      t(
+        "문의·민원·분쟁·권리 침해 신고 대응, 부정 이용 방지와 서비스 보안 유지",
+        "Responding to inquiries, complaints, disputes, and rights reports, preventing abuse, and maintaining Service security",
+      ),
+      t(
+        "법령상 의무 이행과 권리·재산 보호에 필요한 조치",
+        "Taking measures required by law and necessary to protect rights and property",
+      ),
     ],
   },
   {
     id: "privacy-retention",
     number: 4,
-    title: t("보유 및 이용 기간", "Retention and use periods"),
+    title: t(
+      "보유 및 이용 기간",
+      "Retention and use periods",
+    ),
     paragraphs: [
       t(
         "운영자는 개인정보를 수집·이용 목적이 달성될 때까지 보유하며, 목적이 달성되거나 이용자가 삭제를 요청하면 지체 없이 파기합니다. 다만 다른 법령, 회계·감사, 분쟁 해결, 부정 이용 방지 또는 권리 보호를 위해 보존할 필요가 있는 정보는 해당 사유가 끝날 때까지 별도로 보존할 수 있습니다.",
@@ -432,42 +468,78 @@ const privacySections: readonly LegalSection[] = [
     ],
     groups: [
       {
-        label: t("계정·동의 정보", "Account and consent information"),
-        value: t("회원 계정이 유지되는 동안. 탈퇴·삭제 후에는 파기하되 법령상 또는 분쟁 대응상 필요한 동의·처리 기록은 해당 기간 동안 보존.", "While the Member account is maintained. Destroyed after withdrawal or deletion, except for consent and processing records retained as required by law or for disputes."),
+        label: t(
+          "계정·동의 정보",
+          "Account and consent information",
+        ),
+        value: t(
+          "회원 계정이 유지되는 동안. 탈퇴·삭제 후에는 파기하되 법령상 또는 분쟁 대응상 필요한 동의·처리 기록은 해당 기간 동안 보존.",
+          "While the Member account is maintained. Destroyed after withdrawal or deletion, except for consent and processing records retained as required by law or for disputes.",
+        ),
       },
       {
-        label: t("세션·로그인 진행 정보", "Session and login-flow information"),
-        value: t("로그아웃·만료·로그인 절차 완료 또는 실패 시까지. 임시 로그인·대기 정보는 목적 달성 또는 만료 시 삭제.", "Until sign-out, expiration, or completion or failure of the login flow. Temporary login and pending information is deleted when its purpose is achieved or it expires."),
+        label: t(
+          "세션·로그인 진행 정보",
+          "Session and login-flow information",
+        ),
+        value: t(
+          "로그인 대기 정보: 로그인 절차 완료 또는 유효기간 만료 시 파기합니다.\n서버 세션 정보: 세션 유효기간 만료 시 파기합니다.\n임시 인증 토큰: 발급 후 최대 10분간 유효합니다.",
+          "Pending sign-in information: Destroyed when the sign-in flow is completed or the information expires.\nServer session information: Destroyed when the session expires.\nTemporary authentication tokens: Valid for at most ten minutes after issuance.",
+        ),
       },
       {
-        label: t("게시글·댓글·설문·투표", "Posts, comments, surveys, and votes"),
-        value: t("서비스에 게시·보관되는 동안 및 분쟁·운영 대응에 필요한 기간. 삭제·탈퇴 시에도 법령·권리 보호·집계 무결성에 필요한 최소 정보는 별도 보존될 수 있음.", "While published or stored in the Service and for as long as needed for disputes or operations. After deletion or withdrawal, minimum information may be retained for law, rights protection, or tally integrity."),
+        label: t(
+          "게시글·댓글·설문·투표",
+          "Posts, comments, surveys, and votes",
+        ),
+        value: t(
+          "서비스에 게시·보관되는 동안 및 분쟁·운영 대응에 필요한 기간. 삭제·탈퇴 시에도 법령·권리 보호·집계 무결성에 필요한 최소 정보는 별도 보존될 수 있음.",
+          "While published or stored in the Service and for as long as needed for disputes or operations. After deletion or withdrawal, minimum information may be retained for law, rights protection, or tally integrity.",
+        ),
       },
       {
-        label: t("초안·첨부파일", "Drafts and attachments"),
-        value: t("이용자가 삭제하거나 작성 목적이 달성될 때까지. 미사용 파일은 고아 파일 정리 정책에 따라 삭제될 수 있음.", "Until the User deletes them or the writing purpose is achieved. Unused files may be deleted under the orphan-file cleanup policy."),
+        label: t(
+          "초안·첨부파일",
+          "Drafts and attachments",
+        ),
+        value: t(
+          "이용자가 삭제하거나 작성 목적이 달성될 때까지. 미사용 파일은 고아 파일 정리 정책에 따라 삭제될 수 있음.",
+          "Until the User deletes them or the writing purpose is achieved. Unused files may be deleted under the orphan-file cleanup policy.",
+        ),
       },
       {
-        label: t("학생회비·감사·메일 기록", "Fee, audit, and email records"),
-        value: t("수납 확인·회계·감사·보안·분쟁 대응에 필요한 기간 및 관련 법령이나 내부 보존 기준에서 정한 기간. 실제 운영 기준이 변경되면 이 방침에 반영.", "For the period needed for payment verification, accounting, audit, security, and disputes, or the period required by law or internal retention standards. The Policy will be updated when the actual operating standard changes."),
+        label: t(
+          "학생회비 및 감사 기록",
+          "Student fee and audit records",
+        ),
+        value: t(
+          "수납 확인, 회계 결산, 감사 및 분쟁 대응에 필요한 기간 동안 보관하며, 보존 목적 달성 시 지체 없이 파기합니다.",
+          "Retained for the period necessary for payment verification, accounting settlement, audit, and dispute resolution, and destroyed without undue delay once the purpose is fulfilled.",
+        ),
       },
     ],
   },
   {
     id: "privacy-destruction",
     number: 5,
-    title: t("개인정보의 파기 절차와 방법", "Destruction procedures and methods"),
+    title: t(
+      "개인정보의 파기 절차와 방법",
+      "Destruction procedures and methods",
+    ),
     paragraphs: [
       t(
-        "보유기간이 끝났거나 처리 목적이 달성된 개인정보는 파기 대상인지 확인한 뒤 지체 없이 파기합니다. 전자 파일은 복구·재생이 어렵도록 삭제하고, 출력물은 분쇄 또는 소각합니다. 법령·분쟁·감사 사유로 보존하는 정보는 별도 보관하여 일반적인 이용과 분리합니다.",
-        "When a retention period ends or a processing purpose is achieved, the Operator reviews the information for destruction and destroys it without undue delay. Electronic files are deleted so that restoration or reproduction is difficult, and paper records are shredded or incinerated. Information retained for law, disputes, or audit is segregated from ordinary use.",
+        "보유기간이 끝났거나 처리 목적이 달성된 개인정보는 파기 대상인지 확인한 뒤 지체 없이 파기합니다. 전자 파일은 복구·재생이 어렵도록 삭제하고, 출력물은 분쇄 또는 소각합니다. 법령·분쟁·감사 사유로 보존하는 정보는 별도 보관하여 일반적인 이용과 분리합니다.\n감사 로그 백업 파일은 생성일로부터 730일이 경과하면 정기 정리 과정에서 삭제합니다.",
+        "When a retention period ends or a processing purpose is achieved, the Operator reviews the information for destruction and destroys it without undue delay. Electronic files are deleted so that restoration or reproduction is difficult, and paper records are shredded or incinerated. Information retained for law, disputes, or audit is segregated from ordinary use.\nAudit-log backup files are deleted during scheduled cleanup after 730 days have elapsed since their creation.",
       ),
     ],
   },
   {
     id: "privacy-sharing",
     number: 6,
-    title: t("개인정보의 제3자 제공", "Disclosure to third parties"),
+    title: t(
+      "개인정보의 제3자 제공",
+      "Disclosure to third parties",
+    ),
     paragraphs: [
       t(
         "운영자는 원칙적으로 이용자의 개인정보를 외부에 판매하거나 이용 목적을 벗어나 제공하지 않습니다. 다만 이용자가 동의했거나, 법령에 근거한 요청에 응하거나, 생명·신체·재산 보호를 위해 긴급하게 필요한 경우에는 필요한 최소 범위에서 제공할 수 있습니다.",
@@ -482,104 +554,190 @@ const privacySections: readonly LegalSection[] = [
   {
     id: "privacy-outsourcing",
     number: 7,
-    title: t("개인정보 처리의 위탁", "Entrusted processing"),
+    title: t(
+      "외부 서비스 이용 및 개인정보 처리의 위탁",
+      "Use of External Services and Entrusted Processing",
+    ),
     paragraphs: [
       t(
-        "서비스 운영을 위해 다음과 같은 외부 시스템 또는 운영 인프라가 사용될 수 있습니다. 위탁자·재위탁자·보관 국가와 업무 범위는 실제 배포 환경의 계약 및 설정에 맞춰 공개 전에 확정하며, 변경 시 지체 없이 이 방침에 반영합니다.",
-        "The following external systems or operating infrastructure may be used to operate the Service. The actual processor, subprocessor, storage country, and scope of work must be finalized before publication to match deployment contracts and settings, and this Policy will be updated promptly when they change.",
+        "운영자는 원활한 서비스 제공을 위해 다음과 같이 개인정보 처리 업무를 외부 전문 서비스에 위탁하고 있습니다.",
+        "The Operator entrusts certain personal information processing tasks to the following external service providers to deliver smooth operations:",
       ),
     ],
-    groups: [
-      {
-        label: t("SPARCS", "SPARCS"),
-        value: t("운영 서버·데이터베이스 저장 공간 제공과 호스팅 인프라 관리.", "Provision of operating server and database storage and management of hosting infrastructure."),
-      },
-      {
-        label: t("Google Sheets(선택 기능)", "Google Sheets (optional)"),
-        value: t("관리자가 연동한 경우 설문 응답, 집행위원 연락처 또는 학생회비 원장을 Google 스프레드시트에 저장·동기화.", "When connected by an administrator, survey responses, executive contact details, or student-fee ledgers are stored and synchronized in Google spreadsheets."),
-      },
-      {
-        label: t("KAIST SSO", "KAIST SSO"),
-        value: t("로그인 인증과 계정 연계를 위한 사용자 정보 교환. SSO 제공자의 별도 개인정보 안내가 함께 적용될 수 있음.", "User-information exchange for login authentication and account linking. The SSO provider’s separate privacy notice may also apply."),
-      },
-      {
-        label: t("메일 발송 서비스", "Email delivery service"),
-        value: t("관리자 메일 발송·예약·첨부파일 처리. 운영 환경에서는 설정된 SMTP 제공자(예: Dooray SMTP)가 수신자 이메일과 메일 내용을 처리할 수 있음.", "Bulk-email delivery, scheduling, and attachment handling. In production, the configured SMTP provider (for example, Dooray SMTP) may process recipient addresses and email content."),
-      },
-      {
-        label: t("파일 저장소", "File storage"),
-        value: t("게시글·행사·설문·프로필 등에 첨부된 파일 저장·조회. 배포 설정에 따라 운영 서버의 저장소 또는 S3 호환 객체 저장소를 사용.", "Storage and retrieval of files attached to posts, events, surveys, and profiles. Depending on deployment settings, the Service uses local server storage or an S3-compatible object store."),
-      },
-      {
-        label: t("채널톡(선택 기능)", "Channel Talk (optional)"),
-        value: t("문의 메신저 제공. 기능이 활성화되고 로그인한 경우 이름·이메일·내부 회원 식별자가 채널톡 SDK로 전달될 수 있음.", "Support messenger. When enabled and a User is signed in, name, email, and an internal Member identifier may be sent through the Channel Talk SDK."),
-      },
+    bullets: [
+      t(
+        "SPARCS: 서비스 운영 서버 및 데이터베이스 인프라 호스팅 관리",
+        "SPARCS: Provision and management of server and database hosting infrastructure.",
+      ),
+      t(
+        "KAIST SSO: 사용자 로그인 인증 및 계정 연계에 필요한 정보 교환 (KAIST 포털 정책 준용)",
+        "KAIST SSO: User authentication and account-linking information exchange (subject to the KAIST SSO Privacy Policy).",
+      ),
+      t(
+        "주식회사 채널코퍼레이션(채널톡): 온라인 문의 메신저 및 AI 고객 상담(ALF) 서비스 제공",
+        "Channel Corporation (Channel Talk): Online customer support messenger and AI-assisted support (ALF).",
+      ),
+      t(
+        "전달 항목: 로그인 회원의 성명, 이메일, 회원 식별자, 문의 메시지 및 첨부파일",
+        "Items transmitted: Name, email address, internal member identifier of signed-in users, support messages, and attachments.",
+      ),
+      t(
+        "AI 상담 기능에 따른 개인정보 국외 처리에 관한 사항은 제8조에 따릅니다.",
+        "Matters regarding the cross-border processing of personal information for AI support are governed by Section 8.",
+      ),
     ],
   },
   {
     id: "privacy-overseas",
     number: 8,
-    title: t("개인정보의 국외 이전", "Cross-border transfers"),
+    title: t(
+      "개인정보의 국외 이전",
+      "Cross-border Transfers",
+    ),
     paragraphs: [
       t(
-        "운영자는 해외 사업자나 해외 리전에 저장·전송하는 처리 위탁이 실제로 있는 경우 이전 국가, 이전받는 자, 이전 항목, 목적, 보유기간, 이전 방법과 거부 방법을 이 방침에 구체적으로 추가하여 안내합니다. 현재 저장소만으로 확인되지 않는 운영 설정을 근거로 국외 이전의 유무를 단정하지 않습니다.",
-        "If an actual processor stores or transfers information to an overseas provider or region, this Policy will specifically identify the destination country, recipient, data items, purpose, retention, transfer method, and how to refuse. The Operator does not assert whether a cross-border transfer exists based only on repository code when deployment settings have not been confirmed.",
+        "운영자는 채널톡 AI 상담(ALF) 서비스 제공을 위해 상담 과정에서 입력된 개인정보를 다음과 같이 국외 클라우드 및 AI 서비스 제공사로 전송하여 처리합니다.",
+        "To provide Channel Talk AI customer support (ALF), personal information submitted during chat inquiries may be transmitted to and processed by overseas cloud and AI service providers as follows:",
       ),
+    ],
+    groups: [
+      {
+        label: t(
+          "1. 이전받는 자 및 처리 지역:",
+          "1. Recipients and Processing Regions:",
+        ),
+        value: t(
+          "- Google Cloud (Gemini 및 Vertex AI): 글로벌\n- Anthropic: 미국, 유럽, 아시아, 호주\n- OpenAI: 글로벌\n- AWS Bedrock: 글로벌",
+          "- Google Cloud (Gemini and Vertex AI): Global\n- Anthropic: US, Europe, Asia, Australia\n- OpenAI: Global\n- AWS Bedrock: Global",
+        ),
+      },
+      {
+        label: t(
+          "2. 이전 항목:",
+          "2. Items Transferred:",
+        ),
+        value: t(
+          "AI 상담 문의 시 입력된 메시지 및 첨부자료에 포함된 개인정보",
+          "Personal information contained within support chat messages and attachments.",
+        ),
+      },
+      {
+        label: t(
+          "3. 이전 목적 및 방식:",
+          "3. Purpose and Transfer Method:",
+        ),
+        value: t(
+          "실시간 AI 답변 생성을 위한 암호화 네트워크 전송",
+          "Encrypted transmission over networks for real-time AI response generation.",
+        ),
+      },
+      {
+        label: t(
+          "4. 보유 및 이용 기간:",
+          "4. Retention and Use Period:",
+        ),
+        value: t(
+          "AI 답변 생성 완료 후 각 제공사 정책에 따라 지체 없이 파기 (단, 채널톡 자체의 상담 내역 보관은 내부 방침에 따름)",
+          "Destroyed without undue delay after response generation in accordance with each provider’s policies (separate from Channel Talk's own consultation log retention policies).",
+        ),
+      },
+      {
+        label: t(
+          "5. 거부 방법 및 권리 행사:",
+          "5. Refusal and Rights:",
+        ),
+        value: t(
+          "AI 상담 기능 이용을 원하지 않거나 개인정보 처리를 원하지 않는 경우, 공식 문의처(kaist.helloworld@gmail.com)를 통해 수동 문의 및 동의 철회를 요청하실 수 있습니다.",
+          "Users who do not wish to use AI support or who request consent withdrawal may contact the official inquiry email (kaist.helloworld@gmail.com) for manual assistance and request processing.",
+        ),
+      },
     ],
   },
   {
     id: "privacy-rights",
     number: 9,
-    title: t("정보주체의 권리와 행사 방법", "Data-subject rights and how to exercise them"),
+    title: t(
+      "정보주체의 권리와 행사 방법",
+      "Data-subject rights and how to exercise them",
+    ),
     paragraphs: [
       t(
-        `이용자는 자신의 개인정보에 대해 열람, 정정·삭제, 처리정지, 동의 철회 및 개인정보 전송 요구 등 관련 법령이 정한 권리를 행사할 수 있습니다. 서비스 화면에서 직접 처리할 수 없는 요청은 ${CONTACT_EMAIL}로 접수해 주세요.`,
-        `Users may exercise rights provided by applicable law, including access, correction or deletion, suspension of processing, withdrawal of consent, and data-portability requests where applicable. If a request cannot be handled in the Service, submit it to ${CONTACT_EMAIL}.`,
+        "이용자는 자신의 개인정보에 대해 열람, 정정·삭제, 처리정지, 동의 철회, 회원 탈퇴 및 개인정보 전송 요구 등 관련 법령이 정한 권리를 행사할 수 있습니다. 서비스 화면에서 직접 처리할 수 없는 요청은 kaist.helloworld@gmail.com로 접수해 주세요.",
+        "Users may exercise rights provided by applicable law, including access, correction or deletion, suspension of processing, withdrawal of consent, account withdrawal, and data-portability requests where applicable. If a request cannot be handled in the Service, submit it to kaist.helloworld@gmail.com.",
       ),
       t(
-        "운영자는 본인 또는 정당한 대리인인지 확인하기 위해 필요한 최소한의 인증 자료를 요청할 수 있습니다. 다른 사람의 권리, 법령상 의무, 진행 중인 감사·분쟁 또는 서비스 보안을 침해할 우려가 있는 경우 일부 요청을 제한하거나 거절하고 그 사유를 안내할 수 있습니다.",
-        "The Operator may request the minimum verification needed to confirm that the requester is the data subject or an authorized representative. A request may be limited or refused, with reasons given, when it would affect another person’s rights, a legal duty, an ongoing audit or dispute, or Service security.",
+        "운영자는 본인 또는 정당한 대리인 여부를 확인한 후 지체 없이 요청을 처리하고 결과를 안내합니다. 다른 사람의 권리, 법령상 의무, 진행 중인 감사·분쟁 또는 서비스 보안을 침해할 우려가 있는 경우 일부 요청을 제한하거나 거절하고 그 사유를 안내할 수 있습니다.",
+        "The Operator verifies that the requester is the data subject or an authorized representative, processes the request without undue delay, and communicates the outcome. A request may be limited or refused, with reasons given, when it would affect another person’s rights, a legal duty, an ongoing audit or dispute, or Service security.",
       ),
       t(
-        `권리 행사는 ${CONTACT_EMAIL}로 요청 내용을 보내는 방식으로 할 수 있으며, 운영자는 관련 법령이 정한 절차와 기간에 따라 답변합니다.`,
-        `Requests may be made by sending the requested action and relevant details to ${CONTACT_EMAIL}. The Operator responds under the procedures and time limits required by applicable law.`,
+        "권리 행사는 kaist.helloworld@gmail.com로 요청 내용을 보내는 방식으로 할 수 있으며, 운영자는 관련 법령이 정한 절차와 기간에 따라 답변합니다.",
+        "Requests may be made by sending the requested action and relevant details to kaist.helloworld@gmail.com. The Operator responds under the procedures and time limits required by applicable law.",
       ),
     ],
   },
   {
     id: "privacy-contact",
     number: 10,
-    title: t("개인정보 보호책임과 고충 처리", "Privacy contact and complaints"),
+    title: t(
+      "개인정보 보호책임과 고충 처리",
+      "Privacy contact and complaints",
+    ),
     groups: [
       {
-        label: t("개인정보 보호책임자 직책", "Privacy officer role"),
-        value: t("KAIST 전산학부 집행위원회 전산관리부 부장", "Head of IT Administration, SoC Student Council, School of Computing, KAIST"),
+        label: t(
+          "개인정보 보호책임자",
+          "Privacy Officer",
+        ),
+        value: t(
+          "KAIST 전산학부 집행위원회 전산관리부 부장",
+          "Head of IT Administration, SoC Student Council, School of Computing, KAIST",
+        ),
       },
       {
-        label: t("개인정보 관련 문의·열람등요구 접수", "Privacy inquiries and rights requests"),
-        value: t(CONTACT_EMAIL, CONTACT_EMAIL),
-      },
-      {
-        label: t("외부 구제·상담", "External remedies and advice"),
-        value: t("개인정보침해 신고센터 privacy.kisa.or.kr / 국번 없이 118, 개인정보분쟁조정위원회 등 관련 기관", "KISA Privacy Infringement Report Center at privacy.kisa.or.kr / 118, and the Personal Information Dispute Mediation Committee or other relevant authorities"),
+        label: t(
+          "개인정보 관련 문의·열람등요구 접수",
+          "Privacy inquiries and rights requests",
+        ),
+        value: t(
+          "kaist.helloworld@gmail.com",
+          "kaist.helloworld@gmail.com",
+        ),
       },
     ],
   },
   {
     id: "privacy-safeguards",
     number: 11,
-    title: t("개인정보의 안전성 확보조치", "Security safeguards"),
+    title: t(
+      "개인정보의 안전성 확보조치",
+      "Security safeguards",
+    ),
     bullets: [
-      t("개인정보 접근 권한을 업무상 필요한 운영자에게만 부여하고 역할·권한별 접근을 관리합니다.", "Access is granted only to operators who need it for their duties, with role-based permission management."),
-      t("SSO·세션 토큰과 인증 쿠키를 분리하여 관리하고, 동의 전 임시 세션에는 장기 계정을 만들지 않습니다.", "SSO and session tokens and authentication cookies are managed separately, and no persistent account is created for a pre-consent temporary session."),
-      t("운영 변경과 관리자 실행을 감사 로그로 기록하고, 접근 IP와 변경 대상 등 보안 점검에 필요한 정보를 관리합니다.", "Operator changes and administrative actions are recorded in audit logs, including information such as access IP and target needed for security review."),
-      t("HTTPS 전송, 비밀값의 환경변수 관리, 입력값 검증, 파일 접근 제어, 백업·복구와 취약점 대응을 적용합니다.", "The Service applies HTTPS transport, environment-based secret management, input validation, file access controls, backup and recovery, and vulnerability response."),
+      t(
+        "개인정보 접근 권한을 업무상 필요한 운영자에게만 부여하고 역할·권한별 접근을 관리합니다.",
+        "Access is granted only to operators who need it for their duties, with role-based permission management.",
+      ),
+      t(
+        "SSO·세션 토큰과 인증 쿠키를 분리하여 관리하고, 동의 전 임시 세션에는 장기 계정을 만들지 않습니다.",
+        "SSO and session tokens and authentication cookies are managed separately, and no persistent account is created for a pre-consent temporary session.",
+      ),
+      t(
+        "운영 변경과 관리자 실행을 감사 로그로 기록하고, 접근 IP와 변경 대상 등 보안 점검에 필요한 정보를 관리합니다.",
+        "Operator changes and administrative actions are recorded in audit logs, including information such as access IP and target needed for security review.",
+      ),
+      t(
+        "HTTPS 전송, 비밀값의 환경변수 관리, 입력값 검증, 파일 접근 제어, 백업·복구와 취약점 대응을 적용합니다.",
+        "The Service applies HTTPS transport, environment-based secret management, input validation, file access controls, backup and recovery, and vulnerability response.",
+      ),
     ],
   },
   {
     id: "privacy-automated",
     number: 12,
-    title: t("자동화된 결정과 프로파일링", "Automated decisions and profiling"),
+    title: t(
+      "자동화된 결정과 프로파일링",
+      "Automated decisions and profiling",
+    ),
     paragraphs: [
       t(
         "서비스는 현재 이용자에게 법적 효과나 이에 준하는 중대한 영향을 자동으로 발생시키는 결정 또는 광고 목적의 프로파일링을 하지 않습니다. 설문·투표·혜택 자격 확인은 저장된 조건을 화면과 운영자가 확인할 수 있는 방식으로 적용합니다.",
@@ -594,7 +752,10 @@ const privacySections: readonly LegalSection[] = [
   {
     id: "privacy-cookies",
     number: 13,
-    title: t("쿠키와 행태정보", "Cookies and behavioral information"),
+    title: t(
+      "쿠키와 행태정보",
+      "Cookies and behavioral information",
+    ),
     paragraphs: [
       t(
         "서비스는 로그인 유지와 보안에 필요한 httpOnly 세션 쿠키를 사용합니다. 언어 선택과 일부 화면 상태에는 브라우저의 localStorage 또는 sessionStorage가 사용될 수 있습니다. 브라우저 설정으로 쿠키를 제한하면 로그인 등 일부 기능이 정상적으로 동작하지 않을 수 있습니다.",
@@ -609,22 +770,28 @@ const privacySections: readonly LegalSection[] = [
   {
     id: "privacy-changes",
     number: 14,
-    title: t("개인정보처리방침의 변경", "Changes to this Privacy Policy"),
+    title: t(
+      "개인정보처리방침의 변경",
+      "Changes to this Privacy Policy",
+    ),
     paragraphs: [
       t(
-        `이 방침은 서비스 기능, SSO 응답 항목, 처리위탁자, 저장소·보안 방식 또는 관련 법령의 변경을 반영하기 위해 수정될 수 있습니다. 변경 시 시행일과 변경 내용을 이 페이지에 게시하며, 중요한 변경은 서비스 화면 등을 통해 별도로 안내합니다. 현재 방침의 시행일은 ${EFFECTIVE_DATE}입니다.`,
-        `This Policy may be revised to reflect changes to Service features, SSO fields, processors, storage or security methods, or applicable law. The effective date and changes will be posted on this page, and material changes will be separately announced through the Service or another appropriate channel. The current effective date is ${EFFECTIVE_DATE}.`,
+        `이 방침은 서비스 기능, SSO 응답 항목, 처리위탁자, 저장소·보안 방식 또는 관련 법령의 변경을 반영하기 위해 수정될 수 있습니다. 변경 시 시행일과 변경 내용을 이 페이지에 게시하며, 중요한 변경은 서비스 화면 등을 통해 별도로 안내합니다. 현재 방침의 시행일은 ${PRIVACY_EFFECTIVE_DATE}입니다.`,
+        `This Policy may be revised to reflect changes to Service features, SSO fields, processors, storage or security methods, or applicable law. The effective date and changes will be posted on this page, and material changes will be separately announced through the Service or another appropriate channel. The current effective date is ${PRIVACY_EFFECTIVE_DATE}.`,
       ),
     ],
   },
   {
     id: "privacy-remedies",
     number: 15,
-    title: t("권익침해 구제 방법", "Remedies for privacy violations"),
+    title: t(
+      "권익침해 구제 방법",
+      "Remedies for privacy violations",
+    ),
     paragraphs: [
       t(
-        `개인정보 처리에 관한 문의·불만·권리 행사는 ${CONTACT_EMAIL}로 접수해 주세요. 운영자와의 상담으로 해결되지 않는 경우 개인정보침해 신고센터(privacy.kisa.or.kr, 국번 없이 118), 개인정보분쟁조정위원회 등 관계 기관에 상담이나 분쟁조정을 신청할 수 있습니다.`,
-        `For questions, complaints, or rights requests about personal information, contact ${CONTACT_EMAIL}. If the matter is not resolved with the Operator, Users may seek advice or mediation from the KISA Privacy Infringement Report Center (privacy.kisa.or.kr, 118) or the Personal Information Dispute Mediation Committee and other relevant authorities.`,
+        "개인정보 처리에 관한 문의·불만·권리 행사는 kaist.helloworld@gmail.com로 접수해 주세요. 운영자와의 상담으로 해결되지 않는 경우 개인정보침해 신고센터(privacy.kisa.or.kr, 국번 없이 118), 개인정보분쟁조정위원회 등 관계 기관에 상담이나 분쟁조정을 신청할 수 있습니다.",
+        "For questions, complaints, or rights requests about personal information, contact kaist.helloworld@gmail.com. If the matter is not resolved with the Operator, Users may seek advice or mediation from the KISA Privacy Infringement Report Center (privacy.kisa.or.kr, 118) or the Personal Information Dispute Mediation Committee and other relevant authorities.",
       ),
     ],
   },
@@ -657,14 +824,14 @@ function localized(value: LegalText, lang: Language): string {
   return value[lang];
 }
 
-function LegalSectionView({ lang, section }: { lang: Language; section: LegalSection }) {
+function LegalSectionView({ lang, section, kind }: { lang: Language; section: LegalSection; kind: "terms" | "privacy" }) {
   return (
     <section id={section.id} className="scroll-mt-24 break-words select-text px-5 py-7 md:px-8">
       <div className="min-w-0">
         <h2 className="text-lg font-semibold tracking-tight text-app-text-strong">
           {lang === "ko"
             ? `제${section.number}조 (${localized(section.title, lang)})`
-            : `Article ${section.number} (${localized(section.title, lang)})`}
+            : `${kind === "privacy" ? "Section" : "Article"} ${section.number} (${localized(section.title, lang)})`}
         </h2>
 
         {section.paragraphs?.length ? (
@@ -734,7 +901,7 @@ export function LegalDocumentPage({ kind }: { kind: "terms" | "privacy" }) {
               <p className="text-sm leading-6 text-app-text-strong">
                 <span className="font-semibold">[{localized(document.versionLabel, lang)}]</span>
                 <span className="mx-2 text-app-text-muted">{lang === "ko" ? "시행일:" : "Effective:"}</span>
-                <span className="font-medium">{EFFECTIVE_DATE}</span>
+                <span className="font-medium">{kind === "privacy" ? PRIVACY_EFFECTIVE_DATE : EFFECTIVE_DATE}</span>
                 <span className="mx-2 text-app-text-muted" aria-hidden="true">·</span>
                 <span className="text-app-text-muted">{lang === "ko" ? "운영 주체:" : "Operator:"}</span>
                 <span className="ml-1 font-medium">{lang === "ko" ? OPERATOR_NAME : OPERATOR_NAME_EN}</span>
@@ -764,7 +931,7 @@ export function LegalDocumentPage({ kind }: { kind: "terms" | "privacy" }) {
 
             <div className="divide-y divide-slate-100">
               {document.sections.map((section) => (
-                <LegalSectionView key={section.id} lang={lang} section={section} />
+                <LegalSectionView key={section.id} lang={lang} section={section} kind={kind} />
               ))}
             </div>
 
