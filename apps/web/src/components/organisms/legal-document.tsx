@@ -133,7 +133,7 @@ const termsSections: readonly LegalSection[] = [
         "The Operator provides boards, events, schedules, surveys, votes, and other features needed for student council activities. The Operator may temporarily suspend all or part of the Service or change features for maintenance, security, incident response, or operational policy changes.",
       ),
       t(
-        "행사 일정, 설문 기간, 투표 자격과 결과 공개 범위는 각 화면에 표시된 설정을 따릅니다. 서비스에 표시된 정보와 실제 운영 내용이 다를 때에는 운영자에게 확인해 주세요.",
+        "행사 일정, 설문 기간, 투표 자격과 결과 공개 범위는 각 화면에 표시된 설정을 따릅니다. 서비스에 표시된 정보와 실제 운영 내용이 다를 때에는 운영자에게 확인하시기 바랍니다.",
         "Event schedules, survey periods, voting eligibility, and result visibility follow the settings shown on each page. If information shown in the Service differs from the actual operation, please confirm it with the Operator.",
       ),
     ],
@@ -309,7 +309,7 @@ const termsSections: readonly LegalSection[] = [
     title: t("문의와 분쟁 해결", "Contact and dispute resolution"),
     paragraphs: [
       t(
-        `서비스 이용, 콘텐츠 처리, 학생회비 기록 또는 약관에 관한 문의는 ${CONTACT_EMAIL}로 보내 주세요. 문의에는 본인 확인과 사실관계 확인에 필요한 최소한의 정보만 포함해 주세요.`,
+        `서비스 이용, 콘텐츠 처리, 학생회비 기록 또는 약관에 관한 사항은 ${CONTACT_EMAIL}으로 문의하시기 바랍니다. 문의에는 본인 확인과 사실관계 확인에 필요한 최소한의 정보만 포함해야 합니다.`,
         `For questions about the Service, Content handling, student-fee records, or these Terms, contact ${CONTACT_EMAIL}. Include only the minimum information needed to verify your identity and the facts of the request.`,
       ),
       t(
@@ -473,7 +473,7 @@ const privacySections: readonly LegalSection[] = [
           "Account and consent information",
         ),
         value: t(
-          "회원 계정이 유지되는 동안. 탈퇴·삭제 후에는 파기하되 법령상 또는 분쟁 대응상 필요한 동의·처리 기록은 해당 기간 동안 보존.",
+          "회원 계정이 유지되는 동안 보유합니다. 탈퇴·삭제 후에는 파기하되 법령상 또는 분쟁 대응상 필요한 동의·처리 기록은 해당 기간 동안 별도 분리 보관합니다.",
           "While the Member account is maintained. Destroyed after withdrawal or deletion, except for consent and processing records retained as required by law or for disputes.",
         ),
       },
@@ -493,7 +493,7 @@ const privacySections: readonly LegalSection[] = [
           "Posts, comments, surveys, and votes",
         ),
         value: t(
-          "서비스에 게시·보관되는 동안 및 분쟁·운영 대응에 필요한 기간. 삭제·탈퇴 시에도 법령·권리 보호·집계 무결성에 필요한 최소 정보는 별도 보존될 수 있음.",
+          "서비스에 게시·보관되는 동안 및 분쟁·운영 대응에 필요한 기간 동안 보유합니다. 삭제·탈퇴 시에도 법령·권리 보호·집계 무결성에 필요한 최소 정보는 별도 보존될 수 있습니다.",
           "While published or stored in the Service and for as long as needed for disputes or operations. After deletion or withdrawal, minimum information may be retained for law, rights protection, or tally integrity.",
         ),
       },
@@ -503,7 +503,7 @@ const privacySections: readonly LegalSection[] = [
           "Drafts and attachments",
         ),
         value: t(
-          "이용자가 삭제하거나 작성 목적이 달성될 때까지. 미사용 파일은 고아 파일 정리 정책에 따라 삭제될 수 있음.",
+          "이용자가 삭제하거나 작성 목적이 달성될 때까지 보유합니다. 미사용 파일은 고아 파일 정리 정책에 따라 삭제될 수 있습니다.",
           "Until the User deletes them or the writing purpose is achieved. Unused files may be deleted under the orphan-file cleanup policy.",
         ),
       },
@@ -662,7 +662,7 @@ const privacySections: readonly LegalSection[] = [
     ),
     paragraphs: [
       t(
-        "이용자는 자신의 개인정보에 대해 열람, 정정·삭제, 처리정지, 동의 철회, 회원 탈퇴 및 개인정보 전송 요구 등 관련 법령이 정한 권리를 행사할 수 있습니다. 서비스 화면에서 직접 처리할 수 없는 요청은 kaist.helloworld@gmail.com로 접수해 주세요.",
+        "이용자는 자신의 개인정보에 대해 열람, 정정·삭제, 처리정지, 동의 철회, 회원 탈퇴 및 개인정보 전송 요구 등 관련 법령이 정한 권리를 행사할 수 있습니다. 서비스 화면에서 직접 처리할 수 없는 요청은 kaist.helloworld@gmail.com으로 접수하시기 바랍니다.",
         "Users may exercise rights provided by applicable law, including access, correction or deletion, suspension of processing, withdrawal of consent, account withdrawal, and data-portability requests where applicable. If a request cannot be handled in the Service, submit it to kaist.helloworld@gmail.com.",
       ),
       t(
@@ -670,7 +670,7 @@ const privacySections: readonly LegalSection[] = [
         "The Operator verifies that the requester is the data subject or an authorized representative, processes the request without undue delay, and communicates the outcome. A request may be limited or refused, with reasons given, when it would affect another person’s rights, a legal duty, an ongoing audit or dispute, or Service security.",
       ),
       t(
-        "권리 행사는 kaist.helloworld@gmail.com로 요청 내용을 보내는 방식으로 할 수 있으며, 운영자는 관련 법령이 정한 절차와 기간에 따라 답변합니다.",
+        "권리 행사는 kaist.helloworld@gmail.com으로 요청 내용을 보내는 방식으로 할 수 있으며, 운영자는 관련 법령이 정한 절차와 기간에 따라 답변합니다.",
         "Requests may be made by sending the requested action and relevant details to kaist.helloworld@gmail.com. The Operator responds under the procedures and time limits required by applicable law.",
       ),
     ],
@@ -762,7 +762,7 @@ const privacySections: readonly LegalSection[] = [
         "The Service uses httpOnly session cookies needed to maintain sign-in and security. Browser localStorage or sessionStorage may be used for language selection and some screen state. Restricting cookies in the browser may prevent sign-in and other features from working normally.",
       ),
       t(
-        "현재 광고 식별자나 이용자 행동을 분석하여 맞춤형 광고를 제공하기 위한 행태정보를 별도로 수집하지 않습니다. 문의 메신저가 활성화되면 채널톡의 자체 쿠키·기술이 적용될 수 있으며, 자세한 내용은 해당 제공자의 정책을 확인해 주세요.",
+        "현재 광고 식별자나 이용자 행동을 분석하여 맞춤형 광고를 제공하기 위한 행태정보를 별도로 수집하지 않습니다. 문의 메신저가 활성화되면 채널톡의 자체 쿠키·기술이 적용될 수 있으며, 자세한 내용은 해당 제공자의 정책을 확인하시기 바랍니다.",
         "The Service does not currently separately collect behavioral information for advertising identifiers or personalized advertising. If the support messenger is enabled, Channel Talk’s own cookies and technologies may apply; see that provider’s policy for details.",
       ),
     ],
@@ -790,7 +790,7 @@ const privacySections: readonly LegalSection[] = [
     ),
     paragraphs: [
       t(
-        "개인정보 처리에 관한 문의·불만·권리 행사는 kaist.helloworld@gmail.com로 접수해 주세요. 운영자와의 상담으로 해결되지 않는 경우 개인정보침해 신고센터(privacy.kisa.or.kr, 국번 없이 118), 개인정보분쟁조정위원회 등 관계 기관에 상담이나 분쟁조정을 신청할 수 있습니다.",
+        "개인정보 처리에 관한 문의·불만·권리 행사는 kaist.helloworld@gmail.com으로 접수하시기 바랍니다. 운영자와의 상담으로 해결되지 않는 경우 개인정보침해 신고센터(privacy.kisa.or.kr, 국번 없이 118), 개인정보분쟁조정위원회 등 관계 기관에 상담이나 분쟁조정을 신청할 수 있습니다.",
         "For questions, complaints, or rights requests about personal information, contact kaist.helloworld@gmail.com. If the matter is not resolved with the Operator, Users may seek advice or mediation from the KISA Privacy Infringement Report Center (privacy.kisa.or.kr, 118) or the Personal Information Dispute Mediation Committee and other relevant authorities.",
       ),
     ],
