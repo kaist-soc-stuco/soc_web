@@ -171,19 +171,19 @@ function ActivityRows({
         >
           {showType && (
             <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-100 pl-2 pr-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-medium leading-4 text-slate-600">
-              {item.label}
+              <span className="relative -top-[0.5px]">{item.label}</span>
             </span>
           )}
           <span className="min-w-0">
-            {item.boardName && <span className="mb-1 block text-xs text-slate-500">{item.boardName}</span>}
+            {item.boardName && <span className="relative -top-px mb-1 block text-xs text-slate-500">{item.boardName}</span>}
             <span className="flex min-w-0 items-center gap-2">
-              <ArticleListTitle>{item.title}</ArticleListTitle>
+              <ArticleListTitle className="relative -top-px">{item.title}</ArticleListTitle>
               {!!item.commentCount && (
-                <span className="shrink-0 text-xs leading-5 text-[#1769AA]">[{item.commentCount}]</span>
+                <span className="relative -top-px shrink-0 text-xs leading-5 text-[#1769AA]">[{item.commentCount}]</span>
               )}
             </span>
           </span>
-          <time dateTime={item.date} className={`whitespace-nowrap text-xs text-slate-400 ${showType ? "col-start-2" : ""} sm:col-auto`}>
+          <time dateTime={item.date} className={`relative -top-px whitespace-nowrap text-xs text-slate-400 ${showType ? "col-start-2" : ""} sm:col-auto`}>
             {formatRelative(item.date, lang)}
           </time>
         </Link>

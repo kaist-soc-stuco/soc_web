@@ -343,7 +343,7 @@ export function BoardDetailAdjacentNav({
   return (
     <nav
       aria-label={lang === "ko" ? "게시글 이동" : "Post navigation"}
-      className="article-adjacent-navigation mt-6 w-full divide-y divide-slate-100 border-t border-slate-100"
+      className="article-adjacent-navigation mt-3 w-full divide-y divide-slate-100 border-t border-slate-100"
     >
       {renderRow(prevArticle, "prev")}
       {renderRow(nextArticle, "next")}

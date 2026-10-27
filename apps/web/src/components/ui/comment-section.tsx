@@ -347,8 +347,8 @@ function CommentRow({
               {(lang === "en" ? comment.author.nameEn || comment.author.name : comment.author.name)}
             </span>
             {comment.isOfficial ? (
-              <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-transparent px-1.5 py-0.5 text-[length:var(--ui-text-caption-size)] font-normal text-emerald-700">
-                <svg aria-hidden="true" className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m5 12 4 4 10-10" /></svg>{lang === "ko" ? "공식 답변" : "Official response"}
+              <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[length:var(--ui-text-caption-size)] font-normal text-emerald-700">
+                <svg aria-hidden="true" className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m5 12 4 4 10-10" /></svg>{lang === "ko" ? "공식 답변" : "Official response"}
               </span>
             ) : null}
             {comment.status === "HIDDEN" ? (
