@@ -516,7 +516,7 @@ function BulkEmailPageContent() {
     try {
       setUploading(true);
       setOperationError(null);
-      const results = await Promise.allSettled(files.map((file) => apiClient.uploadAsset(file, { transport: "server" })));
+      const results = await Promise.allSettled(files.map((file) => apiClient.uploadAsset(file)));
       const uploaded = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
       setAttachments((previous) =>
         [
@@ -550,7 +550,7 @@ function BulkEmailPageContent() {
     try {
       setUploading(true);
       setOperationError(null);
-      const asset = await apiClient.uploadAsset(file, { transport: "server" });
+      const asset = await apiClient.uploadAsset(file);
       setAttachments((previous) =>
         [
           ...previous,

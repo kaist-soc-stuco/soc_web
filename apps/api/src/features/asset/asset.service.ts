@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -25,10 +24,6 @@ import {
 } from "../board/article-access";
 import { AuditLogService } from "../audit/audit-log.service";
 import type { AuditMetadata } from "../audit/audit-context";
-import type {
-  AssetDirectUploadPrepareResponse,
-  AssetUploadResponse,
-} from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 
 type UploadedAssetFile = {
@@ -40,7 +35,7 @@ type UploadedAssetFile = {
 
 const DEFAULT_ASSET_USER_MAX_COUNT = 100;
 const DEFAULT_ASSET_USER_MAX_BYTES = 512 * 1024 * 1024;
-const DIRECT_UPLOAD_EXPIRES_MS = 10 * 60 * 1_000;
+const UPLOAD_RESERVATION_EXPIRES_MS = 10 * 60 * 1_000;
 const MAX_BUFFERED_ASSET_BYTES = 20 * 1024 * 1024;
 
 @Injectable()
@@ -161,197 +156,6 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       sizeBytes: input.file.size,
       storageKey: toAssetReference(asset.assetId),
     };
-  }
-
-  async prepareDirectUpload(input: {
-    originalFilename: string;
-    mimeType: string;
-    sizeBytes: number;
-    userId: string;
-    audit?: AuditMetadata;
-  }): Promise<AssetDirectUploadPrepareResponse> {
-    if (
-      this.configService.get<string>("ASSET_STORAGE_PROVIDER") !== "s3" ||
-      !this.storage.createPresignedUpload
-    ) {
-      throw new ConflictException("asset_direct_upload_unavailable");
-    }
-
-    const uploadExpiresAt = msToDate(nowMs() + DIRECT_UPLOAD_EXPIRES_MS);
-    const reservationId = await this.reserveAssetUpload(input.userId, input.sizeBytes, uploadExpiresAt);
-    let preparation: AssetDirectUploadPrepareResponse;
-    let storageKey: string | null = null;
-    let asset: { assetId: string };
-    try {
-      preparation = await this.storage.createPresignedUpload({
-        contentType: input.mimeType,
-        originalName: input.originalFilename,
-        sizeBytes: input.sizeBytes,
-      });
-      storageKey = preparation.storageKey;
-
-      asset = await this.assetRepository.createAssetFromReservation({
-        reservationId,
-        storageKey: preparation.storageKey,
-        originalFilename: input.originalFilename,
-        mimeType: input.mimeType,
-        sizeBytes: input.sizeBytes,
-        uploadedBy: input.userId,
-        uploadStatus: "PENDING",
-        uploadExpiresAt,
-      });
-    } catch (error) {
-      await this.releaseAssetUploadReservation(reservationId, input.userId);
-      if (storageKey) {
-        try {
-          await this.storage.delete(storageKey);
-        } catch (cleanupError) {
-          this.logger.error(
-            `Presigned asset cleanup failed after DB failure (${storageKey}).`,
-            cleanupError instanceof Error ? cleanupError.stack : String(cleanupError),
-          );
-        }
-      }
-      throw error;
-    }
-
-    await this.auditLogService?.record({
-      action: "asset.upload.prepare",
-      actorUserId: input.audit?.actorUserId ?? input.userId,
-      ipAddress: input.audit?.ipAddress ?? null,
-      payload: {
-        extension: fileExtension(input.originalFilename),
-        mimeType: input.mimeType,
-        operation: "direct",
-        sizeBytes: input.sizeBytes,
-      },
-      targetId: asset.assetId,
-      targetType: "asset",
-    });
-
-    return preparation;
-  }
-
-  async completeDirectUpload(input: {
-    storageKey: string;
-    userId: string;
-    audit?: AuditMetadata;
-  }): Promise<AssetUploadResponse> {
-    if (
-      this.configService.get<string>("ASSET_STORAGE_PROVIDER") !== "s3" ||
-      !this.storage.verifyUpload
-    ) {
-      throw new ConflictException("asset_direct_upload_unavailable");
-    }
-
-    const asset = await this.assetRepository.findOwnedAssetByStorageKey(
-      input.storageKey,
-      input.userId,
-    );
-    if (!asset) {
-      throw new NotFoundException("asset_upload_not_found");
-    }
-    if (asset.uploadStatus !== "PENDING") {
-      throw new ConflictException("asset_upload_already_completed");
-    }
-    if (asset.uploadExpiresAt && asset.uploadExpiresAt.valueOf() <= nowMs()) {
-      throw new BadRequestException("asset_upload_expired");
-    }
-
-    let uploadedObject: Awaited<ReturnType<NonNullable<AssetStorageProvider["verifyUpload"]>>>;
-    try {
-      uploadedObject = await this.storage.verifyUpload(input.storageKey);
-    } catch {
-      throw new BadRequestException("asset_upload_incomplete");
-    }
-
-    if (uploadedObject.sizeBytes !== asset.sizeBytes) {
-      throw new BadRequestException("asset_upload_size_mismatch");
-    }
-    if (
-      uploadedObject.contentType &&
-      uploadedObject.contentType.toLowerCase() !== asset.mimeType.toLowerCase()
-    ) {
-      throw new BadRequestException("asset_upload_mime_mismatch");
-    }
-
-    const completed = await this.assetRepository.completeDirectUpload(
-      asset.assetId,
-      input.userId,
-    );
-    if (!completed) {
-      throw new ConflictException("asset_upload_expired");
-    }
-
-    const result = {
-      assetId: asset.assetId,
-      originalFilename: asset.originalFilename,
-      mimeType: asset.mimeType,
-      sizeBytes: asset.sizeBytes,
-      storageKey: toAssetReference(asset.assetId),
-    };
-    await this.auditLogService?.record({
-      action: "asset.upload.complete",
-      actorUserId: input.audit?.actorUserId ?? input.userId,
-      ipAddress: input.audit?.ipAddress ?? null,
-      payload: {
-        mimeType: result.mimeType,
-        operation: "direct",
-        sizeBytes: result.sizeBytes,
-      },
-      targetId: result.assetId,
-      targetType: "asset",
-    });
-    return result;
-  }
-
-  async migrateLocalAssets(limit: number, audit?: AuditMetadata): Promise<{
-    scanned: number;
-    migrated: number;
-    failed: number;
-  }> {
-    if (
-      this.configService.get<string>("ASSET_STORAGE_PROVIDER") !== "s3" ||
-      !this.storage.migrateLocalObject
-    ) {
-      throw new ConflictException("asset_s3_provider_not_configured");
-    }
-
-    const candidates = await this.assetRepository.findLocalAssets(limit);
-    let migrated = 0;
-    let failed = 0;
-
-    for (const candidate of candidates) {
-      try {
-        const storageKey = await this.storage.migrateLocalObject({
-          storageKey: candidate.storageKey,
-          originalName: candidate.originalFilename,
-          contentType: candidate.mimeType,
-        });
-        await this.assetRepository.updateStorageKey(
-          candidate.assetId,
-          storageKey,
-        );
-        migrated += 1;
-      } catch (error) {
-        failed += 1;
-        this.logger.warn(
-          `Asset migration failed for ${candidate.assetId}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
-    }
-
-    const result = { scanned: candidates.length, migrated, failed };
-    await this.auditLogService?.record({
-      action: "asset.migrate",
-      actorUserId: audit?.actorUserId ?? null,
-      ipAddress: audit?.ipAddress ?? null,
-      payload: { ...result, source: "local" },
-      targetType: "asset",
-    });
-    return result;
   }
 
   async getFile(
@@ -625,7 +429,7 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
   private async reserveAssetUpload(
     userId: string,
     incomingBytes: number,
-    expiresAt = msToDate(nowMs() + DIRECT_UPLOAD_EXPIRES_MS),
+    expiresAt = msToDate(nowMs() + UPLOAD_RESERVATION_EXPIRES_MS),
   ): Promise<string> {
     const maxCount = this.configService.get<number>(
       "ASSET_USER_MAX_COUNT",

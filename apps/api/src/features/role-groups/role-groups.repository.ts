@@ -48,7 +48,6 @@ export class RoleGroupsRepository {
       departmentEn: row.departmentEn ?? null,
       departmentKo: row.departmentKo ?? null,
       primaryMajor: row.primaryMajor ?? null,
-      gender: row.gender ?? null,
       privacyConsentAt: row.privacyConsentAt
         ? msToIso(row.privacyConsentAt.valueOf())
         : null,

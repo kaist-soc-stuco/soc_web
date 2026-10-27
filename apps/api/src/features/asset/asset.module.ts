@@ -7,7 +7,7 @@ import { AssetService } from "./asset.service";
 import { AssetRepository } from "./repositories/asset.repository";
 import {
   AssetStorageProvider,
-  ConfiguredAssetStorageProvider,
+  LocalAssetStorageProvider,
 } from "./asset.storage";
 import { AuthModule } from "../auth/auth.module";
 import { UsersModule } from "../users/users.module";
@@ -22,7 +22,7 @@ import { AuditLogModule } from "../audit/audit-log.module";
     AssetService,
     {
       provide: AssetStorageProvider,
-      useClass: ConfiguredAssetStorageProvider,
+      useClass: LocalAssetStorageProvider,
     },
   ],
   exports: [AssetRepository, AssetService],

@@ -28,7 +28,6 @@ export interface PendingSsoUser {
   departmentKo?: string;
   departmentEn?: string;
   primaryMajor?: string;
-  gender?: string;
   academicStatus?: string;
   identityCode?: string;
 }

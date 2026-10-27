@@ -173,3 +173,12 @@ test("the Nest upload endpoint keeps the allowed MIME-type contract", async (t) 
   assert.equal(body.message, "unsupported_asset_mime_type");
   assert.equal(fixture.uploadedFiles.length, 0);
 });
+
+test("cloud upload and migration endpoints are no longer exposed", async t => {
+  const fixture = await startUploadServer();
+  t.after(() => fixture.app.close());
+  for (const action of ["presign", "complete", "migrate-local"]) {
+    const response = await fetch(fixture.uploadUrl.replace(/upload$/, action), { method: "POST" });
+    assert.equal(response.status, 404);
+  }
+});

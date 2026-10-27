@@ -25,7 +25,6 @@ const createProductionConfig = () => ({
   AUTH_JWT_SECRET: uniqueSecret("jwt"),
   AUTH_PENDING_LOGIN_ENCRYPTION_KEY: uniqueSecret("pending"),
   VOTE_BALLOT_ENCRYPTION_KEY: uniqueSecret("vote"),
-  ASSET_STORAGE_PROVIDER: "local",
 });
 
 test("production accepts distinct non-placeholder secrets of at least 32 bytes", () => {
@@ -33,6 +32,30 @@ test("production accepts distinct non-placeholder secrets of at least 32 bytes",
   const validated = validateEnv(config);
   assert.equal(validated.AUTH_JWT_SECRET, config.AUTH_JWT_SECRET);
   assert.equal(validated.REDIS_PASSWORD, config.REDIS_PASSWORD);
+});
+
+test("MAIL_* settings support Gmail SSL and STARTTLS without retired SMTP names", () => {
+  const config = { ...createProductionConfig(), MAIL_HOST: "smtp.gmail.com", MAIL_PORT: "465", MAIL_SECURE: "true", MAIL_USER: "sender@example.invalid", MAIL_PASS: "synthetic-app-pass", MAIL_FROM: "SoC <sender@example.invalid>" };
+  const validated = validateEnv(config);
+  assert.equal(validated.MAIL_HOST, "smtp.gmail.com");
+  assert.equal(validated.MAIL_PORT, 465);
+  assert.equal(validated.MAIL_SECURE, true);
+  assert.equal(validated.MAIL_USER, config.MAIL_USER);
+  assert.equal(validated.MAIL_PASS, config.MAIL_PASS);
+  assert.equal(validated.MAIL_FROM, config.MAIL_FROM);
+  const startTls = validateEnv({ ...config, MAIL_PORT: "587", MAIL_SECURE: "false" });
+  assert.equal(startTls.MAIL_PORT, 587);
+  assert.equal(startTls.MAIL_SECURE, false);
+  const automaticTls = validateEnv({ ...createProductionConfig(), MAIL_PORT: "587" });
+  assert.equal(automaticTls.MAIL_SECURE, false);
+});
+
+test("invalid mail ports and SSL/STARTTLS mismatches are caught before startup", () => {
+  for (const MAIL_PORT of ["0", "65536", "465oops", "4.65", "invalid"]) {
+    assert.throws(() => validateEnv({ ...createProductionConfig(), MAIL_PORT }), /MAIL_PORT/);
+  }
+  assert.throws(() => validateEnv({ ...createProductionConfig(), MAIL_PORT: "465", MAIL_SECURE: "false" }), /MAIL_SECURE/);
+  assert.throws(() => validateEnv({ ...createProductionConfig(), MAIL_PORT: "587", MAIL_SECURE: "true" }), /MAIL_SECURE/);
 });
 
 test("production mode is trimmed before hardening and email defaults are applied", () => {

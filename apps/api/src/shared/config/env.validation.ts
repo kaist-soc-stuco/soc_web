@@ -121,12 +121,6 @@ const asOptionalBoolean = (
   throw new Error(`Invalid boolean value for ${name}: ${String(value)}`);
 };
 
-const asAssetStorageProvider = (value: unknown): "local" | "s3" => {
-  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "local";
-  if (normalized === "local" || normalized === "s3") return normalized;
-  throw new Error(`Invalid ASSET_STORAGE_PROVIDER value: ${String(value)}`);
-};
-
 export const validateEnv = (config: Record<string, unknown>): Record<string, unknown> => {
   const nodeEnv = asString(config.NODE_ENV, 'NODE_ENV').trim();
   const isProduction = nodeEnv === 'production';
@@ -174,13 +168,14 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     rejectReusedProductionSecrets(productionSecrets);
   }
 
-  const assetStorageProvider = asAssetStorageProvider(config.ASSET_STORAGE_PROVIDER);
-  const awsS3Bucket = asOptionalString(config.AWS_S3_BUCKET);
-  const awsRegion = asOptionalString(config.AWS_REGION);
-
-  if (assetStorageProvider === "s3") {
-    if (!awsS3Bucket) throw new Error("Missing environment variable: AWS_S3_BUCKET");
-    if (!awsRegion) throw new Error("Missing environment variable: AWS_REGION");
+  const rawMailPort = config.MAIL_PORT;
+  const mailPort = Number(typeof rawMailPort === "string" ? rawMailPort.trim() || 465 : rawMailPort ?? 465);
+  if (!Number.isInteger(mailPort) || mailPort < 1 || mailPort > 65535) {
+    throw new Error("Invalid MAIL_PORT: expected an integer between 1 and 65535");
+  }
+  const mailSecure = asOptionalBoolean(config.MAIL_SECURE, "MAIL_SECURE", mailPort === 465);
+  if ((mailPort === 465 && !mailSecure) || (mailPort === 587 && mailSecure)) {
+    throw new Error("MAIL_PORT 465 requires MAIL_SECURE=true; MAIL_PORT 587 requires MAIL_SECURE=false");
   }
 
   return {
@@ -227,12 +222,12 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       "KAIST_CALENDAR_SYNC_ENABLED",
       false,
     ),
-    DOORAY_SMTP_HOST: asOptionalString(config.DOORAY_SMTP_HOST),
-    DOORAY_SMTP_PORT: asOptionalPositiveInt(config.DOORAY_SMTP_PORT, 'DOORAY_SMTP_PORT', 587),
-    DOORAY_SMTP_USER: asOptionalString(config.DOORAY_SMTP_USER),
-    DOORAY_SMTP_PASSWORD: asOptionalString(config.DOORAY_SMTP_PASSWORD),
-    DOORAY_SMTP_SECURE: asOptionalBoolean(config.DOORAY_SMTP_SECURE, 'DOORAY_SMTP_SECURE', false),
-    EMAIL_FROM: asOptionalString(config.EMAIL_FROM),
+    MAIL_HOST: asOptionalString(config.MAIL_HOST) ?? "smtp.gmail.com",
+    MAIL_PORT: mailPort,
+    MAIL_SECURE: mailSecure,
+    MAIL_USER: asOptionalString(config.MAIL_USER),
+    MAIL_PASS: asOptionalString(config.MAIL_PASS),
+    MAIL_FROM: asOptionalString(config.MAIL_FROM),
     EMAIL_DRY_RUN: asOptionalBoolean(
       config.EMAIL_DRY_RUN,
       'EMAIL_DRY_RUN',
@@ -277,7 +272,6 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       'ASSET_ORPHAN_CLEANUP_INTERVAL_HOURS',
       6,
     ),
-    ASSET_STORAGE_PROVIDER: assetStorageProvider,
     ASSET_UPLOAD_DIR: asOptionalString(config.ASSET_UPLOAD_DIR),
     ASSET_USER_MAX_COUNT: asOptionalPositiveInt(
       config.ASSET_USER_MAX_COUNT,
@@ -289,17 +283,6 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       'ASSET_USER_MAX_BYTES',
       512 * 1024 * 1024,
     ),
-    AWS_REGION: awsRegion,
-    AWS_S3_BUCKET: awsS3Bucket,
-    AWS_S3_PREFIX: asOptionalString(config.AWS_S3_PREFIX) ?? "assets",
-    AWS_S3_ENDPOINT: asOptionalString(config.AWS_S3_ENDPOINT),
-    AWS_S3_FORCE_PATH_STYLE: asOptionalBoolean(
-      config.AWS_S3_FORCE_PATH_STYLE,
-      "AWS_S3_FORCE_PATH_STYLE",
-      false,
-    ),
-    AWS_ACCESS_KEY_ID: asOptionalString(config.AWS_ACCESS_KEY_ID),
-    AWS_SECRET_ACCESS_KEY: asOptionalString(config.AWS_SECRET_ACCESS_KEY),
     POSTGRES_HOST: postgresHost,
     POSTGRES_PORT: postgresPort,
     POSTGRES_USER: postgresUser,

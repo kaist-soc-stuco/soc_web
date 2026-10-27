@@ -30,7 +30,6 @@ export interface AdminUserRecord {
   departmentKo: string | null;
   departmentEn: string | null;
   primaryMajor?: string | null;
-  gender?: string | null;
   privacyConsentAt?: string | null;
   feeStatus?: "PAID" | "PARTIAL" | "UNPAID";
   academicStatus: string | null;
@@ -71,7 +70,6 @@ export interface RoleGroupMemberRecord {
   departmentKo: string | null;
   departmentEn: string | null;
   primaryMajor?: string | null;
-  gender?: string | null;
   academicStatus: string | null;
   identityCode: string | null;
   isActive: boolean;

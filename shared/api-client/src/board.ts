@@ -15,9 +15,6 @@ import type {
   ArticleUpdateRequest,
   ArticleUpdateResponse,
   AnonymousArticleAuthorResponse,
-  AssetDirectUploadPrepareRequest,
-  AssetDirectUploadPrepareResponse,
-  AssetDirectUploadCompleteRequest,
   AssetUploadResponse,
   BoardArchiveResponse,
   BoardCreateRequest,
@@ -43,7 +40,6 @@ import type {
 } from "@soc/contracts";
 
 import {
-  ApiClientHttpError,
   buildListQuery,
   type ApiClientContext,
   type ListQueryOptions,
@@ -52,8 +48,6 @@ import {
 export const createBoardApi = ({
   assetBaseUrl,
   normalizedBaseUrl,
-  postObject,
-  putObject,
   requestJson,
 }: ApiClientContext) => ({
   getBoards: async (): Promise<BoardListResponse> => {
@@ -132,63 +126,11 @@ export const createBoardApi = ({
     );
   },
 
-  uploadAsset: async (file: File, options?: { transport?: "direct" | "server" }): Promise<AssetUploadResponse> => {
-    if (options?.transport === "server") {
-      const body = new FormData();
-      body.set("file", file);
-      return requestJson<AssetUploadResponse>(`${assetBaseUrl}/upload`, { body, method: "POST" }, { retryOnUnauthorized: true });
-    }
-    const prepareBody: AssetDirectUploadPrepareRequest = {
-      originalFilename: file.name,
-      mimeType: file.type,
-      sizeBytes: file.size,
-    };
-
-    let preparation: AssetDirectUploadPrepareResponse | null = null;
-    try {
-      preparation = await requestJson<AssetDirectUploadPrepareResponse>(
-        `${assetBaseUrl}/presign`,
-        {
-          body: JSON.stringify(prepareBody),
-          headers: { "Content-Type": "application/json" },
-          method: "POST",
-        },
-        { retryOnUnauthorized: true },
-      );
-    } catch (error) {
-      if (!(error instanceof ApiClientHttpError) || error.status !== 409) {
-        throw error;
-      }
-    }
-
-    if (preparation) {
-      if (preparation.uploadMethod === "POST" && preparation.uploadFields) {
-        await postObject(preparation.uploadUrl, preparation.uploadFields, file);
-      } else {
-        await putObject(
-          preparation.uploadUrl,
-          file,
-          preparation.uploadHeaders,
-        );
-      }
-      const completeBody: AssetDirectUploadCompleteRequest = {
-        storageKey: preparation.storageKey,
-      };
-      return requestJson<AssetUploadResponse>(
-        `${assetBaseUrl}/complete`,
-        {
-          body: JSON.stringify(completeBody),
-          headers: { "Content-Type": "application/json" },
-          method: "POST",
-        },
-        { retryOnUnauthorized: true },
-      );
-    }
-
-    const formData = new FormData();
-    formData.set("file", file);
+  uploadAsset: async (file: File): Promise<AssetUploadResponse> => {
+    const body = new FormData();
+    body.set("file", file);
     return requestJson<AssetUploadResponse>(`${assetBaseUrl}/upload`, {
-      body: formData,
+      body,
       method: "POST",
     }, { retryOnUnauthorized: true });
   },

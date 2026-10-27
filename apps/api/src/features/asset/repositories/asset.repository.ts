@@ -219,51 +219,6 @@ export class AssetRepository {
       || await this.findVoteImageReference(assetId, { publishedOnly: true }, tx);
   }
 
-  async findOwnedAssetByStorageKey(
-    storageKey: string,
-    uploadedBy: string,
-  ): Promise<{
-    assetId: string;
-    storageKey: string;
-    originalFilename: string;
-    mimeType: string;
-    sizeBytes: number;
-    uploadStatus: "PENDING";
-    uploadExpiresAt: Date | null;
-  } | null> {
-    const [asset] = await this.db
-      .select({
-        assetId: assets.assetId,
-        storageKey: assets.storageKey,
-        originalFilename: assets.originalFilename,
-        mimeType: assets.mimeType,
-        sizeBytes: assets.sizeBytes,
-        uploadStatus: assets.uploadStatus,
-        uploadExpiresAt: assets.uploadExpiresAt,
-      })
-      .from(assets)
-      .where(
-        and(
-          eq(assets.storageKey, storageKey),
-          eq(assets.uploadedBy, uploadedBy),
-          eq(assets.uploadStatus, "PENDING"),
-        ),
-      )
-      .limit(1);
-
-    return asset
-      ? {
-          assetId: String(asset.assetId),
-          storageKey: asset.storageKey,
-          originalFilename: asset.originalFilename,
-          mimeType: asset.mimeType,
-          sizeBytes: asset.sizeBytes,
-          uploadStatus: "PENDING",
-          uploadExpiresAt: asset.uploadExpiresAt,
-        }
-      : null;
-  }
-
   async findOwnedAsset(
     assetId: string,
     uploadedBy: string,
@@ -323,7 +278,7 @@ export class AssetRepository {
       : null;
   }
 
-  /** Reserve quota before a storage provider or presigned upload is touched. */
+  /** Reserve quota before writing an uploaded file to disk. */
   async reserveAssetUpload(input: {
     uploadedBy: string;
     sizeBytes: number;
@@ -519,41 +474,6 @@ export class AssetRepository {
     return Boolean(avatar);
   }
 
-  async findLocalAssets(limit: number): Promise<
-    Array<{
-      assetId: string;
-      storageKey: string;
-      originalFilename: string;
-      mimeType: string;
-    }>
-  > {
-    const rows = await this.db
-      .select({
-        assetId: assets.assetId,
-        storageKey: assets.storageKey,
-        originalFilename: assets.originalFilename,
-        mimeType: assets.mimeType,
-      })
-      .from(assets)
-      .where(sql`${assets.storageKey} NOT LIKE 's3://%'`)
-      .orderBy(asc(assets.createdAt))
-      .limit(limit);
-
-    return rows.map((row) => ({
-      assetId: String(row.assetId),
-      storageKey: row.storageKey,
-      originalFilename: row.originalFilename,
-      mimeType: row.mimeType,
-    }));
-  }
-
-  async updateStorageKey(assetId: string, storageKey: string): Promise<void> {
-    await this.db
-      .update(assets)
-      .set({ storageKey })
-      .where(eq(assets.assetId, Number(assetId)));
-  }
-
   async findUnlinkedAssetsBefore(
     cutoff: Date,
     limit: number,
@@ -572,20 +492,6 @@ export class AssetRepository {
       assetId: String(row.assetId),
       storageKey: row.storageKey,
     }));
-  }
-
-  async completeDirectUpload(assetId: string, uploadedBy: string): Promise<boolean> {
-    const updated = await this.db
-      .update(assets)
-      .set({ uploadStatus: "COMPLETED", uploadExpiresAt: null })
-      .where(and(
-        eq(assets.assetId, Number(assetId)),
-        eq(assets.uploadedBy, uploadedBy),
-        eq(assets.uploadStatus, "PENDING"),
-        or(isNull(assets.uploadExpiresAt), gt(assets.uploadExpiresAt, nowDate())),
-      ))
-      .returning({ assetId: assets.assetId });
-    return updated.length > 0;
   }
 
   async getUserAssetUsage(uploadedBy: string): Promise<{ count: number; bytes: number }> {

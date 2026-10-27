@@ -30,7 +30,6 @@ const isPendingSsoUser = (value: unknown): value is PendingSsoUser => {
     isOptionalString(payload.departmentKo) &&
     isOptionalString(payload.departmentEn) &&
     isOptionalString(payload.primaryMajor) &&
-    isOptionalString(payload.gender) &&
     isOptionalString(payload.academicStatus) &&
     isOptionalString(payload.identityCode)
   );

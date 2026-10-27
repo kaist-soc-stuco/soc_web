@@ -216,14 +216,15 @@ export class AuthService {
 
     const config = this.readCallbackConfig();
 
-    const stateKey = this.buildRedisKey(body.state);
-    const storedState = await this.consumePendingState(stateKey);
-
-    if (!storedState) {
-      return this.redirectResult("error", "invalid_or_expired_state");
-    }
-
+    let stage: "state" | "exchange" | "profile" | "account" | "session" = "state";
     try {
+      const stateKey = this.buildRedisKey(body.state);
+      const storedState = await this.consumePendingState(stateKey);
+      if (!storedState) {
+        return this.redirectResult("error", "invalid_or_expired_state");
+      }
+
+      stage = "exchange";
       const response = await fetch(config.authApiUrl, {
         method: "POST",
         headers: {
@@ -238,17 +239,16 @@ export class AuthService {
         signal: AbortSignal.timeout(15_000),
       });
 
-      const parsedResponse = JSON.parse(await readResponseTextWithLimit(response, 512 * 1024)) as
-        | SsoApiErrorResponse
-        | SsoApiSuccessResponse;
-
       if (!response.ok) {
+        this.logger.warn(`SSO callback failed at exchange: HTTP ${response.status}`);
         return this.redirectResult("error", "sso_exchange_failed");
       }
 
-      if (isSsoApiErrorResponse(parsedResponse) && parsedResponse.errorCode) {
-        return this.redirectResult("error", "sso_exchange_failed");
+      const parsed: unknown = JSON.parse(await readResponseTextWithLimit(response, 512 * 1024));
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return this.redirectResult("error", "sso_response_invalid");
       }
+      const parsedResponse = parsed as SsoApiErrorResponse | SsoApiSuccessResponse;
 
       if (isSsoApiErrorResponse(parsedResponse)) {
         return this.redirectResult("error", "sso_exchange_failed");
@@ -258,6 +258,7 @@ export class AuthService {
         return this.redirectResult("error", "nonce_mismatch");
       }
 
+      stage = "profile";
       const userInfo = this.normalizeUserInfo(parsedResponse.userInfo);
       const ssoSubject = this.readRequiredUserInfoString(
         userInfo,
@@ -290,9 +291,6 @@ export class AuthService {
       const departmentKo = this.readUserInfoString(userInfo, "std_dept_kor_nm");
       const departmentEn = this.readUserInfoString(userInfo, "std_dept_eng_nm");
       const primaryMajor = departmentKo;
-      const gender =
-        this.readUserInfoString(userInfo, "gender") ??
-        this.readUserInfoString(userInfo, "gender_cd");
       const academicStatus = undefined;
       const identityCode = this.readUserInfoString(userInfo, "socps_cd");
 
@@ -300,6 +298,7 @@ export class AuthService {
         return this.redirectResult("error", "missing_email");
       }
 
+      stage = "account";
       const existingUser = await this.usersService.findByKaistUid(kaistUid);
 
       if (existingUser) {
@@ -313,7 +312,6 @@ export class AuthService {
             departmentEn,
             departmentKo,
             primaryMajor,
-            gender,
             email: userEmail,
             identityCode,
             nameEn,
@@ -332,6 +330,7 @@ export class AuthService {
           stdNo ?? existingUser.stdNo ?? undefined,
         );
 
+        stage = "session";
         const issued = await this.authSessionService.issuePersistedSession(
           existingUser.userId,
         );
@@ -361,6 +360,7 @@ export class AuthService {
         };
       }
 
+      stage = "session";
       const pendingLoginToken = randomUUID();
       await this.pendingLoginRepository.save(pendingLoginToken, {
         academicStatus,
@@ -375,7 +375,6 @@ export class AuthService {
         ssoSubject,
         stdNo,
         primaryMajor,
-        gender,
       }, PENDING_LOGIN_TTL_SECONDS);
 
       const transactionToken = randomUUID();
@@ -394,9 +393,16 @@ export class AuthService {
       };
     } catch (error) {
       this.logger.warn(
-        `SSO callback failed: ${error instanceof Error ? error.name : "unknown_error"}`,
+        `SSO callback failed at ${stage}: ${error instanceof Error ? error.name : "unknown_error"}`,
       );
-      return this.redirectResult("error", "sso_exchange_failed");
+      const reasons = {
+        state: "login_state_unavailable",
+        exchange: "sso_exchange_failed",
+        profile: "sso_profile_invalid",
+        account: "login_account_failed",
+        session: "login_session_failed",
+      };
+      return this.redirectResult("error", reasons[stage]);
     }
   }
 

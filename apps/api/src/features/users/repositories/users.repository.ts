@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   InternalServerErrorException,
@@ -79,7 +80,6 @@ type UserUpsertInput = {
   departmentEn?: string | null;
   departmentKo?: string | null;
   primaryMajor?: string | null;
-  gender?: string | null;
   email: string;
   identityCode?: string | null;
   isActive?: boolean;
@@ -92,7 +92,6 @@ type UserProfileUpdateInput = {
   departmentEn?: string | null;
   departmentKo?: string | null;
   primaryMajor?: string | null;
-  gender?: string | null;
   email?: string;
   identityCode?: string | null;
   nameEn?: string | null;
@@ -184,7 +183,6 @@ export class UsersRepository {
       departmentEn: row.departmentEn ?? null,
       departmentKo: row.departmentKo ?? null,
       primaryMajor: row.primaryMajor ?? null,
-      gender: row.gender ?? null,
       academicStatus: row.academicStatus ?? null,
       identityCode: row.identityCode ?? null,
       privacyConsentAt: row.privacyConsentAt ? msToIso(row.privacyConsentAt.valueOf()) : null,
@@ -204,7 +202,6 @@ export class UsersRepository {
       departmentEn: row.departmentEn ?? null,
       departmentKo: row.departmentKo ?? null,
       primaryMajor: row.primaryMajor ?? null,
-      gender: row.gender ?? null,
       privacyConsentAt: row.privacyConsentAt
         ? msToIso(row.privacyConsentAt.valueOf())
         : null,
@@ -272,7 +269,7 @@ export class UsersRepository {
         departmentEn: input.departmentEn ?? null,
         departmentKo: input.departmentKo ?? null,
         primaryMajor: input.primaryMajor ?? null,
-        gender: input.gender ?? null,
+        gender: null,
         email: input.email,
         identityCode: input.identityCode ?? null,
         isActive: input.isActive ?? true,
@@ -288,11 +285,11 @@ export class UsersRepository {
     const now = nowDate();
     const updateSet: Partial<typeof users.$inferInsert> = {
       email: input.email,
-      isActive: input.isActive ?? true,
       kaistUid: input.kaistUid,
       lastLoginAt: input.lastLoginAt ?? now,
       nameKo: input.nameKo,
       updatedAt: now,
+      gender: null,
       ...(input.nameEn !== undefined ? { nameEn: input.nameEn } : {}),
       ...(input.stdNo !== undefined ? { stdNo: input.stdNo } : {}),
       ...(input.departmentKo !== undefined
@@ -304,7 +301,6 @@ export class UsersRepository {
       ...(input.primaryMajor !== undefined
         ? { primaryMajor: input.primaryMajor }
         : {}),
-      ...(input.gender !== undefined ? { gender: input.gender } : {}),
       ...(input.academicStatus !== undefined
         ? { academicStatus: input.academicStatus }
         : {}),
@@ -322,6 +318,9 @@ export class UsersRepository {
       });
 
       if (existingByKaistUid) {
+        if (!existingByKaistUid.isActive) {
+          throw new ForbiddenException("account_expired");
+        }
         const [updated] = await tx
           .update(users)
           .set(updateSet)
@@ -336,6 +335,9 @@ export class UsersRepository {
       });
 
       if (existingByEmail) {
+        if (!existingByEmail.isActive) {
+          throw new ForbiddenException("account_expired");
+        }
         const [updated] = await tx
           .update(users)
           .set(updateSet)
@@ -357,7 +359,7 @@ export class UsersRepository {
           stdNo: input.stdNo ?? null,
           departmentKo: input.departmentKo ?? null,
           primaryMajor: input.primaryMajor ?? null,
-          gender: input.gender ?? null,
+          gender: null,
           departmentEn: input.departmentEn ?? null,
           academicStatus: null,
           identityCode: input.identityCode ?? null,
@@ -380,7 +382,7 @@ export class UsersRepository {
       departmentEn?: string | null;
       departmentKo?: string | null;
       primaryMajor?: string | null;
-      gender?: string | null;
+      gender: null;
       updatedAt: Date;
       email?: string;
       identityCode?: string | null;
@@ -390,6 +392,7 @@ export class UsersRepository {
       stdNo?: string | null;
     } = {
       updatedAt: nowDate(),
+      gender: null,
     };
 
     if (input.nameKo !== undefined) {
@@ -419,11 +422,6 @@ export class UsersRepository {
     if (input.primaryMajor !== undefined) {
       updateSet.primaryMajor = input.primaryMajor;
     }
-
-    if (input.gender !== undefined) {
-      updateSet.gender = input.gender;
-    }
-
 
     if (input.academicStatus !== undefined) {
       updateSet.academicStatus = null;

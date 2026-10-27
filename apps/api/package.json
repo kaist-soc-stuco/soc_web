@@ -16,9 +16,6 @@
     "test": "pnpm --dir ../../shared/common build && pnpm build && node --conditions=production --test --test-concurrency=1 test/*.test.js"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.862.0",
-    "@aws-sdk/s3-presigned-post": "3.1113.0",
-    "@aws-sdk/s3-request-presigner": "^3.862.0",
     "@nestjs/common": "^11.1.27",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.27",

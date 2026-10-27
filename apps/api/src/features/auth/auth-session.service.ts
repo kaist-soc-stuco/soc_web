@@ -454,7 +454,6 @@ export class AuthSessionService {
         departmentEn: pendingUser.departmentEn,
         departmentKo: pendingUser.departmentKo,
         primaryMajor: pendingUser.primaryMajor,
-        gender: pendingUser.gender,
         kaistUid: pendingUser.kaistUid,
         email: pendingUser.email,
         identityCode: pendingUser.identityCode,

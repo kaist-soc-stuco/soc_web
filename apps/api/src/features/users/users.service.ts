@@ -111,7 +111,6 @@ export class UsersService {
     departmentEn?: string;
     departmentKo?: string;
     primaryMajor?: string;
-    gender?: string;
     identityCode?: string;
     stdNo?: string;
     consentedAt?: Date;
@@ -122,7 +121,6 @@ export class UsersService {
       departmentEn: input.departmentEn,
       departmentKo: input.departmentKo,
       primaryMajor: input.primaryMajor,
-      gender: input.gender,
       kaistUid: input.kaistUid,
       identityCode: input.identityCode,
       nameEn: input.nameEn,
@@ -285,7 +283,6 @@ export class UsersService {
       departmentEn?: string;
       departmentKo?: string;
       primaryMajor?: string;
-      gender?: string;
       email?: string;
       identityCode?: string;
       nameEn?: string;

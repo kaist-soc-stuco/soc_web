@@ -233,7 +233,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     try {
       const uploaded = await Promise.all(
         Array.from(files).map(async (file) => {
-          const asset = await apiClient.uploadAsset(file, { transport: "server" });
+          const asset = await apiClient.uploadAsset(file);
           return {
             assetId: asset.assetId,
             mimeType: asset.mimeType,
@@ -276,7 +276,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
 
     setUploading(true);
     try {
-      const asset = await apiClient.uploadAsset(file, { transport: "server" });
+      const asset = await apiClient.uploadAsset(file);
       setAssets((current) => [
         ...current,
         {
@@ -318,7 +318,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
 
     setUploading(true);
     try {
-      const asset = await apiClient.uploadAsset(file, { transport: "server" });
+      const asset = await apiClient.uploadAsset(file);
       const thumbnail = {
         assetId: asset.assetId,
         mimeType: asset.mimeType,

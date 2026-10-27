@@ -2,7 +2,7 @@ import { localDate } from "@soc/shared";
 
 import type { Language } from "@/hooks/use-language";
 import type { CalendarEvent } from "@/lib/events-surveys";
-import { formatNumericDate } from "@/lib/date-display";
+import { formatNumericDate } from "../../lib/date-display";
 
 export function getCalendarEventLocation(event: CalendarEvent, lang: Language) {
   return event.kind === "EVENT" ? (lang === "en" ? event.locationEn || event.location : event.location)?.trim() || "" : "";

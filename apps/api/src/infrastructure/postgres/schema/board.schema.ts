@@ -202,8 +202,8 @@ export const assets = pgTable("asset", {
 
 /**
  * A committed reservation closes the check-then-insert race for uploads that
- * have not produced an asset row yet (for example while a presigned POST is
- * being created). Active rows count toward the owner's quota.
+ * have not produced an asset row yet while the file is being written to disk.
+ * Active rows count toward the owner's quota.
  */
 export const assetUploadReservations = pgTable("asset_upload_reservation", {
   reservationId: uuid("reservation_id").defaultRandom().primaryKey(),

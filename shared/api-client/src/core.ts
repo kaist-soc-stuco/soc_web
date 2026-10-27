@@ -54,16 +54,6 @@ export interface ApiClientContext {
     init: RequestInit,
     options?: { retryOnUnauthorized?: boolean },
   ) => Promise<Blob>;
-  putObject: (
-    url: string,
-    body: BodyInit,
-    headers?: HeadersInit,
-  ) => Promise<void>;
-  postObject: (
-    url: string,
-    fields: Record<string, string>,
-    file: File,
-  ) => Promise<void>;
   requestVoid: (
     url: string,
     init: RequestInit,
@@ -497,43 +487,6 @@ export const createApiClientContext = ({
     return readBlob(response);
   };
 
-  const putObject = async (
-    url: string,
-    body: BodyInit,
-    headers?: HeadersInit,
-  ): Promise<void> => {
-    const response = await fetcher(
-      url,
-      withCredentialsAndTemporaryAuth(url, {
-        body,
-        headers,
-        method: "PUT",
-      }),
-    );
-    if (!response.ok) {
-      throw await readHttpError(response);
-    }
-  };
-
-  const postObject = async (
-    url: string,
-    fields: Record<string, string>,
-    file: File,
-  ): Promise<void> => {
-    const formData = new FormData();
-    for (const [name, value] of Object.entries(fields)) {
-      formData.append(name, value);
-    }
-    formData.append("file", file);
-    const response = await fetcher(url, {
-      body: formData,
-      method: "POST",
-    });
-    if (!response.ok) {
-      throw await readHttpError(response);
-    }
-  };
-
   return {
     auditLogsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "audit-logs"),
     assetBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "assets"),
@@ -545,8 +498,6 @@ export const createApiClientContext = ({
     notificationsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "notifications"),
     refreshSession: sendRefreshRequest,
     roadmapBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "roadmap"),
-    putObject,
-    postObject,
     requestJson,
     requestBlob,
     requestText,

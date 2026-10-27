@@ -104,7 +104,7 @@ test("pending login records encrypt the complete SSO profile and fail closed", a
     email: "encrypted@example.invalid",
     stdNo: "20991234",
     departmentKo: "합성 학과",
-    gender: "synthetic-gender",
+    identityCode: "synthetic-member-code",
   };
 
   await repository.save("opaque-pending", payload, 60);
@@ -539,3 +539,52 @@ test("existing SSO login records recent access with refreshed profile", async ()
   assert.ok(saved.lastLoginAt instanceof Date);
   assert.ok(saved.lastLoginAt.getTime() >= before && saved.lastLoginAt.getTime() <= Date.now());
 });
+
+for (const existing of [true, false]) {
+  test(`SSO gender fields are discarded for ${existing ? "existing" : "new"} accounts`, async (t) => {
+    const redis = createRedisStore();
+    const pending = new PendingLoginRepository(config, redis);
+    const initialAdmin = { async ensureRoleForUser() {} };
+    let savedProfile;
+    const users = {
+      ...createUsersService(),
+      async findByKaistUid() {
+        return existing ? { userId: "user-a", isActive: true } : null;
+      },
+      async updateProfileFromSso(_userId, profile) { savedProfile = profile; },
+      async upsertUserFromConsent(profile) {
+        savedProfile = profile;
+        return { userId: "user-a", isActive: true };
+      },
+      async invalidatePermissionCache() {},
+    };
+    const session = new AuthSessionService(config, createSessionRepository(), pending, users, initialAdmin);
+    const service = new AuthService(config, users, session, pending, initialAdmin, redis);
+    const start = await service.createLoginStartPayload();
+    t.mock.method(global, "fetch", async () => new Response(JSON.stringify({
+      nonce: start.nonce,
+      userInfo: {
+        user_id: "subject-a",
+        email: "synthetic@example.invalid",
+        gender: "synthetic-gender",
+        gender_cd: "synthetic-gender-code",
+      },
+    }), { status: 200 }));
+
+    const callback = await service.handleLoginCallback({ state: start.state, code: "synthetic-code" }, start.state);
+    assert.match(callback.redirectUrl, existing ? /status=success/ : /status=consent-required/);
+    if (!existing) {
+      const token = await service.getPendingLoginToken(callback.transactionToken);
+      const profile = await pending.find(token);
+      assert.equal(Object.hasOwn(profile, "gender"), false);
+      assert.equal(Object.hasOwn(profile, "gender_cd"), false);
+      // A login already pending during deployment must not restore old gender data.
+      await pending.save(token, { ...profile, gender: "legacy-gender" }, 60);
+      const result = await session.handleConsentDecision({ consent: true, pendingLoginToken: token });
+      assert.equal(result.storageMode, "persisted");
+    }
+    assert.equal(savedProfile.email, "synthetic@example.invalid");
+    assert.equal(Object.hasOwn(savedProfile, "gender"), false);
+    assert.equal(Object.hasOwn(savedProfile, "gender_cd"), false);
+  });
+}

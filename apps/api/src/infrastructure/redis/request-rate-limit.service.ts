@@ -164,7 +164,7 @@ function classifyPath(path: string): RateCategory | null {
   if (normalized === "/calendar" || normalized.startsWith("/calendar/")) return "calendar";
   if (normalized.includes("/search") || normalized === "/articles/search") return "search";
   if (normalized === "/surveys" || normalized.startsWith("/surveys/")) return "survey";
-  if (/^\/assets\/(upload|presign|complete)$/.test(normalized)) return "upload";
+  if (normalized === "/assets/upload") return "upload";
   if (/^\/votes\/[^/]+\/receipts\//.test(normalized)) return "receipt";
   return null;
 }

@@ -17,6 +17,10 @@ test("privacy consent shows every required notice item", () => {
   ]) {
     assert.match(source, new RegExp(heading.replace("·", "\\·")));
   }
+  assert.doesNotMatch(source, /성별|gender/);
+  assert.match(source, /href="\/privacy" target="_blank" rel="noopener noreferrer"/);
+  assert.match(source, /Privacy Policy/);
+  assert.match(source, /개인정보처리방침/);
 });
 
 test("privacy policy names configured processors", () => {

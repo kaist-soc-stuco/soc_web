@@ -54,14 +54,19 @@ export class EmailDeliveryService implements OnModuleDestroy {
       return { dryRun: true };
     }
 
-    const host = this.configService.get<string>("DOORAY_SMTP_HOST");
-    const from = this.configService.get<string>("EMAIL_FROM");
-    if (!host || !from) {
+    const host = this.configService.get<string>("MAIL_HOST", "smtp.gmail.com").trim();
+    const from = this.configService.get<string>("MAIL_FROM")?.trim();
+    const user = this.configService.get<string>("MAIL_USER")?.trim();
+    const rawPassword = this.configService.get<string>("MAIL_PASS");
+    const password = host.toLowerCase() === "smtp.gmail.com"
+      ? rawPassword?.replace(/\s/g, "")
+      : rawPassword;
+    if (!host || !from || !user || !password) {
       throw new ServiceUnavailableException(EMAIL_DELIVERY_NOT_CONFIGURED);
     }
 
-    const user = this.configService.get<string>("DOORAY_SMTP_USER");
-    const password = this.configService.get<string>("DOORAY_SMTP_PASSWORD");
+    const port = this.configService.get<number>("MAIL_PORT", 465);
+    const secure = this.configService.get<boolean>("MAIL_SECURE", port === 465);
     const transporter = this.transporter ??= nodemailer.createTransport({
       host,
       pool: true,
@@ -70,9 +75,10 @@ export class EmailDeliveryService implements OnModuleDestroy {
       connectionTimeout: 10_000,
       greetingTimeout: 10_000,
       socketTimeout: 30_000,
-      port: this.configService.get<number>("DOORAY_SMTP_PORT", 587),
-      secure: this.configService.get<boolean>("DOORAY_SMTP_SECURE", false),
-      ...(user && password ? { auth: { user, pass: password } } : {}),
+      port,
+      secure,
+      requireTLS: !secure,
+      auth: { user, pass: password },
     });
 
     try {

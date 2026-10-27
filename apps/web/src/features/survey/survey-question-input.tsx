@@ -446,7 +446,7 @@ export function SurveyQuestionInput({
         try {
           const uploadedFiles = await Promise.all(
             selectedFiles.map(async (file): Promise<FileAnswer> => {
-              const asset = await apiClient.uploadAsset(file, { transport: "server" });
+              const asset = await apiClient.uploadAsset(file);
               return {
                 assetId: asset.assetId,
                 fileName: asset.originalFilename,

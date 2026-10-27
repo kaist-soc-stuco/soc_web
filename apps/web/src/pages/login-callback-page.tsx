@@ -306,7 +306,7 @@ export function LoginCallbackPage() {
             </div>
             <div>
               <dt className="font-semibold text-slate-800">{lang === "ko" ? "수집 항목" : "Information collected"}</dt>
-              <dd>{lang === "ko" ? "KAIST UID, 성명(한글·영문), 학번, 이메일, 소속, 주전공, 성별, 학적 상태·신분코드, 동의·로그인·접속기록" : "KAIST UID, Korean and English names, student number, email, department, primary major, gender, academic status and member code, consent, login, and access records"}</dd>
+              <dd>{lang === "ko" ? "KAIST UID, 성명(한글·영문), 학번, 이메일, 소속, 주전공, 신분코드, 동의·로그인·접속기록" : "KAIST UID, Korean and English names, student number, email, department, primary major, member code, consent, login, and access records"}</dd>
             </div>
             <div>
               <dt className="font-semibold text-slate-800">{lang === "ko" ? "보유·이용 기간" : "Retention period"}</dt>
@@ -317,8 +317,14 @@ export function LoginCallbackPage() {
               <dd>{lang === "ko" ? "동의를 거부할 수 있습니다. 거부하면 회원 정보를 저장하지 않는 임시 세션만 제공되며 마이페이지 등 계정 저장이 필요한 기능은 이용할 수 없습니다. 임시 정보는 세션 종료 시 파기합니다." : "You may refuse consent. If you refuse, only a temporary session without a stored account is provided, and account-based features such as My Page are unavailable. Temporary information is deleted when the session ends."}</dd>
             </div>
           </dl>
-
-
+          <p className="text-sm leading-6 text-slate-600">
+            {lang === "ko" ? "개인정보 처리에 관한 자세한 내용은 " : "For details about how we handle personal information, see our "}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-primary underline underline-offset-4">
+              {lang === "ko" ? "개인정보처리방침" : "Privacy Policy"}
+              <span className="sr-only">{lang === "ko" ? " (새 탭에서 열림)" : " (opens in a new tab)"}</span>
+            </a>
+            {lang === "ko" ? "을 확인해 주세요." : "."}
+          </p>
         </Modal>
       ) : null}
     </main>
