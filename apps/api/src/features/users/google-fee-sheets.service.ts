@@ -11,6 +11,7 @@ import {
   GoogleSpreadsheetSyncQueueService,
   type GoogleSpreadsheetSyncJobContext,
 } from "../../infrastructure/google/google-spreadsheet-sync-queue.service";
+import { initialFeeRosterStatus } from "./student-fee-roster";
 import { resolveFeeReferenceSemester } from "./fee-semester";
 import { UsersService } from "./users.service";
 import { AuditLogService } from "../audit/audit-log.service";
@@ -123,6 +124,8 @@ export class GoogleFeeSheetsService implements OnModuleInit {
       throw new Error("google_sheet_sync_claim_lost");
     }
 
+    const initialRoster = await this.usersService.listInitialStudentFeeRoster();
+
     await this.sheets.syncSheet({
       spreadsheetId: spreadsheet.spreadsheetId,
       sheetTitle: SHEET_TITLE,
@@ -142,6 +145,7 @@ export class GoogleFeeSheetsService implements OnModuleInit {
         "납부 일자",
         "비고",
         "사용자 ID",
+        "가입 일시",
       ],
       rows: rows.map((row) => [
         row.stdNo ?? "",
@@ -159,10 +163,23 @@ export class GoogleFeeSheetsService implements OnModuleInit {
         row.paidAt ?? "",
         row.note ?? "",
         row.userId,
+        row.joinedAt ?? "",
       ]),
-      dateTimeColumns: [12],
-      columnWidths: [105, 110, 240, 160, 160, 100, 145, 165, 125, 125, 180, 180, 155, 260, 270],
+      dateTimeColumns: [12, 15],
+      columnWidths: [105, 110, 240, 160, 160, 100, 145, 165, 125, 125, 180, 180, 155, 260, 270, 170],
       protectionDescription: "KAIST SOC · 과비 납부 (읽기 전용)",
+    });
+
+    if (job && !(await job.isCurrentClaim())) throw new Error("google_sheet_sync_claim_lost");
+    await this.sheets.syncSheet({
+      spreadsheetId: spreadsheet.spreadsheetId,
+      sheetTitle: "초기 납부 명부",
+      headers: ["학번", "이름", "입학 연도", "납부한 학기수", "납부액", "납부 상태", "가입 일시"],
+      rows: initialRoster.map(record => [record.stdNo, record.nameKo ?? "", record.admissionYear ?? "",
+        record.paidSemesters, record.paidAmount, initialFeeRosterStatus(record.paidSemesters), record.joinedAt?.toISOString() ?? ""]),
+      dateTimeColumns: [6],
+      columnWidths: [105, 110, 105, 145, 125, 100, 170],
+      protectionDescription: "KAIST SOC · 초기 납부 명부 (읽기 전용)",
     });
 
     const result = {

@@ -24,6 +24,7 @@ import {
   studentFeePaymentBatches,
   studentFeePayments,
   studentFeeStatus,
+  paidStudentRecords,
   studentFeePolicies,
   userRoleGroups,
   users,
@@ -38,7 +39,9 @@ import {
 
 import type { UserRecord } from "../entities/user";
 import { hashStudentFeePaymentPayload } from "../fee-payment-idempotency";
-import { getStudentFeeBootstrap } from "../student-fee-bootstrap-loader";
+import type { StudentFeeBootstrapRecord } from "../student-fee-bootstrap-loader";
+import { INITIAL_FEE_ROSTER_NOTE, initialFeeRosterLinkAllowed, initialFeeRosterStatus } from "../student-fee-roster";
+import type { PostgresTransaction } from "../../../infrastructure/postgres/postgres.provider";
 import { effectiveFeeStatusSql } from "../fee-status";
 import { readableArticleFilter } from "../../board/article-query-access";
 import type {
@@ -755,85 +758,74 @@ export class UsersRepository {
     return input;
   }
 
-  /**
-   * 첫 영속 로그인 시 제공된 과비 실자료를 학번으로 한 번만 적용합니다.
-   * 이미 운영자가 확인하거나 수정한 상태는 절대 덮어쓰지 않습니다.
-   */
-  async applyStudentFeeBootstrap(
-    userId: string,
-    stdNo: string | null | undefined,
-  ): Promise<StudentFeeStatusRecord | null> {
-    const source = getStudentFeeBootstrap(stdNo);
-    if (!source) return null;
+  /** Link untouched summaries without replacing an operator's payment ledger. */
+  private async linkInitialFeeRecords(tx: PostgresTransaction, records: Array<{ userId: string; paidSemesters: number; paidAmount: number }>) {
+    if (!records.length) return [];
+    const paidUsers = new Set((await tx.selectDistinct({ userId: studentFeePayments.userId }).from(studentFeePayments)
+      .where(inArray(studentFeePayments.userId, records.map(record => record.userId)))).map(row => row.userId));
+    records = records.filter(record => !paidUsers.has(record.userId));
+    if (!records.length) return [];
+    return tx.insert(studentFeeStatus).values(records.map((record) => ({
+      userId: record.userId, coverageSemesters: record.paidSemesters, paidAmount: record.paidAmount,
+      status: initialFeeRosterStatus(record.paidSemesters), note: INITIAL_FEE_ROSTER_NOTE,
+    }))).onConflictDoUpdate({
+      target: studentFeeStatus.userId,
+      set: { coverageSemesters: sql`excluded.coverage_semesters`, paidAmount: sql`excluded.paid_amount`,
+        status: sql`excluded.status`, note: INITIAL_FEE_ROSTER_NOTE, updatedAt: nowDate() },
+      setWhere: and(initialFeeRosterLinkAllowed(), sql`(
+        ${studentFeeStatus.coverageSemesters} IS DISTINCT FROM excluded.coverage_semesters OR
+        ${studentFeeStatus.paidAmount} IS DISTINCT FROM excluded.paid_amount OR
+        ${studentFeeStatus.status} IS DISTINCT FROM excluded.status OR
+        ${studentFeeStatus.note} IS DISTINCT FROM ${INITIAL_FEE_ROSTER_NOTE})`),
+    }).returning();
+  }
 
-    const row = await this.db.transaction(async (tx) => {
-      const lockedUser = await tx
-        .select({ userId: users.userId })
-        .from(users)
-        .where(eq(users.userId, userId))
-        .for("update")
-        .limit(1);
-
-      if (!lockedUser.length) {
-        throw new InternalServerErrorException("Can't load data");
+  /** Import is additive and idempotent: a deployment file never overwrites the DB ledger. */
+  async importStudentFeeRoster(records: readonly StudentFeeBootstrapRecord[]) {
+    return this.db.transaction(async (tx) => {
+      let insertedCount = 0;
+      let linkedCount = 0;
+      for (let index = 0; index < records.length; index += 500) {
+        const inserted = await tx.insert(paidStudentRecords).values(records.slice(index, index + 500).map(record => ({
+          stdNo: record.stdNo, nameKo: record.nameKo ?? null, admissionYear: record.admissionYear,
+          paidSemesters: record.paidSemesters, paidAmount: record.paidAmount,
+        }))).onConflictDoNothing({ target: paidStudentRecords.stdNo }).returning({ stdNo: paidStudentRecords.stdNo });
+        insertedCount += inserted.length;
       }
-
-      const [current] = await tx
-        .select()
-        .from(studentFeeStatus)
-        .where(eq(studentFeeStatus.userId, userId))
-        .for("update")
-        .limit(1);
-
-      const isUntouchedDefault = Boolean(
-        current &&
-          current.status === "UNPAID" &&
-          current.coverageSemesters === 6 &&
-          current.paidAmount === 0 &&
-          current.paidAt === null &&
-          current.verifiedBy === null &&
-          current.verifiedAt === null &&
-          current.note === null,
-      );
-
-      if (current && !isUntouchedDefault) return current;
-
-      const now = nowDate();
-      const nextRecord = {
-        coverageSemesters: source.paidSemesters,
-        paidAmount: source.paidAmount,
-        paidAt: null,
-        status:
-          source.paidSemesters >= 6
-            ? ("PAID" as const)
-            : source.paidSemesters > 0
-              ? ("PARTIAL" as const)
-              : ("UNPAID" as const),
-        updatedAt: now,
-        userId,
-        verifiedAt: null,
-        verifiedBy: null,
-        note: "과비 실자료 정리본 기준 최초 로그인 자동 반영",
-      };
-
-      if (current) {
-        return (
-          await tx
-            .update(studentFeeStatus)
-            .set(nextRecord)
-            .where(eq(studentFeeStatus.userId, userId))
-            .returning()
-        )[0];
+      const matched = await tx.select({ userId: users.userId, paidSemesters: paidStudentRecords.paidSemesters, paidAmount: paidStudentRecords.paidAmount })
+        .from(users).innerJoin(paidStudentRecords, eq(users.stdNo, paidStudentRecords.stdNo))
+        .where(notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS])).orderBy(asc(users.userId)).for("update", { of: users });
+      for (let index = 0; index < matched.length; index += 500) {
+        linkedCount += (await this.linkInitialFeeRecords(tx, matched.slice(index, index + 500))).length;
       }
-
-      return (await tx.insert(studentFeeStatus).values(nextRecord).returning())[0];
+      return { insertedCount, linkedCount };
     });
+  }
 
-    if (!row) {
-      throw new InternalServerErrorException("fee_bootstrap_failed");
-    }
+  async listInitialStudentFeeRoster() {
+    return this.db.select({
+      stdNo: paidStudentRecords.stdNo,
+      nameKo: sql<string | null>`coalesce(${users.nameKo}, ${paidStudentRecords.nameKo})`,
+      admissionYear: paidStudentRecords.admissionYear, paidSemesters: paidStudentRecords.paidSemesters,
+      paidAmount: paidStudentRecords.paidAmount, joinedAt: users.createdAt,
+    }).from(paidStudentRecords).leftJoin(users, eq(users.stdNo, paidStudentRecords.stdNo)).orderBy(asc(paidStudentRecords.stdNo));
+  }
 
-    return this.mapFeeStatusRow(row);
+  async linkInitialStudentFeeRecord(userId: string, stdNo: string | null | undefined) {
+    const normalized = stdNo?.trim();
+    if (!normalized || !/^\d{8}$/.test(normalized)) return { record: null, changed: false };
+    const row = await this.db.transaction(async (tx) => {
+      const [user] = await tx.select({ userId: users.userId }).from(users)
+        .where(and(eq(users.userId, userId), eq(users.stdNo, normalized))).for("update").limit(1);
+      if (!user) return { record: null, changed: false };
+      const [source] = await tx.select().from(paidStudentRecords).where(eq(paidStudentRecords.stdNo, normalized)).limit(1);
+      if (!source) return { record: null, changed: false };
+      const [linked] = await this.linkInitialFeeRecords(tx, [{ userId, paidSemesters: source.paidSemesters, paidAmount: source.paidAmount }]);
+      if (linked) return { record: linked, changed: true };
+      const [current] = await tx.select().from(studentFeeStatus).where(eq(studentFeeStatus.userId, userId)).limit(1);
+      return { record: current ?? null, changed: false };
+    });
+    return { record: row.record ? this.mapFeeStatusRow(row.record) : null, changed: row.changed };
   }
 
   async getStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord | null> {
@@ -1347,6 +1339,7 @@ export class UsersRepository {
     const rows = await this.db
       .select({
         userId: users.userId,
+        joinedAt: users.createdAt,
         nameKo: users.nameKo,
         nameEn: users.nameEn,
         stdNo: users.stdNo,
@@ -1395,6 +1388,7 @@ export class UsersRepository {
         status: resolvedStatus,
         eligible,
         userId: row.userId,
+        joinedAt: msToIso(row.joinedAt.valueOf()),
         nameKo: row.nameKo,
         nameEn: row.nameEn ?? undefined,
         stdNo: row.stdNo ?? undefined,

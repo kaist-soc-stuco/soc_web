@@ -322,11 +322,20 @@ export class UsersService {
     return status;
   }
 
+  async listInitialStudentFeeRoster() {
+    return this.usersRepository.listInitialStudentFeeRoster();
+  }
+
   async applyStudentFeeBootstrap(
     userId: string,
     stdNo: string | null | undefined,
   ): Promise<StudentFeeStatusRecord | null> {
-    return this.usersRepository.applyStudentFeeBootstrap(userId, stdNo);
+    const result = await this.usersRepository.linkInitialStudentFeeRecord(userId, stdNo);
+    if (result.changed) {
+      try { await this.googleSheetsQueue?.enqueue(GOOGLE_SHEET_RESOURCE.STUDENT_FEES); }
+      catch { this.logger.warn("initial_fee_roster_mirror_enqueue_failed"); }
+    }
+    return result.record;
   }
 
   async updateStudentFeeStatus(

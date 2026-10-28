@@ -99,6 +99,7 @@ export interface StudentFeeSpreadsheetSyncResponse {
 export interface StudentFeeListResponse {
   students: Array<{
     userId: string;
+    joinedAt?: string | null;
     nameKo: string;
     nameEn?: string;
     stdNo?: string;

@@ -120,6 +120,13 @@
       "when": 1793030400000,
       "tag": "0016_clear_user_gender",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793209560828,
+      "tag": "0019_paid_student_records",
+      "breakpoints": true
     }
   ]
 }

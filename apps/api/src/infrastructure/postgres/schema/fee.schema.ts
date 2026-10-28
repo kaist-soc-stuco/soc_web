@@ -13,6 +13,17 @@ import {
 
 import { users } from "./auth.schema";
 
+/** Initial fee ledger keyed by student number; includes students without accounts. */
+export const paidStudentRecords = pgTable("paid_student_records", {
+  stdNo: varchar("std_no", { length: 8 }).primaryKey(),
+  nameKo: varchar("name_ko", { length: 100 }),
+  admissionYear: integer("admission_year"),
+  paidSemesters: smallint("paid_semesters").notNull(),
+  paidAmount: integer("paid_amount").notNull(),
+  importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const studentFeeStatus = pgTable("student_fee_status", {
   userId: uuid("user_id")
     .primaryKey()
