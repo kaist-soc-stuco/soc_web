@@ -23,7 +23,7 @@ export function CalendarSubscriptionButton({
   const panelId = useId();
   const absoluteFeedUrl = toAbsoluteUrl(feedUrl);
   const appleCalendarUrl = absoluteFeedUrl.replace(/^https?:/i, "webcal:");
-  const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(absoluteFeedUrl)}`;
+  const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(appleCalendarUrl)}`;
   const actionClassName = "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30";
 
   useEffect(() => () => {
