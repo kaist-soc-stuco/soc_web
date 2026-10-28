@@ -209,7 +209,13 @@ export function getDiscoveryDateTime(item: UnifiedItem, lang: string) {
   return `${getDiscoveryPeriod(start, lang)} ${time}`;
 }
 
-export function getDiscoveryBadge(item: UnifiedItem, lang: string, currentMs = nowMs()) {
+type DiscoveryBadgeItem = Pick<UnifiedItem,
+  | "kind" | "computedState" | "opensAt" | "closesAt" | "isAlwaysOpen"
+  | "maxResponses" | "responseCount" | "linkedSurveyState" | "linkedSurveyClosesAt"
+  | "linkedSurveyAlwaysOpen" | "linkedSurveyMaxResponses" | "linkedSurveyResponseCount"
+>;
+
+export function getDiscoveryBadge(item: DiscoveryBadgeItem, lang: string, currentMs = nowMs()) {
   const ko = lang === "ko";
   const badge = (label: string, tone = "neutral", deadline?: string | null) => ({ label, tone, deadline: deadline ?? null });
   const kstDay = (ms: number) => Math.floor((ms + 9 * 3600000) / 86400000);

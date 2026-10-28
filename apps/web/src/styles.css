@@ -5004,9 +5004,14 @@ input[type="search"]:focus-visible,
   backdrop-filter: none;
 }
 .home-portal-event-badges .is-open {
-  border-color: #cee4d8;
+  border-color: transparent;
   color: #075f4a;
   background: #eaf5ef;
+}
+.home-portal-event-badges .is-urgent {
+  border-color: transparent;
+  color: #9b3d13;
+  background: #fff0e4;
 }
 .home-portal-event-badges .is-closed {
   border-color: transparent;

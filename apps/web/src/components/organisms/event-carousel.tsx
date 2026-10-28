@@ -1,5 +1,5 @@
 import { createApiClient } from "@soc/api-client";
-import { isoToMs, localDate, msToDate, nowMs } from "@soc/shared";
+import { isoToMs, msToDate, nowMs } from "@soc/shared";
 import { ArrowUpRight, ChevronLeft, ChevronRight, Clock, MapPin } from "lucide-react";
 import {
   useEffect,
@@ -16,7 +16,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { resolveAssetUrl } from "@/lib/asset-url";
-import { getEventArticleState } from "@/lib/events-surveys";
+import { formatCompactDateTime, getEventArticleState, getDiscoveryBadge } from "@/lib/events-surveys";
 
 interface EventCardRecord {
   id: string;
@@ -36,6 +36,8 @@ interface EventCardRecord {
   eventState: "before_open" | "open" | "closed";
   surveyId: string | null;
   linkedSurveyState: "before_open" | "open" | "closed" | null;
+  linkedSurveyClosesAt: string | null;
+  linkedSurveyAlwaysOpen: boolean;
   linkedSurveyMaxResponses: number | null;
   linkedSurveyResponseCount: number;
 }
@@ -51,6 +53,8 @@ interface EventCardItem {
   eventState: "before_open" | "open" | "closed";
   surveyId: string | null;
   linkedSurveyState: "before_open" | "open" | "closed" | null;
+  linkedSurveyClosesAt: string | null;
+  linkedSurveyAlwaysOpen: boolean;
   linkedSurveyMaxResponses: number | null;
   linkedSurveyResponseCount: number;
 }
@@ -151,6 +155,8 @@ function localizeEvent(record: EventCardRecord, lang: string): EventCardItem {
     eventState: record.eventState,
     surveyId: record.surveyId,
     linkedSurveyState: record.linkedSurveyState,
+    linkedSurveyClosesAt: record.linkedSurveyClosesAt,
+    linkedSurveyAlwaysOpen: record.linkedSurveyAlwaysOpen,
     linkedSurveyMaxResponses: record.linkedSurveyMaxResponses,
     linkedSurveyResponseCount: record.linkedSurveyResponseCount,
   };
@@ -172,76 +178,21 @@ function EventImage({ event }: { event: EventCardItem }) {
   );
 }
 
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
-
-function localDayTimestamp(value: number) {
-  const date = msToDate(value);
-  return localDate(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-}
-
-function getEventDdayLabel(startAt: string | null, endAt: string | null) {
-  const today = localDayTimestamp(nowMs());
-  const start = startAt ? isoToMs(startAt) : Number.NaN;
-  const end = endAt ? isoToMs(endAt) : Number.NaN;
-  const startDay = Number.isFinite(start) ? localDayTimestamp(start) : null;
-  const endDay = Number.isFinite(end) ? localDayTimestamp(end) : null;
-  const targetDay = startDay !== null && startDay >= today
-    ? startDay
-    : endDay !== null && endDay >= today
-      ? endDay
-      : null;
-
-  if (targetDay === null) return null;
-  const dayDifference = Math.round((targetDay - today) / DAY_IN_MS);
-  if (dayDifference < 0) return null;
-  return dayDifference === 0 ? "D-Day" : `D-${dayDifference}`;
-}
-
-function EventDayBadge({ event, lang }: { event: EventCardItem; lang: string }) {
-  const label = event.eventState === "closed"
-    ? lang === "ko" ? "행사 종료" : "Event ended"
-    : event.eventState === "open"
-      ? lang === "ko" ? "행사 진행 중" : "Event ongoing"
-      : [lang === "ko" ? "행사 예정" : "Upcoming", getEventDdayLabel(event.startAt, event.endAt)].filter(Boolean).join(" ");
-  return label ? <span className={`home-editorial-dday is-${event.eventState === "closed" ? "closed" : event.eventState === "open" ? "open" : "neutral"}`}>{label}</span> : null;
-}
-
-function getEventApplicationLabel(event: EventCardItem, lang: string) {
-  if (!event.surveyId || !event.linkedSurveyState) return null;
-
-  const isFull = Boolean(
-    event.linkedSurveyMaxResponses &&
-      event.linkedSurveyMaxResponses > 0 &&
-      event.linkedSurveyResponseCount >= event.linkedSurveyMaxResponses,
-  );
-  if (isFull || event.linkedSurveyState === "closed") {
-    return lang === "ko" ? isFull ? "정원 마감" : "신청 마감" : isFull ? "At capacity" : "Closed";
-  }
-  if (event.linkedSurveyState === "open") {
-    return lang === "ko" ? "신청 중" : "Open";
-  }
-  return lang === "ko" ? "신청 예정" : "Upcoming";
-}
-
-function isEventApplicationClosed(event: EventCardItem) {
-  if (!event.surveyId || !event.linkedSurveyState) return false;
-
-  const isFull = Boolean(
-    event.linkedSurveyMaxResponses &&
-      event.linkedSurveyMaxResponses > 0 &&
-      event.linkedSurveyResponseCount >= event.linkedSurveyMaxResponses,
-  );
-
-  return isFull || event.linkedSurveyState === "closed";
-}
-
-function EventApplicationBadge({ event, lang }: { event: EventCardItem; lang: string }) {
-  const label = getEventApplicationLabel(event, lang);
-  return label ? (
-    <span
-      className={`home-editorial-event-application ${isEventApplicationClosed(event) ? "is-closed" : event.linkedSurveyState === "open" ? "is-open" : ""}`}
-    >
-      {label}
+function EventStatusBadge({ event, lang }: { event: EventCardItem; lang: string }) {
+  const status = getDiscoveryBadge({
+    kind: "EVENT",
+    computedState: event.eventState,
+    opensAt: event.startAt,
+    closesAt: event.endAt,
+    linkedSurveyState: event.linkedSurveyState,
+    linkedSurveyClosesAt: event.linkedSurveyClosesAt,
+    linkedSurveyAlwaysOpen: event.linkedSurveyAlwaysOpen,
+    linkedSurveyMaxResponses: event.linkedSurveyMaxResponses,
+    linkedSurveyResponseCount: event.linkedSurveyResponseCount,
+  }, lang);
+  return status.label ? (
+    <span className={`home-portal-event-badge is-${status.tone}`} title={status.deadline ? `${formatCompactDateTime(status.deadline)} (KST)` : undefined}>
+      {status.label}
     </span>
   ) : null;
 }
@@ -276,8 +227,7 @@ function EventCard({
       </div>
       <div className="home-portal-event-body break-keep">
         <div className="home-portal-event-badges empty:hidden">
-          <EventDayBadge event={event} lang={lang} />
-          <EventApplicationBadge event={event} lang={lang} />
+          <EventStatusBadge event={event} lang={lang} />
         </div>
         <h3 className="line-clamp-2">{event.title}</h3>
         {event.description ? <p className="line-clamp-2">{event.description}</p> : null}
@@ -387,6 +337,8 @@ export function EventCarousel() {
             eventState,
             surveyId: item.surveyId ?? item.survey?.surveyId ?? null,
             linkedSurveyState: normalizeEventState(item.survey?.computedState),
+            linkedSurveyClosesAt: item.survey?.closeAt ?? null,
+            linkedSurveyAlwaysOpen: item.survey?.isAlwaysOpen ?? false,
             linkedSurveyMaxResponses: item.survey?.maxResponses ?? null,
             linkedSurveyResponseCount: item.survey?.responseCount ?? 0,
           };
