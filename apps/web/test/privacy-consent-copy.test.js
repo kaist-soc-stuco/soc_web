@@ -29,8 +29,9 @@ test("privacy policy names configured processors", () => {
     "utf8",
   );
 
-  assert.match(source, /SPARCS: 서비스 운영 서버 및 데이터베이스 인프라 호스팅 관리/);
-  assert.match(source, /Channel Corporation \(Channel Talk\):/);
+  assert.match(source, /label:\s*t\("SPARCS", "SPARCS"\)/);
+  assert.match(source, /서비스 운영 서버 및 데이터베이스 인프라의 호스팅을 관리합니다/);
+  assert.match(source, /Channel Corporation \(Channel Talk\)/);
   assert.match(source, /label:\s*t\(\s*"SSO 연동 정보"/);
   assert.doesNotMatch(source, /label:\s*t\(\s*"(?:필수 항목|선택 항목)"/);
 });

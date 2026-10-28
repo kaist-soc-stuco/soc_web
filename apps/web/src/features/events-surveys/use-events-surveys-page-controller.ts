@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { rememberAuthReturnPath } from "@/lib/auth-storage";
 import { resolveAssetUrl } from "@/lib/asset-url";
+import { VOTING_ENABLED } from "@/lib/feature-flags";
 import {
   buildCalendarEventsFromPublicItems,
   buildUnifiedItems,
@@ -214,7 +215,7 @@ export function useEventsSurveysPageController({
   const calendarEvents = useMemo<CalendarEvent[]>(
     () =>
       buildCalendarEventsFromPublicItems(
-        calendarEventsQuery.data?.items ?? [],
+        (calendarEventsQuery.data?.items ?? []).filter(item => VOTING_ENABLED || item.sourceType !== "VOTE"),
         lang,
       ),
     [calendarEventsQuery.data?.items, lang],

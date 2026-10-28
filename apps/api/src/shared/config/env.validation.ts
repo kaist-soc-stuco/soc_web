@@ -265,7 +265,7 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     ASSET_ORPHAN_CLEANUP_ENABLED: asOptionalBoolean(
       config.ASSET_ORPHAN_CLEANUP_ENABLED,
       'ASSET_ORPHAN_CLEANUP_ENABLED',
-      false,
+      nodeEnv === "production",
     ),
     ASSET_ORPHAN_CLEANUP_INTERVAL_HOURS: asOptionalPositiveInt(
       config.ASSET_ORPHAN_CLEANUP_INTERVAL_HOURS,
@@ -273,6 +273,7 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       6,
     ),
     ASSET_UPLOAD_DIR: asOptionalString(config.ASSET_UPLOAD_DIR),
+    DATA_RETENTION_ENABLED: asOptionalBoolean(config.DATA_RETENTION_ENABLED, 'DATA_RETENTION_ENABLED', nodeEnv === 'production'),
     ASSET_USER_MAX_COUNT: asOptionalPositiveInt(
       config.ASSET_USER_MAX_COUNT,
       'ASSET_USER_MAX_COUNT',

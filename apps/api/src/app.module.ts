@@ -24,6 +24,7 @@ import { SiteContentModule } from "./features/site-content/site-content.module";
 import { NotificationsModule } from "./features/notifications/notifications.module";
 import { VotesModule } from "./features/votes/votes.module";
 import { RoadmapModule } from "./features/roadmap/roadmap.module";
+import { RetentionModule } from "./features/privacy-retention/retention.module";
 
 const devOnlyModules = new Set(["development", "test"]).has(process.env.NODE_ENV ?? "")
   ? [MockModule]
@@ -58,6 +59,7 @@ const devOnlyModules = new Set(["development", "test"]).has(process.env.NODE_ENV
     NotificationsModule,
     VotesModule,
     RoadmapModule,
+    RetentionModule,
     RoleGroupsModule,
     HealthModule,
     ...devOnlyModules,

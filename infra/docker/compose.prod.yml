@@ -24,7 +24,8 @@ services:
       TRUST_PROXY_IPS: ${TRUST_PROXY_IPS:-172.16.0.0/12}
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
       ASSET_UPLOAD_DIR: /app/apps/api/uploads/assets
-      ASSET_ORPHAN_CLEANUP_ENABLED: ${ASSET_ORPHAN_CLEANUP_ENABLED:-false}
+      ASSET_ORPHAN_CLEANUP_ENABLED: ${ASSET_ORPHAN_CLEANUP_ENABLED:-true}
+      DATA_RETENTION_ENABLED: ${DATA_RETENTION_ENABLED:-true}
       STUDENT_FEE_BOOTSTRAP_PATH: /run/secrets/student-fee-bootstrap.json
     expose:
       - "3000"
@@ -136,7 +137,7 @@ services:
       PGUSER: ${POSTGRES_USER}
       PGPASSWORD: ${POSTGRES_PASSWORD}
       AUDIT_LOG_BACKUP_INTERVAL_SECONDS: ${AUDIT_LOG_BACKUP_INTERVAL_SECONDS:-86400}
-      AUDIT_LOG_BACKUP_RETENTION_DAYS: ${AUDIT_LOG_BACKUP_RETENTION_DAYS:-730}
+      AUDIT_LOG_BACKUP_RETENTION_DAYS: ${AUDIT_LOG_BACKUP_RETENTION_DAYS:-30}
     command: ["/bin/sh", "/usr/local/bin/backup-audit-logs.sh"]
     read_only: true
     security_opt:

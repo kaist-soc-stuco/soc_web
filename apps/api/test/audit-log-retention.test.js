@@ -5,7 +5,7 @@ const test = require("node:test");
 
 const repositoryRoot = path.resolve(__dirname, "../../..");
 
-test("audit log backups default to at least two years of retention", () => {
+test("recovery backup rotation is independent of source audit-record retention", () => {
   const sources = [
     ".env.example",
     "infra/docker/compose.prod.yml",
@@ -16,12 +16,14 @@ test("audit log backups default to at least two years of retention", () => {
     const content = fs.readFileSync(path.join(repositoryRoot, source), "utf8");
     const match = content.match(/AUDIT_LOG_BACKUP_RETENTION_DAYS(?::-|=)(\d+)/);
     assert.ok(match, `${source} must configure audit-log retention`);
-    assert.ok(Number(match[1]) >= 730, `${source} must retain audit logs for at least 730 days`);
+    assert.equal(Number(match[1]), 30, `${source} must rotate recovery backups after 30 days`);
   }
 
   const script = fs.readFileSync(
     path.join(repositoryRoot, "infra/docker/scripts/backup-audit-logs.sh"),
     "utf8",
   );
-  assert.match(script, /find "\$backup_dir".+-mtime "\+\$\{retention_days\}" -delete/);
+  assert.match(script, /retention_cutoff_days=\$\(\(retention_days - 1\)\)/);
+  assert.match(script, /find "\$backup_dir".+-mtime "\+\$\{retention_cutoff_days\}" -delete/);
+  assert.doesNotMatch(script, /\bDELETE\s+FROM\s+audit_log\b/i);
 });

@@ -34,6 +34,7 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { clearStoredAuthState, rememberAuthReturnPath } from "@/lib/auth-storage";
 import { getBoardLabelFromMetadata, isLegacyPublicBoardCode } from "@/lib/board-metadata";
 import { Permissions } from "@/lib/permissions";
+import { VOTING_ENABLED } from "@/lib/feature-flags";
 import { MobileSearchPreview } from "@/features/search/mobile-search-preview";
 
 interface HeaderProps {
@@ -397,12 +398,12 @@ export function Header({ variant = "default" }: HeaderProps) {
             ],
           },
           {
-            label: "설문·투표",
+            label: VOTING_ENABLED ? "설문·투표" : "설문",
             href: "/surveys",
             activePaths: ["/surveys", "/survey", "/votes", "/vote"],
             megaItems: [
               { label: "설문", href: "/surveys" },
-              { label: "투표", href: "/votes" },
+              ...(VOTING_ENABLED ? [{ label: "투표", href: "/votes" }] : []),
             ],
           },
           {
@@ -456,7 +457,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             activePaths: ["/surveys", "/survey", "/votes", "/vote"],
             megaItems: [
               { label: "Surveys", href: "/surveys" },
-              { label: "Voting", href: "/votes" },
+              ...(VOTING_ENABLED ? [{ label: "Voting", href: "/votes" }] : []),
             ],
           },
           {

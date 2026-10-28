@@ -7,7 +7,7 @@ import { msToIso, nowMs } from "@soc/shared";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { getDraftStorageKey } from "@/lib/draft-storage";
+import { getDraftStorageKey, readDraftStorage } from "@/lib/draft-storage";
 import {
   answerContentToValue,
   emptyAnswerValue,
@@ -29,7 +29,7 @@ function readSurveyResponseDraft(
   if (typeof window === "undefined") return null;
 
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    const raw = readDraftStorage(storageKey);
     if (!raw) return null;
 
     const parsed: unknown = JSON.parse(raw);

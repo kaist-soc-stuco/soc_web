@@ -11,3 +11,4 @@ export * from "./schema/notification.schema";
 export * from "./schema/vote.schema";
 export * from "./schema/roadmap.schema";
 export * from "./schema/google.schema";
+export * from "./schema/privacy-retention.schema";

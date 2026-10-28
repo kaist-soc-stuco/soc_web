@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { Permissions } from "@/lib/permissions";
+import { VOTING_ENABLED } from "@/lib/feature-flags";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -69,7 +70,7 @@ export function AdminSidebar() {
   }
 
   const visibleItems = ADMIN_MENU.filter((item) =>
-    Permissions.hasAny(permission, ...item.bits),
+    (VOTING_ENABLED || item.to !== "/admin/votes") && Permissions.hasAny(permission, ...item.bits),
   );
 
   const groups = [

@@ -22,6 +22,7 @@ import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
 import { formatShortDate } from "@/lib/date-display";
+import { VOTING_ENABLED } from "@/lib/feature-flags";
 
 import type { AboutSearchItem, SearchFilter } from "./search-utils";
 
@@ -113,7 +114,7 @@ export function MobileSearchFilters({ searchBy, filter, counts, lang, onApply }:
     { value: "faq", label: "FAQ" },
     { value: "event", label: lang === "ko" ? "행사" : "Events" },
     { value: "survey", label: lang === "ko" ? "설문" : "Surveys" },
-    { value: "vote", label: lang === "ko" ? "투표" : "Votes" },
+    ...(VOTING_ENABLED ? [{ value: "vote" as const, label: lang === "ko" ? "투표" : "Votes" }] : []),
   ];
   return <><MobileFilterButton open={open} active={filter !== "all" || searchBy !== "title_content"} label={lang === "ko" ? "필터" : "Filters"} onClick={() => { setDraft({ scope: searchBy, kind: filter }); setOpen(true); }} />
     <FilterSheet className="mobile-filter-sheet" open={open} onClose={() => setOpen(false)} title={lang === "ko" ? "검색 필터" : "Search filters"} closeLabel={lang === "ko" ? "필터 닫기" : "Close filters"} footer={<MobileFilterActions lang={lang} onReset={() => setDraft({ scope: "title_content", kind: "all" })} onApply={() => { onApply(draft.scope, draft.kind); setOpen(false); }} />}>
@@ -162,7 +163,7 @@ export function SearchFilterTabs({
       filter: "survey",
       label: lang === "ko" ? "설문" : "Surveys",
     },
-    { count: voteCount, filter: "vote", label: lang === "ko" ? "투표" : "Votes" },
+    ...(VOTING_ENABLED ? [{ count: voteCount, filter: "vote" as const, label: lang === "ko" ? "투표" : "Votes" }] : []),
   ];
 
   if (mode === "mobile") return (
@@ -352,7 +353,7 @@ export function SearchResults({
       {filter === "survey" || showAll ? (
         <><SurveyResults lang={lang} query={query} surveys={surveys} />{more.survey && <Button variant="ghost" disabled={loadingMore !== null} onClick={() => void onLoadMore("survey")}>{lang === "ko" ? "설문 결과 더보기" : "Show more surveys"}</Button>}</>
       ) : null}
-      {filter === "vote" || showAll ? (
+      {VOTING_ENABLED && (filter === "vote" || showAll) ? (
         <VoteResults lang={lang} query={query} votes={votes} />
       ) : null}
       {moreError && <p role="alert" className="text-sm text-rose-600">{moreError}</p>}

@@ -23,7 +23,7 @@ import { useScheduleMode } from "@/hooks/use-schedule-mode";
 import { canWriteBoardFromMetadata } from "@/lib/board-metadata";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
-import { getDraftStorageKey } from "@/lib/draft-storage";
+import { getDraftStorageKey, readDraftStorage } from "@/lib/draft-storage";
 import { hasAdminPermission } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
@@ -421,7 +421,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
         const latest = routeDraftId ? await apiClient.getArticleDraft(routeDraftId) : response.items[0];
         if (cancelled || hasWriteContentRef.current) return;
         let localUpdatedAt = 0;
-        try { const raw = localDraftStorageKey && localStorage.getItem(localDraftStorageKey); if (raw) localUpdatedAt = JSON.parse(raw).updatedAt ?? 0; } catch { /* Ignore an invalid local fallback. */ }
+        try { const raw = readDraftStorage(localDraftStorageKey); if (raw) localUpdatedAt = JSON.parse(raw).updatedAt ?? 0; } catch { /* Ignore an invalid local fallback. */ }
         if (!routeDraftId && localUpdatedAt && (!latest || localUpdatedAt > isoToMs(latest.updatedAt))) {
           if (latest) applyDraftToForm(latest);
           await handleRestoreDraft(undefined, true);
@@ -615,7 +615,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
 
     const key = localDraftStorageKey;
     if (!key) return;
-    const raw = localStorage.getItem(key);
+    const raw = readDraftStorage(key);
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw);

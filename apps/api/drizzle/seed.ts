@@ -934,36 +934,6 @@ type OperationalSurveySeed = {
 
 const OPERATIONAL_SURVEY_SEEDS: OperationalSurveySeed[] = [
   {
-    surveyId: OPERATIONAL_SURVEY_IDS.corporatePartnership,
-    sectionId: "7a120000-0000-4000-8000-000000000003",
-    sectionTitleKo: "후원 및 제휴 제안",
-    sectionTitleEn: "Sponsorship and partnership proposal",
-    kind: "SURVEY",
-    titleKo: "기업 후원 및 제휴 문의",
-    titleEn: "Sponsorship and Partnership Inquiry",
-    descriptionKo: "KAIST 전산학부 학생회와 함께할 행사 후원, 채용 설명회, 기술 세미나 및 제휴를 제안해 주세요. 담당자가 제안 내용을 검토한 후 입력하신 이메일로 회신드립니다.",
-    descriptionEn: "Propose event sponsorship, recruiting sessions, technical talks, or partnerships with the KAIST School of Computing Student Council. We will review your proposal and reply to the email address provided.",
-    eligibleSocAffiliations: [],
-    academicEligibility: "ANY",
-    allowAnonymous: true,
-    allowMultipleResponses: true,
-    questions: [
-      { id: "7a130000-0000-4000-8000-000000000301", titleKo: "기업·기관명", titleEn: "Company or organization", questionType: "short_text", sortOrder: 0 },
-      { id: "7a130000-0000-4000-8000-000000000302", titleKo: "담당자 성함", titleEn: "Contact person's name", questionType: "short_text", sortOrder: 1 },
-      { id: "7a130000-0000-4000-8000-000000000303", titleKo: "회신 이메일", titleEn: "Contact email", questionType: "short_text", answerRegex: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", config: { validationType: "regex", validationErrorMessage: "올바른 이메일 주소를 입력해 주세요." }, sortOrder: 2 },
-      { id: "7a130000-0000-4000-8000-000000000304", titleKo: "제안 유형", titleEn: "Proposal type", questionType: "dropdown", options: [
-        { value: "sponsorship", labelKo: "행사·물품 후원", labelEn: "Event or in-kind sponsorship" },
-        { value: "recruiting", labelKo: "채용 설명회", labelEn: "Recruiting session" },
-        { value: "tech-talk", labelKo: "기술 세미나", labelEn: "Technical talk" },
-        { value: "partnership", labelKo: "제휴", labelEn: "Partnership" },
-        { value: "other", labelKo: "기타", labelEn: "Other" },
-      ], sortOrder: 3 },
-      { id: "7a130000-0000-4000-8000-000000000305", titleKo: "제안 내용", titleEn: "Proposal details", questionType: "long_text", descriptionKo: "제안 목적, 협력 방식과 학생들에게 제공할 내용을 알려 주세요.", descriptionEn: "Describe the purpose, proposed collaboration, and what students would receive.", sortOrder: 4 },
-      { id: "7a130000-0000-4000-8000-000000000306", titleKo: "희망 일정", titleEn: "Preferred schedule", questionType: "short_text", isRequired: false, sortOrder: 5 },
-      { id: "7a130000-0000-4000-8000-000000000307", titleKo: "회사 소개 및 참고 자료 링크", titleEn: "Company information and supporting links", questionType: "long_text", isRequired: false, sortOrder: 6 },
-    ],
-  },
-  {
     surveyId: OPERATIONAL_SURVEY_IDS.cohortChatInvitation,
     sectionId: "7a120000-0000-4000-8000-000000000001",
     sectionTitleKo: "신청 정보",

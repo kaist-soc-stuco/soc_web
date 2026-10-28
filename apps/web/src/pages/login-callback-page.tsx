@@ -13,6 +13,7 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { useLanguage } from "@/hooks/use-language";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { UiInput } from "@/components/ui/form-control";
 import { IconButton } from "@/components/ui/icon-button";
 import { useToast } from "@/components/ui/toast";
 import { ResponseStateCard, responseStateActionClassName } from "@/features/survey/response-state-card";
@@ -68,6 +69,7 @@ export function LoginCallbackPage() {
   const [consentSubmitting, setConsentSubmitting] = useState<
     null | "persisted" | "temporary"
   >(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const returnToPreviousPage = useCallback(
     (message: string) => {
@@ -192,6 +194,11 @@ export function LoginCallbackPage() {
   }, [apiClient, lang, location.search, navigate, queryClient, returnToPreviousPage]);
 
   const submitConsentDecision = async (consent: boolean) => {
+    if (!termsAccepted) {
+      toast({ type: "error", message: lang === "ko" ? "서비스 이용약관에 동의해 주세요." : "Please agree to the Terms of Service." });
+      return;
+    }
+
     if (!pendingConsentToken) {
       toast({ type: "error", message: lang === "ko" ? "로그인 동의 세션이 없습니다. 다시 로그인해 주세요." : "Please sign in again." });
       return;
@@ -272,8 +279,7 @@ export function LoginCallbackPage() {
                 : "Sign-in was canceled.",
             )
           }
-          title={lang === "ko" ? "개인정보 수집 및 이용 동의" : "Consent to Collection and Use of Personal Information"}
-          showClose={false}
+          title={lang === "ko" ? "서비스 이용 동의" : "Service agreements"}
           size="standard"
           bodyClassName="space-y-3"
           footer={
@@ -281,40 +287,65 @@ export function LoginCallbackPage() {
               <Button loading={consentSubmitting === "temporary"}
                 variant="outline"
                 type="button"
-                disabled={consentSubmitting !== null}
+                disabled={consentSubmitting !== null || !termsAccepted}
                 onClick={() => void submitConsentDecision(false)}
                 className="text-sm font-medium"
               >
-                {lang === "ko" ? "임시로 이용" : "Use temporarily"}
+                {lang === "ko" ? "개인정보 동의 없이 임시 이용" : "Use without privacy consent"}
               </Button>
               <Button loading={consentSubmitting === "persisted"}
                 variant="default"
                 type="button"
-                disabled={consentSubmitting !== null}
+                disabled={consentSubmitting !== null || !termsAccepted}
                 onClick={() => void submitConsentDecision(true)}
                 className="text-sm font-semibold shadow-sm"
               >
-                {lang === "ko" ? "동의하고 계속" : "Agree and continue"}
+                {lang === "ko" ? "개인정보 동의 후 가입" : "Consent to data use and join"}
               </Button>
             </div>
           }
         >
+          <div className="space-y-2 border-b border-slate-200 pb-3">
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-brand-primary underline underline-offset-4">
+              {lang === "ko" ? "서비스 이용약관 전문 보기" : "Read the Terms of Service"}
+              <span className="sr-only">{lang === "ko" ? " (새 탭에서 열림)" : " (opens in a new tab)"}</span>
+            </a>
+            <p className="text-sm leading-6 text-slate-600">
+              {lang === "ko"
+                ? "이용약관에는 게시물의 서비스 내 이용허락(제9조), 게시물 관리·이용 제한 및 이의 제기(제11·12조), 회원 탈퇴(제17조)에 관한 사항이 포함되어 있습니다. 임시 이용 시에도 이용약관 동의가 필요합니다."
+                : "The Terms cover the license to Posts within the Service (Section 9), moderation, restrictions and objections (Sections 11–12), and account closure (Section 17). Agreement is also required for temporary access."}
+            </p>
+            <label className="flex cursor-pointer items-start gap-2 text-sm leading-6 text-slate-800">
+              <UiInput
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(event) => setTermsAccepted(event.target.checked)}
+                disabled={consentSubmitting !== null}
+                required
+                className="mt-1 shrink-0"
+              />
+              <span>{lang === "ko" ? "[필수] 서비스 이용약관에 동의합니다." : "[Required] I agree to the Terms of Service."}</span>
+            </label>
+          </div>
+          <h3 className="text-sm font-semibold text-slate-800">
+            {lang === "ko" ? "개인정보 수집 및 이용 동의" : "Consent to collection and use of personal information"}
+          </h3>
           <dl className="space-y-3 text-sm font-medium leading-6 text-slate-600">
             <div>
               <dt className="font-semibold text-slate-800">{lang === "ko" ? "수집·이용 목적" : "Purpose"}</dt>
-              <dd>{lang === "ko" ? "KAIST 구성원 확인, 회원 계정 생성, 홈페이지 서비스 제공·운영 및 보안" : "KAIST identity verification, account creation, service operation, and security"}</dd>
+              <dd>{lang === "ko" ? "KAIST 구성원 확인, 회원 계정의 생성·관리 및 서비스 운영·보안을 위하여 수집·이용합니다." : "Information is collected and used to verify KAIST membership, create and manage accounts, operate the service, and maintain security."}</dd>
             </div>
             <div>
               <dt className="font-semibold text-slate-800">{lang === "ko" ? "수집 항목" : "Information collected"}</dt>
-              <dd>{lang === "ko" ? "KAIST UID, 성명(한글·영문), 학번, 이메일, 소속, 주전공, 신분코드, 동의·로그인·접속기록" : "KAIST UID, Korean and English names, student number, email, department, primary major, member code, consent, login, and access records"}</dd>
+              <dd>{lang === "ko" ? "KAIST UID, 성명(한글·영문), 학번, 이메일 주소, 소속 학과, 주전공, 신분코드(KAIST 구성원 구분 코드), 동의·로그인·접속기록을 수집합니다." : "Information collected includes KAIST UID, Korean and English names, student number, email address, department, primary major, member code (KAIST membership classification code), and consent, sign-in, and access records."}</dd>
             </div>
             <div>
               <dt className="font-semibold text-slate-800">{lang === "ko" ? "보유·이용 기간" : "Retention period"}</dt>
-              <dd>{lang === "ko" ? "회원 탈퇴 또는 처리 목적 달성 시까지. 법령과 내부 보존 기준에 따른 기록은 정해진 기간 동안 별도 보관" : "Until account withdrawal or the processing purpose is achieved. Records required by law or internal retention rules are kept separately for the applicable period."}</dd>
+              <dd>{lang === "ko" ? "회원·SSO·동의 정보는 회원 탈퇴, 동의 철회 또는 서비스 종료 시까지 보유합니다. 운영·보안 기록은 2년간, 개인정보취급자의 접근 권한 변경 기록은 3년간 보유합니다. 로그인 대기·세션 정보의 유효기간과 파기 시점은 개인정보처리방침 제4조에 따릅니다." : "Account, SSO, and consent information is retained until account closure, withdrawal of consent, or termination of the service. Operational and security records are retained for two years, and administrator access-permission records for three years. Section 4 of the Privacy Policy sets out the validity and destruction of pending sign-in and session information."}</dd>
             </div>
             <div>
               <dt className="font-semibold text-slate-800">{lang === "ko" ? "동의 거부권 및 불이익" : "Right to refuse and consequences"}</dt>
-              <dd>{lang === "ko" ? "동의를 거부할 수 있습니다. 거부하면 회원 정보를 저장하지 않는 임시 세션만 제공되며 마이페이지 등 계정 저장이 필요한 기능은 이용할 수 없습니다. 임시 정보는 세션 종료 시 파기합니다." : "You may refuse consent. If you refuse, only a temporary session without a stored account is provided, and account-based features such as My Page are unavailable. Temporary information is deleted when the session ends."}</dd>
+              <dd>{lang === "ko" ? "동의를 거부할 수 있으며, 이 경우 회원 계정을 저장하지 않는 임시 세션을 제공합니다. 임시 접근토큰의 유효기간은 최대 10분이며, 마이페이지 등 회원 계정이 필요한 기능은 이용할 수 없습니다. 브라우저에 저장되는 초안의 보유기간과 삭제 방법은 개인정보처리방침 제13조에 따릅니다." : "You may refuse consent. In that case, a temporary session is provided without storing a member account. The temporary access token is valid for at most ten minutes, and features requiring a member account, such as My Page, are unavailable. Section 13 of the Privacy Policy describes retention and deletion of browser-stored drafts."}</dd>
             </div>
           </dl>
           <p className="text-sm leading-6 text-slate-600">
@@ -323,7 +354,7 @@ export function LoginCallbackPage() {
               {lang === "ko" ? "개인정보처리방침" : "Privacy Policy"}
               <span className="sr-only">{lang === "ko" ? " (새 탭에서 열림)" : " (opens in a new tab)"}</span>
             </a>
-            {lang === "ko" ? "을 확인해 주세요." : "."}
+            {lang === "ko" ? "을 확인할 수 있습니다." : "."}
           </p>
         </Modal>
       ) : null}

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api";
+import { VOTING_ENABLED } from "@/lib/feature-flags";
 
 type Participation = { id: string; titleKo: string; titleEn?: string | null; href: string; kind: "event" | "survey" | "vote"; start: number; end: number };
 
@@ -20,7 +21,7 @@ export function HomeParticipation() {
     const refresh = async () => {
       if (pending || document.hidden) return;
       pending = true;
-      const results = await Promise.allSettled([client.getArticles("_EVENT", { limit: 100 }), client.getPublicSurveys({ pageSize: 100 }), client.listPublicVotes()]);
+      const results = await Promise.allSettled([client.getArticles("_EVENT", { limit: 100 }), client.getPublicSurveys({ pageSize: 100 }), VOTING_ENABLED ? client.listPublicVotes() : Promise.resolve([])]);
       if (!active) return;
       const next: Participation[] = [];
       const linked = new Set<string>();
@@ -54,7 +55,7 @@ export function HomeParticipation() {
   const kindLabels = lang === "ko" ? { event: "행사", survey: "설문 · 신청", vote: "투표" } : { event: "Event", survey: "Survey", vote: "Vote" };
   return <section className="min-w-0 bg-slate-50 px-5 py-6 sm:px-8" aria-labelledby="home-participation-title">
     <h2 id="home-participation-title" className="text-xl font-semibold text-slate-900">{lang === "ko" ? "지금 참여할 수 있어요" : "Get involved"}</h2>
-    <p className="mt-1 text-sm text-slate-600">{lang === "ko" ? "진행 중인 행사와 설문, 투표를 확인하세요." : "Explore events, surveys and votes."}</p>
+    <p className="mt-1 text-sm text-slate-600">{lang === "ko" ? (VOTING_ENABLED ? "진행 중인 행사와 설문, 투표를 확인하세요." : "진행 중인 행사와 설문을 확인하세요.") : (VOTING_ENABLED ? "Explore events, surveys and votes." : "Explore events and surveys.")}</p>
     <div className="mt-4 grid gap-2">
       {items.map((item) => <Link key={item.id} to={item.href} className="block rounded-xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-brand-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-primary">
         <span className="text-xs text-slate-500">{kindLabels[item.kind]} · {item.start > nowMs() ? (lang === "ko" ? "예정" : "Upcoming") : (lang === "ko" ? "진행 중" : "Open")}</span>

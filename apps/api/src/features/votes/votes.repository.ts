@@ -37,8 +37,8 @@ export class VotesRepository {
     return this.db
       .select({
         vote: votes,
-        eligibleCount: sql<number>`count(*) filter (where ${voteVoters.status} = 'ELIGIBLE')::int`,
-        votedCount: sql<number>`count(*) filter (where ${voteVoters.status} = 'ELIGIBLE' and ${voteVoters.hasVoted} = true)::int`,
+        eligibleCount: sql<number>`coalesce((select (t.result->>'_retentionEligibleCount')::int from vote_tally t where t.vote_id = ${votes.voteId}), count(*) filter (where ${voteVoters.status} = 'ELIGIBLE')::int)`,
+        votedCount: sql<number>`coalesce((select (t.result->>'_retentionVotedCount')::int from vote_tally t where t.vote_id = ${votes.voteId}), count(*) filter (where ${voteVoters.status} = 'ELIGIBLE' and ${voteVoters.hasVoted} = true)::int)`,
       })
       .from(votes)
       .leftJoin(voteVoters, eq(voteVoters.voteId, votes.voteId))
@@ -67,8 +67,8 @@ export class VotesRepository {
   async counts(id: string, tx?: PostgresTransaction) {
     const db = tx ?? this.db;
     const [row] = await db.select({
-      eligibleCount: sql<number>`count(*) filter (where ${voteVoters.status} = 'ELIGIBLE')::int`,
-      votedCount: sql<number>`count(*) filter (where ${voteVoters.status} = 'ELIGIBLE' and ${voteVoters.hasVoted} = true)::int`,
+      eligibleCount: sql<number>`coalesce((select (t.result->>'_retentionEligibleCount')::int from vote_tally t where t.vote_id = ${id}::uuid), count(*) filter (where ${voteVoters.status} = 'ELIGIBLE')::int)`,
+      votedCount: sql<number>`coalesce((select (t.result->>'_retentionVotedCount')::int from vote_tally t where t.vote_id = ${id}::uuid), count(*) filter (where ${voteVoters.status} = 'ELIGIBLE' and ${voteVoters.hasVoted} = true)::int)`,
     }).from(voteVoters).where(eq(voteVoters.voteId, id));
     return row ?? { eligibleCount: 0, votedCount: 0 };
   }

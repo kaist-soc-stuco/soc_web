@@ -39,7 +39,7 @@ import { Permissions } from "@/lib/permissions";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { useCurrentSession } from "@/hooks/use-current-session";
-import { getDraftStorageKey } from "@/lib/draft-storage";
+import { getDraftStorageKey, readDraftStorage } from "@/lib/draft-storage";
 
 const RECIPIENT_TYPES: ReadonlyArray<{
   value: SendBulkEmailRequest["recipientType"];
@@ -886,7 +886,7 @@ function readStoredEmailDraft(storageKey: string | null): StoredEmailDraft | nul
   if (!storageKey) return null;
 
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    const raw = readDraftStorage(storageKey);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return null;

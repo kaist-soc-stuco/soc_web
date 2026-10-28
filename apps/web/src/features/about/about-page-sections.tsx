@@ -1,9 +1,8 @@
-import { OPERATIONAL_SURVEY_IDS, operationalSurveyPath } from "@soc/contracts";
-import { Link } from "react-router-dom";
 import { useEffect, useRef, type ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { useLocalizedSiteContent, usePublicContentBlocksByType } from "@/features/site-content/site-content";
 import { resolveAssetUrl } from "@/lib/asset-url";
+import { useOpenChannelTalk } from "@/features/channel-talk/channel-talk-provider";
 import { PledgesSection } from "./pledges-section";
 import { AboutProgramsSection } from "./about-programs-section";
 import { AboutPartnerMarquee } from "./about-partner-marquee";
@@ -115,6 +114,7 @@ function PeopleSection({ lang }: { lang: string }) {
 }
 
 function PartnershipSection({ lang }: { lang: string }) {
+  const openSupport = useOpenChannelTalk();
   const title = useLocalizedSiteContent("about.partnership.title");
   const description = useLocalizedSiteContent("about.partnership.description");
   const cta = useLocalizedSiteContent("about.partnership.cta");
@@ -122,7 +122,7 @@ function PartnershipSection({ lang }: { lang: string }) {
     <div className="tree-container">
       <div className="tree-partnership-inner" data-tree-reveal>
         <div><h2 id="tree-partnership-title">{title}</h2><p>{lang === "ko" ? description.replace(/받습니다\.\s*제안/, "받습니다.\n제안") : description}</p></div>
-        <Link className="tree-primary-link" to={operationalSurveyPath(OPERATIONAL_SURVEY_IDS.corporatePartnership)} target="_blank" rel="noopener noreferrer">{cta}<span className="sr-only">{lang === "ko" ? " (새 탭에서 열림)" : " (opens in a new tab)"}</span><ArrowUpRight aria-hidden="true" /></Link>
+        <button type="button" className="tree-primary-link" onClick={openSupport}>{cta}<ArrowUpRight aria-hidden="true" /></button>
       </div>
       <AboutPartnerMarquee lang={lang} />
     </div>

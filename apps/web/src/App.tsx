@@ -11,6 +11,8 @@ import { AuthGuard } from '@/components/guards/auth-guard';
 import { useCurrentSession } from '@/hooks/use-current-session';
 import { resolveApiBaseUrl } from '@/lib/api-base-url';
 import { clearStoredAuthState } from '@/lib/auth-storage';
+import { purgeExpiredDrafts } from '@/lib/draft-storage';
+import { VOTING_ENABLED } from '@/lib/feature-flags';
 import {
   idleLogoutDelay,
   initialSessionActivityAt,
@@ -449,14 +451,14 @@ const router = createBrowserRouter(createRoutesFromElements(
             }
           />
           <Route path="/survey/:id/results" element={<SurveyResultsPage />} />
-          <Route path="/votes" element={<VoteListPage />} />
+          {VOTING_ENABLED && <Route path="/votes" element={<VoteListPage />} />}
           <Route path="/mypage" element={<MyPage />} />
           <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Route>
           <Route path="/survey/:id" element={<SurveyPage />} />
-          <Route path="/votes/:id" element={<VotePage />} />
-          <Route path="/votes/:id/result" element={<VotePage />} />
+          {VOTING_ENABLED && <Route path="/votes/:id" element={<VotePage />} />}
+          {VOTING_ENABLED && <Route path="/votes/:id/result" element={<VotePage />} />}
           <Route path="/login" element={<LoginCallbackPage />} />
           {/* Admin Routes with nested Outlet */}
           <Route path="/admin" element={<AdminLayout />}>
@@ -473,9 +475,9 @@ const router = createBrowserRouter(createRoutesFromElements(
             <Route path="surveys/:id/edit" element={<SurveyEditorPage />} />
             <Route path="surveys/:id/responses" element={<SurveyResponseListPage />} />
             <Route path="surveys/:id/responses/:responseId" element={<SurveyResponseDetailPage />} />
-            <Route path="votes" element={<AdminVoteListPage />} />
-            <Route path="votes/new" element={<VoteEditorPage />} />
-            <Route path="votes/:id" element={<VoteEditorPage />} />
+            {VOTING_ENABLED && <Route path="votes" element={<AdminVoteListPage />} />}
+            {VOTING_ENABLED && <Route path="votes/new" element={<VoteEditorPage />} />}
+            {VOTING_ENABLED && <Route path="votes/:id" element={<VoteEditorPage />} />}
             <Route path="content" element={<SiteContentPage />} />
             <Route path="roadmap" element={<RoadmapManagementPage />} />
             <Route path="calendar" element={<CalendarManagementPage />} />
@@ -487,5 +489,10 @@ const router = createBrowserRouter(createRoutesFromElements(
 ));
 
 export function App() {
+  useEffect(() => {
+    purgeExpiredDrafts();
+    const timer = window.setInterval(() => purgeExpiredDrafts(), 60 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
   return <RouterProvider router={router} />;
 }

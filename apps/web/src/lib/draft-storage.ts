@@ -7,6 +7,57 @@ type DraftSession = Pick<
 >;
 
 const TRANSIENT_DRAFT_SESSION_KEY = "soc:draft:transient-session";
+export const DRAFT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+type DraftStorage = Pick<Storage, "getItem" | "removeItem" | "key" | "length">;
+
+function draftExpired(raw: string, now: number): boolean {
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== "object") return true;
+    const draft = value as { updatedAt?: unknown; savedAt?: unknown };
+    const modifiedAt = typeof draft.updatedAt === "number"
+      ? draft.updatedAt
+      : typeof draft.savedAt === "string" ? Date.parse(draft.savedAt) : Number.NaN;
+    return !Number.isFinite(modifiedAt) || modifiedAt > now + 60_000 || now - modifiedAt >= DRAFT_RETENTION_MS;
+  } catch {
+    return true;
+  }
+}
+
+/** Expired drafts are never restored, including drafts from previous sessions. */
+export function readDraftStorage(key: string | null, now = nowMs()): string | null {
+  if (!key || typeof window === "undefined") return null;
+  try {
+    const storage = window.localStorage;
+    const raw = storage.getItem(key);
+    if (!raw || !draftExpired(raw, now)) return raw;
+    if (storage.getItem(key) === raw) storage.removeItem(key);
+  } catch {
+    // Browser storage can be disabled; drafting must remain usable.
+  }
+  return null;
+}
+
+export function purgeExpiredDrafts(storage?: DraftStorage, now = nowMs()): number {
+  if (!storage && typeof window === "undefined") return 0;
+  let removed = 0;
+  try {
+    const target = storage ?? window.localStorage;
+    const keys = Array.from({ length: target.length }, (_, i) => target.key(i));
+    for (const key of keys) {
+      if (!key?.startsWith("soc:draft:")) continue;
+      const raw = target.getItem(key);
+      if (raw && draftExpired(raw, now) && target.getItem(key) === raw) {
+        target.removeItem(key);
+        removed += 1;
+      }
+    }
+  } catch {
+    // Quota and privacy settings can prevent local-storage access.
+  }
+  return removed;
+}
 
 const encodeDraftPart = (value: string): string => encodeURIComponent(value);
 

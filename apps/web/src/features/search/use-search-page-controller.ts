@@ -11,6 +11,7 @@ import type {
 
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { VOTING_ENABLED } from "@/lib/feature-flags";
 
 import { ABOUT_ITEMS, includesQuery, type SearchFilter } from "./search-utils";
 
@@ -24,7 +25,7 @@ export function useSearchPageController() {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get("q")?.trim() ?? "";
   const [inputValue, setInputValue] = useState(query);
-  const filter: SearchFilter = (["all", "board", "faq", "event", "survey", "vote"] as const).find(value => value === searchParams.get("type")) ?? "all";
+  const filter: SearchFilter = (["all", "board", "faq", "event", "survey", "vote"] as const).find(value => value === searchParams.get("type") && (VOTING_ENABLED || value !== "vote")) ?? "all";
   const searchBy: SearchBy = searchParams.get("by") === "title" ? "title" : "title_content";
   const updateSearchOption = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -107,7 +108,7 @@ export function useSearchPageController() {
         })
         .then((response) => response.items)
         .catch(() => { if (!cancelled) setPartialErrors(previous => [...previous, "faq"]); return [] as ArticleListItem[]; }),
-      apiClient
+      VOTING_ENABLED ? apiClient
         .listPublicVotes()
         .then((items) =>
           items.filter((vote) =>
@@ -124,7 +125,7 @@ export function useSearchPageController() {
             ),
           ),
         )
-        .catch(() => { if (!cancelled) setPartialErrors(previous => [...previous, "vote"]); return [] as VoteRecord[]; }),
+        .catch(() => { if (!cancelled) setPartialErrors(previous => [...previous, "vote"]); return [] as VoteRecord[]; }) : Promise.resolve([] as VoteRecord[]),
       apiClient.getBoards().catch(() => ({ items: [] as BoardSummary[] })),
       apiClient.searchPublicCalendarEvents(query, 40),
     ])
@@ -235,6 +236,7 @@ export function useSearchPageController() {
   };
 
   const retryPart = async (kind: PartialSearchKind) => {
+    if (kind === "vote" && !VOTING_ENABLED) return;
     if (retryPartLock.current) return;
     retryPartLock.current = true; setRetryingPart(kind);
     const requestGeneration = generation.current;

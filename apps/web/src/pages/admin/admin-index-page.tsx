@@ -2,6 +2,7 @@ import { Navigate } from "react-router-dom";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { Permissions } from "@/lib/permissions";
+import { VOTING_ENABLED } from "@/lib/feature-flags";
 
 const ADMIN_ENTRY_ROUTES = [
   { to: "votes", bit: Permissions.MANAGE_VOTE },
@@ -27,7 +28,7 @@ export function AdminIndexPage() {
 
   const permission = session?.permission ?? 0;
   const entry = ADMIN_ENTRY_ROUTES.find((route) =>
-    Permissions.has(permission, route.bit),
+    (VOTING_ENABLED || route.to !== "votes") && Permissions.has(permission, route.bit),
   );
 
   if (!entry) {

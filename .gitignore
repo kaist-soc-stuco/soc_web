@@ -71,3 +71,4 @@ secrets/google-oauth-client.json
 secrets/google-oauth-token.json
 /secrets/student-fee-bootstrap.json
 /apps/api/src/features/users/student-fee-bootstrap.ts
+/apps/api/src/features/privacy-retention/OPERATIONS.md
