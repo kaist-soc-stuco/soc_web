@@ -1,6 +1,6 @@
 {
-  "id": "431c0049-b7b5-4529-9a07-24ca60194bd8",
-  "prevId": "c5b0fafa-5a45-4061-bb91-b876302b9caa",
+  "id": "fadce0aa-6b60-445b-8ae1-bacfe3204569",
+  "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -658,6 +658,63 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.paid_student_records": {
+      "name": "paid_student_records",
+      "schema": "",
+      "columns": {
+        "std_no": {
+          "name": "std_no",
+          "type": "varchar(8)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name_ko": {
+          "name": "name_ko",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "admission_year": {
+          "name": "admission_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "paid_semesters": {
+          "name": "paid_semesters",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "paid_amount": {
+          "name": "paid_amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "imported_at": {
+          "name": "imported_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1621,6 +1678,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "faq_category": {
+          "name": "faq_category",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "content_ko": {
           "name": "content_ko",
           "type": "text",
@@ -1753,6 +1816,12 @@
         },
         "event_location": {
           "name": "event_location",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "event_location_en": {
+          "name": "event_location_en",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
@@ -1933,7 +2002,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "article_faq_category_check": {
+          "name": "article_faq_category_check",
+          "value": "\"article\".\"faq_category\" IN ('account', 'fees', 'events-surveys', 'other')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.asset_cleanup_lease": {
@@ -1960,6 +2034,32 @@
         },
         "updated_at": {
           "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.asset_deletion_job": {
+      "name": "asset_deletion_job",
+      "schema": "",
+      "columns": {
+        "storage_key": {
+          "name": "storage_key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
@@ -2896,6 +2996,80 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.survey_response_subscription": {
+      "name": "survey_response_subscription",
+      "schema": "",
+      "columns": {
+        "survey_id": {
+          "name": "survey_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "survey_response_subscription_unique": {
+          "name": "survey_response_subscription_unique",
+          "columns": [
+            {
+              "expression": "survey_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "survey_response_subscription_survey_id_survey_survey_id_fk": {
+          "name": "survey_response_subscription_survey_id_survey_survey_id_fk",
+          "tableFrom": "survey_response_subscription",
+          "tableTo": "survey",
+          "columnsFrom": [
+            "survey_id"
+          ],
+          "columnsTo": [
+            "survey_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "survey_response_subscription_user_id_users_user_id_fk": {
+          "name": "survey_response_subscription_user_id_users_user_id_fk",
+          "tableFrom": "survey_response_subscription",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.survey_responses": {
       "name": "survey_responses",
       "schema": "",
@@ -3326,6 +3500,13 @@
           "notNull": true,
           "default": false
         },
+        "accepting_responses": {
+          "name": "accepting_responses",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
         "lifecycle_status": {
           "name": "lifecycle_status",
           "type": "varchar(20)",
@@ -3345,6 +3526,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": 1
+        },
+        "show_on_list": {
+          "name": "show_on_list",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
         },
         "show_on_calendar": {
           "name": "show_on_calendar",
@@ -4669,6 +4857,22 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "content_block_singleton_type_unique_idx": {
+          "name": "content_block_singleton_type_unique_idx",
+          "columns": [
+            {
+              "expression": "type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"content_block\".\"type\" IN ('HERO', 'LOGO', 'TOP_BANNER', 'ORGANIZATION_CHART')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -5561,11 +5765,30 @@
           "primaryKey": false,
           "notNull": false
         },
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "type": {
           "name": "type",
           "type": "varchar(30)",
           "primaryKey": false,
           "notNull": true
+        },
+        "selection_error_message": {
+          "name": "selection_error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "selection_rule": {
+          "name": "selection_rule",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'max'"
         },
         "max_selections": {
           "name": "max_selections",
@@ -5627,6 +5850,10 @@
         "vote_item_type_check": {
           "name": "vote_item_type_check",
           "value": "\"vote_item\".\"type\" in ('YES_NO_ABSTAIN', 'SINGLE_CHOICE', 'MULTIPLE_CHOICE')"
+        },
+        "vote_item_selection_rule_check": {
+          "name": "vote_item_selection_rule_check",
+          "value": "\"vote_item\".\"selection_rule\" in ('max', 'min', 'exact')"
         },
         "vote_item_max_selection_check": {
           "name": "vote_item_max_selection_check",
@@ -6031,7 +6258,8 @@
           "name": "quorum_percent",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": 50
         },
         "quorum_inclusive": {
           "name": "quorum_inclusive",
@@ -6843,6 +7071,151 @@
         "google_spreadsheet_sync_job_attempts_check": {
           "name": "google_spreadsheet_sync_job_attempts_check",
           "value": "\"google_spreadsheet_sync_job\".\"attempts\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.privacy_retention_case": {
+      "name": "privacy_retention_case",
+      "schema": "",
+      "columns": {
+        "kind": {
+          "name": "kind",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resource_id": {
+          "name": "resource_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_version": {
+          "name": "source_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "finalized_at": {
+          "name": "finalized_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hold_until": {
+          "name": "hold_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hold_reason": {
+          "name": "hold_reason",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_count": {
+          "name": "deleted_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "privacy_retention_due_idx": {
+          "name": "privacy_retention_due_idx",
+          "columns": [
+            {
+              "expression": "completed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "privacy_retention_case_created_by_users_user_id_fk": {
+          "name": "privacy_retention_case_created_by_users_user_id_fk",
+          "tableFrom": "privacy_retention_case",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "privacy_retention_case_kind_resource_id_pk": {
+          "name": "privacy_retention_case_kind_resource_id_pk",
+          "columns": [
+            "kind",
+            "resource_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "privacy_retention_kind_check": {
+          "name": "privacy_retention_kind_check",
+          "value": "\"privacy_retention_case\".\"kind\" in ('SURVEY', 'APPLICATION', 'VOTE', 'FEE_PAYMENT', 'CONTACT')"
+        },
+        "privacy_retention_dates_check": {
+          "name": "privacy_retention_dates_check",
+          "value": "\"privacy_retention_case\".\"expires_at\" >= \"privacy_retention_case\".\"finalized_at\""
+        },
+        "privacy_retention_hold_check": {
+          "name": "privacy_retention_hold_check",
+          "value": "\"privacy_retention_case\".\"hold_until\" is null or \"privacy_retention_case\".\"hold_reason\" is not null"
         }
       },
       "isRLSEnabled": false

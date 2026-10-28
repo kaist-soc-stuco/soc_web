@@ -39,6 +39,15 @@ describe("privacy retention on an isolated PostgreSQL database", { skip: !databa
     await admin?.end();
   });
   const count = async table => Number((await pool.query(`SELECT count(*) AS count FROM ${table}`)).rows[0].count);
+  test("the fresh baseline is applied once and rerunning migrations preserves existing rows", async () => {
+    const before = (await pool.query("SELECT id, hash, created_at FROM drizzle.__drizzle_migrations ORDER BY id")).rows;
+    assert.equal(before.length, 1);
+    await migrate(drizzle(pool), { migrationsFolder: path.join(__dirname, "../drizzle") });
+    assert.deepEqual((await pool.query("SELECT id, hash, created_at FROM drizzle.__drizzle_migrations ORDER BY id")).rows, before);
+    assert.equal(await count("users"), 1);
+    assert.equal(await count("board"), 1);
+    assert.equal((await pool.query("SELECT name_ko FROM users WHERE user_id = $1", [actor])).rows[0].name_ko, "합성 사용자");
+  });
   async function survey(kind = "SURVEY", spreadsheet = null) {
     const id = randomUUID(), section = randomUUID(), question = randomUUID(), response = randomUUID();
     await pool.query("INSERT INTO survey (survey_id, kind, title_ko, spreadsheet_id, created_at, updated_at) VALUES ($1,$2,'합성 설문',$3,$4,$4)", [id, kind, spreadsheet, old]);

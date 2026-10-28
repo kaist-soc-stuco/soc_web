@@ -1,1 +1,0 @@
-CREATE UNIQUE INDEX "content_block_singleton_type_unique_idx" ON "content_block" USING btree ("type") WHERE "content_block"."type" IN ('HERO', 'LOGO', 'TOP_BANNER', 'ORGANIZATION_CHART');

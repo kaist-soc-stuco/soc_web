@@ -1,19 +1,9 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const { AuditLogController } = require("../dist/apps/api/src/features/audit/audit-log.controller.js");
 const { UsersRepository } = require("../dist/apps/api/src/features/users/repositories/users.repository.js");
 const { GoogleFeeSheetsService } = require("../dist/apps/api/src/features/users/google-fee-sheets.service.js");
 const { BulkEmailService } = require("../dist/apps/api/src/features/email/bulk-email.service.js");
-
-test("vote image repair runs after every previously recorded migration", () => {
-  const directory = path.join(__dirname, "../drizzle");
-  const { entries } = JSON.parse(fs.readFileSync(path.join(directory, "meta/_journal.json"), "utf8"));
-  const repair = entries.find(entry => entry.tag === "0008_repair_vote_item_image");
-  assert.ok(repair.when > Math.max(...entries.filter(entry => entry.idx < repair.idx).map(entry => entry.when)));
-  assert.match(fs.readFileSync(path.join(directory, `${repair.tag}.sql`), "utf8"), /ADD COLUMN IF NOT EXISTS "image_url"/);
-});
 
 test("audit day filters include the Korean midnight boundary, not UTC midnight", async () => {
   let received;
@@ -34,7 +24,7 @@ function database(results) {
 }
 
 test("fee detail and ledger agree before, during, and after paid coverage", async () => {
-  const user = { userId: "u", nameKo: "QA", nameEn: "QA", email: "qa@example.invalid", primaryMajor: "CS" };
+  const user = { userId: "u", nameKo: "QA", nameEn: "QA", email: "qa@example.invalid", primaryMajor: "CS", joinedAt: new Date("2026-09-01T00:00:00Z") };
   const legacy = { userId: "u", status: "PAID", coverageSemesters: 1, paidAt: new Date("2026-09-20T00:00:00Z"), paidAmount: 45000, verifiedAt: null, verifiedBy: null, note: null, updatedAt: new Date("2026-09-20T00:00:00Z") };
   const payment = { ...legacy, paymentId: "p", userId: "u", amount: 45000, effectiveStartSemester: "2026-2", createdAt: legacy.paidAt };
   for (const [semester, expected] of [["2026-1", "UNPAID"], ["2026-2", "PAID"], ["2027-1", "UNPAID"]]) {
