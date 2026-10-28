@@ -25,6 +25,7 @@
 .discovery-card-detail > svg { width: .875rem; height: .875rem; flex: none; stroke-width: 1.5; }
 .discovery-card-badges { display: flex; flex-wrap: wrap; align-items: center; gap: .375rem .5rem; margin-top: .5625rem; }
 .discovery-badge { display: inline-flex; align-items: center; min-height: 1.375rem; padding: .125rem .375rem; border: 1px solid #d0d5dd; border-radius: .25rem; color: #344054; background: white; font-size: var(--discovery-badge-size); line-height: 1.4; font-weight: 500; white-space: nowrap; }
+.discovery-badge.is-neutral { border-color: #d0d5dd; color: #344054; background: #f2f4f7; }
 .discovery-badge.is-open { border-color: transparent; color: #075f4a; background: #eaf5ef; }
 .discovery-badge.is-urgent { border-color: transparent; color: #9b3d13; background: #fff0e4; }
 .discovery-badge.is-closed { border-color: transparent; color: #667085; background: #f2f4f7; }

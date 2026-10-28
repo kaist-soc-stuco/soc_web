@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 const toneClasses = {
   closed: "border-transparent bg-[#f2f4f7] text-[#667085]",
-  upcoming: "border-[#d0d5dd] bg-white text-[#344054]",
+  upcoming: "border-[#d0d5dd] bg-[#f2f4f7] text-[#344054]",
   draft: "border-slate-200 bg-white text-slate-600",
   neutral: "border-slate-200 bg-slate-100 text-slate-600",
   info: "border-blue-200 bg-blue-50 text-blue-700",

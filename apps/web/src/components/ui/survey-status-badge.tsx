@@ -14,7 +14,7 @@ interface SurveyStatusBadgeProps {
 }
 
 const toneClassNames: Record<SurveyStatusTone, string> = {
-  beforeOpen: "border-[#d0d5dd] bg-white text-[#344054]",
+  beforeOpen: "border-[#d0d5dd] bg-[#f2f4f7] text-[#344054]",
   closed: "border-transparent bg-[#f2f4f7] text-[#667085]",
   draft: "border-slate-200 bg-white text-slate-600",
   open: "border-[#cee4d8] bg-[#eaf5ef] text-[#075f4a]",

@@ -215,13 +215,13 @@ export function getDiscoveryBadge(item: UnifiedItem, lang: string, currentMs = n
   const kstDay = (ms: number) => Math.floor((ms + 9 * 3600000) / 86400000);
   const datedBadge = (label: string, target: string, tone = "neutral", englishVerb: "Opens" | "Closes" | "Ends" = "Closes") => {
     const days = kstDay(isoToMs(target)) - kstDay(currentMs);
+    const past = englishVerb === "Opens" ? "Opened" : englishVerb === "Ends" ? "Ended" : "Closed";
+    if (tone === "closed" || days < 0) return badge(ko ? label : past, "closed", target);
     if (!ko) {
-      const past = englishVerb === "Opens" ? "Opened" : englishVerb === "Ends" ? "Ended" : "Closed";
-      const englishLabel = tone === "closed" ? past : days === 0 ? `${englishVerb} today` : days > 0 ? `${englishVerb} in ${days}d` : `${past} ${-days}d ago`;
+      const englishLabel = days === 0 ? `${englishVerb} today` : `${englishVerb} in ${days}d`;
       return badge(englishLabel, tone, target);
     }
-    const dDay = days === 0 ? "D-Day" : days > 0 ? `D-${days}` : `D+${-days}`;
-    return badge(`${label} ${dDay}`, tone, target);
+    return badge(days === 0 ? `오늘 ${label}` : `${label} D-${days}`, tone, target);
   };
   const event = item.kind === "EVENT";
   const full = event
@@ -231,8 +231,8 @@ export function getDiscoveryBadge(item: UnifiedItem, lang: string, currentMs = n
   if (item.computedState === "closed") {
     const end = item.closesAt;
     return end && !item.isAlwaysOpen && isoToMs(end) <= currentMs
-      ? datedBadge(event ? "행사 종료" : "설문 마감", end, "closed", event ? "Ends" : "Closes")
-      : badge(ko ? event ? "지난 행사" : "설문 마감" : event ? "Ended" : "Closed", "closed");
+      ? datedBadge(event ? "행사 종료" : "마감", end, "closed", event ? "Ends" : "Closes")
+      : badge(ko ? event ? "행사 종료" : "마감" : event ? "Ended" : "Closed", "closed");
   }
   const state = item.kind === "EVENT" ? item.linkedSurveyState : item.computedState;
   const deadline = item.kind === "EVENT" ? item.linkedSurveyClosesAt : item.closesAt;
@@ -240,18 +240,18 @@ export function getDiscoveryBadge(item: UnifiedItem, lang: string, currentMs = n
   if (event && state === "closed") {
     return deadline && !alwaysOpen && isoToMs(deadline) <= currentMs
       ? datedBadge("신청 마감", deadline, "closed")
-      : badge(ko ? "신청 중단" : "Closed", "closed");
+      : badge(ko ? "신청 마감" : "Closed", "closed");
   }
-  if (event && state === "before_open") return badge(ko ? "신청 예정" : "Registration upcoming");
+  if (event && state === "before_open") return badge(ko ? "신청 예정" : "Upcoming");
   if (!event && state === "before_open" && item.opensAt) return datedBadge("설문 시작", item.opensAt, "neutral", "Opens");
   if ((state === "open" || state === "before_open") && deadline && !alwaysOpen) {
     const end = isoToMs(deadline);
     if (event) {
       if (end <= currentMs) return badge(ko ? "신청 마감" : "Closed", "closed", deadline);
-      if (kstDay(end) === kstDay(currentMs)) return badge(ko ? "오늘 신청 마감" : "Closes today", "urgent", deadline);
+      if (kstDay(end) === kstDay(currentMs)) return badge(ko ? "오늘 마감" : "Closes today", "urgent", deadline);
       return datedBadge("신청 마감", deadline, end - currentMs < 3 * 86400000 ? "urgent" : "open");
     }
-    return datedBadge("설문 마감", deadline,
+    return datedBadge("마감", deadline,
       end <= currentMs ? "closed" : end - currentMs < 3 * 86400000 ? "urgent" : "open");
   }
   if (state === "open") {

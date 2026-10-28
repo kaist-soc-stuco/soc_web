@@ -215,12 +215,12 @@ function getEventApplicationLabel(event: EventCardItem, lang: string) {
       event.linkedSurveyResponseCount >= event.linkedSurveyMaxResponses,
   );
   if (isFull || event.linkedSurveyState === "closed") {
-    return lang === "ko" ? isFull ? "정원 마감" : "신청 마감" : isFull ? "At capacity" : "Registration closed";
+    return lang === "ko" ? isFull ? "정원 마감" : "신청 마감" : isFull ? "At capacity" : "Closed";
   }
   if (event.linkedSurveyState === "open") {
-    return lang === "ko" ? "신청 중" : "Registration open";
+    return lang === "ko" ? "신청 중" : "Open";
   }
-  return lang === "ko" ? "신청 예정" : "Registration upcoming";
+  return lang === "ko" ? "신청 예정" : "Upcoming";
 }
 
 function isEventApplicationClosed(event: EventCardItem) {

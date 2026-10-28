@@ -31,7 +31,7 @@ function VoteCard({ vote, lang, now }: { vote: VoteRecord; lang: string; now: nu
   const state = getVoteListState(vote, now);
   const upcoming = state === "upcoming";
   const open = state === "open";
-  const status = lang === "ko" ? upcoming ? "예정" : open ? "진행 중" : "종료" : upcoming ? "Upcoming" : open ? "Open" : "Ended";
+  const status = lang === "ko" ? upcoming ? "투표 예정" : open ? "진행 중" : "투표 종료" : upcoming ? "Upcoming" : open ? "Open" : "Voting ended";
   const content = <div className="discovery-card-copy">
     <p className="discovery-card-date" title={formatVotePeriod(vote.startsAt, vote.endsAt)}>{formatVotePeriod(vote.startsAt, vote.endsAt)}</p>
     <h3 className="discovery-card-title">{title}</h3>

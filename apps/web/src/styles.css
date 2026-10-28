@@ -4995,7 +4995,7 @@ input[type="search"]:focus-visible,
   border-radius: 999px;
   padding: 0.125rem 0.5rem;
   color: #344054;
-  background: white;
+  background: #f2f4f7;
   font-size: var(--ui-text-caption-size);
   line-height: 1;
   font-weight: 500;
