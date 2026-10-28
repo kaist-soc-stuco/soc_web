@@ -625,7 +625,7 @@ export class CalendarSyncService {
     return { processedCount, succeededCount, failedCount };
   }
 
-  @Cron("*/1 * * * *")
+  @Cron("*/15 * * * *")
   async processGoogleCalendarQueue(): Promise<void> {
     if (!this.isAnyGoogleSyncEnabled()) return;
     try {

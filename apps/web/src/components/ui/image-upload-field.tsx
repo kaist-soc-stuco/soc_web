@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ImagePlus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ interface ImageUploadFieldProps {
   emptyText?: string;
   fileName?: string;
   imageUrl?: string;
+  fallbackPreview?: ReactNode;
   onRemove: () => void;
   onSelect: (file: File) => void | Promise<void>;
   previewErrorText?: string;
@@ -39,6 +40,7 @@ export function ImageUploadField({
   emptyText,
   fileName,
   imageUrl,
+  fallbackPreview,
   onRemove,
   onSelect,
   previewErrorText = "이미지를 불러오지 못했습니다. 다시 선택해 주세요.",
@@ -115,7 +117,7 @@ export function ImageUploadField({
       />
 
       <div
-        className={cn("relative overflow-hidden rounded-xl border border-dashed transition-colors", dragging ? "border-slate-600 bg-slate-100" : "border-slate-300 bg-slate-50/60", blocked && "opacity-60")}
+        className={cn("relative overflow-hidden rounded-xl border transition-colors", !hasPreview && !fallbackPreview && "border-dashed", dragging ? "border-slate-600 bg-slate-100" : "border-slate-300 bg-slate-50/60", blocked && "opacity-60")}
         onDragOver={event => { event.preventDefault(); if (!blocked) { event.dataTransfer.dropEffect = "copy"; setDragging(true); } }}
         onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
         onDrop={event => { event.preventDefault(); setDragging(false); if (!blocked) acceptFile(event.dataTransfer.files[0]); }}
@@ -123,7 +125,7 @@ export function ImageUploadField({
         <button type="button" disabled={blocked} aria-label={selectLabel} onClick={() => inputRef.current?.click()}
           style={{ aspectRatio, minHeight: metadata && !hasPreview ? "9rem" : undefined }}
           className="relative flex w-full flex-col items-center justify-center gap-2 overflow-hidden p-4 text-slate-500 transition-colors hover:bg-slate-100/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand-primary disabled:cursor-not-allowed">
-          {hasPreview ? <img src={previewUrl} alt={alt} draggable={false} onError={() => setPreviewFailed(true)} className="absolute inset-0 size-full object-contain" /> : <>
+          {hasPreview ? <img src={previewUrl} alt={alt} draggable={false} onError={() => setPreviewFailed(true)} className="absolute inset-0 size-full object-contain" /> : fallbackPreview ?? <>
             <ImagePlus aria-hidden="true" className="size-6 text-slate-400" />
             <span className={compact ? "text-xs font-medium" : "text-sm font-medium"}>{emptyText || (ko ? "이미지를 놓거나 클릭해서 선택" : "Drop an image or click to choose")}</span>
             <span className="text-xs font-normal tabular-nums text-slate-400">

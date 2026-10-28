@@ -492,8 +492,8 @@ function CourseEditorModal({ apiClient, course, data, isNew, onClose, onSaved, o
       <SegmentedControl
         variant="underline" ariaLabel="과목 편집 탭"
         role="tablist"
-        className="w-full"
-        itemClassName="flex-1"
+        className="w-full [&>.ui-view-tab-indicator]:!h-px"
+        itemClassName="flex-1 !border-b"
         value={tab}
         onChange={setTab}
         options={[
@@ -605,27 +605,27 @@ function OfferingEditor({
           ))}
         </AdminTableBody>
       </AdminDataTable>
-      {draft ? (
-        <div className="grid shrink-0 gap-4 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <AdminFormField label="분반"><UiInput className="w-full min-w-0" value={draft.section} onChange={(event) => set("section", event.currentTarget.value)} /></AdminFormField>
-            <AdminFormField label="담당교수"><UiInput className="w-full min-w-0" value={draft.instructor} onChange={(event) => set("instructor", event.currentTarget.value)} /></AdminFormField>
-            <AdminFormField label="정원"><UiInput className="w-full min-w-0" type="number" min={0} value={draft.capacity} onChange={(event) => set("capacity", event.currentTarget.value)} /></AdminFormField>
-            <AdminFormField label="수강인원"><UiInput className="w-full min-w-0" type="number" min={0} value={draft.enrolled} onChange={(event) => set("enrolled", event.currentTarget.value)} /></AdminFormField>
-            <AdminFormField label="강의시간"><UiInput className="w-full min-w-0" value={draft.time} onChange={(event) => set("time", event.currentTarget.value)} /></AdminFormField>
-            <AdminFormField label="강의실"><UiInput className="w-full min-w-0" value={draft.room} onChange={(event) => set("room", event.currentTarget.value)} /></AdminFormField>
-            <AdminFormField label="강의 방식" className="sm:col-span-2"><UiInput className="w-full min-w-0" value={draft.delivery} onChange={(event) => set("delivery", event.currentTarget.value)} /></AdminFormField>
+      <Modal open={Boolean(draft)} onClose={() => { if (!saving) onCancel(); }} title={editingExisting ? "분반 편집" : "분반 추가"} size="standard" mobileFullscreen bodyClassName="space-y-5" footer={<>
+        {editingExisting ? <Button type="button" variant="ghost" className="mr-auto text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={saving} onClick={onDelete}>분반 삭제</Button> : null}
+        <Button type="button" variant="outline" disabled={saving} onClick={onCancel}>취소</Button>
+        <Button loading={saving} type="button" disabled={saving} onClick={onSave}>{editingExisting ? "저장" : "추가"}</Button>
+      </>}>
+        {draft ? <>
+          <p className="text-sm text-slate-500">{formatTerm(draft.term)}</p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <AdminFormField label="분반"><UiInput className="w-full" value={draft.section} onChange={(event) => set("section", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="담당교수" className="sm:col-span-2"><UiInput className="w-full" value={draft.instructor} onChange={(event) => set("instructor", event.currentTarget.value)} /></AdminFormField>
           </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <AdminFormField label="강의시간"><UiTextarea autoResize={false} rows={4} className="w-full" value={draft.time} onChange={(event) => set("time", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="강의실"><UiTextarea autoResize={false} rows={4} className="w-full" value={draft.room} onChange={(event) => set("room", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="수강인원"><UiInput className="w-full" type="number" min={0} value={draft.enrolled} onChange={(event) => set("enrolled", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="정원"><UiInput className="w-full" type="number" min={0} value={draft.capacity} onChange={(event) => set("capacity", event.currentTarget.value)} /></AdminFormField>
+          </div>
+          <AdminFormField label="강의 방식"><UiInput className="w-full" value={draft.delivery} onChange={(event) => set("delivery", event.currentTarget.value)} /></AdminFormField>
           <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={draft.inEnglish} onChange={(event) => set("inEnglish", event.currentTarget.checked)} className="size-4 accent-emerald-700" />영어 강의</label>
-          <div className="flex justify-end gap-2">
-            {editingExisting ? <Button type="button" variant="ghost" className="mr-auto text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={saving} onClick={onDelete}>분반 삭제</Button> : null}
-            <Button type="button" variant="outline" disabled={saving} onClick={onCancel}>취소</Button>
-            <Button loading={saving} type="button" disabled={saving} onClick={onSave}>
-              {editingExisting ? "저장" : "추가"}
-            </Button>
-          </div>
-        </div>
-      ) : null}
+        </> : null}
+      </Modal>
     </div>
   );
 }

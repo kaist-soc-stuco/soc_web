@@ -9,6 +9,7 @@ import { ListState, ListStateAction } from "@/components/ui/data-state";
 import { ResponseStateCard, responseStateActionClassName } from "@/features/survey/response-state-card";
 import { Pagination } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import { rememberAuthReturnPath } from "@/lib/auth-storage";
 import { PageSearchField } from "@/components/ui/page-layout";
 
 import type {
@@ -147,7 +148,7 @@ export function MyPageUnavailableState({ authenticated, lang }: UnavailableState
     <ResponseStateCard icon={authenticated ? ShieldCheck : LockKeyhole} headingAs="h1"
       title={lang === "ko" ? authenticated ? "개인정보 제공 동의가 필요합니다" : "로그인이 필요합니다" : authenticated ? "Consent is required" : "Sign in to use My Page"}
       description={lang === "ko" ? authenticated ? <><span className="md:hidden">다시 로그인해 동의를 완료해 주세요.</span><span className="hidden md:inline">마이페이지를 이용하려면 다시 로그인해 동의를 완료해 주세요.</span></> : "내 정보와 활동 내역을 확인하려면 로그인해 주세요." : authenticated ? "To use My Page, sign in again and complete the consent process." : "Sign in to view your profile and activity."}
-      actions={<Button asChild className={responseStateActionClassName}><Link to="/login">{lang === "ko" ? authenticated ? "다시 로그인" : "로그인" : authenticated ? "Sign in again" : "Sign in"}</Link></Button>}
+      actions={<Button asChild className={responseStateActionClassName}><Link to="/login" onClick={() => rememberAuthReturnPath()}>{lang === "ko" ? authenticated ? "다시 로그인" : "로그인" : authenticated ? "Sign in again" : "Sign in"}</Link></Button>}
     />
   );
 }

@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { rememberAuthReturnPath } from "@/lib/auth-storage";
 import { useOpenChannelTalk } from "@/features/channel-talk/channel-talk-provider";
 import { ResponseStateCard, responseStateActionClassName } from "./response-state-card";
 import { SurveyListAction, VoteListAction } from "./response-layout";
@@ -82,7 +83,7 @@ export function SurveyParticipationNotice({
     icon={isLoginRequired ? LockKeyhole : ShieldAlert} tone={isLoginRequired ? "neutral" : "warning"}
     title={lang === "ko" ? isLoginRequired ? `로그인이 필요한 ${subject === "vote" ? "투표" : "설문"}입니다` : "참여 조건을 충족하지 않습니다" : isLoginRequired ? "Login required" : "You are not eligible to participate"}
     description={description ?? (lang === "ko" ? isLoginRequired ? "참여하려면 KAIST 계정으로 로그인해 주세요." : "아래 사유로 참여할 수 없습니다." : isLoginRequired ? "Sign in with your KAIST account to participate." : "You cannot participate for the following reasons.")}
-    actions={isLoginRequired ? <Button asChild className={responseStateActionClassName}><Link to="/login">{lang === "ko" ? "로그인" : "Sign in"}</Link></Button> : undefined}
+    actions={isLoginRequired ? <Button asChild className={responseStateActionClassName}><Link to="/login" onClick={() => rememberAuthReturnPath()}>{lang === "ko" ? "로그인" : "Sign in"}</Link></Button> : undefined}
     mobileAction={!isLoginRequired ? subject === "vote" ? <VoteListAction lang={lang} /> : <SurveyListAction lang={lang} /> : undefined}
   >
     {reasonList}
@@ -139,7 +140,7 @@ export function SurveyParticipationNotice({
 
       {isLoginRequired ? (
         <Button asChild size={compact ? "sm" : "default"} className={cn(!compact && "w-full")}>
-          <Link to="/login">{lang === "ko" ? "로그인" : "Sign in"}</Link>
+          <Link to="/login" onClick={() => rememberAuthReturnPath()}>{lang === "ko" ? "로그인" : "Sign in"}</Link>
         </Button>
       ) : null}
     </div>

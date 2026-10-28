@@ -44,10 +44,8 @@ export function scrollToAboutElement(target: HTMLElement, behavior: ScrollBehavi
 }
 
 function sectionScrollTop(target: HTMLElement) {
-  const nav = document.querySelector<HTMLElement>(".about-section-nav");
-  const style = nav ? getComputedStyle(nav) : null;
-  const offset = nav ? (Number.parseFloat(style?.top ?? "0") || 0) + nav.offsetHeight + 16 : 0;
-  const heading = target.querySelector<HTMLElement>("h1, h2") ?? target;
+  const offset = Number.parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
+  const heading = target.id === "intro" ? target : target.querySelector<HTMLElement>("h1, h2") ?? target;
   // Reveal transforms change bounding rectangles without changing layout.
   // Use layout offsets so the heading stays clear after the animation ends.
   let top = 0;
@@ -158,13 +156,8 @@ export function useAboutPageController() {
       animationFrame = 0;
       if (performance.now() < suppressScrollSpyUntilRef.current) return;
 
-      const rootStyle = getComputedStyle(document.documentElement);
-      const headerHeightToken = rootStyle.getPropertyValue("--ui-header-height").trim();
-      const rootFontSize = Number.parseFloat(rootStyle.fontSize) || 16;
-      const headerHeight = headerHeightToken.endsWith("rem")
-        ? Number.parseFloat(headerHeightToken) * rootFontSize
-        : Number.parseFloat(headerHeightToken) || 68;
-      const anchorLine = headerHeight + 76;
+      const firstSection = document.getElementById("programs");
+      const anchorLine = (firstSection ? Number.parseFloat(getComputedStyle(firstSection).scrollMarginTop) : 0) + 24;
       let nextSection: AboutSectionId = ABOUT_SECTION_IDS[0];
       for (const sectionId of ABOUT_SECTION_IDS) {
         const section = document.getElementById(getSectionTargetId(sectionId));

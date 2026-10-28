@@ -11,6 +11,7 @@ import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { EventsSurveysLoadMore } from "@/features/events-surveys/events-surveys-load-more";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { Permissions } from "@/lib/permissions";
+import "@/features/events-surveys/events-surveys-calendar.css";
 import {
   PageHeader,
   PageContainer,
@@ -115,12 +116,13 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
 
 
   return (
-    <PageShell className={`mobile-white-page${currentTab === "calendar" ? "" : " discovery-page"}`}>
+    <PageShell className={`mobile-white-page${currentTab === "calendar" ? " calendar-page" : " discovery-page"}`}>
 
 
-      <PageMain>
+      <PageMain className={currentTab === "calendar" ? "calendar-page-main" : undefined}>
         <PageHeader
-          containerClassName={currentTab === "calendar" ? "mobile-calendar-page-heading events-list-page-heading pt-4 sm:items-center" : "events-list-page-heading"}
+          className={currentTab === "calendar" ? "calendar-page-heading" : undefined}
+          containerClassName={currentTab === "calendar" ? "mobile-calendar-page-heading events-list-page-heading max-w-[100rem] pt-4 sm:items-center" : "events-list-page-heading"}
           actions={
             currentTab === "calendar" ? (
               <CalendarSubscriptionButton feedUrl={calendarFeedUrl} lang={lang} />
@@ -147,7 +149,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
           }
         />
 
-        <PageContainer className="pb-8">
+        <PageContainer className={currentTab === "calendar" ? "calendar-page-body max-w-[100rem] pb-4" : "pb-8"}>
           {currentTab !== "calendar" && !loading ? (
             <EventsSurveysFilterBar
               isSurvey={currentTab === "survey"}

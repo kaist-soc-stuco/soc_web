@@ -228,7 +228,7 @@ function BoardManagementPageContent() {
 
   return <AdminPageShell>
     {ConfirmDialog}
-    <AdminPageMain className="!max-w-5xl">
+    <AdminPageMain className="!max-w-6xl">
       <AdminPageHeader title="게시판 관리" actions={<Button type="button" onClick={startCreate}> 게시판 추가</Button>} />
       {loadError ? <ErrorState title={loadError} onRetry={() => void loadBoards()} /> : null}
 
@@ -241,12 +241,12 @@ function BoardManagementPageContent() {
           onDragCancel={handleDragCancel}
           onDragEnd={handleDragEnd}
         >
-          <AdminDataTable minWidth={0} isDragging={Boolean(activeBoardCode)} className={`admin-sortable-table admin-sortable-list ${loading && boards.length > 0 ? "opacity-60 transition-opacity" : ""}`}>
-            <colgroup><col style={{ width: 36 }} /><col /><col style={{ width: "32%" }} /><col style={{ width: 80 }} /></colgroup>
-            <AdminTableHeader><tr><AdminTableHead><span className="sr-only">순서</span></AdminTableHead><AdminTableHead>게시판</AdminTableHead><AdminTableHead>운영 설정</AdminTableHead><AdminTableHead>상태</AdminTableHead></tr></AdminTableHeader>
+          <AdminDataTable minWidth={880} isDragging={Boolean(activeBoardCode)} className={`admin-sortable-table admin-sortable-list ${loading && boards.length > 0 ? "opacity-60 transition-opacity" : ""}`}>
+            <colgroup><col style={{ width: 36 }} /><col /><col style={{ width: "13%" }} /><col style={{ width: "23%" }} /><col style={{ width: "23%" }} /><col style={{ width: 80 }} /></colgroup>
+            <AdminTableHeader><tr><AdminTableHead><span className="sr-only">순서</span></AdminTableHead><AdminTableHead>게시판</AdminTableHead><AdminTableHead>열람 권한</AdminTableHead><AdminTableHead>작성 권한</AdminTableHead><AdminTableHead>활성 기능</AdminTableHead><AdminTableHead>상태</AdminTableHead></tr></AdminTableHeader>
             <AdminTableBody>
-              {loading && boards.length === 0 ? <tr><AdminTableCell colSpan={4} className="py-16 text-center">불러오는 중...</AdminTableCell></tr>
-                : boards.length === 0 ? <AdminTableEmpty colSpan={4}>등록된 게시판이 없습니다.</AdminTableEmpty>
+              {loading && boards.length === 0 ? <tr><AdminTableCell colSpan={6} className="py-16 text-center">불러오는 중...</AdminTableCell></tr>
+                : boards.length === 0 ? <AdminTableEmpty colSpan={6}>등록된 게시판이 없습니다.</AdminTableEmpty>
                 : <SortableContext items={boards.map((board) => board.code)} strategy={verticalListSortingStrategy}>
                   {boards.map((board) => <SortableBoardRow key={board.boardId} board={board} disabled={saving} onOpen={startEdit} />)}
                 </SortableContext>}
@@ -274,7 +274,11 @@ function BoardManagementPageContent() {
             <AdminFormField label="이름 (한글)"><UiInput value={form.nameKo} onChange={(event) => { const value = event.currentTarget.value; setForm((current) => ({ ...current, nameKo: value })); }} /></AdminFormField>
             <AdminFormField label="이름 (영문)"><UiInput value={form.nameEn ?? ""} onChange={(event) => { const value = event.currentTarget.value; setForm((current) => ({ ...current, nameEn: value })); }} /></AdminFormField>
           </div>
-          <Toggle label="공개 여부" checked={form.isActive} onChange={(checked) => setForm((current) => ({ ...current, isActive: checked }))} />
+        </section>
+
+        <section className="space-y-4 border-t border-slate-100 pt-6">
+          <h3 className="text-sm font-semibold text-slate-900">열람 권한</h3>
+          <Toggle label="비로그인 열람 허용" checked={form.allowGuestRead} onChange={(checked) => setForm((current) => ({ ...current, allowGuestRead: checked }))} />
         </section>
 
         <section className="space-y-4 border-t border-slate-100 pt-6">
@@ -326,8 +330,13 @@ function BoardManagementPageContent() {
         </section>
 
         <section className="space-y-4 border-t border-slate-100 pt-6">
-          <h3 className="text-sm font-semibold text-slate-900">게시판 기능</h3>
-          <div className="grid gap-2 md:grid-cols-2"><Toggle label="댓글 허용" checked={form.allowComment} onChange={(checked) => setForm((current) => ({ ...current, allowComment: checked }))} /><Toggle label="비밀글 허용" checked={form.allowSecret} onChange={(checked) => setForm((current) => ({ ...current, allowSecret: checked }))} /><Toggle label="추천 및 스크랩" checked={form.allowLike} onChange={(checked) => setForm((current) => ({ ...current, allowLike: checked }))} /><Toggle label="비로그인 열람 허용" checked={form.allowGuestRead} onChange={(checked) => setForm((current) => ({ ...current, allowGuestRead: checked }))} /></div>
+          <h3 className="text-sm font-semibold text-slate-900">활성 기능</h3>
+          <div className="grid gap-2 md:grid-cols-2"><Toggle label="댓글 허용" checked={form.allowComment} onChange={(checked) => setForm((current) => ({ ...current, allowComment: checked }))} /><Toggle label="비밀글 허용" checked={form.allowSecret} onChange={(checked) => setForm((current) => ({ ...current, allowSecret: checked }))} /><Toggle label="추천/스크랩" checked={form.allowLike} onChange={(checked) => setForm((current) => ({ ...current, allowLike: checked }))} /></div>
+        </section>
+
+        <section className="space-y-4 border-t border-slate-100 pt-6">
+          <h3 className="text-sm font-semibold text-slate-900">상태</h3>
+          <Toggle label="게시판 활성화" checked={form.isActive} onChange={(checked) => setForm((current) => ({ ...current, isActive: checked }))} />
         </section>
 
       </div>
@@ -342,7 +351,9 @@ function SortableBoardRow({ board, disabled, onOpen }: { board: BoardSummary; di
   return <tr ref={setNodeRef} style={style} aria-label={`${board.nameKo} 게시판 설정 열기`} role="button" className={cn("cursor-pointer transition-colors hover:bg-slate-50/60 focus-visible:bg-slate-50 focus-visible:outline-none", isDragging && "relative z-10 opacity-70")} onClick={() => onOpen(board)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(board); } }} tabIndex={0}>
     <AdminTableCell className="text-center"><button ref={setActivatorNodeRef} type="button" aria-label={`${board.nameKo} 순서 이동`} {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="admin-list-drag-handle"><GripVertical aria-hidden="true" className="size-4" /></button></AdminTableCell>
     <AdminTableCell truncate><span className="admin-table-text-emphasis">{board.nameKo}</span>{board.nameEn ? <span className="admin-table-text"> / {board.nameEn}</span> : null}</AdminTableCell>
-    <AdminTableCell truncate>{[board.allowComment && "댓글", board.allowSecret && "비밀글", board.allowLike && "추천·스크랩"].filter(Boolean).join(" · ") || "추가 기능 없음"}</AdminTableCell>
+    <AdminTableCell data-mobile-label="열람 권한">{board.allowGuestRead ? "전체 공개" : "로그인 사용자"}</AdminTableCell>
+    <AdminTableCell truncate data-mobile-label="작성 권한">{board.writeAccessScope === "PERMISSION" ? permissionOptions.find((option) => option.bit === board.writePermissionBit)?.label ?? "권한 보유자" : WRITE_ACCESS_OPTIONS.find((option) => option.value === board.writeAccessScope)?.label ?? "로그인 사용자"}</AdminTableCell>
+    <AdminTableCell truncate data-mobile-label="활성 기능">{[board.allowComment && "댓글", board.allowLike && "추천/스크랩", board.allowSecret && "비밀글"].filter(Boolean).join(" · ") || "없음"}</AdminTableCell>
     <AdminTableCell>{board.isActive ? <AdminStatusBadge tone="positive">활성</AdminStatusBadge> : <AdminStatusBadge>비활성</AdminStatusBadge>}</AdminTableCell>
   </tr>;
 }

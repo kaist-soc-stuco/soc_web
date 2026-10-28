@@ -10,6 +10,7 @@ import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { rememberAuthReturnPath } from "@/lib/auth-storage";
 import {
   getBoardDescriptionFromMetadata,
   getBoardTitleFromMetadata,
@@ -260,7 +261,7 @@ export function useBoardPageController() {
             : "You need to sign in to use this feature.",
         action: {
           label: lang === "ko" ? "로그인" : "Login",
-          onClick: () => navigate("/login"),
+          onClick: () => { rememberAuthReturnPath(); navigate("/login"); },
         },
       });
       return;

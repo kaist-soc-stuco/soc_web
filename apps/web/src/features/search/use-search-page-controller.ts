@@ -46,7 +46,8 @@ export function useSearchPageController() {
   const [votes, setVotes] = useState<VoteRecord[]>([]);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const error = loadFailed ? (lang === "ko" ? "검색 결과를 불러오지 못했습니다." : "Failed to load search results.") : null;
   const generation = useRef(0);
   const [more, setMore] = useState({ event: false, survey: false });
   const [pages, setPages] = useState({ event: 1, survey: 1 });
@@ -79,14 +80,14 @@ export function useSearchPageController() {
       setSurveys([]);
       setFaqArticles([]);
       setVotes([]);
-      setError(null);
+      setLoadFailed(false);
       setLoading(false);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
-    setError(null);
+    setLoadFailed(false);
 
     Promise.all([
       apiClient.searchArticles(query, 60, searchBy),
@@ -151,7 +152,7 @@ export function useSearchPageController() {
           setSurveys([]);
           setFaqArticles([]);
           setVotes([]);
-          setError(lang === "ko" ? "검색 결과를 불러오지 못했습니다." : "Failed to load search results.");
+          setLoadFailed(true);
         }
       })
       .finally(() => {
@@ -162,7 +163,7 @@ export function useSearchPageController() {
       cancelled = true;
       generation.current++;
     };
-  }, [apiClient, lang, query, retryKey, searchBy]);
+  }, [apiClient, query, retryKey, searchBy]);
 
   const boardById = useMemo(
     () => new Map(boards.map((board) => [board.boardId, board])),

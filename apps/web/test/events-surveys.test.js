@@ -16,14 +16,23 @@ const {
 
 const NOW = Date.parse("2026-05-30T00:00:00.000Z");
 
+test("registration that has not opened is neutral even with a close deadline", () => {
+  const [event] = buildUnifiedItems([], [article({ survey: {
+    surveyId: "registration", computedState: "before_open", closeAt: "2026-05-30T14:59:00Z", isAlwaysOpen: false,
+  }, eventStartDate: "2026-06-10T09:00:00Z", eventEndDate: "2026-06-10T11:00:00Z" })], NOW);
+  assert.deepEqual(getDiscoveryBadge(event, "ko", NOW), { label: "신청 예정", tone: "neutral", deadline: null });
+  assert.equal(getDiscoveryBadge(event, "en", NOW).label, "Registration upcoming");
+  assert.equal(getDiscoveryBadge({ ...event, linkedSurveyState: "open" }, "ko", NOW).tone, "urgent");
+});
+
 test("registration badges use the application deadline, not the event start", () => {
   const [event] = buildUnifiedItems([], [article({survey: {
     surveyId:"registration",computedState:"open",closeAt:"2026-05-31T14:59:00Z",isAlwaysOpen:false,
   },eventStartDate:"2026-06-10T09:00:00Z",eventEndDate:"2026-06-10T11:00:00Z"})], NOW);
   assert.equal(getDiscoveryBadge(event,"ko",NOW).label,"신청 마감 D-1");
-  assert.equal(getDiscoveryBadge(event,"ko",Date.parse("2026-05-31T14:58:00Z")).label,"오늘 마감");
+  assert.equal(getDiscoveryBadge(event,"ko",Date.parse("2026-05-31T14:58:00Z")).label,"오늘 신청 마감");
   assert.equal(getDiscoveryBadge(event,"ko",Date.parse("2026-05-31T14:59:00Z")).label,"신청 마감");
-  assert.equal(getDiscoveryBadge({...event,linkedSurveyAlwaysOpen:true},"ko",NOW).label,"상시 접수");
+  assert.equal(getDiscoveryBadge({...event,linkedSurveyAlwaysOpen:true},"ko",NOW).label,"상시 신청");
   assert.equal(getDiscoveryBadge({...event,computedState:"closed"},"ko",Date.parse("2026-06-11T00:00:00Z")).label,"행사 종료 D+1");
 });
 
@@ -42,10 +51,10 @@ test("event deadlines distinguish today in KST from upcoming registration", () =
     surveyId:"registration",computedState:"open",closeAt:"2026-06-02T14:59:00Z",isAlwaysOpen:false,
   },eventStartDate:"2026-06-10T09:00:00Z",eventEndDate:"2026-06-10T11:00:00Z"})], NOW);
   assert.equal(getDiscoveryBadge(event,"ko",NOW).label,"신청 마감 D-3");
-  assert.equal(getDiscoveryBadge(event,"ko",NOW).tone,"deadline");
+  assert.equal(getDiscoveryBadge(event,"ko",NOW).tone,"open");
   assert.equal(getDiscoveryBadge(event,"ko",Date.parse("2026-06-01T14:59:59Z")).label,"신청 마감 D-1");
-  assert.equal(getDiscoveryBadge(event,"ko",Date.parse("2026-06-01T15:00:00Z")).label,"오늘 마감");
-  assert.equal(getDiscoveryBadge(event,"ko",Date.parse("2026-06-01T15:00:00Z")).tone,"today");
+  assert.equal(getDiscoveryBadge(event,"ko",Date.parse("2026-06-01T15:00:00Z")).label,"오늘 신청 마감");
+  assert.equal(getDiscoveryBadge(event,"ko",Date.parse("2026-06-01T15:00:00Z")).tone,"urgent");
   assert.equal(getDiscoveryBadge(event,"en",Date.parse("2026-06-01T15:00:00Z")).label,"Closes today");
   assert.equal(getDiscoveryBadge(event,"ko",Date.parse("2026-06-02T14:59:00Z")).tone,"closed");
 });
@@ -53,9 +62,22 @@ test("event deadlines distinguish today in KST from upcoming registration", () =
 test("survey cards preserve always-open and end-only timing", () => {
   const [form]=buildUnifiedItems([survey({isAlwaysOpen:true,opensAt:null,closesAt:null})],[],NOW);
   assert.equal(getDiscoveryPeriod(form,"ko"),"상시");
-  assert.equal(getDiscoveryBadge(form,"ko",NOW).label,"상시 접수");
+  assert.equal(getDiscoveryBadge(form,"ko",NOW).label,"상시 진행");
   assert.match(getDiscoveryPeriod({...form,isAlwaysOpen:false,closesAt:"2026-06-01T14:59:00Z"},"ko"),/6월 1일.*마감/);
-  assert.equal(getDiscoveryBadge({...form,isAlwaysOpen:false,closesAt:"2026-05-31T14:59:00Z"},"ko",NOW).label,"응답 마감 D-1");
+  assert.equal(getDiscoveryBadge({...form,isAlwaysOpen:false,closesAt:"2026-05-31T14:59:00Z"},"ko",NOW).label,"설문 마감 D-1");
+});
+
+test("survey labels and compact English badges distinguish opening, closing and closed states", () => {
+  const [form] = buildUnifiedItems([survey({ opensAt: "2026-06-01T00:00:00Z", closesAt: "2026-06-02T00:00:00Z", computedState: "before_open" })], [], NOW);
+  assert.equal(getDiscoveryBadge(form, "ko", NOW).label, "설문 시작 D-2");
+  assert.equal(getDiscoveryBadge(form, "en", NOW).label, "Opens in 2d");
+  const open = { ...form, computedState: "open", closesAt: "2026-06-01T00:00:00Z" };
+  assert.equal(getDiscoveryBadge(open, "en", NOW).label, "Closes in 2d");
+  assert.equal(getDiscoveryBadge({ ...open, closesAt: "2026-05-30T14:00:00Z" }, "en", NOW).label, "Closes today");
+  assert.equal(getDiscoveryBadge({ ...open, closesAt: null }, "ko", NOW).label, "진행 중");
+  const closed = { ...form, computedState: "closed", closesAt: "2026-05-29T00:00:00Z" };
+  assert.equal(getDiscoveryBadge(closed, "ko", NOW).label, "설문 마감 D+1");
+  assert.equal(getDiscoveryBadge(closed, "en", NOW).label, "Closed");
 });
 
 function article(overrides = {}) {

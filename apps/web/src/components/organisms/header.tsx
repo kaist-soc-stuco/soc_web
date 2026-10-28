@@ -438,7 +438,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                 href: operationalSurveyPath(OPERATIONAL_SURVEY_IDS.cohortChatInvitation),
                 newTab: true,
               },
-              { label: "Chat Promotion Request", href: operationalSurveyPath(OPERATIONAL_SURVEY_IDS.externalPromotionPostRequest), newTab: true },
+              { label: "Promote in Chats", href: operationalSurveyPath(OPERATIONAL_SURVEY_IDS.externalPromotionPostRequest), newTab: true },
             ],
           },
           {

@@ -149,7 +149,7 @@ export function LoginCallbackPage() {
         .then(async () => {
           clearStoredAuthState();
           await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
-          navigate("/", { replace: true });
+          navigate(consumeAuthReturnPath() ?? "/", { replace: true });
         })
         .catch((error) => {
           console.error(error);
@@ -213,7 +213,7 @@ export function LoginCallbackPage() {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
-      navigate("/", { replace: true });
+      navigate(consumeAuthReturnPath() ?? "/", { replace: true });
     } catch (error) {
       console.error(error);
       toast({ type: "error", message: lang === "ko" ? "동의 처리에 실패했습니다. 다시 시도해 주세요." : "Could not save your choice. Please try again." });

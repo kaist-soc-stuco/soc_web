@@ -304,11 +304,10 @@ export function UserManagementPage() {
             ) : (
               <AdminDataTable minWidth={0} mobileMode="cards">
                 <colgroup>
-                  <col style={{ width: "29%" }} />
-                  <col style={{ width: "29%" }} />
-                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "32%" }} />
+                  <col style={{ width: "32%" }} />
+                  <col style={{ width: "17%" }} />
                   <col style={{ width: "13%" }} />
-                  <col style={{ width: "9%" }} />
                   <col style={{ width: "6%" }} />
                 </colgroup>
                 <AdminTableHeader>
@@ -322,7 +321,6 @@ export function UserManagementPage() {
                     </AdminSortableHead>
                     <AdminTableHead>이메일</AdminTableHead>
                     <AdminTableHead>전공</AdminTableHead>
-                    <AdminTableHead>동의 시각</AdminTableHead>
                     <AdminSortableHead
                       active={sortBy === "lastLoginAt"}
                       ascending={sortBy === "lastLoginAt" && sortDirection === "asc"}
@@ -365,9 +363,6 @@ export function UserManagementPage() {
                         </AdminTableCell>
                         <AdminTableCell data-mobile-label="전공" className="py-3">
                           {major ? <div className="mt-0.5 truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]">{major}</div> : null}
-                        </AdminTableCell>
-                        <AdminTableCell truncate data-mobile-label="동의 시각" className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
-                          {user.privacyConsentAt ? formatShortDateTime(user.privacyConsentAt) : ""}
                         </AdminTableCell>
                         <AdminTableCell truncate data-mobile-label="최근 접속" className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
                           <time dateTime={user.lastLoginAt ?? undefined} title={formatShortDateTime(user.lastLoginAt)}>

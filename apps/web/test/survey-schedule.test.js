@@ -4,6 +4,7 @@ const { UpdateSurveySchema } = require("@soc/contracts");
 const { buildSurveySchedule } = require("../dist/test-src/lib/survey-schedule.js");
 
 test("incomplete survey drafts keep their explicit schedule mode", () => {
+  assert.deepEqual(buildSurveySchedule({ isAlwaysOpen: false, openAt: "", closeAt: "" }), { isAlwaysOpen: false, openAt: null, closeAt: null });
   for (const isAllDay of [false, true]) {
     const schedule = buildSurveySchedule({ isAlwaysOpen: false, isAllDay, openAt: "", closeAt: isAllDay ? "2026-10-28" : "2026-10-28T18:00" });
     assert.equal(schedule.isAlwaysOpen, false);

@@ -142,6 +142,13 @@ const redirectToLogin = (): void => {
     return;
   }
 
+  if (!/^\/login(?:\/|$)/i.test(window.location.pathname)) {
+    try {
+      window.sessionStorage.setItem("soc.auth.return-to", `${current}${window.location.hash ?? ""}`);
+    } catch {
+      // Continue to sign-in even when a return path cannot be persisted.
+    }
+  }
   window.location.assign(target);
 };
 

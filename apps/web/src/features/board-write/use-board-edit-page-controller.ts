@@ -589,9 +589,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
             : undefined,
         eventDescriptionEn:
           (category === "_EVENT" || category === "promotions")
-            ? isKoreanOnly
-              ? null
-              : eventDescriptionEn.trim()
+            ? eventDescriptionEn.trim()
             : undefined,
       });
       articleUpdated = true;

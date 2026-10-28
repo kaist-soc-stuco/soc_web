@@ -32,6 +32,7 @@ interface EventCardRecord {
   startAt: string | null;
   endAt: string | null;
   location: string | null;
+  locationEn: string | null;
   eventState: "before_open" | "open" | "closed";
   surveyId: string | null;
   linkedSurveyState: "before_open" | "open" | "closed" | null;
@@ -146,7 +147,7 @@ function localizeEvent(record: EventCardRecord, lang: string): EventCardItem {
       : record.descriptionEn || record.titleEn || record.descriptionKo || record.titleKo,
     startAt: record.startAt,
     endAt: record.endAt,
-    location: record.location,
+    location: lang === "en" ? record.locationEn || record.location : record.location,
     eventState: record.eventState,
     surveyId: record.surveyId,
     linkedSurveyState: record.linkedSurveyState,
@@ -198,10 +199,10 @@ function getEventDdayLabel(startAt: string | null, endAt: string | null) {
 
 function EventDayBadge({ event, lang }: { event: EventCardItem; lang: string }) {
   const label = event.eventState === "closed"
-    ? lang === "ko" ? "마감" : "Closed"
+    ? lang === "ko" ? "행사 종료" : "Event ended"
     : event.eventState === "open"
-      ? lang === "ko" ? "진행 중" : "Ongoing"
-      : getEventDdayLabel(event.startAt, event.endAt);
+      ? lang === "ko" ? "행사 진행 중" : "Event ongoing"
+      : [lang === "ko" ? "행사 예정" : "Upcoming", getEventDdayLabel(event.startAt, event.endAt)].filter(Boolean).join(" ");
   return label ? <span className={`home-editorial-dday is-${event.eventState === "closed" ? "closed" : event.eventState === "open" ? "open" : "neutral"}`}>{label}</span> : null;
 }
 
@@ -214,14 +215,12 @@ function getEventApplicationLabel(event: EventCardItem, lang: string) {
       event.linkedSurveyResponseCount >= event.linkedSurveyMaxResponses,
   );
   if (isFull || event.linkedSurveyState === "closed") {
-    return lang === "ko" ? "신청 마감" : "Applications closed";
+    return lang === "ko" ? isFull ? "정원 마감" : "신청 마감" : isFull ? "At capacity" : "Registration closed";
   }
   if (event.linkedSurveyState === "open") {
-    return event.eventState === "before_open"
-      ? lang === "ko" ? "사전 신청" : "Pre-registration"
-      : lang === "ko" ? "신청중" : "Applications open";
+    return lang === "ko" ? "신청 중" : "Registration open";
   }
-  return lang === "ko" ? "신청 예정" : "Registration opens soon";
+  return lang === "ko" ? "신청 예정" : "Registration upcoming";
 }
 
 function isEventApplicationClosed(event: EventCardItem) {
@@ -383,7 +382,8 @@ export function EventCarousel() {
             homeOrder: item.homeOrder ?? null,
             startAt: item.eventStartDate ?? null,
             endAt: item.eventEndDate ?? null,
-            location: (lang === "en" ? item.eventLocationEn || item.eventLocation : item.eventLocation) ?? null,
+            location: item.eventLocation ?? null,
+            locationEn: item.eventLocationEn ?? null,
             eventState,
             surveyId: item.surveyId ?? item.survey?.surveyId ?? null,
             linkedSurveyState: normalizeEventState(item.survey?.computedState),

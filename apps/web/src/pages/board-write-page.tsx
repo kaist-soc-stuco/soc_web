@@ -162,7 +162,6 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
       eventStartDate={eventStartDate}
       isAllDay={isAllDay}
       isEventAlwaysOpen={isEventAlwaysOpen}
-      isKoreanOnly={isKoreanOnly}
       lang={lang}
       onEventAlwaysOpenChange={(checked) => {
         setIsEventAlwaysOpen(checked);

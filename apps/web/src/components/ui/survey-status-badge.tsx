@@ -4,6 +4,7 @@ import {
   type SurveyStatusTone,
 } from "@/lib/survey-display";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/use-language";
 
 interface SurveyStatusBadgeProps {
   className?: string;
@@ -13,10 +14,10 @@ interface SurveyStatusBadgeProps {
 }
 
 const toneClassNames: Record<SurveyStatusTone, string> = {
-  beforeOpen: "border-slate-200 bg-white text-slate-600",
-  closed: "border-slate-200 bg-slate-200 text-slate-500",
+  beforeOpen: "border-[#d0d5dd] bg-white text-[#344054]",
+  closed: "border-transparent bg-[#f2f4f7] text-[#667085]",
   draft: "border-slate-200 bg-white text-slate-600",
-  open: "border-[#cee4d8] bg-[#eaf4ee] text-[#176345]",
+  open: "border-[#cee4d8] bg-[#eaf5ef] text-[#075f4a]",
 };
 
 export function SurveyStatusBadge({
@@ -25,6 +26,7 @@ export function SurveyStatusBadge({
   size = "md",
   survey,
 }: SurveyStatusBadgeProps) {
+  const { lang } = useLanguage();
   if (!survey) return null;
 
   const status = getSurveyStatusInfo(survey, showDday);
@@ -40,7 +42,7 @@ export function SurveyStatusBadge({
         className,
       )}
     >
-      {status.label}
+      {lang === "en" ? { beforeOpen: "Upcoming", closed: "Closed", draft: "Draft", open: "Open" }[status.tone] : status.label}
     </span>
   );
 }

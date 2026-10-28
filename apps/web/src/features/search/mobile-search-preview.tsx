@@ -23,7 +23,7 @@ export function MobileSearchPreview({ query, lang, onSelect }: { query: string; 
     return () => window.clearTimeout(timeout);
   }, [value]);
   const { data, isFetching, isError } = useQuery({
-    queryKey: ["mobile-search-preview", session?.userId ?? "anonymous", session?.permission ?? 0, debouncedQuery, lang],
+    queryKey: ["mobile-search-preview", session?.userId ?? "anonymous", session?.permission ?? 0, debouncedQuery],
     enabled: Boolean(value && debouncedQuery) && !sessionPending && !boardsLoading,
     staleTime: 30_000,
     retry: false,
@@ -34,6 +34,9 @@ export function MobileSearchPreview({ query, lang, onSelect }: { query: string; 
         client.getPublicSurveys({ page: 1, pageSize: 3, query: debouncedQuery }),
       ]);
       if (sources.every(source => source.status === "rejected")) throw new Error("Search preview unavailable");
+      return sources;
+    },
+    select: (sources) => {
       const items: PreviewItem[] = [];
       const [articles, events, surveys] = sources;
       if (articles.status === "fulfilled") for (const item of articles.value) {

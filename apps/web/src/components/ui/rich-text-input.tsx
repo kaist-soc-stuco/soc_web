@@ -1,5 +1,5 @@
 import { sanitizeForDisplay } from "./rich-text-content";
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   Bold,
@@ -49,7 +49,7 @@ export function RichTextInput({
   const [focused, setFocused] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const editor = editorRef.current;
     if (!editor || document.activeElement === editor) return;
     const safeValue = sanitizeForDisplay(value);

@@ -35,6 +35,7 @@ import { useCurrentSession } from "@/hooks/use-current-session";
 import { hasSurveyManagePermission, Permissions } from "@/lib/permissions";
 import {
   filterAndSortSurveys,
+  formatSurveyPeriod,
   type SurveySortDirection,
   type SurveySortKey,
   type SurveyStatusFilter,
@@ -46,40 +47,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-
-// Convert timestamp to 24-hour format
-function format24hDateTime(dateIso: string | null) {
-  if (!dateIso) return null;
-  const d = isoToDate(dateIso);
-  if (isNaN(d.getTime())) return null;
-
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const hour = String(d.getHours()).padStart(2, "0");
-  const minute = String(d.getMinutes()).padStart(2, "0");
-
-  return {
-    dateStr: `${year}.${month}.${day}`,
-    timeStr: `${hour}:${minute}`
-  };
-}
-
-function formatSurveyPeriod(survey: SurveyRecord) {
-  if (survey.isAlwaysOpen || !survey.opensAt) return "상시";
-
-  const start = format24hDateTime(survey.opensAt);
-  if (!start) return "상시";
-
-  const startLabel = `${start.dateStr} ${start.timeStr}`;
-  const end = format24hDateTime(survey.closesAt);
-  if (!end) return `${startLabel} ~`;
-
-  const endDate = end.dateStr.slice(0, 4) === start.dateStr.slice(0, 4)
-    ? end.dateStr.slice(5)
-    : end.dateStr;
-  return `${startLabel} ~ ${endDate} ${end.timeStr}`;
-}
 
 // Convert timestamp to Korean relative time
 function formatRelativeTime(dateIso: string | null) {
@@ -252,7 +219,8 @@ export function SurveyListPage() {
 
   // Perform Dynamic Client-Side Filtering & Sorting
   const filteredSurveys = useMemo(() => {
-    return filterAndSortSurveys(surveys.filter(survey => survey.isAlwaysOpen === (surveyGroup === "operational")).filter(survey => overlapsDateRange(survey.isAlwaysOpen ? null : survey.opensAt, survey.isAlwaysOpen ? null : survey.closesAt, dateRange)), {
+    return filterAndSortSurveys(surveys.filter(survey => overlapsDateRange(survey.isAlwaysOpen ? null : survey.opensAt, survey.isAlwaysOpen ? null : survey.closesAt, dateRange)), {
+      surveyGroup,
       periodFilter: "all",
       searchQuery,
       sortBy,

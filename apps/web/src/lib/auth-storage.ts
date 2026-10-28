@@ -15,12 +15,26 @@ export interface StoredAuthState {
 const STORAGE_KEY = "soc.auth.state";
 export const AUTH_RETURN_TO_KEY = "soc.auth.return-to";
 
-export const rememberAuthReturnPath = (path: string): void => {
-  if (typeof window === "undefined" || !path.startsWith("/")) {
-    return;
+const safeAuthReturnPath = (path: string | null): string | null => {
+  if (!path?.startsWith("/") || path.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(path)) return null;
+  try {
+    const url = new URL(path, "https://soc.invalid");
+    if (url.origin !== "https://soc.invalid" || /^\/(?:login|api\/auth)(?:\/|$)/i.test(url.pathname)) return null;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return null;
   }
+};
 
-  window.sessionStorage.setItem(AUTH_RETURN_TO_KEY, path);
+export const rememberAuthReturnPath = (path?: string): void => {
+  if (typeof window === "undefined") return;
+  const returnPath = safeAuthReturnPath(path ?? `${window.location.pathname}${window.location.search}${window.location.hash}`);
+  if (!returnPath) return;
+  try {
+    window.sessionStorage.setItem(AUTH_RETURN_TO_KEY, returnPath);
+  } catch {
+    // Sign-in remains available when browser storage is disabled.
+  }
 };
 
 export const consumeAuthReturnPath = (): string | null => {
@@ -28,9 +42,13 @@ export const consumeAuthReturnPath = (): string | null => {
     return null;
   }
 
-  const path = window.sessionStorage.getItem(AUTH_RETURN_TO_KEY);
-  window.sessionStorage.removeItem(AUTH_RETURN_TO_KEY);
-  return path?.startsWith("/") ? path : null;
+  try {
+    const path = window.sessionStorage.getItem(AUTH_RETURN_TO_KEY);
+    window.sessionStorage.removeItem(AUTH_RETURN_TO_KEY);
+    return safeAuthReturnPath(path);
+  } catch {
+    return null;
+  }
 };
 
 export const readStoredAuthState = (): StoredAuthState | null => {

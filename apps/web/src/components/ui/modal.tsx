@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -6,6 +6,9 @@ import { IconButton } from "@/components/ui/icon-button";
 import { useOverlayBehavior } from "@/components/ui/use-overlay-behavior";
 import { cn } from "@/lib/utils";
 import { SheetHandle } from "@/components/ui/sheet-handle";
+
+const ModalDepthContext = createContext(0);
+let openModalCount = 0;
 
 export function Modal({
   children,
@@ -36,6 +39,7 @@ export function Modal({
   title: ReactNode;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const depth = useContext(ModalDepthContext);
   const titleId = useId();
   const handleOverlayKeyDown = useOverlayBehavior({
     onClose,
@@ -46,14 +50,19 @@ export function Modal({
   useEffect(() => {
     if (!open || typeof document === "undefined") return;
 
+    openModalCount += 1;
     document.body.classList.add("ui-modal-open");
-    return () => document.body.classList.remove("ui-modal-open");
+    return () => {
+      openModalCount -= 1;
+      if (openModalCount === 0) document.body.classList.remove("ui-modal-open");
+    };
   }, [open]);
 
   if (!open) return null;
 
   return createPortal(
-    <div className={cn("ui-modal fixed inset-0 z-[70] flex items-center justify-center p-4 sm:py-6", mobileFullscreen && "max-sm:p-0", placement === "bottom" && "ui-modal--bottom !items-end !p-0")}>
+    <ModalDepthContext.Provider value={depth + 1}>
+    <div style={{ zIndex: 70 + depth * 10 }} className={cn("ui-modal fixed inset-0 z-[70] flex items-center justify-center p-4 sm:py-6", mobileFullscreen && "max-sm:p-0", placement === "bottom" && "ui-modal--bottom !items-end !p-0")}>
       <button
         type="button"
         aria-label="닫기"
@@ -104,7 +113,8 @@ export function Modal({
           </div>
         ) : null}
       </div>
-    </div>,
+    </div>
+    </ModalDepthContext.Provider>,
     document.body,
   );
 }

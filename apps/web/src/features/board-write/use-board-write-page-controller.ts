@@ -937,9 +937,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
             : undefined,
         eventDescriptionEn:
           (selectedCategory === "_EVENT" || selectedCategory === "promotions")
-            ? isKoreanOnly
-              ? undefined
-              : eventDescriptionEn.trim() || undefined
+            ? eventDescriptionEn.trim() || undefined
             : undefined,
       });
       articlePublished = true;

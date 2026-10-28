@@ -47,7 +47,7 @@ export function EventsSurveysGrid({ isAuthenticated, items, lang, hideDate = fal
       const audience = audienceText(item, lang);
       const surveyBadges = [
         !item.allowAnonymous && (lang === "ko" ? "로그인 필요" : "Login required"),
-        item.allowAnonymous && (lang === "ko" ? "익명 설문" : "Anonymous survey"),
+        item.allowAnonymous && (lang === "ko" ? "비회원 참여 가능" : "Guests welcome"),
         item.feePayersOnly && (lang === "ko" ? "과비 납부자만" : "Fee-paying members"),
         item.isKoreanOnly && (lang === "ko" ? "한국어 전용" : "Korean only"),
       ].filter((label): label is string => Boolean(label));

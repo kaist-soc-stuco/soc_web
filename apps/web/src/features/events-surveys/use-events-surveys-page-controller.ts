@@ -8,6 +8,7 @@ import { isoToDate, localDate, nowDate } from "@soc/shared";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { rememberAuthReturnPath } from "@/lib/auth-storage";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import {
   buildCalendarEventsFromPublicItems,
@@ -245,7 +246,7 @@ export function useEventsSurveysPageController({
             : "You need to sign in to use this feature.",
         action: {
           label: lang === "ko" ? "로그인" : "Login",
-          onClick: () => navigate("/login"),
+          onClick: () => { rememberAuthReturnPath(); navigate("/login"); },
         },
       });
       return;

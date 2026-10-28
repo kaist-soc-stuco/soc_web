@@ -18,13 +18,9 @@ export function AboutPage() {
     <PageShell className="about-landing-page mobile-white-page about-tree-page">
 
       <main className="channel-talk-safe-area flex-1">
-        <AboutSectionNavigation
-          activeSection={activeSection}
-          lang={lang}
-          onNavigate={scrollToSection}
-        />
         <AboutLandingContent
           lang={lang}
+          navigation={<AboutSectionNavigation activeSection={activeSection} lang={lang} onNavigate={scrollToSection} />}
         />
       </main>
       <Footer />

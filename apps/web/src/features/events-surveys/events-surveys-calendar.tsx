@@ -97,9 +97,9 @@ export function EventsSurveysCalendar({
     selectedDate={selectedDate} calendarQuery={calendarQuery} onCalendarQueryChange={onCalendarQueryChange}
     holidays={holidays} isFetching={isFetching} />;
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[minmax(0,1fr)_calc(25%+2rem)]">
-        <div className="flex h-full min-w-0 flex-col rounded-lg border border-card-border-subtle bg-white px-4 py-3 sm:px-5 sm:py-3">
+    <div className="calendar-workspace space-y-6">
+      <div className="calendar-workspace-layout grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[minmax(0,1fr)_calc(25%+2rem)]">
+        <div className="calendar-month-card flex h-full min-w-0 flex-col rounded-lg border border-card-border-subtle bg-white px-4 py-3 sm:px-5 sm:py-3">
           <div className="calendar-header grid min-w-0 grid-cols-1 items-center gap-1.5 pb-1 select-none sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
             <div
               className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--ui-text-caption-size)] font-semibold text-slate-500"

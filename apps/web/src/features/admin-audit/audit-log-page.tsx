@@ -226,7 +226,7 @@ export function AuditLogPage() {
       {DownloadReasonDialog}
         <AdminPageMain tableLayout className="!max-w-6xl">
           <AdminPageHeader
-            title="접속기록 관리"
+            title="운영 로그"
             actions={<Button type="button" disabled={exporting} aria-busy={exporting} onClick={() => void handleExport()}><Download aria-hidden="true" className="size-4" />내보내기</Button>}
           />
 

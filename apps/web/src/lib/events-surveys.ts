@@ -213,8 +213,13 @@ export function getDiscoveryBadge(item: UnifiedItem, lang: string, currentMs = n
   const ko = lang === "ko";
   const badge = (label: string, tone = "neutral", deadline?: string | null) => ({ label, tone, deadline: deadline ?? null });
   const kstDay = (ms: number) => Math.floor((ms + 9 * 3600000) / 86400000);
-  const datedBadge = (label: string, target: string, tone = "neutral") => {
+  const datedBadge = (label: string, target: string, tone = "neutral", englishVerb: "Opens" | "Closes" | "Ends" = "Closes") => {
     const days = kstDay(isoToMs(target)) - kstDay(currentMs);
+    if (!ko) {
+      const past = englishVerb === "Opens" ? "Opened" : englishVerb === "Ends" ? "Ended" : "Closed";
+      const englishLabel = tone === "closed" ? past : days === 0 ? `${englishVerb} today` : days > 0 ? `${englishVerb} in ${days}d` : `${past} ${-days}d ago`;
+      return badge(englishLabel, tone, target);
+    }
     const dDay = days === 0 ? "D-Day" : days > 0 ? `D-${days}` : `D+${-days}`;
     return badge(`${label} ${dDay}`, tone, target);
   };
@@ -226,29 +231,33 @@ export function getDiscoveryBadge(item: UnifiedItem, lang: string, currentMs = n
   if (item.computedState === "closed") {
     const end = item.closesAt;
     return end && !item.isAlwaysOpen && isoToMs(end) <= currentMs
-      ? datedBadge(ko ? event ? "행사 종료" : "응답 마감" : event ? "Event ended" : "Response deadline", end, "closed")
-      : badge(ko ? event ? "지난 행사" : "응답 중단" : event ? "Past event" : "Responses stopped", "closed");
+      ? datedBadge(event ? "행사 종료" : "설문 마감", end, "closed", event ? "Ends" : "Closes")
+      : badge(ko ? event ? "지난 행사" : "설문 마감" : event ? "Ended" : "Closed", "closed");
   }
   const state = item.kind === "EVENT" ? item.linkedSurveyState : item.computedState;
   const deadline = item.kind === "EVENT" ? item.linkedSurveyClosesAt : item.closesAt;
   const alwaysOpen = item.kind === "EVENT" ? item.linkedSurveyAlwaysOpen : item.isAlwaysOpen;
   if (event && state === "closed") {
     return deadline && !alwaysOpen && isoToMs(deadline) <= currentMs
-      ? datedBadge(ko ? "신청 마감" : "Registration deadline", deadline, "closed")
-      : badge(ko ? "신청 중단" : "Registration stopped", "closed");
+      ? datedBadge("신청 마감", deadline, "closed")
+      : badge(ko ? "신청 중단" : "Closed", "closed");
   }
-  if (!event && state === "before_open" && item.opensAt) return datedBadge(ko ? "접수 시작" : "Opens", item.opensAt);
+  if (event && state === "before_open") return badge(ko ? "신청 예정" : "Registration upcoming");
+  if (!event && state === "before_open" && item.opensAt) return datedBadge("설문 시작", item.opensAt, "neutral", "Opens");
   if ((state === "open" || state === "before_open") && deadline && !alwaysOpen) {
     const end = isoToMs(deadline);
     if (event) {
-      if (end <= currentMs) return badge(ko ? "신청 마감" : "Registration closed", "closed", deadline);
-      if (kstDay(end) === kstDay(currentMs)) return badge(ko ? "오늘 마감" : "Closes today", "today", deadline);
-      return datedBadge(ko ? "신청 마감" : "Registration deadline", deadline, "deadline");
+      if (end <= currentMs) return badge(ko ? "신청 마감" : "Closed", "closed", deadline);
+      if (kstDay(end) === kstDay(currentMs)) return badge(ko ? "오늘 신청 마감" : "Closes today", "urgent", deadline);
+      return datedBadge("신청 마감", deadline, end - currentMs < 3 * 86400000 ? "urgent" : "open");
     }
-    return datedBadge(ko ? event ? "신청 마감" : "응답 마감" : event ? "Registration deadline" : "Response deadline", deadline,
+    return datedBadge("설문 마감", deadline,
       end <= currentMs ? "closed" : end - currentMs < 3 * 86400000 ? "urgent" : "open");
   }
-  if (state === "open") return badge(ko ? alwaysOpen ? "상시 접수" : "접수 중" : alwaysOpen ? "Always open" : "Open", "open");
+  if (state === "open") {
+    const koreanLabel = alwaysOpen ? event ? "상시 신청" : "상시 진행" : event ? "신청 중" : "진행 중";
+    return badge(ko ? koreanLabel : alwaysOpen ? "Always open" : "Open", "open");
+  }
   if (event) return badge("");
   const target = item.computedState === "open" ? item.closesAt : item.opensAt;
   if (target) return datedBadge(ko ? item.computedState === "open" ? "행사 종료" : "행사" : item.computedState === "open" ? "Event ends" : "Event", target);

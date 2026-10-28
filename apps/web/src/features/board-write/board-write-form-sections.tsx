@@ -244,7 +244,6 @@ interface EventFieldsProps {
   eventStartDate: string;
   isAllDay: boolean;
   isEventAlwaysOpen: boolean;
-  isKoreanOnly: boolean;
   lang: string;
   onEventDescriptionKoChange: (value: string) => void;
   onEventDescriptionEnChange: (value: string) => void;
@@ -270,7 +269,6 @@ export function BoardWriteEventFields({
   eventStartDate,
   isAllDay,
   isEventAlwaysOpen,
-  isKoreanOnly,
   onAllDayChange,
   lang,
   onEventAlwaysOpenChange,
@@ -288,7 +286,7 @@ export function BoardWriteEventFields({
 }: EventFieldsProps) {
   const [locationLanguage, setLocationLanguage] = useState<"ko" | "en">("ko");
   const [descriptionLanguage, setDescriptionLanguage] = useState<"ko" | "en">("ko");
-  const activeDescriptionLanguage = isKoreanOnly ? "ko" : descriptionLanguage;
+  const activeDescriptionLanguage = descriptionLanguage;
   const eventStartInputValue = isAllDay
     ? switchEventDateInputMode(eventStartDate, true)
     : switchEventDateInputMode(eventStartDate, false);
@@ -427,15 +425,12 @@ export function BoardWriteEventFields({
               >
                 {(["ko", "en"] as const).map((language) => {
                   const isActive = activeDescriptionLanguage === language;
-                  const isDisabled = language === "en" && isKoreanOnly;
                   return (
                     <button
                       key={language}
                       type="button"
                       role="tab"
                       aria-selected={isActive}
-                      aria-disabled={isDisabled}
-                      disabled={isDisabled}
                       onClick={() => setDescriptionLanguage(language)}
                       className={`select-none rounded px-2 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold uppercase leading-4 transition-colors ${
                         isActive
@@ -453,7 +448,7 @@ export function BoardWriteEventFields({
               id="event-description"
               type="text"
               aria-label={lang === "ko" ? "카드 요약 설명" : "Card summary"}
-              placeholder={lang === "ko" ? "설명을 입력하세요" : "Enter a description"}
+              placeholder={activeDescriptionLanguage === "ko" ? "설명을 입력하세요" : "Enter a description"}
               className="w-full"
               value={activeDescriptionLanguage === "ko" ? eventDescriptionKo : eventDescriptionEn}
               onChange={(event) => {

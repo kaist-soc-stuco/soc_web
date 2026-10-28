@@ -3,11 +3,12 @@ import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const toneClasses = {
-  closed: "border-slate-200 bg-slate-200 text-slate-500",
+  closed: "border-transparent bg-[#f2f4f7] text-[#667085]",
+  upcoming: "border-[#d0d5dd] bg-white text-[#344054]",
   draft: "border-slate-200 bg-white text-slate-600",
   neutral: "border-slate-200 bg-slate-100 text-slate-600",
   info: "border-blue-200 bg-blue-50 text-blue-700",
-  success: "border-[#cee4d8] bg-[#eaf4ee] text-[#176345]",
+  success: "border-[#cee4d8] bg-[#eaf5ef] text-[#075f4a]",
   warning: "border-amber-200 bg-amber-50 text-amber-700",
   danger: "border-rose-200 bg-rose-50 text-rose-700",
 } as const;

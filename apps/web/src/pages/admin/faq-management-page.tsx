@@ -39,10 +39,11 @@ import {
   AdminPageShell,
   AdminTableCard,
 } from "@/components/ui/admin-page";
+import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { AdminDrawer } from "@/components/ui/admin-drawer";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
-import { UiInput, UiTextarea, UiSelect } from "@/components/ui/form-control";
+import { UiInput, UiTextarea } from "@/components/ui/form-control";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -274,9 +275,9 @@ function FaqManagementPageContent() {
         <div className="space-y-5">
           <label className="grid gap-1.5 text-xs font-normal text-slate-600">
             카테고리
-            <UiSelect className="w-full" value={form.faqCategory} onChange={(event) => { const value = event.currentTarget.value as FaqCategory; setForm((current) => ({ ...current, faqCategory: value })); }}>
-              {FAQ_CATEGORIES.map((category) => <option key={category.key} value={category.key}>{category.titleKo}</option>)}
-            </UiSelect>
+            <AdminSelectDropdown ariaLabel="FAQ 카테고리" value={form.faqCategory}
+              options={FAQ_CATEGORIES.map((category) => ({ value: category.key, label: category.titleKo }))}
+              onChange={(value) => setForm((current) => ({ ...current, faqCategory: value as FaqCategory }))} />
           </label>
           <label className="grid gap-1.5 text-xs font-normal text-slate-600">
             질문

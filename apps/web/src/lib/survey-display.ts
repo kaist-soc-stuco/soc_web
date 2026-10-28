@@ -1,5 +1,5 @@
 import type { SurveyRecord } from "@soc/contracts";
-import { isoToMs, nowMs } from "@soc/shared";
+import { isoToDate, isoToMs, nowMs } from "@soc/shared";
 
 export type SurveyStatusTone =
   | "draft"
@@ -30,6 +30,7 @@ export type SurveySortKey = "updatedAt" | "opensAt" | "responseCount";
 export type SurveySortDirection = "asc" | "desc";
 
 export interface SurveyListFilterOptions {
+  surveyGroup?: "general" | "operational";
   periodFilter: SurveyPeriodFilter;
   searchQuery: string;
   sortBy: SurveySortKey;
@@ -55,7 +56,7 @@ export function getSurveyStatusInfo(
   }
 
   if (survey.computedState === "open") {
-    return { label: "진행중", tone: "open" };
+    return { label: "진행 중", tone: "open" };
   }
 
   const openMs = survey.opensAt ? isoToMs(survey.opensAt) : null;
@@ -69,7 +70,7 @@ export function getSurveyStatusInfo(
     return { label: "시작 예정", tone: "beforeOpen" };
   }
 
-  return { label: "진행중", tone: "open" };
+  return { label: "진행 중", tone: "open" };
 }
 
 export function filterAndSortSurveys(
@@ -77,7 +78,9 @@ export function filterAndSortSurveys(
   options: SurveyListFilterOptions,
   currentMs = nowMs(),
 ): SurveyRecord[] {
-  let result = [...surveys];
+  let result = options.surveyGroup
+    ? surveys.filter(survey => Boolean(survey.isAlwaysOpen) === (options.surveyGroup === "operational"))
+    : [...surveys];
   const query = options.searchQuery.trim().toLowerCase();
 
   if (query.length > 0) {
@@ -140,4 +143,41 @@ export function filterAndSortSurveys(
   });
 
   return result;
+}
+
+// Convert timestamp to 24-hour format
+function format24hDateTime(dateIso: string | null) {
+  if (!dateIso) return null;
+  const d = isoToDate(dateIso);
+  if (isNaN(d.getTime())) return null;
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hour = String(d.getHours()).padStart(2, "0");
+  const minute = String(d.getMinutes()).padStart(2, "0");
+
+  return {
+    dateStr: `${year}.${month}.${day}`,
+    timeStr: `${hour}:${minute}`
+  };
+}
+
+export function formatSurveyPeriod(survey: Pick<SurveyRecord, "isAlwaysOpen" | "opensAt" | "closesAt">) {
+  if (survey.isAlwaysOpen) return "상시";
+
+  const start = format24hDateTime(survey.opensAt);
+  if (!start) {
+    const end = format24hDateTime(survey.closesAt);
+    return end ? `미지정 ~ ${end.dateStr} ${end.timeStr}` : "미지정";
+  }
+
+  const startLabel = `${start.dateStr} ${start.timeStr}`;
+  const end = format24hDateTime(survey.closesAt);
+  if (!end) return `${startLabel} ~`;
+
+  const endDate = end.dateStr.slice(0, 4) === start.dateStr.slice(0, 4)
+    ? end.dateStr.slice(5)
+    : end.dateStr;
+  return `${startLabel} ~ ${endDate} ${end.timeStr}`;
 }

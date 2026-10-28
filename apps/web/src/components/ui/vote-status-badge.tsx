@@ -6,18 +6,18 @@ export function VoteStatusBadge({ status, startsAt, endsAt }: { status: string; 
   const { lang } = useLanguage();
   const now = nowMs();
   const labels = lang === "ko"
-    ? { draft: "임시저장", scheduled: "예정", open: "진행", ended: "마감", closed: "마감", tallied: "종료" }
-    : { draft: "Draft", scheduled: "Scheduled", open: "Open", ended: "Ended", closed: "Awaiting tally", tallied: "Closed" };
+    ? { draft: "임시저장", scheduled: "예정", open: "진행 중", ended: "투표 종료", closed: "개표 대기", tallied: "개표 완료" }
+    : { draft: "Draft", scheduled: "Upcoming", open: "Open", ended: "Voting ended", closed: "Awaiting tally", tallied: "Tallied" };
   const config = status === "DRAFT"
     ? { label: labels.draft, tone: "draft" as const }
     : status === "PUBLISHED"
       ? startsAt && now < isoToMs(startsAt)
-        ? { label: labels.scheduled, tone: "neutral" as const }
+        ? { label: labels.scheduled, tone: "upcoming" as const }
         : endsAt && now >= isoToMs(endsAt)
           ? { label: labels.ended, tone: "closed" as const }
           : { label: labels.open, tone: "success" as const }
       : status === "CLOSED"
-        ? { label: labels.closed, tone: "closed" as const }
+        ? { label: labels.closed, tone: "upcoming" as const }
         : { label: labels.tallied, tone: "closed" as const };
   return <Badge tone={config.tone}>{config.label}</Badge>;
 }

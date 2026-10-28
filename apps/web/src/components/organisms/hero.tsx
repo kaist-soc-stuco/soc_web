@@ -7,6 +7,7 @@ import {
 } from "@/features/site-content/site-content";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveAssetUrl } from "@/lib/asset-url";
+import { resolveQuickLinkUrl } from "@/lib/quick-link-url";
 
 export function Hero() {
   const { lang } = useLanguage();
@@ -47,9 +48,10 @@ export function Hero() {
             <div className="home-hero-links-enter mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
               {quickLinks.map((block) => {
                 const text = resolveContentBlockText(block, lang);
-                return block.linkUrl ? (
-                  <a key={block.contentBlockId} href={block.linkUrl} className="home-hero-quick-link">
-                    {lang === "ko" && text.title === "행사·일정 확인" ? "행사·일정 보기" : text.title}
+                const href = resolveQuickLinkUrl(block.linkUrl ?? "");
+                return href ? (
+                  <a key={block.contentBlockId} href={href} className="home-hero-quick-link">
+                    {text.title}
                     <ArrowUpRight aria-hidden="true" className="size-4" />
                   </a>
                 ) : null;

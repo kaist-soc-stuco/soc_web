@@ -1289,7 +1289,7 @@ export function BilingualRichTextEditor({
     editorMinHeight: "min-h-[300px] lg:min-h-[28rem]",
     onImageUpload,
     onChange: onContentKoChange,
-    placeholder: lang === "ko" ? "내용을 입력하세요" : "Enter content in Korean",
+    placeholder: "내용을 입력하세요",
     spellCheck: true,
   });
   const englishEditor = useTiptapEditor({
@@ -1298,7 +1298,7 @@ export function BilingualRichTextEditor({
     editorMinHeight: "min-h-[300px] lg:min-h-[28rem]",
     onImageUpload,
     onChange: onContentEnChange,
-    placeholder: lang === "ko" ? "영문 내용을 입력하세요" : "Enter content",
+    placeholder: "Enter content",
     spellCheck: true,
   });
   const [activeLanguage, setActiveLanguage] = useState<"ko" | "en">("ko");
@@ -1363,7 +1363,7 @@ export function BilingualRichTextEditor({
 
           onFocus={() => setActiveLanguage("ko")}
           onTitleChange={onTitleKoChange}
-          placeholder={lang === "ko" ? "제목을 입력하세요" : "Enter title in Korean"}
+          placeholder="제목을 입력하세요"
           title={titleKo}
           titleLabel={lang === "ko" ? "국문" : "Korean"}
         />
@@ -1375,7 +1375,7 @@ export function BilingualRichTextEditor({
 
               onFocus={() => setActiveLanguage("en")}
               onTitleChange={onTitleEnChange}
-              placeholder={lang === "ko" ? "영문 제목을 입력하세요" : "Enter title"}
+              placeholder="Enter a title"
               title={titleEn}
               titleLabel={lang === "ko" ? "영문" : "English"}
             />

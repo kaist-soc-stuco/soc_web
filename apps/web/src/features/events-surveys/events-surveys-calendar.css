@@ -1,0 +1,48 @@
+@media (min-width: 1024px) {
+  .public-site-layout:has(.calendar-page) {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .public-site-content:has(.calendar-page) {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .calendar-page {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .calendar-page-main,
+  .calendar-page-body,
+  .calendar-workspace,
+  .calendar-month-grid,
+  .calendar-month-grid > div {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .calendar-page-main { overflow: hidden; }
+  .calendar-page-heading,
+  .calendar-weekdays { flex: none; }
+  .calendar-workspace-layout,
+  .calendar-month-card { flex: 1; min-height: 0; }
+
+  .calendar-page .calendar-grid-body {
+    flex: 1;
+    min-height: 0;
+    --calendar-week-row-height: minmax(0, 1fr);
+    --calendar-week-overflow-row-height: minmax(0, 1fr);
+  }
+
+  .calendar-page #calendar-day-details {
+    position: static;
+    height: 100%;
+    min-height: 0;
+  }
+}

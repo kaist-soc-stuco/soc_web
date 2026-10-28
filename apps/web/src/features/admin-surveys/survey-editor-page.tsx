@@ -1,9 +1,10 @@
 import { useDebouncedEditorSave } from "@/hooks/use-debounced-editor-save";
+import { rememberAuthReturnPath } from "@/lib/auth-storage";
 import { SurveyBuilderToolbar } from "./survey-builder-toolbar";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { restrictListDrag } from "@/lib/drag-bounds";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
@@ -91,6 +92,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { IconButton } from "@/components/ui/icon-button";
 import { useToast } from "@/components/ui/toast";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
+import { surveyEditorErrorMessage } from "@/lib/survey-editor-errors";
 import { buildSurveySchedule } from "@/lib/survey-schedule";
 
 import { SurveyResponsesPanel } from "./survey-responses-panel";
@@ -223,23 +225,10 @@ const questionToFormState = (question: SurveyQuestionRecord): QuestionFormState 
 const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
 
 const getErrorMessage = (err: unknown, fallback: string) => {
-  if (err instanceof ApiClientHttpError &&
-      (err.code === "survey_question_has_answers" || err.code === "survey_section_has_answers")) {
-    return "응답이 있는 항목은 삭제할 수 없습니다. 설문을 복제해 수정해 주세요.";
-  }
-  return fallback;
+  if (err instanceof ApiClientHttpError) return surveyEditorErrorMessage(err.code, err.status, fallback);
+  return err instanceof Error && err.message === "편집 중인 문항 또는 섹션을 확인해 주세요." ? err.message : fallback;
 };
-
-const getSurveyErrorMessage = (err: unknown, fallback: string) => {
-  const message = getErrorMessage(err, fallback);
-  if (message.includes("survey_branch_must_target_later_section")) {
-    return "섹션 이동 경로는 현재 섹션보다 뒤에 있는 섹션만 선택할 수 있습니다.";
-  }
-  if (message.includes("survey_branch_target_section_in_use")) {
-    return "다른 문항의 이동 경로에서 사용 중인 섹션은 삭제할 수 없습니다.";
-  }
-  return message;
-};
+const getSurveyErrorMessage = getErrorMessage;
 
 type SurveyEditorSection = SurveySectionRecord & { questions: SurveyQuestionRecord[] };
 
@@ -866,6 +855,15 @@ function QuestionDragOverlayRow({
   );
 }
 
+function SurveySectionFrame({ index, count, header, selected, children }: {
+  index: number; count: number; header?: boolean; selected?: boolean; children: ReactNode;
+}) {
+  return <div>
+    <div className="flex w-fit rounded-t-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white">{count} 중 {index + 1} 섹션</div>
+    <div className={`survey-section-surface relative ${header ? "is-header" : ""} ${selected ? "is-selected" : ""}`}>{children}</div>
+  </div>;
+}
+
 export function SurveyEditorPage() {
   const navigate = useNavigate();
   const { id: surveyId } = useParams<{ id: string }>();
@@ -877,6 +875,7 @@ export function SurveyEditorPage() {
   const rememberedAllDayRef = useRef(false);
   const form = useForm<SurveySettingsFormValues>({
     resolver: zodResolver(SurveySettingsSchema),
+    shouldFocusError: false,
     defaultValues: {
       titleKo: "",
       titleEn: "",
@@ -976,6 +975,42 @@ export function SurveyEditorPage() {
   const [sectionReorderSaving, setSectionReorderSaving] = useState(false);
 
   const [loadedSurveyId, setLoadedSurveyId] = useState<string | null>(null);
+  const draftFocus = useRef<{ label: string; start: number; end: number } | null>(null);
+  const [settlingDraft, setSettlingDraft] = useState(false);
+  const [validationFocus, setValidationFocus] = useState<keyof SurveySettingsFormValues | null>(null);
+  useLayoutEffect(() => {
+    if (tab !== "delivery" || !validationFocus) return;
+    form.setFocus(validationFocus);
+    setValidationFocus(null);
+  }, [tab, validationFocus, form]);
+  useLayoutEffect(() => {
+    const saved = draftFocus.current;
+    if (!loadedSurveyId || !saved) return;
+    draftFocus.current = null;
+    const input = Array.from(document.querySelectorAll<HTMLElement>('[contenteditable="true"][aria-label]'))
+      .find(element => element.getAttribute("aria-label") === saved.label);
+    if (!input) return;
+    input.focus({ preventScroll: true });
+    const position = (offset: number): [Node, number] => {
+      const walker = document.createTreeWalker(input, NodeFilter.SHOW_TEXT);
+      let node = walker.nextNode();
+      while (node) {
+        if (offset <= (node.textContent?.length ?? 0)) return [node, offset];
+        offset -= node.textContent?.length ?? 0;
+        node = walker.nextNode();
+      }
+      return [input, input.childNodes.length];
+    };
+    const range = document.createRange();
+    range.setStart(...position(saved.start)); range.setEnd(...position(saved.end));
+    const selection = window.getSelection();
+    selection?.removeAllRanges(); selection?.addRange(range);
+  }, [loadedSurveyId]);
+  useEffect(() => {
+    if (!settlingDraft) return;
+    const timer = window.setTimeout(() => setSettlingDraft(false), 250);
+    return () => window.clearTimeout(timer);
+  }, [settlingDraft]);
   const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
   const [sheetBusy, setSheetBusy] = useState(false);
   const [draftRestoredAt, setDraftRestoredAt] = useState<string | null>(null);
@@ -1036,6 +1071,7 @@ export function SurveyEditorPage() {
     (async () => {
       if (sessionLoading) return;
       if (!sessionAuthenticated) {
+        rememberAuthReturnPath();
         navigate("/login");
         return;
       }
@@ -1232,23 +1268,25 @@ export function SurveyEditorPage() {
         const headerField = focusedInput?.closest("[data-section-field]")?.getAttribute("data-section-field") as keyof SectionFormState | undefined;
         if (headerField) {
           const values = form.getValues();
-          setEditingSection({ sectionId: section.id, initialFocus: headerField, initial: {
+          setEditingSection({ sectionId: section.id, initialFocus: null, initial: {
             titleKo: values.titleKo, titleEn: values.titleEn ?? "",
             descriptionKo: values.descriptionKo ?? "", descriptionEn: values.descriptionEn ?? "",
           } });
         } else if (focusLabel && createdQuestionId) {
           setEditingQuestion({ sectionId: section.id, questionId: createdQuestionId, initial: firstQuestionRef.current });
         }
-        if (focusLabel) requestAnimationFrame(() => {
-          const input = Array.from(document.querySelectorAll<HTMLElement>('[contenteditable="true"][aria-label]'))
-            .find(element => element.getAttribute("aria-label") === focusLabel);
-          if (!input) return;
-          input.focus();
-          const range = document.createRange();
-          range.selectNodeContents(input); range.collapse(false);
+        if (focusLabel && focusedInput instanceof HTMLElement) {
           const selection = window.getSelection();
-          selection?.removeAllRanges(); selection?.addRange(range);
-        });
+          let start = focusedInput.textContent?.length ?? 0;
+          let end = start;
+          if (selection?.rangeCount && focusedInput.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+            const range = selection.getRangeAt(0);
+            const before = range.cloneRange(); before.selectNodeContents(focusedInput); before.setEnd(range.startContainer, range.startOffset);
+            start = before.toString().length; end = start + range.toString().length;
+          }
+          draftFocus.current = { label: focusLabel, start, end };
+        }
+        setSettlingDraft(true);
         createdDraftNavigationRef.current = created.id;
         form.setValue("isAlwaysOpen", detail.isAlwaysOpen);
         if (!plainText(form.getValues("titleKo"))) form.setValue("titleKo", detail.titleKo);
@@ -1264,7 +1302,7 @@ export function SurveyEditorPage() {
         setDraftBannerVisible(false);
         form.setValue("isPublished", false);
         setSaveState("saved");
-        navigate(`/admin/surveys/${created.id}/edit`, { replace: true });
+        navigate(`/admin/surveys/${created.id}/edit${window.location.search}${window.location.hash}`, { replace: true });
         return created.id;
       } catch (err: unknown) {
         setSaveState("error");
@@ -1301,10 +1339,12 @@ export function SurveyEditorPage() {
     setPublishing(Boolean(options?.publish));
     setSaveState("saving");
     setSectionOrderError(null);
+    let editsSaved = false;
     try {
       const id = loadedSurveyId ?? await ensureDraft();
       if (!(await commitEditingQuestion()) || (sectionCommitRef.current && !(await sectionCommitRef.current()))) { throw new Error("편집 중인 문항 또는 섹션을 확인해 주세요."); }
       await flushAutoSave.current();
+      editsSaved = true;
       const body = buildSurveyBody(values, { publish: options?.publish });
       const updated = await client.updateSurvey(id, body);
       suppressAutoSave.current = true;
@@ -1316,7 +1356,7 @@ export function SurveyEditorPage() {
       toast({ type: "success", message: options?.publish ? "설문이 게시되었습니다. 응답자 링크를 공유해 보세요." : "설정이 저장되었습니다." });
     } catch (err: unknown) {
       console.error(err);
-      setSaveState("error");
+      setSaveState(options?.publish && editsSaved ? "saved" : "error");
       const message = getErrorMessage(err, options?.publish ? "설문을 게시하지 못했습니다. 다시 시도해 주세요." : "설정을 저장하지 못했습니다.");
       toast({ type: "error", message });
     } finally {
@@ -1422,8 +1462,7 @@ export function SurveyEditorPage() {
   useEffect(() => { if (loadedSurveyId) void client.getSurveyDetail(loadedSurveyId).then(detail => setResponseCount(detail.responseCount ?? 0)); }, [loadedSurveyId, tab]);
   const surveyAction = async (action: "duplicate" | "delete") => {
     if (!loadedSurveyId) {
-      if (action === "duplicate") { try { const id = await ensureDraft(); const created = await client.duplicateSurvey(id); navigate(`/admin/surveys/${created.id}/edit`); } catch { toast({type:"error",message:"사본을 만들지 못했습니다."}); } }
-      else if (action === "delete") navigate("/admin/surveys");
+      if (action === "delete") navigate("/admin/surveys");
       return;
     }
     if (action === "delete" && !await requestConfirm({ tone: "danger", title: "설문 삭제", description: "설문과 응답을 삭제합니다. 이 작업은 되돌릴 수 없습니다.", confirmLabel: "삭제" })) return;
@@ -2348,7 +2387,7 @@ export function SurveyEditorPage() {
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
       <AdminPageShell>
         {ConfirmDialog}
-        <main inert={historyBusy || undefined} className="admin-page__main admin-survey-editor mx-auto flex w-full max-w-[76rem] flex-col gap-5 px-4 pb-6 pt-0 sm:px-5 md:gap-6 md:px-8 md:pb-7 xl:px-10">
+        <main inert={historyBusy || undefined} data-draft-settling={settlingDraft || undefined} className="admin-page__main admin-survey-editor mx-auto flex w-full max-w-[76rem] flex-col gap-5 px-4 pb-6 pt-0 sm:px-5 md:gap-6 md:px-8 md:pb-7 xl:px-10">
 
           <div data-survey-editor-header className="sticky top-0 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-6 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
           <AdminPageHeader
@@ -2373,7 +2412,7 @@ export function SurveyEditorPage() {
                   <IconButton aria-label="응답 링크 복사" className="border-0 text-slate-600" onClick={() => void copyRespondentLink()}><Link2 className="size-5" /></IconButton>
                   <IconButton data-tooltip="미리보기" aria-label="미리보기" className="border-0 text-slate-600" onClick={() => void previewSurvey()}><Eye className="size-5" /></IconButton>
 
-                  <DropdownMenu.Root modal={false}><DropdownMenu.Trigger asChild><IconButton aria-label="설문 더보기" className="text-slate-600"><MoreVertical className="size-5" /></IconButton></DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[100] min-w-52 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{(["duplicate", "delete"] as const).map(action => <DropdownMenu.Item key={action} className={`flex cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm outline-none ${action === "delete" ? "text-rose-600 focus:bg-rose-50" : "text-slate-800 focus:bg-slate-100"}`} onSelect={() => void surveyAction(action)}>{action === "duplicate" ? <Copy className="size-4" /> : <Trash2 className="size-4" />}{action === "duplicate" ? "사본 만들기(복제)" : "삭제"}</DropdownMenu.Item>)}</DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
+                  <DropdownMenu.Root modal={false}><DropdownMenu.Trigger asChild><IconButton aria-label="설문 더보기" className="text-slate-600"><MoreVertical className="size-5" /></IconButton></DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[100] min-w-52 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{(["duplicate", "delete"] as const).map(action => <DropdownMenu.Item key={action} disabled={action === "duplicate" && !loadedSurveyId} className={`flex cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 ${action === "delete" ? "text-rose-600 focus:bg-rose-50" : "text-slate-800 focus:bg-slate-100"}`} onSelect={() => void surveyAction(action)}>{action === "duplicate" ? <Copy className="size-4" /> : <Trash2 className="size-4" />}{action === "duplicate" ? "사본 만들기(복제)" : "삭제"}</DropdownMenu.Item>)}</DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
                 </>
                 <Button loading={publishing}
                   type="button"
@@ -2383,6 +2422,8 @@ export function SurveyEditorPage() {
                   onClick={() => void form.handleSubmit(
                     (values) => handleSaveSettings(values, { publish: true }),
                     (errors) => {
+                      const field = Object.keys(errors)[0] as keyof SurveySettingsFormValues | undefined;
+                      if (field) { setSearchParams({ tab: "delivery" }); setValidationFocus(field); }
                       const message = Object.values(errors).find(error => error?.message)?.message;
                       toast({ type: "error", message: message || "설정의 필수 항목을 확인해 주세요." });
                     },
@@ -2438,7 +2479,7 @@ export function SurveyEditorPage() {
              <div hidden={Boolean(loadError) || tab !== "content"} className="space-y-6">
                {!loadedSurveyId ? (
                 <div className="survey-editor-canvas space-y-6">
-                  <div className="survey-section-surface is-header is-selected p-6">
+                  <SurveySectionFrame index={0} count={1} header selected>
                     <SectionInlineEditor
                       initial={{ titleKo: "", titleEn: "", descriptionKo: "", descriptionEn: "" }}
                       value={{ titleKo: initialDraftTitle ?? "", titleEn: initialDraftTitleEn ?? "", descriptionKo: form.watch("descriptionKo") ?? "", descriptionEn: form.watch("descriptionEn") ?? "" }}
@@ -2450,7 +2491,7 @@ export function SurveyEditorPage() {
                       isSurveyHeader isKoreanOnly={isKoreanOnly}
                       onSave={() => undefined} onCancel={() => undefined}
                     />
-                  </div>
+                  </SurveySectionFrame>
                   <QuestionInlineEditor initial={firstQuestion} value={firstQuestion}
                     onDraftChange={setFirstQuestion} isKoreanOnly={isKoreanOnly}
                     onSave={() => undefined} onCancel={() => undefined}
@@ -2483,7 +2524,6 @@ export function SurveyEditorPage() {
                            : plainText(section.descriptionKo) ||
                              plainText(section.descriptionEn) ||
                              DEFAULT_SECTION_DESCRIPTION_KO;
-                         const sectionSurfaceClass = `survey-section-surface relative ${isSurveyHeader ? "is-header" : ""} ${editingSection?.sectionId === section.id ? "is-selected" : ""}`;
                          const sectionContentClass = isSurveyHeader
                            ? "flex min-w-0 cursor-text items-start justify-between gap-4 px-6 pb-7 pt-6 pr-24"
                            : "flex min-w-0 cursor-text items-start justify-between gap-4 px-6 py-4 pr-24";
@@ -2497,9 +2537,7 @@ export function SurveyEditorPage() {
                              key={section.id}
                              className="relative space-y-3"
                              >
-                              <div>
-                              <div className="flex w-fit rounded-t-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white">{orderedSections.length} 중 {sectionIndex + 1} 섹션</div>
-                              <div className={sectionSurfaceClass}>
+                              <SurveySectionFrame index={sectionIndex} count={orderedSections.length} header={isSurveyHeader} selected={editingSection?.sectionId === section.id}>
                                <div
                                  hidden={editingSection?.sectionId === section.id}
                                  className={sectionContentClass}
@@ -2608,8 +2646,7 @@ export function SurveyEditorPage() {
                                 onCancel={() => {}}
                               />
                             ) : null}
-                            </div>
-                             </div>
+                              </SurveySectionFrame>
                              <div className="space-y-3 pt-1">
                               {isCollapsed ? (
                                 section.questions.map((question) => (

@@ -161,8 +161,9 @@ test("API clients do not refresh after one hour of browser inactivity", async ()
       assign() {},
       href: "",
       origin: "https://stuco.test",
-      pathname: "/admin",
-      search: "",
+      pathname: "/survey/example",
+      search: "?source=events",
+      hash: "#question-2",
     },
     sessionStorage: createStorage(),
   };
@@ -185,6 +186,7 @@ test("API clients do not refresh after one hour of browser inactivity", async ()
       (error) => error.code === "idle_session_expired",
     );
     assert.equal(refreshCalls, 0);
+    assert.equal(global.window.sessionStorage.getItem("soc.auth.return-to"), "/survey/example?source=events#question-2");
   } finally {
     global.window = originalWindow;
     global.document = originalDocument;

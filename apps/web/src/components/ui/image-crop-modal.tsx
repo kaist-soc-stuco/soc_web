@@ -413,7 +413,7 @@ export function ImageCropModal({
             {dragging ? (
               <div
                 data-crop-grid
-                className="absolute inset-0 grid grid-cols-3 grid-rows-3 [filter:drop-shadow(0_0_1px_#000)]"
+                className="absolute inset-0 grid grid-cols-3 grid-rows-3 [filter:drop-shadow(0_0_0.5px_rgb(0_0_0_/_0.5))]"
               >
                 {Array.from({ length: 9 }, (_, index) => (
                   <div

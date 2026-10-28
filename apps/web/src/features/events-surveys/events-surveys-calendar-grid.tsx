@@ -255,9 +255,9 @@ export function EventsSurveysCalendarGrid({
   );
 
   return (
-    <div className="min-w-0 overflow-visible">
+    <div className="calendar-month-grid min-w-0 overflow-visible">
       <div className="min-w-0 w-full">
-        <div className="grid grid-cols-7 border-b border-slate-200 pb-1 text-center text-[length:var(--ui-text-caption-size)] font-semibold text-slate-400">
+        <div className="calendar-weekdays grid grid-cols-7 border-b border-slate-200 pb-1 text-center text-[length:var(--ui-text-caption-size)] font-semibold text-slate-400">
           {weekHeaders.map((header, index) => (
             <div
               className={`flex min-h-6 items-center justify-center ${index === 0 ? "text-rose-500" : ""} ${

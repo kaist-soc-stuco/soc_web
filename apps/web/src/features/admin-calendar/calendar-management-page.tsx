@@ -18,7 +18,7 @@ import {
   msToIso,
   nowMs,
 } from "@soc/shared";
-import { CalendarDays, Download, Upload, RefreshCw } from "lucide-react";
+import { CalendarDays, ChevronDown, Upload, RefreshCw } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import {
@@ -47,7 +47,7 @@ import { PageSearchField } from "@/components/ui/page-layout";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { downloadBlob } from "@/lib/download-blob";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { formatNumericDateRange } from "@/lib/date-display";
 import { Permissions } from "@/lib/permissions";
 
@@ -306,15 +306,6 @@ function CalendarManagementContent() {
     }
   };
 
-  const exportIcs = async () => {
-    try {
-      const blob = await apiClient.exportCalendarIcs();
-      downloadBlob(blob, "soc-calendar.ics");
-    } catch {
-      toast({ type: "error", message: "캘린더를 내보내지 못했습니다." });
-    }
-  };
-
   const syncKaistCalendar = async () => {
     setSyncing("kaist");
     try {
@@ -380,18 +371,13 @@ function CalendarManagementContent() {
                 <Upload className="size-4" aria-hidden="true" />
                 ICS 가져오기
               </Button>
-              <Button variant="outline" onClick={() => void exportIcs()}>
-                <Download className="size-4" aria-hidden="true" />
-                ICS 내보내기
-              </Button>
-              <Button variant="outline" disabled={syncing !== null} onClick={() => void syncKaistCalendar()}>
-                <RefreshCw className={`size-4 ${syncing === "kaist" ? "animate-spin" : ""}`} aria-hidden="true" />
-                학사일정 동기화
-              </Button>
-              <Button variant="outline" disabled={syncing !== null} onClick={() => void syncGoogleCalendar()}>
-                <RefreshCw className={`size-4 ${syncing === "google" ? "animate-spin" : ""}`} aria-hidden="true" />
-                구글 캘린더 동기화
-              </Button>
+              <DropdownMenu.Root modal={false}>
+                <DropdownMenu.Trigger asChild><Button variant="outline" disabled={syncing !== null}><RefreshCw className={`size-4 ${syncing ? "animate-spin" : ""}`} aria-hidden="true" />동기화<ChevronDown className="size-4" aria-hidden="true" /></Button></DropdownMenu.Trigger>
+                <DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[100] min-w-52 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                  <DropdownMenu.Item className="cursor-pointer rounded px-3 py-2 text-sm outline-none focus:bg-slate-100" onSelect={() => void syncKaistCalendar()}>학사일정 동기화</DropdownMenu.Item>
+                  <DropdownMenu.Item className="cursor-pointer rounded px-3 py-2 text-sm outline-none focus:bg-slate-100" onSelect={() => void syncGoogleCalendar()}>구글 캘린더 동기화</DropdownMenu.Item>
+                </DropdownMenu.Content></DropdownMenu.Portal>
+              </DropdownMenu.Root>
               <Button onClick={openCreate}>
 
                 일정 추가

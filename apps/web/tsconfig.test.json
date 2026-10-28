@@ -31,6 +31,7 @@
     "src/lib/date-range-filter.ts",
     "src/lib/date-picker.ts",
     "src/lib/survey-schedule.ts",
+    "src/lib/survey-editor-errors.ts",
     "src/lib/vote-display.ts",
     "src/lib/survey-results-display.ts",
     "src/lib/session-idle.ts",

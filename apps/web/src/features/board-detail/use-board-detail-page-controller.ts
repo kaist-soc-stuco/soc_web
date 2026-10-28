@@ -23,6 +23,7 @@ import {
 } from "@/lib/board-metadata";
 import { Permissions } from "@/lib/permissions";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { rememberAuthReturnPath } from "@/lib/auth-storage";
 import { getArticleImageLayout } from "@/lib/article-image-layout";
 
 const COMMENT_PAGE_SIZE = 10;
@@ -91,7 +92,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
           : "You need to sign in to use this feature.",
       action: {
         label: lang === "ko" ? "로그인" : "Login",
-        onClick: () => navigate("/login"),
+        onClick: () => { rememberAuthReturnPath(); navigate("/login"); },
       },
     });
   };
@@ -202,11 +203,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
       })
       .catch(() => {
         if (!cancelled) {
-          setCommentError(
-            lang === "ko"
-              ? "댓글을 불러오지 못했습니다."
-              : "Failed to load comments.",
-          );
+          setCommentError("comments_load_failed");
         }
       })
       .finally(() => {
@@ -216,7 +213,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     return () => {
       cancelled = true;
     };
-  }, [apiClient, articleId, category, commentPage, lang, loading]);
+  }, [apiClient, articleId, category, commentPage, loading]);
 
   const refreshComments = async (page = commentPage) => {
     if (!articleId) return;
@@ -643,7 +640,9 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     canModerate,
     canManageComments,
     category,
-    commentError,
+    commentError: commentError === "comments_load_failed"
+      ? (lang === "ko" ? "댓글을 불러오지 못했습니다." : "Failed to load comments.")
+      : commentError,
     commentActionSubmitting,
     commentPage,
     commentPageSize: COMMENT_PAGE_SIZE,

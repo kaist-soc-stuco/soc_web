@@ -4,8 +4,19 @@ const test = require("node:test");
 const {
   filterAndSortSurveys,
   getSurveyStatusInfo,
+  formatSurveyPeriod,
 } = require("../dist/test-src/lib/survey-display.js");
 const NOW = Date.parse("2026-05-30T00:00:00.000Z");
+
+test("unscheduled drafts stay in general surveys and never display as always-open", () => {
+  const draft = survey({ id: "unscheduled", isPublished: false, isAlwaysOpen: false, opensAt: null, closesAt: null });
+  const always = survey({ id: "always", isAlwaysOpen: true, opensAt: null, closesAt: null });
+  const options = { periodFilter: "all", searchQuery: "", sortBy: "updatedAt", statusFilter: "all" };
+  assert.deepEqual(filterAndSortSurveys([draft, always], { ...options, surveyGroup: "general" }, NOW).map(item => item.id), ["unscheduled"]);
+  assert.deepEqual(filterAndSortSurveys([draft, always], { ...options, surveyGroup: "operational" }, NOW).map(item => item.id), ["always"]);
+  assert.equal(formatSurveyPeriod(draft), "미지정");
+  assert.equal(formatSurveyPeriod(always), "상시");
+});
 
 function survey(overrides = {}) {
   return {
@@ -49,7 +60,7 @@ test("returns draft status for unpublished surveys", () => {
 test("returns a concise computed open status without a duplicate D-day badge", () => {
   assert.deepEqual(
     getSurveyStatusInfo(survey({ closesAt: "2026-06-02T00:00:00.000Z" }), true, NOW),
-    { label: "진행중", tone: "open" },
+    { label: "진행 중", tone: "open" },
   );
 });
 

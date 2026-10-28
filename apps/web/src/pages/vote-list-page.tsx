@@ -39,7 +39,7 @@ function VoteCard({ vote, lang, now }: { vote: VoteRecord; lang: string; now: nu
     <div className="discovery-card-footer">
       <div className="discovery-card-bottom">
         <div className="discovery-card-badges">
-          <span className={`discovery-badge is-${open ? "open" : "closed"}`}>{status}</span>
+          <span className={`discovery-badge is-${upcoming ? "neutral" : open ? "open" : "closed"}`}>{status}</span>
           <span className="vote-list-participants tabular-nums">{lang === "ko" ? "참여" : "Participation"} {vote.votedCount}/{vote.eligibleCount}{lang === "ko" ? "명" : " voters"}</span>
         </div>
         {!upcoming && <span className="discovery-survey-cta">{lang === "ko" ? open ? "투표 참여" : "결과 보기" : open ? "Vote" : "View results"}<ArrowRight aria-hidden="true" /></span>}
@@ -61,27 +61,24 @@ export function VoteListPage() {
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const [votes, setVotes] = useState<VoteRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const error = loadFailed ? (lang === "ko" ? "투표 목록을 불러오지 못했습니다." : "Failed to load votes.") : null;
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    setError(null);
+    setLoadFailed(false);
     void client
       .listPublicVotes()
       .then(result => { if (active) setVotes(result); })
       .catch(() => {
         if (!active) return;
-        setError(
-          lang === "ko"
-            ? "투표 목록을 불러오지 못했습니다."
-            : "Failed to load votes.",
-        );
+        setLoadFailed(true);
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [client, lang, reloadKey, session?.userId, session?.permission]);
+  }, [client, reloadKey, session?.userId, session?.permission]);
 
   const now = nowMs();
   const filteredVotes = votes;
