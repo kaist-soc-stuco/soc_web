@@ -8,6 +8,7 @@ const { AuthService } = require("../dist/apps/api/src/features/auth/auth.service
 const { AuthSessionService } = require("../dist/apps/api/src/features/auth/auth-session.service.js");
 const { PendingLoginRepository } = require("../dist/apps/api/src/features/auth/pending-login.repository.js");
 const { UsersRepository } = require("../dist/apps/api/src/features/users/repositories/users.repository.js");
+const { UsersService } = require("../dist/apps/api/src/features/users/users.service.js");
 
 const config = { get: key => ({
   AUTH_JWT_SECRET: "synthetic-login-test-secret",
@@ -28,15 +29,21 @@ function harness(existing = true) {
     async del(key) { values.delete(key); },
   };
   const sessions = new Map();
-  const feeRepository = new UsersRepository({
-    async transaction() { assert.fail("Unavailable fee import must not touch the DB"); },
-  }, {}, config);
+  // Login now links the stored fee roster. Loading the optional import file
+  // belongs to bootstrap, so an absent roster row must not prevent sign-in.
+  const feeService = new UsersService({
+    async linkInitialStudentFeeRecord(userId, stdNo) {
+      assert.equal(userId, "synthetic-user");
+      assert.equal(stdNo, "90990001");
+      return { record: null, changed: false };
+    },
+  }, {});
   const users = {
     async findByKaistUid() { return existing ? { userId: "synthetic-user", isActive: true, stdNo: "90990001" } : null; },
     async updateProfileFromSso() {},
     async invalidatePermissionCache() {},
     async upsertUserFromConsent() { return { userId: "synthetic-user", isActive: true }; },
-    async applyStudentFeeBootstrap(userId, stdNo) { return feeRepository.applyStudentFeeBootstrap(userId, stdNo); },
+    async applyStudentFeeBootstrap(userId, stdNo) { return feeService.applyStudentFeeBootstrap(userId, stdNo); },
   };
   const pending = new PendingLoginRepository(config, redis);
   const initialAdmin = { async ensureRoleForUser() {} };
