@@ -70,6 +70,7 @@ export function LoginCallbackPage() {
     null | "persisted" | "temporary"
   >(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const returnToPreviousPage = useCallback(
     (message: string) => {
@@ -199,6 +200,11 @@ export function LoginCallbackPage() {
       return;
     }
 
+    if (consent && !privacyAccepted) {
+      toast({ type: "error", message: lang === "ko" ? "개인정보 수집 및 이용에 동의해 주세요." : "Please agree to the collection and use of personal information." });
+      return;
+    }
+
     if (!pendingConsentToken) {
       toast({ type: "error", message: lang === "ko" ? "로그인 동의 세션이 없습니다. 다시 로그인해 주세요." : "Please sign in again." });
       return;
@@ -280,6 +286,7 @@ export function LoginCallbackPage() {
             )
           }
           title={lang === "ko" ? "서비스 이용 동의" : "Service agreements"}
+          showClose={false}
           size="standard"
           bodyClassName="space-y-3"
           footer={
@@ -287,7 +294,7 @@ export function LoginCallbackPage() {
               <Button loading={consentSubmitting === "temporary"}
                 variant="outline"
                 type="button"
-                disabled={consentSubmitting !== null || !termsAccepted}
+                disabled={consentSubmitting !== null || !termsAccepted || privacyAccepted}
                 onClick={() => void submitConsentDecision(false)}
                 className="text-sm font-medium"
               >
@@ -296,7 +303,7 @@ export function LoginCallbackPage() {
               <Button loading={consentSubmitting === "persisted"}
                 variant="default"
                 type="button"
-                disabled={consentSubmitting !== null || !termsAccepted}
+                disabled={consentSubmitting !== null || !termsAccepted || !privacyAccepted}
                 onClick={() => void submitConsentDecision(true)}
                 className="text-sm font-semibold shadow-sm"
               >
@@ -305,6 +312,24 @@ export function LoginCallbackPage() {
             </div>
           }
         >
+          <div className="border-b border-slate-200 pb-3">
+            <label className="flex cursor-pointer items-center gap-2 text-base font-semibold text-slate-900">
+              <UiInput
+                type="checkbox"
+                checked={termsAccepted && privacyAccepted}
+                ref={(input) => {
+                  if (input) input.indeterminate = termsAccepted !== privacyAccepted;
+                }}
+                onChange={(event) => {
+                  setTermsAccepted(event.target.checked);
+                  setPrivacyAccepted(event.target.checked);
+                }}
+                disabled={consentSubmitting !== null}
+                className="shrink-0"
+              />
+              <span>{lang === "ko" ? "전체 동의하기" : "Agree to all"}</span>
+            </label>
+          </div>
           <div className="space-y-2 border-b border-slate-200 pb-3">
             <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-brand-primary underline underline-offset-4">
               {lang === "ko" ? "서비스 이용약관 전문 보기" : "Read the Terms of Service"}
@@ -356,6 +381,17 @@ export function LoginCallbackPage() {
             </a>
             {lang === "ko" ? "을 확인할 수 있습니다." : "."}
           </p>
+          <label className="flex cursor-pointer items-start gap-2 text-sm leading-6 text-slate-800">
+            <UiInput
+              type="checkbox"
+              checked={privacyAccepted}
+              onChange={(event) => setPrivacyAccepted(event.target.checked)}
+              disabled={consentSubmitting !== null}
+              required
+              className="mt-1 shrink-0"
+            />
+            <span>{lang === "ko" ? "[필수] 개인정보 수집 및 이용에 동의합니다." : "[Required] I agree to the collection and use of personal information."}</span>
+          </label>
         </Modal>
       ) : null}
     </main>

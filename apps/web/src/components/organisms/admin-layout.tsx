@@ -19,6 +19,7 @@ const ADMIN_ACCESS_PERMISSIONS = [
   Permissions.MANAGE_CONTACTS,
   Permissions.MANAGE_USERS,
   Permissions.MANAGE_FINANCE,
+  Permissions.VIEW_FINANCE,
   Permissions.MODERATE_CONTENT,
   Permissions.MANAGE_BOARDS,
   Permissions.SEND_BULK_EMAIL,

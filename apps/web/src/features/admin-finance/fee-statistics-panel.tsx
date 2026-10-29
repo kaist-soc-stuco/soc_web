@@ -46,7 +46,7 @@ export function FeeStatisticsPanel({ semester, semesterOptions, loading, onSemes
     {error ? <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600"><span>{error}</span><Button type="button" variant="ghost" size="sm" onClick={onRetry}>다시 시도</Button></div> : null}
     <AdminCard className="overflow-visible">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-        <div><h2 className="text-base font-medium text-slate-900">학기별 납부 현황</h2><p className="mt-1 text-xs text-slate-500">선택 학기에 납부 혜택이 적용되는 회원 기준입니다.</p></div>
+        <div><h2 className="text-base font-medium text-slate-900">학기별 납부 현황</h2><p className="mt-1 text-xs text-slate-500">미가입자를 포함한 전체 납부 대상자의 선택 학기 기준입니다.</p></div>
         <AdminSelectDropdown ariaLabel="납부 현황 기준 학기" value={semester} onChange={onSemesterChange} options={[...semesterOptions]} className="w-44" />
       </div>
       <div className={`grid divide-y divide-slate-100 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-y-0 ${loading ? "opacity-60" : ""}`}>

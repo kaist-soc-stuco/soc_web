@@ -183,6 +183,7 @@ export function Header({ variant = "default" }: HeaderProps) {
         Permissions.MANAGE_CONTACTS,
         Permissions.MANAGE_USERS,
         Permissions.MANAGE_FINANCE,
+  Permissions.VIEW_FINANCE,
         Permissions.MODERATE_CONTENT,
         Permissions.MANAGE_BOARDS,
         Permissions.SEND_BULK_EMAIL,

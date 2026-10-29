@@ -1,0 +1,40 @@
+.admin-sheet-grid {
+  --rdg-background-color: white;
+  --rdg-header-background-color: #f8fafb;
+  --rdg-row-hover-background-color: #f8fafb;
+  --rdg-border-color: #e5e7eb;
+  --rdg-color: #334155;
+  --rdg-selection-color: #087654;
+  --rdg-font-size: .875rem;
+  height: max(22rem, calc(100dvh - var(--sheet-offset, 20rem)));
+  min-height: 22rem;
+  border: 0;
+  font-family: inherit;
+}
+.admin-sheet-grid .rdg-cell { font-weight: 400; }
+.admin-sheet-money { text-align: right; font-variant-numeric: tabular-nums; }
+.admin-sheet-link { color: #172033; text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
+
+/* Header selection keeps the grid's keyboard state without a cell outline. */
+.admin-sheet-grid [role="columnheader"][aria-selected="true"] { outline: none; }
+.admin-fee-page { display: flex; flex-direction: column; height: 100dvh; min-height: 0; overflow: hidden; }
+.admin-fee-page .admin-fee-management { flex: 1; min-height: 0; overflow-y: auto; }
+.admin-fee-page--payments .admin-fee-management { overflow: hidden; }
+.admin-fee-page--payments .admin-fee-management > * { flex-shrink: 0; }
+.admin-fee-page--payments .fee-roster-panel { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.admin-fee-page--payments .fee-roster-card { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.admin-fee-page--payments .fee-roster-card > :not(.admin-sheet-grid) { flex-shrink: 0; }
+.admin-fee-page--payments .admin-sheet-grid { flex: 1; height: auto; min-height: 0; }
+@media (max-width: 47.999rem) { .admin-fee-page { height: calc(100dvh - 4rem); } }
+
+.survey-responses-panel .admin-sheet-grid [role="gridcell"] { cursor: pointer; }
+
+.admin-survey-table-page { display: flex; flex-direction: column; height: 100dvh; min-height: 0; overflow: hidden; }
+.admin-survey-table-page .admin-survey-editor { flex: 1; min-height: 0; overflow: hidden; }
+.admin-survey-table-page .admin-survey-editor > * { flex-shrink: 0; }
+.admin-survey-table-page .survey-responses-panel { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.admin-survey-table-page .survey-responses-panel > * { flex-shrink: 0; }
+.admin-survey-table-page .survey-response-table-card { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.admin-survey-table-page .survey-response-table-card > :not(.admin-sheet-grid) { flex-shrink: 0; }
+.admin-survey-table-page .admin-sheet-grid { flex: 1; height: auto; min-height: 0; }
+@media (max-width: 47.999rem) { .admin-survey-table-page { height: calc(100dvh - 4rem); } }

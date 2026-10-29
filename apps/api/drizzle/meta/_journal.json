@@ -8,6 +8,20 @@
       "when": 1793212964217,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793259075867,
+      "tag": "0001_internal_fee_roster",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793265027960,
+      "tag": "0002_unified_fee_payments",
+      "breakpoints": true
     }
   ]
 }

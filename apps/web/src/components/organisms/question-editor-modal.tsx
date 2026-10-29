@@ -569,7 +569,7 @@ export function QuestionInlineEditor({
   const [moreMenuStyle, setMoreMenuStyle] = useState<CSSProperties>({
     visibility: "hidden",
   });
-  const savingRef = useRef(false);
+  const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const focusNewOptionRef = useRef(false);
   const lastOptionLabelRef = useRef<HTMLInputElement | null>(null);
   const focusNewGridOptionRef = useRef<"rows" | "columns" | null>(null);
@@ -891,7 +891,6 @@ export function QuestionInlineEditor({
 
   const handleSave = async (): Promise<boolean> => {
     const snapshot = JSON.stringify(form);
-    if (snapshot === savedFormRef.current) return true;
     const usedOptionValues = new Set<string>();
     const normalizedOptions = (needsOptions && form.options.length === 0 ? [{ value: "option_1", labelKo: "", labelEn: "" }] : form.options).map((option, index) => {
       let value = option.value.trim() || `option_${index + 1}`;
@@ -964,17 +963,21 @@ export function QuestionInlineEditor({
       }
     }
 
-    if (savingRef.current) return false;
-    savingRef.current = true;
-    try {
-      await onSave(normalizedForm);
-      savedFormRef.current = snapshot;
-      return true;
-    } catch {
-      return false;
-    } finally {
-      savingRef.current = false;
-    }
+    // A publish/section change can commit while the idle autosave is pending.
+    // Serialize those commits and compare after waiting, so the caller neither
+    // reports a false failure nor skips edits made during the previous request.
+    const task = saveQueueRef.current.then(async () => {
+      if (snapshot === savedFormRef.current) return true;
+      try {
+        await onSave(normalizedForm);
+        savedFormRef.current = snapshot;
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    saveQueueRef.current = task;
+    return task;
   };
 
   useDebouncedEditorSave(form, handleSave, value === undefined && !isOngoing);

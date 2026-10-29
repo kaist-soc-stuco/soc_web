@@ -1,0 +1,28 @@
+# Used with tools/security_qa/compose.yml. All credentials and records are synthetic.
+services:
+  api:
+    depends_on:
+      sso:
+        condition: service_healthy
+
+  sso:
+    image: python:3.13-alpine
+    env_file:
+      - ${SECURITY_E2E_ENV_FILE}
+    environment:
+      LOCAL_QA_ENV_FILE: /config/e2e.env
+      LOCAL_QA_BIND: 0.0.0.0
+      LOCAL_QA_PORT: 38765
+      LOCAL_QA_UPSTREAM: http://nginx:80
+      LOCAL_QA_CONTAINER_FIXTURE: "true"
+    command: ["python", "/fixture/tools/mobile_qa/sso_server.py"]
+    ports:
+      - "127.0.0.1:38765:38765"
+    volumes:
+      - ../mobile_qa/sso_server.py:/fixture/tools/mobile_qa/sso_server.py:ro
+      - ${SECURITY_E2E_ENV_FILE}:/config/e2e.env:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:38765/__local-sso/health', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

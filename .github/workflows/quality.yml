@@ -93,6 +93,40 @@ jobs:
       - name: Build production bundles
         run: pnpm build
 
+  product-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      TZ: Asia/Seoul
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install browser test runtime
+        run: |
+          python3 -m venv "$RUNNER_TEMP/product-qa"
+          "$RUNNER_TEMP/product-qa/bin/pip" install --requirement tools/security_qa/requirements.txt
+          "$RUNNER_TEMP/product-qa/bin/playwright" install --with-deps chromium
+
+      - name: Run isolated browser acceptance tests
+        run: '"$RUNNER_TEMP/product-qa/bin/python" tools/product_qa/run_e2e.py'
+
+      - name: Save acceptance report and failure evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: product-e2e
+          path: |
+            output/product-e2e/report.json
+            output/product-e2e/*.log
+            output/product-e2e/*.png
+            output/product-e2e/*.zip
+          if-no-files-found: warn
+          retention-days: 7
+
   security:
     runs-on: ubuntu-24.04
     timeout-minutes: 30

@@ -1011,8 +1011,6 @@ export function SurveyEditorPage() {
     const timer = window.setTimeout(() => setSettlingDraft(false), 250);
     return () => window.clearTimeout(timer);
   }, [settlingDraft]);
-  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
-  const [sheetBusy, setSheetBusy] = useState(false);
   const [draftRestoredAt, setDraftRestoredAt] = useState<string | null>(null);
   const [draftBannerVisible, setDraftBannerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1140,7 +1138,6 @@ export function SurveyEditorPage() {
             [...detail.sections].sort(compareSurveySectionOrder)[0]?.id ?? null,
           );
           setLoadedSurveyId(surveyId);
-          setSpreadsheetUrl(detail.spreadsheetUrl ?? null);
           setLoadedLifecycleStatus(detail.lifecycleStatus);
           if (detail.lifecycleStatus === "DRAFT") {
             setDraftRestoredAt(detail.updatedAt);
@@ -1291,7 +1288,6 @@ export function SurveyEditorPage() {
         form.setValue("isAlwaysOpen", detail.isAlwaysOpen);
         if (!plainText(form.getValues("titleKo"))) form.setValue("titleKo", detail.titleKo);
         setLoadedSurveyId(created.id);
-        setSpreadsheetUrl(detail.spreadsheetUrl ?? null);
         setLoadedLifecycleStatus(detail.lifecycleStatus);
         resetSections(detail.sections.length ? detail.sections : [{ ...section, questions: [] }]);
         setActiveEditorSectionId(
@@ -1350,7 +1346,6 @@ export function SurveyEditorPage() {
       suppressAutoSave.current = true;
       try { form.setValue("isPublished", updated.isPublished ?? Boolean(options?.publish)); }
       finally { suppressAutoSave.current = false; }
-      setSpreadsheetUrl(updated.spreadsheetUrl ?? null);
       setLoadedLifecycleStatus(updated.lifecycleStatus);
       setSaveState("saved");
       toast({ type: "success", message: options?.publish ? "설문이 게시되었습니다. 응답자 링크를 공유해 보세요." : "설정이 저장되었습니다." });
@@ -1479,30 +1474,6 @@ export function SurveyEditorPage() {
     window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn);
   }, [saveState]);
 
-  const handleSheet = async () => {
-    if (!loadedSurveyId || sheetBusy) return;
-    if (spreadsheetUrl) {
-      window.open(spreadsheetUrl, "_blank", "noopener,noreferrer");
-      return;
-    }
-
-    setSheetBusy(true);
-    try {
-      const updated = await client.connectSurveySpreadsheet(loadedSurveyId);
-      setSpreadsheetUrl(updated.spreadsheetUrl ?? null);
-      if (updated.spreadsheetUrl) {
-        window.open(updated.spreadsheetUrl, "_blank", "noopener,noreferrer");
-      }
-    } catch {
-      toast({
-        type: "error",
-        message: "Google Sheets를 연결하지 못했습니다. Google 계정 연결과 OAuth 권한을 확인해주세요.",
-      });
-    } finally {
-      setSheetBusy(false);
-    }
-  };
-
   const copyRespondentLink = async () => {
     try {
       const id = loadedSurveyId ?? await ensureDraft();
@@ -1562,7 +1533,6 @@ export function SurveyEditorPage() {
     setDraftBannerVisible(false);
     setDraftRestoredAt(null);
     setLoadedSurveyId(null);
-    setSpreadsheetUrl(null);
     setLoadedLifecycleStatus(null);
     resetSections([]);
     setActiveEditorSectionId(null);
@@ -2385,9 +2355,9 @@ export function SurveyEditorPage() {
 
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
-      <AdminPageShell>
+      <AdminPageShell className={tab === "responses" && searchParams.get("view") === "table" ? "admin-survey-table-page" : undefined}>
         {ConfirmDialog}
-        <main inert={historyBusy || undefined} data-draft-settling={settlingDraft || undefined} className="admin-page__main admin-survey-editor mx-auto flex w-full max-w-[76rem] flex-col gap-5 px-4 pb-6 pt-0 sm:px-5 md:gap-6 md:px-8 md:pb-7 xl:px-10">
+        <main inert={historyBusy || undefined} data-draft-settling={settlingDraft || undefined} className={`admin-page__main admin-survey-editor mx-auto flex w-full ${tab === "responses" ? "max-w-none" : "max-w-[76rem]"} flex-col gap-5 px-4 pb-6 pt-0 sm:px-5 md:gap-6 md:px-8 md:pb-7 xl:px-10`}>
 
           <div data-survey-editor-header className="sticky top-0 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-6 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
           <AdminPageHeader
@@ -2458,7 +2428,7 @@ export function SurveyEditorPage() {
           ) : null}
           {!loadError && saveState === "error" ? <div role="status" className="flex items-center gap-2 text-sm text-slate-600">저장되지 않은 변경 사항이 있습니다.<Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => void handleSaveSettings(form.getValues())}>다시 시도</Button></div> : null}
 
-          {!loadError && !surveyLoading && tab === "responses" && (<SurveyResponsesPanel ensureSurvey={async () => loadedSurveyId ?? await ensureDraft()} beforeToggle={async () => { await flushAutoSave.current(); }} surveyId={loadedSurveyId} onSheet={handleSheet} sheetBusy={sheetBusy} onResponsesDeleted={() => setResponseCount(0)} />)}
+          {!loadError && !surveyLoading && tab === "responses" && (<SurveyResponsesPanel ensureSurvey={async () => loadedSurveyId ?? await ensureDraft()} beforeToggle={async () => { await flushAutoSave.current(); }} surveyId={loadedSurveyId} onResponsesDeleted={() => setResponseCount(0)} />)}
 
           {!loadError && !surveyLoading && tab === "delivery" && (
             <FormProvider {...form}>

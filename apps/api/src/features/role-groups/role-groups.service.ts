@@ -31,6 +31,8 @@ const RESERVED_DELEGATION_BITS =
   Permissions.MANAGE_ROLES |
   Permissions.MANAGE_USERS |
   Permissions.MANAGE_FINANCE |
+  Permissions.VIEW_FINANCE |
+  Permissions.EXPORT_FINANCE |
   Permissions.MANAGE_CONTACTS |
   Permissions.SEND_BULK_EMAIL |
   Permissions.VIEW_AUDIT_LOG |

@@ -14,6 +14,41 @@ export type FeeMajorCategory = "PRIMARY";
 export type FeePaymentType = "SIX_SEMESTER_LUMP_SUM" | "PRIOR_PAYMENT_BALANCE";
 export type FeePaymentMethod = "BANK_TRANSFER" | "CASH" | "OTHER";
 
+export interface StudentFeeRosterRecord {
+  stdNo: string;
+  nameKo: string | null;
+  admissionYear: number | null;
+  paidSemesters: number;
+  paidAmount: number;
+  note: string | null;
+  userId: string | null;
+  joinedAt: string | null;
+  updatedAt: string | null;
+  totalPaidAmount?: number;
+  status?: FeeStatus;
+  email?: string;
+  paidAt?: string | null;
+}
+
+export interface StudentFeeRosterResponse {
+  records: StudentFeeRosterRecord[];
+  total: number;
+}
+
+export interface StudentFeeRosterUpdate {
+  stdNo: string;
+  nameKo: string | null;
+  admissionYear: number | null;
+  paidSemesters: number;
+  paidAmount: number;
+  note: string | null;
+  expectedUpdatedAt: string | null;
+}
+
+export interface SaveStudentFeeRosterRequest {
+  records: StudentFeeRosterUpdate[];
+}
+
 export interface StudentFeeStatusRecord {
   userId: string;
   status: FeeStatus;
@@ -44,7 +79,8 @@ export type BulkProcessStudentFeePaymentsRequest = z.infer<
 
 export interface StudentFeePaymentRecord {
   paymentId: string;
-  userId: string;
+  userId: string | null;
+  stdNo?: string | null;
   amount: number;
   paymentType: FeePaymentType;
   paymentMethod: FeePaymentMethod;
@@ -192,4 +228,9 @@ export interface StudentFeeImportPreview {
     error: "USER_NOT_FOUND" | "DUPLICATE_USER" | null;
   }>;
   canApply: boolean;
+}
+
+export interface StudentFeeRosterDetailResponse {
+  record: StudentFeeRosterRecord;
+  history: StudentFeePaymentRecord[];
 }

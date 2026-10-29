@@ -121,7 +121,7 @@ test("historical fee detail still resolves the requested semester from stored hi
   assert.equal((await users.getStudentFeeDetail(id)).status.status, "UNPAID");
 });
 
-test("revoking consent deletes the contact and queues the sheet refresh atomically", opts, async () => {
+test("revoking consent deletes the contact without creating an external Sheets job", opts, async () => {
   const created = await contacts.insert({ nameKo: `${prefix}-revoke`, nameEn: "Synthetic", roleKo: "검증", roleEn: "Synthetic" });
   let separateQueueCalls = 0;
   const service = new ContactsService(contacts, audit, {}, { enqueueSync: async () => { separateQueueCalls++; } });
@@ -130,12 +130,12 @@ test("revoking consent deletes the contact and queues the sheet refresh atomical
   assert.equal(saved.privacyConsented, false);
   assert.equal(await contacts.findById(created.id), null);
   const [job] = await db.select().from(schema.googleSpreadsheetSyncJobs).where(eq(schema.googleSpreadsheetSyncJobs.resourceType, "CONTACTS"));
-  assert.equal(job.status, "PENDING");
+  assert.equal(job, undefined);
   assert.equal(separateQueueCalls, 0);
   await assert.rejects(service.update(randomUUID(), { privacyConsented: false }), error => error.getStatus() === 404);
 });
 
-test("a failed sheet queue insert rolls the consent deletion back", opts, async () => {
+test("retired Sheets inserts cannot block a consent deletion", opts, async () => {
   const created = await contacts.insert({ nameKo: `${prefix}-rollback`, nameEn: "Synthetic", roleKo: "검증", roleEn: "Synthetic" });
   const failing = new ContactsRepository({ transaction: callback => db.transaction(tx => callback(new Proxy(tx, {
     get(target, key) {
@@ -144,8 +144,8 @@ test("a failed sheet queue insert rolls the consent deletion back", opts, async 
       return typeof value === "function" ? value.bind(target) : value;
     },
   }))) });
-  await assert.rejects(failing.update(created.id, { privacyConsented: false }), /injected_queue_failure/);
-  assert.equal((await contacts.findById(created.id)).privacyConsented, true);
+  await failing.update(created.id, { privacyConsented: false });
+  assert.equal(await contacts.findById(created.id), null);
 });
 
 test("contact export traverses all pages with filters and audits the full exported count", opts, async () => {

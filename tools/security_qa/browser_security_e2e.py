@@ -55,45 +55,30 @@ def wait_for_home(page: Page) -> None:
 
 
 def login(page: Page, profile: str, *, consent: bool) -> dict[str, Any]:
-    consent_label = "동의하고 저장" if consent else "저장하지 않고 계속"
-    completed = False
-    for attempt in range(3):
-        try:
-            mark(f"login:{profile}:start")
-            page.goto(f"{BASE_URL}/login", wait_until="commit")
-            mark(f"login:{profile}:fake-sso")
-            fake_sso_profile_buttons = page.locator(
-                'form[action="/__local-sso/approve"] button[name="profile"]'
-            )
-            fake_sso_profile_buttons.first.wait_for(state="visible", timeout=10000)
-            expect(
-                urlsplit(page.url).path == "/__local-sso/authorize",
-                "login did not reach the synthetic SSO",
-            )
-            page.get_by_role("button", name=PROFILE_LABELS[profile], exact=True).click(
-                no_wait_after=True
-            )
-            mark(f"login:{profile}:consent")
-            consent_button = page.get_by_role("button", name=consent_label, exact=True)
-            consent_button.wait_for(state="visible", timeout=10000)
-            consent_url = urlsplit(page.url)
-            expect(
-                consent_url.path == "/login"
-                and "consent-required" in parse_qs(consent_url.query).get("status", []),
-                "login did not reach the consent screen",
-            )
-            consent_button.click()
-            mark(f"login:{profile}:home")
-            wait_for_home(page)
-            completed = True
-            break
-        except PlaywrightTimeoutError:
-            if attempt == 2:
-                raise
-            page.goto(BASE_URL, wait_until="commit")
-            page.wait_for_timeout(500)
-
-    expect(completed, f"login did not complete for synthetic profile {profile}")
+    consent_label = "개인정보 동의 후 가입" if consent else "개인정보 동의 없이 임시 이용"
+    mark(f"login:{profile}:start")
+    page.goto(f"{BASE_URL}/login", wait_until="commit")
+    mark(f"login:{profile}:fake-sso")
+    page.locator('form[action="/__local-sso/approve"] button[name="profile"]').first.wait_for(state="visible")
+    expect(urlsplit(page.url).path == "/__local-sso/authorize", "login did not reach the synthetic SSO")
+    page.get_by_role("button", name=PROFILE_LABELS[profile], exact=True).click(no_wait_after=True)
+    mark(f"login:{profile}:consent")
+    # Returning persisted users legitimately skip the consent dialog. Do not
+    # silently retry a failed authentication and turn a regression green.
+    page.wait_for_function("location.pathname === '/' || (location.pathname === '/login' && ['consent-required', 'error'].includes(new URLSearchParams(location.search).get('status')))")
+    if urlsplit(page.url).path != "/":
+        consent_url = urlsplit(page.url)
+        expect("consent-required" in parse_qs(consent_url.query).get("status", []), "synthetic SSO returned a login error")
+        consent_button = page.get_by_role("button", name=consent_label, exact=True)
+        consent_button.wait_for(state="visible")
+        expect(not consent_button.is_enabled(), "consent was actionable without the required agreement")
+        page.get_by_role("checkbox", name="[필수] 서비스 이용약관에 동의합니다.", exact=True).check()
+        if consent:
+            expect(not consent_button.is_enabled(), "persisted sign-in was actionable without privacy consent")
+            page.get_by_role("checkbox", name="[필수] 개인정보 수집 및 이용에 동의합니다.", exact=True).check()
+        consent_button.click()
+    mark(f"login:{profile}:home")
+    wait_for_home(page)
     session = api_json(page, "/api/auth/session")
     body = session["body"] or {}
     page.locator(
@@ -123,7 +108,10 @@ def logout(page: Page) -> None:
             'button[aria-label*="세션 로그아웃"]:visible, button[aria-label*="temporary session"]:visible'
         ).first
     logout_button.wait_for(state="visible")
-    logout_button.click()
+    # Both modes navigate with location.assign after clearing client state.
+    # Waiting only for the pathname races that hard navigation when already home.
+    with page.expect_navigation(wait_until="domcontentloaded"):
+        logout_button.click()
     mark("logout:home")
     # /api/auth/session is itself an auth-rate-limited endpoint. A polling
     # loop here would make this fixture fail its own request budget and would
@@ -145,6 +133,11 @@ def api_json(page: Page, path: str, *, method: str = "GET", body: Any = None) ->
         """
 async ({path, method, body}) => {
           const headers = new Headers(body === null ? undefined : {"Content-Type": "application/json"});
+          if (!["GET", "HEAD"].includes(method.toUpperCase())) {
+            const csrf = await fetch('/api/auth/csrf', { credentials: 'same-origin' });
+            if (!csrf.ok) throw new Error(`CSRF setup failed: ${csrf.status}`);
+            headers.set('X-CSRF-Token', (await csrf.json()).csrfToken);
+          }
           try {
             const stored = JSON.parse(sessionStorage.getItem("soc.auth.state") || "null");
             const accessToken = stored?.temporarySession?.accessToken;

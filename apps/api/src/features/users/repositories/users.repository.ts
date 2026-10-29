@@ -10,7 +10,7 @@ import { ConfigService } from "@nestjs/config";
 import { DEFAULT_AUTHENTICATED_PERMISSION_BITS } from "@soc/contracts";
 import Redis from "ioredis";
 
-import { isoToDate, isoToMs, msToIso, nowDate } from "@soc/shared";
+import { isoToDate, isoToMs, msToDate, msToIso, nowDate } from "@soc/shared";
 import { and, asc, desc, eq, getTableColumns, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 
 import {
@@ -46,6 +46,8 @@ import { effectiveFeeStatusSql } from "../fee-status";
 import { readableArticleFilter } from "../../board/article-query-access";
 import type {
   StudentFeePolicy,
+  StudentFeeRosterRecord,
+  StudentFeeRosterUpdate,
   AdminUserListResponse,
   AdminUserRecord,
   BulkUpdateStudentFeeStatusRequest,
@@ -811,15 +813,96 @@ export class UsersRepository {
     }).from(paidStudentRecords).leftJoin(users, eq(users.stdNo, paidStudentRecords.stdNo)).orderBy(asc(paidStudentRecords.stdNo));
   }
 
+  async listStudentFeeRoster(referenceSemester?: string): Promise<StudentFeeRosterRecord[]> {
+    const reference = this.semesterOrdinal(referenceSemester) ? referenceSemester! : this.currentReferenceSemester();
+    const [sources, members, statuses, payments] = await Promise.all([
+      this.db.select().from(paidStudentRecords),
+      this.db.select().from(users).where(notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS])),
+      this.db.select().from(studentFeeStatus),
+      this.db.select(getTableColumns(studentFeePayments)).from(studentFeePayments).leftJoin(users, eq(users.userId, studentFeePayments.userId))
+        .where(or(isNull(studentFeePayments.userId), notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]))),
+    ]);
+    const memberByNumber = new Map(members.filter(member => member.stdNo).map(member => [member.stdNo!, member]));
+    const statusByUser = new Map(statuses.map(status => [status.userId, status]));
+    const byUser = new Map<string, typeof payments>();
+    const byNumber = new Map<string, typeof payments>();
+    for (const payment of payments) {
+      if (payment.userId) byUser.set(payment.userId, [...(byUser.get(payment.userId) ?? []), payment]);
+      if (payment.stdNo) byNumber.set(payment.stdNo, [...(byNumber.get(payment.stdNo) ?? []), payment]);
+    }
+    const result: StudentFeeRosterRecord[] = [];
+    const represented = new Set<string>();
+    const append = (source: typeof sources[number] | undefined, member: typeof members[number] | undefined) => {
+      if (member) represented.add(member.userId);
+      const entries = [...new Map([...(member ? byUser.get(member.userId) ?? [] : []), ...(source ? byNumber.get(source.stdNo) ?? [] : [])].map(payment => [payment.paymentId, payment])).values()];
+      entries.sort((a, b) => b.paidAt.valueOf() - a.paidAt.valueOf());
+      const legacy = member ? statusByUser.get(member.userId) : undefined;
+      const baseline = source?.paidAmount ?? (entries.length ? 0 : legacy?.paidAmount ?? 0);
+      const status = this.feeStatusAt(legacy ?? { status: initialFeeRosterStatus(source?.paidSemesters ?? 0), paidAt: null, paidAmount: baseline, coverageSemesters: source?.paidSemesters ?? 0 }, entries, reference);
+      result.push({ stdNo: source?.stdNo ?? member?.stdNo ?? "", nameKo: source?.nameKo ?? member?.nameKo ?? null,
+        admissionYear: source?.admissionYear ?? null, paidSemesters: source?.paidSemesters ?? 0, paidAmount: source?.paidAmount ?? 0,
+        note: source?.note ?? legacy?.note ?? null, userId: member?.userId ?? null, joinedAt: member ? msToIso(member.createdAt.valueOf()) : null,
+        updatedAt: source ? msToIso(source.updatedAt.valueOf()) : null, email: member?.email ?? "", status,
+        totalPaidAmount: baseline + entries.reduce((sum, payment) => sum + payment.amount, 0),
+        paidAt: entries[0] ? msToIso(entries[0].paidAt.valueOf()) : legacy?.paidAt ? msToIso(legacy.paidAt.valueOf()) : null });
+    };
+    for (const source of sources) append(source, memberByNumber.get(source.stdNo));
+    for (const member of members) if (!represented.has(member.userId)) append(undefined, member);
+    return result.sort((a, b) => a.stdNo.localeCompare(b.stdNo) || (a.nameKo ?? "").localeCompare(b.nameKo ?? "", "ko"));
+  }
+
+  async getStudentFeeRosterDetail(identifier: string, referenceSemester?: string) {
+    const record = (await this.listStudentFeeRoster(referenceSemester)).find(row => row.userId === identifier || row.stdNo === identifier);
+    if (!record) throw new BadRequestException("fee_person_not_found");
+    const conditions: SQL[] = [];
+    if (record.userId) conditions.push(eq(studentFeePayments.userId, record.userId));
+    if (record.stdNo) conditions.push(eq(studentFeePayments.stdNo, record.stdNo));
+    const history = conditions.length ? await this.db.select().from(studentFeePayments).where(or(...conditions)).orderBy(desc(studentFeePayments.paidAt), desc(studentFeePayments.createdAt)) : [];
+    return { record, history: history.map(payment => ({ ...this.mapFeePaymentRow(payment), stdNo: payment.stdNo })) };
+  }
+
+  async saveStudentFeeRoster(records: StudentFeeRosterUpdate[]): Promise<number> {
+    return this.db.transaction(async tx => {
+      const now = nowDate();
+      for (const record of [...records].sort((a, b) => a.stdNo.localeCompare(b.stdNo))) {
+        const [existing] = await tx.select().from(paidStudentRecords).where(eq(paidStudentRecords.stdNo, record.stdNo)).for("update");
+        if (existing ? msToIso(existing.updatedAt.valueOf()) !== record.expectedUpdatedAt : record.expectedUpdatedAt !== null) {
+          throw new ConflictException("fee_roster_changed");
+        }
+        const { stdNo, expectedUpdatedAt: _version, ...values } = record;
+        if (existing) {
+          await tx.update(paidStudentRecords).set({ ...values, updatedAt: msToDate(Math.max(now.valueOf(), existing.updatedAt.valueOf() + 1)) }).where(eq(paidStudentRecords.stdNo, stdNo));
+        } else {
+          const inserted = await tx.insert(paidStudentRecords).values({ stdNo, ...values, updatedAt: now })
+            .onConflictDoNothing({ target: paidStudentRecords.stdNo }).returning({ stdNo: paidStudentRecords.stdNo });
+          if (!inserted.length) throw new ConflictException("fee_roster_changed");
+        }
+      }
+      const matched = await tx.select({ userId: users.userId, paidSemesters: paidStudentRecords.paidSemesters, paidAmount: paidStudentRecords.paidAmount })
+        .from(users).innerJoin(paidStudentRecords, eq(users.stdNo, paidStudentRecords.stdNo))
+        .where(and(inArray(paidStudentRecords.stdNo, records.map(record => record.stdNo)), notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS])))
+        .orderBy(asc(users.userId)).for("update", { of: users });
+      await this.linkInitialFeeRecords(tx, matched);
+      return records.length;
+    });
+  }
+
   async linkInitialStudentFeeRecord(userId: string, stdNo: string | null | undefined) {
     const normalized = stdNo?.trim();
     if (!normalized || !/^\d{8}$/.test(normalized)) return { record: null, changed: false };
     const row = await this.db.transaction(async (tx) => {
+      const [source] = await tx.select().from(paidStudentRecords).where(eq(paidStudentRecords.stdNo, normalized)).for("update").limit(1);
+      if (!source) return { record: null, changed: false };
       const [user] = await tx.select({ userId: users.userId }).from(users)
         .where(and(eq(users.userId, userId), eq(users.stdNo, normalized))).for("update").limit(1);
       if (!user) return { record: null, changed: false };
-      const [source] = await tx.select().from(paidStudentRecords).where(eq(paidStudentRecords.stdNo, normalized)).limit(1);
-      if (!source) return { record: null, changed: false };
+      const attached = await tx.update(studentFeePayments).set({ userId, updatedAt: nowDate() })
+        .where(and(eq(studentFeePayments.stdNo, normalized), isNull(studentFeePayments.userId))).returning();
+      if (attached.length) {
+        const latest = attached.sort((a, b) => b.paidAt.valueOf() - a.paidAt.valueOf())[0];
+        await tx.insert(studentFeeStatus).values({ userId, status: "PAID", paidAmount: latest.amount, coverageSemesters: latest.coverageSemesters,
+          paidAt: latest.paidAt, verifiedBy: latest.recordedBy, verifiedAt: nowDate(), note: latest.note }).onConflictDoNothing({ target: studentFeeStatus.userId });
+      }
       const [linked] = await this.linkInitialFeeRecords(tx, [{ userId, paidSemesters: source.paidSemesters, paidAmount: source.paidAmount }]);
       if (linked) return { record: linked, changed: true };
       const [current] = await tx.select().from(studentFeeStatus).where(eq(studentFeeStatus.userId, userId)).limit(1);
@@ -1038,7 +1121,31 @@ export class UsersRepository {
       const updated: StudentFeeStatusRecord[] = [];
       const payments: StudentFeePaymentRecord[] = [];
 
-      for (const payment of input.payments) {
+      // Lock all roster targets first, then accounts, in a deterministic order.
+      const rosterNumbers = [...new Set(input.payments.flatMap(payment => payment.stdNo ? [payment.stdNo] : []))].sort();
+      if (rosterNumbers.length) await tx.select().from(paidStudentRecords).where(inArray(paidStudentRecords.stdNo, rosterNumbers)).orderBy(asc(paidStudentRecords.stdNo)).for("update");
+      const identifiers: SQL[] = [];
+      const accountIds = input.payments.flatMap(payment => payment.userId ? [payment.userId] : []);
+      if (accountIds.length) identifiers.push(inArray(users.userId, accountIds));
+      if (rosterNumbers.length) identifiers.push(inArray(users.stdNo, rosterNumbers));
+      if (identifiers.length) await tx.select({ userId: users.userId }).from(users).where(or(...identifiers)).orderBy(asc(users.userId)).for("update");
+      const ordered = [...input.payments].sort((a, b) => (a.userId ?? a.stdNo ?? "").localeCompare(b.userId ?? b.stdNo ?? ""));
+      for (const target of ordered) {
+        let payment = target;
+        if (target.stdNo) {
+          const [source] = await tx.select().from(paidStudentRecords).where(eq(paidStudentRecords.stdNo, target.stdNo));
+          if (!source) throw new BadRequestException("fee_person_not_found");
+          const [member] = await tx.select({ userId: users.userId }).from(users).where(eq(users.stdNo, target.stdNo));
+          if (member) payment = { ...target, userId: member.userId };
+          else {
+            const [saved] = await tx.insert(studentFeePayments).values({ stdNo: target.stdNo, amount: target.amount, paymentType: target.paymentType,
+              paymentMethod: target.paymentMethod, effectiveStartSemester: target.effectiveStartSemester, coverageSemesters: target.coverageSemesters,
+              paidAt: isoToDate(target.paidAt), note: target.note ?? null, recordedBy: actorUserId }).returning();
+            payments.push({ ...this.mapFeePaymentRow(saved), stdNo: saved.stdNo });
+            continue;
+          }
+        }
+        if (!payment.userId) throw new BadRequestException("fee_person_not_found");
         const lockedUser = await tx
           .select({ userId: users.userId })
           .from(users)
@@ -1109,7 +1216,7 @@ export class UsersRepository {
         });
       }
 
-      const response = { updated, payments, count: updated.length };
+      const response = { updated, payments, count: payments.length };
       await tx
         .update(studentFeePaymentBatches)
         .set({ result: response, updatedAt: nowDate() })
@@ -1370,6 +1477,7 @@ export class UsersRepository {
       : [];
     const paymentsByUser = new Map<string, typeof paymentRows>();
     for (const payment of paymentRows) {
+      if (!payment.userId) continue;
       const existing = paymentsByUser.get(payment.userId) ?? [];
       existing.push(payment);
       paymentsByUser.set(payment.userId, existing);
@@ -1464,205 +1572,58 @@ export class UsersRepository {
   }
 
   async getStudentFeeStats(options: StudentFeeStatsOptions = {}): Promise<StudentFeeStatsResponse> {
-    const normalizedReference = this.semesterOrdinal(options.referenceSemester)
-      ? options.referenceSemester!
-      : this.currentReferenceSemester();
-    const start = options.dateFrom ? isoToDate(`${options.dateFrom}T00:00:00.000+09:00`) : undefined;
-    const end = options.dateTo ? isoToDate(`${options.dateTo}T00:00:00.000+09:00`) : undefined;
-    if (end) end.setDate(end.getDate() + 1);
-    const conditions: SQL[] = [];
-    if (start) conditions.push(gte(studentFeePayments.paidAt, start));
-    if (end) conditions.push(lt(studentFeePayments.paidAt, end));
-    // Receipt dates and benefit semesters are independent reporting dimensions.
-
-    const targetCondition = and(
-      eq(users.isActive, true),
-      notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]),
-    );
-    const receiptTargetCondition = notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]);
-    const selectedPaymentCondition = and(receiptTargetCondition, ...conditions);
-
-    const [paymentRows, allPaymentRows, userRows, statusRows] = await Promise.all([
-      this.db
-        .select({
-          amount: studentFeePayments.amount,
-          paidAt: studentFeePayments.paidAt,
-          userId: studentFeePayments.userId,
-        })
-        .from(studentFeePayments)
-        .innerJoin(users, eq(studentFeePayments.userId, users.userId))
-        .where(selectedPaymentCondition)
-        .orderBy(asc(studentFeePayments.paidAt)),
-      this.db
-        .select({
-          amount: studentFeePayments.amount,
-          coverageSemesters: studentFeePayments.coverageSemesters,
-          effectiveStartSemester: studentFeePayments.effectiveStartSemester,
-          paidAt: studentFeePayments.paidAt,
-          userId: studentFeePayments.userId,
-        })
-        .from(studentFeePayments)
-        .innerJoin(users, eq(studentFeePayments.userId, users.userId))
-        .where(targetCondition)
-        .orderBy(asc(studentFeePayments.paidAt)),
-      this.db.select({
-        userId: users.userId,
-        primaryMajor: users.primaryMajor,
-      }).from(users).where(targetCondition),
-      this.db
-        .select({
-          userId: studentFeeStatus.userId,
-          status: studentFeeStatus.status,
-          paidAmount: studentFeeStatus.paidAmount,
-          paidAt: studentFeeStatus.paidAt,
-          coverageSemesters: studentFeeStatus.coverageSemesters,
-        })
-        .from(studentFeeStatus)
-        .innerJoin(users, eq(studentFeeStatus.userId, users.userId))
-        .where(targetCondition),
+    const reference = this.semesterOrdinal(options.referenceSemester) ? options.referenceSemester! : this.currentReferenceSemester();
+    const [people, policy, receipts, members] = await Promise.all([
+      this.listStudentFeeRoster(reference), this.getStudentFeePolicy(reference),
+      this.db.select(getTableColumns(studentFeePayments)).from(studentFeePayments).leftJoin(users, eq(users.userId, studentFeePayments.userId))
+        .where(or(isNull(studentFeePayments.userId), notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]))).orderBy(asc(studentFeePayments.paidAt)),
+      this.db.select({ userId: users.userId, primaryMajor: users.primaryMajor }).from(users).where(notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS])),
     ]);
-
-    const bucket = options.bucket ?? "day";
-    const koreanDateFormatter = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Seoul",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-    const koreanDate = (date: Date) => {
-      const parts = Object.fromEntries(koreanDateFormatter.formatToParts(date).map((part) => [part.type, part.value]));
-      return `${parts.year}-${parts.month}-${parts.day}`;
-    };
-    const isoWeek = (day: string) => {
-      const date = isoToDate(`${day}T00:00:00.000Z`);
-      const weekday = date.getUTCDay() || 7;
-      date.setUTCDate(date.getUTCDate() + 4 - weekday);
-      const yearStart = isoToDate(`${date.getUTCFullYear()}-01-01T00:00:00.000Z`);
-      const week = Math.ceil((((date.getTime() - yearStart.getTime()) / 86_400_000) + 1) / 7);
-      return `${date.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
-    };
-    const periodKey = (date: Date) => {
-      const day = koreanDate(date);
-      if (bucket === "month") return day.slice(0, 7);
-      if (bucket === "week") return isoWeek(day);
+    const start = options.dateFrom ? isoToDate(`${options.dateFrom}T00:00:00.000+09:00`).valueOf() : -Infinity;
+    const endDate = options.dateTo ? isoToDate(`${options.dateTo}T00:00:00.000+09:00`) : null;
+    if (endDate) endDate.setDate(endDate.getDate() + 1);
+    const selected = receipts.filter(payment => payment.paidAt.valueOf() >= start && payment.paidAt.valueOf() < (endDate?.valueOf() ?? Infinity));
+    const dayOf = (date: Date) => { const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date).map(part => [part.type, part.value])); return `${parts.year}-${parts.month}-${parts.day}`; };
+    const periodOf = (date: Date) => {
+      const day = dayOf(date);
+      if (options.bucket === "month") return day.slice(0, 7);
+      if (options.bucket === "week") {
+        const value = isoToDate(`${day}T00:00:00Z`);
+        value.setUTCDate(value.getUTCDate() + 4 - (value.getUTCDay() || 7));
+        const year = value.getUTCFullYear();
+        const week = Math.ceil(((value.valueOf() - isoToDate(`${year}-01-01T00:00:00Z`).valueOf()) / 86400000 + 1) / 7);
+        return `${year}-W${String(week).padStart(2, "0")}`;
+      }
       return day;
     };
-
-    const halfGroups = new Map<string, { paidAmount: number; paymentCount: number; users: Set<string> }>();
-    for (const payment of allPaymentRows) {
-      const day = koreanDate(payment.paidAt);
-      const period = `${day.slice(0, 4)}-${Number(day.slice(5, 7)) <= 6 ? "H1" : "H2"}`;
-      const group = halfGroups.get(period) ?? { paidAmount: 0, paymentCount: 0, users: new Set<string>() };
-      group.paidAmount += Number(payment.amount); group.paymentCount += 1; group.users.add(payment.userId);
-      halfGroups.set(period, group);
-    }
-    const paymentHalfBreakdown = [...halfGroups].sort(([a], [b]) => a.localeCompare(b)).map(([period, group]) => ({ period, paidAmount: group.paidAmount, paymentCount: group.paymentCount, paidStudents: group.users.size }));
-
-    const grouped = new Map<string, { paidAmount: number; paymentCount: number; userIds: Set<string> }>();
-    paymentRows.forEach((payment) => {
-      const period = periodKey(payment.paidAt);
-      const current = grouped.get(period) ?? { paidAmount: 0, paymentCount: 0, userIds: new Set<string>() };
-      current.paidAmount += Number(payment.amount);
-      current.paymentCount += 1;
-      current.userIds.add(payment.userId);
-      grouped.set(period, current);
-    });
-
-    const cumulativeUsers = new Set<string>();
-    let cumulativeAmount = 0;
-    const trend = Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([period, value]) => {
-      cumulativeAmount += value.paidAmount;
-      value.userIds.forEach((userId) => cumulativeUsers.add(userId));
-      return {
-        period,
-        paidAmount: value.paidAmount,
-        paidStudents: value.userIds.size,
-        paymentCount: value.paymentCount,
-        cumulativeAmount,
-        cumulativeStudents: cumulativeUsers.size,
-      };
-    });
-
-    const paidAmount = paymentRows.reduce((sum, payment) => sum + Number(payment.amount), 0);
-    const feePolicy = await this.getStudentFeePolicy(normalizedReference);
-    const totalStudents = userRows.length;
-    const paymentsByUserId = new Map<string, typeof allPaymentRows>();
-    for (const payment of allPaymentRows) {
-      const current = paymentsByUserId.get(payment.userId) ?? [];
-      current.push(payment);
-      paymentsByUserId.set(payment.userId, current);
-    }
-    const statusByUserId = new Map(statusRows.map((row) => [row.userId, row]));
-    const ledgerAmount = allPaymentRows.reduce((sum, payment) => sum + Number(payment.amount), 0);
-    const legacyOnlyAmount = statusRows.reduce(
-      (sum, row) => paymentsByUserId.has(row.userId) ? sum : sum + Number(row.paidAmount ?? 0),
-      0,
-    );
-    const collectedAmount = ledgerAmount + legacyOnlyAmount;
-    const paidUserIds = new Set<string>();
-    const partialUserIds = new Set<string>();
-    for (const user of userRows) {
-      const payments = paymentsByUserId.get(user.userId) ?? [];
-      const legacy = statusByUserId.get(user.userId);
-      const covered = payments.some((payment) => this.isSemesterCovered(
-        payment.effectiveStartSemester,
-        payment.coverageSemesters,
-        normalizedReference,
-      ));
-      const legacyStartSemester = this.semesterFromDate(legacy?.paidAt);
-      const legacyActive = legacy?.paidAt === null || this.isSemesterCovered(
-        legacyStartSemester,
-        legacy?.coverageSemesters ?? 6,
-        normalizedReference,
-      );
-      const hasLegacyPaid = legacy?.status === "PAID" && legacyActive;
-      const hasLegacyPartial = legacy?.status === "PARTIAL" && legacyActive && (legacy.paidAmount ?? 0) > 0;
-      if (covered || hasLegacyPaid) paidUserIds.add(user.userId);
-      else if (hasLegacyPartial) partialUserIds.add(user.userId);
-    }
-    const paidStudents = paidUserIds.size;
-    const partialStudents = partialUserIds.size;
-    const targetAmount = totalStudents * feePolicy.amount;
-    const outstandingAmount = Math.max(0, targetAmount - collectedAmount);
-    const categoryDefinitions = [
-      { category: "PRIMARY" as const, label: "주전공", field: "primaryMajor" as const },
-    ];
-
-    return {
-      totals: {
-        totalStudents,
-        paidStudents,
-        paidStudentCount: paidStudents,
-        paymentCount: paymentRows.length,
-        partialStudents,
-        unpaidStudents: Math.max(0, totalStudents - paidStudents - partialStudents),
-        paymentRate: totalStudents > 0 ? Math.round((paidStudents / totalStudents) * 1_000) / 10 : 0,
-        paidAmount,
-        collectedAmount,
-        targetAmount,
-        outstandingAmount,
-      },
-      trend,
-      paymentHalfBreakdown,
-      majorBreakdown: categoryDefinitions.map(({ category, label, field }) => {
-        const eligibleIds = new Set(userRows.filter((user) => Boolean(user[field])).map((user) => user.userId));
-        const categoryPayments = paymentRows.filter((payment) => eligibleIds.has(payment.userId));
-        const categoryPaidIds = new Set([...paidUserIds].filter((userId) => eligibleIds.has(userId)));
-        const categoryPartialIds = new Set([...partialUserIds].filter((userId) => eligibleIds.has(userId)));
-        const total = eligibleIds.size;
-        const paid = categoryPaidIds.size;
-        return {
-          category,
-          label,
-          totalStudents: total,
-          paidStudents: paid,
-          partialStudents: categoryPartialIds.size,
-          unpaidStudents: Math.max(0, total - paid - categoryPartialIds.size),
-          paymentRate: total > 0 ? Math.round((paid / total) * 1_000) / 10 : 0,
-          paidAmount: categoryPayments.reduce((sum, payment) => sum + Number(payment.amount), 0),
-        };
-      }),
+    const groups = new Map<string, { amount: number; count: number; people: Set<string> }>();
+    const halves = new Map<string, { amount: number; count: number; people: Set<string> }>();
+    const add = (map: typeof groups, key: string, payment: typeof receipts[number]) => {
+      const group = map.get(key) ?? { amount: 0, count: 0, people: new Set<string>() };
+      group.amount += payment.amount; group.count++; group.people.add(payment.userId ?? payment.stdNo!); map.set(key, group);
     };
+    selected.forEach(payment => add(groups, periodOf(payment.paidAt), payment));
+    receipts.forEach(payment => { const day = dayOf(payment.paidAt); add(halves, `${day.slice(0, 4)}-${Number(day.slice(5, 7)) <= 6 ? "H1" : "H2"}`, payment); });
+    let cumulativeAmount = 0; const cumulativePeople = new Set<string>();
+    const trend = [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([period, group]) => {
+      cumulativeAmount += group.amount; group.people.forEach(person => cumulativePeople.add(person));
+      return { period, paidAmount: group.amount, paidStudents: group.people.size, paymentCount: group.count, cumulativeAmount, cumulativeStudents: cumulativePeople.size };
+    });
+    const paid = people.filter(person => person.status === "PAID").length;
+    const partial = people.filter(person => person.status === "PARTIAL").length;
+    const collected = people.reduce((sum, person) => sum + (person.totalPaidAmount ?? 0), 0);
+    const primaryIds = new Set(members.filter(member => member.primaryMajor).map(member => member.userId));
+    const primary = people.filter(person => person.userId && primaryIds.has(person.userId));
+    const primaryPaid = primary.filter(person => person.status === "PAID").length;
+    const primaryPartial = primary.filter(person => person.status === "PARTIAL").length;
+    return { totals: { totalStudents: people.length, paidStudents: paid, paidStudentCount: paid, paymentCount: selected.length,
+      partialStudents: partial, unpaidStudents: people.length - paid - partial, paymentRate: people.length ? Math.round(paid / people.length * 1000) / 10 : 0,
+      paidAmount: selected.reduce((sum, payment) => sum + payment.amount, 0), collectedAmount: collected,
+      targetAmount: people.length * policy.amount, outstandingAmount: Math.max(0, people.length * policy.amount - collected) }, trend,
+      paymentHalfBreakdown: [...halves].sort(([a], [b]) => a.localeCompare(b)).map(([period, group]) => ({ period, paidAmount: group.amount, paymentCount: group.count, paidStudents: group.people.size })),
+      majorBreakdown: [{ category: "PRIMARY" as const, label: "주전공", totalStudents: primary.length, paidStudents: primaryPaid, partialStudents: primaryPartial,
+        unpaidStudents: primary.length - primaryPaid - primaryPartial, paymentRate: primary.length ? Math.round(primaryPaid / primary.length * 1000) / 10 : 0,
+        paidAmount: selected.filter(payment => payment.userId && primaryIds.has(payment.userId)).reduce((sum, payment) => sum + payment.amount, 0) }] };
   }
 
   async getMyArticles(

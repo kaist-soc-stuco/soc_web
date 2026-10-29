@@ -11,6 +11,7 @@ import type {
 } from "./repositories/users.repository";
 import type {
   StudentFeePolicy,
+  StudentFeeRosterUpdate,
   AdminUserListResponse,
   AdminUserRecord,
   BulkUpdateStudentFeeStatusRequest,
@@ -320,6 +321,32 @@ export class UsersService {
       audit,
     );
     return status;
+  }
+
+  async listStudentFeeRoster(audit?: AuditMetadata, semester?: string) {
+    const records = await this.usersRepository.listStudentFeeRoster(semester);
+    if (audit) await this.auditLogService.record({ action: "student_fee.roster.list", actorUserId: audit.actorUserId, ipAddress: audit.ipAddress, targetType: "paid_student_records", payload: { count: records.length } });
+    return { records, total: records.length };
+  }
+
+  async getStudentFeeRosterDetail(identifier: string, semester: string | undefined, audit: AuditMetadata) {
+    const result = await this.usersRepository.getStudentFeeRosterDetail(identifier, semester);
+    await this.auditLogService.record({ action: "student_fee_status.detail", actorUserId: audit.actorUserId, ipAddress: audit.ipAddress, targetType: "paid_student_records", targetId: identifier });
+    return result;
+  }
+
+  async saveStudentFeeRoster(records: StudentFeeRosterUpdate[], audit?: AuditMetadata) {
+    const count = await this.usersRepository.saveStudentFeeRoster(records);
+    await this.auditLogService.record({ action: "student_fee.roster.update", actorUserId: audit?.actorUserId, ipAddress: audit?.ipAddress,
+      targetType: "paid_student_records", payload: { count, studentNumbers: records.map(record => record.stdNo) } });
+    return { count };
+  }
+
+  async exportStudentFeeRoster(audit?: AuditMetadata, reason?: string, semester?: string) {
+    const result = await this.listStudentFeeRoster(undefined, semester);
+    await this.auditLogService.record({ action: "student_fee.roster.export", actorUserId: audit?.actorUserId, ipAddress: audit?.ipAddress,
+      targetType: "paid_student_records", payload: { count: result.total, reason } });
+    return result;
   }
 
   async listInitialStudentFeeRoster() {

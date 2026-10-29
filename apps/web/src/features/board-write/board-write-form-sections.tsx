@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from "react";
 import { useState } from "react";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import type { SurveyRecord } from "@soc/contracts";
 import {
   ChevronDown,
@@ -575,8 +576,16 @@ export function BoardWriteSettings({
   onHomeVisibleChange,
   stacked = false,
 }: BoardWriteSettingsProps) {
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
   return (
-    <details className="board-write-settings group border-t border-slate-200">
+    <details
+      className="board-write-settings group border-t border-slate-200"
+      open={isDesktop || mobileSettingsOpen}
+      onToggle={(event) => {
+        if (!isDesktop) setMobileSettingsOpen(event.currentTarget.open);
+      }}
+    >
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-slate-800 [&::-webkit-details-marker]:hidden md:hidden">
         <span>{lang === "ko" ? "게시 설정" : "Post settings"}</span>
         <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />

@@ -75,7 +75,7 @@ function ResponseTrend({ responses }: { responses: SurveyResponseWithAnswers[] }
   const maximum = Math.max(1, ...trend.map((item) => item.count));
 
   return (
-    <AdminCard className="p-5">
+    <AdminCard className="p-4">
       <div className="mb-5 flex items-center justify-between gap-3">
         <h2 className="text-[length:var(--ui-text-section-size)] font-medium text-[#172033]">최근 14일 응답 추이</h2>
         <span className="text-xs font-normal text-[#344054]">제출 완료 기준</span>
@@ -94,7 +94,7 @@ function ResponseTrend({ responses }: { responses: SurveyResponseWithAnswers[] }
 }
 
 export function SurveyResponseSummary({ analytics, responses }: { analytics: SurveyAnalyticsResponse; responses: SurveyResponseWithAnswers[] }) {
-  return <div className="space-y-4"><KpiStrip analytics={analytics} responses={responses} /><ResponseTrend responses={responses} /></div>;
+  return <div className="space-y-3"><KpiStrip analytics={analytics} responses={responses} /><ResponseTrend responses={responses} /></div>;
 }
 
 function ChoiceBreakdown({ question }: { question: SurveyQuestionAnalyticsItem }) {
@@ -145,12 +145,12 @@ export function SurveyQuestionSummary({ analytics, questions, responses }: { ana
   if (answerableQuestions.length === 0) return <AdminCard><AdminEmptyState message="등록된 문항이 없습니다." /></AdminCard>;
   const analyticsByQuestion = new Map(analytics.questions.map((question) => [question.questionId, question]));
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {answerableQuestions.map((question, index) => {
         const result = analyticsByQuestion.get(question.id);
         return (
-          <AdminCard key={question.id} className="p-5">
-            <div className="mb-4 flex items-start justify-between gap-4 border-b border-[#edf1f4] pb-4">
+          <AdminCard key={question.id} className="p-4">
+            <div className="mb-3 flex items-start justify-between gap-3 border-b border-[#edf1f4] pb-3">
               <div className="min-w-0"><p className="text-xs font-normal text-[#344054]">문항 {index + 1}</p><h2 className="mt-1 text-[length:var(--ui-text-section-size)] font-semibold leading-6 text-[#172033]">{stripRichText(question.titleKo)}</h2></div>
               <span className="shrink-0 text-xs font-normal tabular-nums text-[#344054]">응답 {result?.totalAnswers ?? 0}건</span>
             </div>

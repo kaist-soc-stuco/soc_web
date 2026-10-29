@@ -1,3 +1,6 @@
+import { DataGrid, type Column } from "react-data-grid";
+import "react-data-grid/lib/styles.css";
+import "@/components/ui/admin-sheet.css";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Check, Download, MoreVertical, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -24,7 +27,7 @@ import { SurveyQuestionSummary } from "./survey-analytics-dashboard";
 const positiveInteger = (value: string | null) => Math.max(1, Math.min(1_000_000, Number.parseInt(value ?? "1", 10) || 1));
 
 /** Shares the editor's URL and leaves its draft state mounted while reading responses. */
-export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle, ensureSurvey, onSheet, onResponsesDeleted, sheetBusy = false }: { beforeToggle?: () => Promise<void>; ensureSurvey?: () => Promise<string>; onResponsesDeleted?: () => void; surveyId: string | null; onSheet?: () => Promise<void>; sheetBusy?: boolean }) {
+export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle, ensureSurvey, onResponsesDeleted }: { beforeToggle?: () => Promise<void>; ensureSurvey?: () => Promise<string>; onResponsesDeleted?: () => void; surveyId: string | null; }) {
   const { promptDownloadReason, DownloadReasonDialog } = useDownloadReasonDialog();
   const surveyId = requestedSurveyId ?? "";
   const { toast } = useToast();
@@ -58,7 +61,7 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
     finally { setMutating(false); }
   };
   const [params, setParams] = useSearchParams();
-  const view = params.get("view") === "questions" ? "questions" : params.get("view") === "individual" ? "individual" : "summary";
+  const view = params.get("view") === "table" ? "table" : params.get("view") === "questions" ? "questions" : params.get("view") === "individual" ? "individual" : "summary";
   const [renderedView, setRenderedView] = useState(view);
   const responseId = params.get("response");
   const page = positiveInteger(params.get(view === "individual" ? "entry" : "answerPage"));
@@ -117,7 +120,7 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
   const setPage = (value: number) => update({ [contentView === "individual" ? "entry" : "answerPage"]: String(Math.max(1, Math.min(renderedPages, value))), response: null });
   const pager = <div className="flex flex-wrap items-center justify-center gap-3">
     <Button variant="ghost" size="icon" aria-label={contentView === "individual" ? "이전 응답" : "이전 페이지"} disabled={renderedPage <= 1} onClick={() => setPage(renderedPage - 1)}><ChevronLeft className="size-4" /></Button>
-    <label className="flex items-center gap-2 text-sm"><span className="sr-only">{contentView === "individual" ? "응답 번호" : "답변 페이지"}</span><UiInput aria-label={contentView === "individual" ? "응답 번호" : "답변 페이지"} type="number" min={1} max={renderedPages} value={renderedPage} onChange={(event) => setPage(positiveInteger(event.currentTarget.value))} className={`${contentView === "individual" ? "w-14" : "w-20"} text-center`} /> / {contentView === "individual" ? total : renderedPages}</label>
+    <label className="flex items-center gap-2 text-sm"><span className="sr-only">{contentView === "individual" ? "응답 번호" : "답변 페이지"}</span><UiInput aria-label={contentView === "individual" ? "응답 번호" : "답변 페이지"} type="number" min={1} max={renderedPages} value={renderedPage} onChange={(event) => setPage(positiveInteger(event.currentTarget.value))} className="!size-9 !px-0 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" /> / {contentView === "individual" ? total : renderedPages}</label>
     <Button variant="ghost" size="icon" aria-label={contentView === "individual" ? "다음 응답" : "다음 페이지"} disabled={renderedPage >= renderedPages} onClick={() => setPage(renderedPage + 1)}><ChevronRight className="size-4" /></Button>
   </div>;
 
@@ -150,12 +153,16 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
     } catch {toast({type:"error",message:"응답을 내려받지 못했습니다."});}
     finally {setExporting(false);}
   };
-  return <section aria-label="설문 응답" className="survey-responses-panel min-w-0 space-y-5">
+  return <section aria-label="설문 응답" className="survey-responses-panel min-w-0 space-y-3">
       {DownloadReasonDialog}
-    <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-      <div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-xl font-medium tracking-tight">응답 {statistics.data?.totalResponses ?? 0}개</h2>
-<div className="flex items-center gap-2">
- {onSheet && surveyId ? <Button variant="ghost" className="!font-medium text-brand-primary" onClick={()=>void onSheet()} disabled={sheetBusy}>Google Sheets에 연결</Button> : null}
+    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 sm:px-5">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-medium tracking-tight">응답 {statistics.data?.totalResponses ?? 0}개</h2>
+<div className="flex items-center gap-3">
+        <label className={`inline-flex items-center gap-3 text-sm font-medium ${canToggleReception ? "cursor-pointer" : "opacity-60"}`}>
+          <UiInput type="checkbox" role="switch" aria-label="응답 받기" className="peer sr-only" checked={acceptingResponses} disabled={!canToggleReception} onChange={event => void toggleReception(event.target.checked)} />
+          응답 받기
+          <span aria-hidden="true" className="relative h-5 w-9 rounded-full bg-slate-200 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-brand-primary/25 after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-brand-primary peer-checked:after:translate-x-4" />
+        </label>
  <DropdownMenu.Root modal={false}><DropdownMenu.Trigger asChild><Button variant="ghost" size="icon" aria-label="응답 더보기"><MoreVertical className="size-4" /></Button></DropdownMenu.Trigger>
  <DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[100] w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
  <DropdownMenu.Item disabled={(!surveyId && !ensureSurvey) || exporting} onSelect={()=>void exportCsv()} className="flex cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm outline-none focus:bg-slate-100"><Download className="size-4" />CSV 내보내기</DropdownMenu.Item>
@@ -165,14 +172,6 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
  </DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
 </div>
 </div>
-      <div className="flex flex-wrap items-center justify-end gap-3">
-
-        <label className={`inline-flex items-center gap-3 text-sm font-medium ${canToggleReception ? "cursor-pointer" : "opacity-60"}`}>
-          <UiInput type="checkbox" role="switch" aria-label="응답 받기" className="peer sr-only" checked={acceptingResponses} disabled={!canToggleReception} onChange={event => void toggleReception(event.target.checked)} />
-          응답 받기
-          <span aria-hidden="true" className="relative h-5 w-9 rounded-full bg-slate-200 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-brand-primary/25 after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-brand-primary peer-checked:after:translate-x-4" />
-        </label>
-      </div>
       <SegmentedControl
         variant="underline"
         ariaLabel="응답 보기 방식"
@@ -181,23 +180,23 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
         onChange={(value) => update({ view: value })}
         options={[
           { value: "summary", label: "요약" },
+          { value: "table", label: "응답표" },
           { value: "questions", label: "질문" },
           { value: "individual", label: "개별 보기" },
         ]}
-        className="mt-4"
+        className="mt-2"
       />
     </div>
     <Modal open={deleteOpen} onClose={()=>{if(!mutating)setDeleteOpen(false);}} title="모든 응답 삭제" size="compact" footer={<><Button variant="outline" disabled={mutating} onClick={()=>setDeleteOpen(false)}>취소</Button><Button variant="destructive" disabled={mutating} onClick={()=>void removeResponses()}>모든 응답 삭제</Button></>}>
       <p>응답 {total}개를 모두 삭제하시겠습니까? 삭제한 응답은 복구할 수 없습니다.</p>
-      {definition.data?.spreadsheetUrl && <p className="mt-3 text-sm text-slate-500">연결된 Sheets의 응답도 동기화됩니다.</p>}
     </Modal>
     {error ? <ErrorState
       className="rounded-xl border border-slate-200 bg-white shadow-[0_8px_28px_rgba(15,23,42,0.04)]"
       description="일시적인 네트워크 오류일 수 있습니다. 잠시 후 다시 시도해 주세요."
       onRetry={retryResponses}
       title="응답을 불러오지 못했습니다."
-    /> : pending && !hasResponseData ? null : total === 0 ? <EmptyState message="아직 제출된 응답이 없습니다." className="border-solid bg-white" /> : <>
-      {contentView !== "individual" && statistics.data ? <>
+    /> : pending && !hasResponseData ? null : (total === 0 && contentView !== "table") ? <EmptyState message="아직 제출된 응답이 없습니다." className="border-solid bg-white" /> : <>
+      {(contentView === "summary" || contentView === "questions") && statistics.data ? <>
         {contentView === "questions" && question ? <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
           <SelectDropdown
             ariaLabel="질문 선택"
@@ -211,22 +210,34 @@ export function SurveyResponsesPanel({ surveyId: requestedSurveyId, beforeToggle
         {contentView === "summary" ? <SurveyQuestionSummary analytics={statistics.data} questions={questions} responses={records.data?.items ?? []} /> : question ? <div className="space-y-3"><h3 className="px-1 font-semibold">{stripRichText(question.titleKo)}</h3>{Array.from((records.data?.items ?? []).reduce((groups, entry) => {
  const text = formatSurveyAnswer(entry.answers.find(a=>a.questionId===question.id),question) || "응답 없음";
  const list=groups.get(text) ?? [];list.push(entry.id);groups.set(text,list);return groups;
-},new Map<string,string[]>())).map(([text,ids])=><article key={text} className="rounded-xl border border-slate-200 bg-white p-5"><p className="whitespace-pre-wrap break-words">{text}</p><div className="mt-4 border-t border-slate-100 pt-3"><span className="text-sm text-slate-500">응답 {ids.length}개</span><div className="mt-2 flex flex-wrap gap-2">{ids.map((id,index)=><Button key={id} variant="ghost" size="sm" onClick={()=>update({view:"individual",response:id})}>개별 응답 {index+1}</Button>)}</div></div></article>)}</div> : null}
+},new Map<string,string[]>())).map(([text,ids])=><article key={text} className="rounded-xl border border-slate-200 bg-white p-4"><p className="whitespace-pre-wrap break-words">{text}</p><div className="mt-4 border-t border-slate-100 pt-3"><span className="text-sm text-slate-500">응답 {ids.length}개</span><div className="mt-2 flex flex-wrap gap-2">{ids.map((id,index)=><Button key={id} variant="ghost" size="sm" onClick={()=>update({view:"individual",response:id})}>개별 응답 {index+1}</Button>)}</div></div></article>)}</div> : null}
         {total > renderedPageSize ? <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4"><p className="text-center text-sm text-slate-500">{contentView === "questions" ? `현재 페이지의 응답 ${renderedPageSize}개를 기준으로 답변을 묶어 표시합니다.` : `집계는 전체 응답 기준입니다. 서술형·첨부 답변은 ${renderedPageSize}개씩 표시합니다.`}</p>{pager}</div> : null}
       </> : null}
+      {contentView === "table" ? <div className="survey-response-table-card overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <DataGrid aria-label="설문 응답표" className="admin-sheet-grid rdg-light" rowKeyGetter={row=>row.id} rows={records.data?.items ?? []} defaultColumnOptions={{resizable:true}}
+          onCellClick={({row, rowIdx})=>update({view:"individual",response:row.id,entry:String(((records.data?.page ?? 1)-1)*50+rowIdx+1)})}
+          onCellKeyDown={({row, rowIdx},event)=>{if(row && event.key === "Enter"){event.preventDefault();update({view:"individual",response:row.id,entry:String(((records.data?.page ?? 1)-1)*50+rowIdx+1)});}}}
+          columns={[
+            { key:"submittedAt",name:"응답 일시",width:180,frozen:true,renderCell:({row})=>row.submittedAt ? formatKoreanDateTime(row.submittedAt) : "미제출" },
+            { key:"respondent",name:"응답자",width:140,frozen:true,renderCell:({row})=>row.user?.nameKo ?? "익명 응답" },
+            ...questions.map(question=>({key:question.id,name:stripRichText(question.titleKo),minWidth:220,
+              renderCell:({row})=>{const answer=formatSurveyAnswer(row.answers.find(item=>item.questionId === question.id),question);return <span title={answer}>{answer}</span>;}} as Column<NonNullable<typeof records.data>["items"][number]>)),
+          ]} />
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 p-3"><p className="text-xs text-slate-500">전체 {total.toLocaleString()}건 · 응답 내용은 읽기 전용입니다.</p>{pager}</div>
+      </div> : null}
       {contentView === "individual" ? <>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">{responseId ? <Button variant="outline" onClick={() => update({ response: null, entry: "1" })}>전체 응답 순서로 보기</Button> : pager}</div>
+        <div className="rounded-xl border border-slate-200 bg-white p-3">{responseId ? <Button variant="outline" onClick={() => update({ response: null, entry: "1" })}>전체 응답 순서로 보기</Button> : pager}</div>
         {selected.isError && responseId ? <ErrorState
           className="rounded-xl border border-slate-200 bg-white"
           description="다른 응답을 선택해 다시 확인해 주세요."
           title="선택한 응답을 찾을 수 없습니다."
         /> : !response ? responseId && selected.isPending ? <div aria-busy="true" className="min-h-24" /> : <EmptyState message="이 번호에 응답이 없습니다." className="border-solid bg-white" /> : <>
-          <div className="rounded-xl border border-slate-200 bg-white p-5"><h3 className="font-semibold">{response.user?.nameKo ?? "익명 응답"}</h3><p className="mt-1 text-sm text-slate-500">{response.submittedAt ? formatKoreanDateTime(response.submittedAt) : "미제출"} · 읽기 전용</p></div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4"><h3 className="font-semibold">{response.user?.nameKo ?? "익명 응답"}</h3><p className="mt-1 text-sm text-slate-500">{response.submittedAt ? formatKoreanDateTime(response.submittedAt) : "미제출"} · 읽기 전용</p></div>
           {questions.map((item, index) => {
             const answer = response.answers.find((value) => value.questionId === item.id);
             const content = answer?.content;
             const ids = Array.isArray(content?.assetIds) ? content.assetIds.filter((id): id is string => typeof id === "string") : typeof content?.assetId === "string" ? [content.assetId] : [];
-            return <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><p className="mb-2 text-xs text-slate-500">질문 {index + 1}</p><h3 className="font-medium">{stripRichText(item.titleKo)}</h3><div className="mt-4 whitespace-pre-wrap break-words text-sm leading-7">{item.questionType === "file_upload" && ids.length ? ids.map((id, fileIndex) => <a key={id} className="block text-brand-primary underline" href={resolveAssetUrl(`asset:${id}`)} target="_blank" rel="noopener noreferrer">첨부파일 {fileIndex + 1}</a>) : <SurveyQuestionInput question={item} value={answerContentToValue(item.questionType, answer)} lang="ko" disabled onChange={()=>{}} />}</div></article>;
+            return <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-4"><p className="mb-1.5 text-xs text-slate-500">질문 {index + 1}</p><h3 className="font-medium">{stripRichText(item.titleKo)}</h3><div className="mt-3 whitespace-pre-wrap break-words text-sm leading-7">{item.questionType === "file_upload" && ids.length ? ids.map((id, fileIndex) => <a key={id} className="block text-brand-primary underline" href={resolveAssetUrl(`asset:${id}`)} target="_blank" rel="noopener noreferrer">첨부파일 {fileIndex + 1}</a>) : <SurveyQuestionInput question={item} value={answerContentToValue(item.questionType, answer)} lang="ko" disabled onChange={()=>{}} />}</div></article>;
           })}
         </>}
       </> : null}

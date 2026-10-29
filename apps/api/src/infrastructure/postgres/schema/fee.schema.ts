@@ -1,4 +1,5 @@
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -11,6 +12,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
+import { sql } from "drizzle-orm";
+
 import { users } from "./auth.schema";
 
 /** Initial fee ledger keyed by student number; includes students without accounts. */
@@ -20,6 +23,7 @@ export const paidStudentRecords = pgTable("paid_student_records", {
   admissionYear: integer("admission_year"),
   paidSemesters: smallint("paid_semesters").notNull(),
   paidAmount: integer("paid_amount").notNull(),
+  note: text("note"),
   importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -50,9 +54,8 @@ export const studentFeeStatus = pgTable("student_fee_status", {
  */
 export const studentFeePayments = pgTable("student_fee_payment", {
   paymentId: uuid("payment_id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.userId),
+  userId: uuid("user_id").references(() => users.userId),
+  stdNo: varchar("std_no", { length: 8 }).references(() => paidStudentRecords.stdNo),
   amount: integer("amount").notNull().default(0),
   paymentType: varchar("payment_type", { length: 40 }).notNull(),
   paymentMethod: varchar("payment_method", { length: 30 }).notNull(),
@@ -64,6 +67,8 @@ export const studentFeePayments = pgTable("student_fee_payment", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  check("student_fee_payment_person_required", sql`${table.userId} IS NOT NULL OR ${table.stdNo} IS NOT NULL`),
+  index("student_fee_payment_std_no_idx").on(table.stdNo, table.paidAt),
   index("student_fee_payment_user_paid_idx").on(table.userId, table.paidAt),
   index("student_fee_payment_semester_idx").on(table.effectiveStartSemester),
 ]);

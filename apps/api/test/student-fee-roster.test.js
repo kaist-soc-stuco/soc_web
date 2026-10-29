@@ -76,21 +76,125 @@ test("import and login preserve administrator decisions and existing payment tra
   assert.deepEqual(await repository.linkInitialStudentFeeRecord(userId, first.stdNo), { record: null, changed: false });
 });
 
-test("sheet mirror keeps the initial ledger in a separate protected tab with an empty join date for unregistered students", async () => {
-  const calls = [];
-  const service = new GoogleFeeSheetsService({
-    getOrCreateSpreadsheet: async () => ({ spreadsheetId: "synthetic-mirror", spreadsheetUrl: "https://docs.google.com/spreadsheets/d/synthetic-mirror/edit" }),
-    syncSheet: async definition => calls.push(definition),
-  }, {
-    exportStudentsByFeeStatus: async () => [{ userId: "synthetic-user", stdNo: first.stdNo, nameKo: first.nameKo, email: "synthetic@example.invalid", status: "PAID", coverageSemesters: 6, paidAmount: 30000, joinedAt: "2026-10-01T00:00:00.000Z" }],
-    listInitialStudentFeeRoster: async () => [{ ...first, joinedAt: new Date("2026-10-01T00:00:00.000Z") }, { ...second, joinedAt: null }],
-  }, {});
-  await service.sync();
-  assert.equal(calls.length, 2);
-  assert.equal(calls[0].headers.at(-1), "가입 일시");
-  assert.equal(calls[0].rows[0].at(-1), "2026-10-01T00:00:00.000Z");
-  assert.equal(calls[1].sheetTitle, "초기 납부 명부");
-  assert.equal(calls[1].rows.length, 2);
-  assert.equal(calls[1].rows[1].at(-1), "");
-  assert.match(calls[1].protectionDescription, /읽기 전용/);
+test("fee roster is not exported to Google Sheets", async () => {
+  await assert.rejects(new GoogleFeeSheetsService().sync(), /google_sheets_retired/);
+});
+
+test("unregistered roster rows are editable and later link to SSO accounts", integration, async () => {
+  await repository.importStudentFeeRoster([second]);
+  const [before] = await repository.listStudentFeeRoster();
+  assert.equal(before.userId, null);
+  assert.equal(before.joinedAt, null);
+  const update = { ...second, paidSemesters: 6, paidAmount: 30000, note: "합성 확인 메모", expectedUpdatedAt: before.updatedAt };
+  await repository.saveStudentFeeRoster([update]);
+  const [saved] = await repository.listStudentFeeRoster();
+  assert.equal(saved.note, "합성 확인 메모");
+  assert.notEqual(saved.updatedAt, before.updatedAt);
+  const userId = await addUser(second.stdNo);
+  await repository.linkInitialStudentFeeRecord(userId, second.stdNo);
+  const [linked] = await repository.listStudentFeeRoster();
+  assert.equal(linked.userId, userId);
+  assert.ok(linked.joinedAt);
+  assert.equal((await repository.getStudentFeeStatus(userId)).status, "PAID");
+});
+
+test("a stale edit rolls back every row in the same batch", integration, async () => {
+  await repository.importStudentFeeRoster([first, second]);
+  const originals = await repository.listStudentFeeRoster();
+  const updates = originals.map(row => ({ stdNo: row.stdNo, nameKo: row.nameKo, admissionYear: row.admissionYear,
+    paidSemesters: 1, paidAmount: 5000, note: null, expectedUpdatedAt: row.updatedAt }));
+  updates[1].expectedUpdatedAt = "2000-01-01T00:00:00.000Z";
+  await assert.rejects(repository.saveStudentFeeRoster(updates), /fee_roster_changed/);
+  assert.deepEqual(await repository.listStudentFeeRoster(), originals);
+});
+
+test("only one concurrent edit with the same version succeeds", integration, async () => {
+  await repository.importStudentFeeRoster([second]);
+  const [row] = await repository.listStudentFeeRoster();
+  const update = { ...second, note: null, expectedUpdatedAt: row.updatedAt };
+  const results = await Promise.allSettled([
+    repository.saveStudentFeeRoster([{ ...update, paidAmount: 15000 }]),
+    repository.saveStudentFeeRoster([{ ...update, paidAmount: 20000 }]),
+  ]);
+  assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
+  const failure = results.find(result => result.status === "rejected");
+  assert.match(failure.reason.message, /fee_roster_changed/);
+});
+
+test("new roster entries are additive and repeated creates cannot replace a row", integration, async () => {
+  const update = { ...second, note: null, expectedUpdatedAt: null };
+  await repository.saveStudentFeeRoster([update]);
+  await assert.rejects(repository.saveStudentFeeRoster([{ ...update, paidAmount: 1 }]), /fee_roster_changed/);
+  assert.equal((await repository.listStudentFeeRoster())[0].paidAmount, second.paidAmount);
+});
+
+function paymentRequest(target, idempotencyKey = randomUUID()) {
+  return { idempotencyKey, payments: [{ ...target, amount: 5000, paymentType: "PRIOR_PAYMENT_BALANCE", paymentMethod: "BANK_TRANSFER", effectiveStartSemester: "2026-2", coverageSemesters: 6, paidAt: "2026-10-29T00:00:00.000Z", note: "합성 추가 납부" }] };
+}
+
+test("unified fees include accounts without initial rows and retain unregistered students", integration, async () => {
+  await repository.importStudentFeeRoster([second]);
+  const userId = await addUser(first.stdNo);
+  const rows = await repository.listStudentFeeRoster("2026-2");
+  assert.equal(rows.length, 2);
+  assert.equal(rows.find(row => row.stdNo === second.stdNo).userId, null);
+  assert.equal(rows.find(row => row.userId === userId).updatedAt, null);
+});
+
+test("unregistered receipts survive login with the same IDs, totals, history and fee eligibility", integration, async () => {
+  const actor = await addUser("90990099");
+  await repository.importStudentFeeRoster([second]);
+  const request = paymentRequest({ stdNo: second.stdNo });
+  const created = await repository.processStudentFeePayments(request, actor);
+  assert.equal(created.count, 1);
+  assert.equal(created.payments[0].userId, null);
+  assert.deepEqual(await repository.processStudentFeePayments(request, actor), created);
+  let detail = await repository.getStudentFeeRosterDetail(second.stdNo, "2026-2");
+  assert.equal(detail.record.totalPaidAmount, 15000);
+  assert.equal(detail.record.status, "PAID");
+  const userId = await addUser(second.stdNo);
+  await repository.linkInitialStudentFeeRecord(userId, second.stdNo);
+  await repository.linkInitialStudentFeeRecord(userId, second.stdNo);
+  detail = await repository.getStudentFeeRosterDetail(userId, "2026-2");
+  assert.equal(detail.record.totalPaidAmount, 15000);
+  assert.equal(detail.history.length, 1);
+  assert.equal(detail.history[0].paymentId, created.payments[0].paymentId);
+  assert.equal(detail.history[0].userId, userId);
+  assert.equal((await repository.getStudentFeeStatus(userId)).status, "PAID");
+});
+
+test("mixed registered and unregistered payments are atomic and idempotent", integration, async () => {
+  const actor = await addUser("90990099");
+  const userId = await addUser(first.stdNo);
+  await repository.importStudentFeeRoster([first, second]);
+  const request = paymentRequest({ userId });
+  request.payments.push(paymentRequest({stdNo:second.stdNo}).payments[0]);
+  await repository.processStudentFeePayments(request, actor);
+  await repository.processStudentFeePayments(request, actor);
+  const rows = await db.select().from(schema.studentFeePayments);
+  assert.equal(rows.length, 2);
+  const unified = await repository.listStudentFeeRoster("2026-2");
+  assert.equal(unified.find(row=>row.stdNo===first.stdNo).totalPaidAmount, 35000);
+  assert.equal(unified.find(row=>row.stdNo===second.stdNo).totalPaidAmount, 15000);
+  const broken = paymentRequest({stdNo:second.stdNo});
+  broken.payments.push(paymentRequest({stdNo:"90990111"}).payments[0]);
+  await assert.rejects(repository.processStudentFeePayments(broken, actor), /fee_person_not_found/);
+  assert.equal((await db.select().from(schema.studentFeePayments)).length, 2);
+  const stats = await repository.getStudentFeeStats({referenceSemester:"2026-2",dateFrom:"2026-10-01",dateTo:"2026-10-31"});
+  assert.equal(stats.totals.collectedAmount, 50000);
+  assert.equal(stats.totals.paymentCount, 2);
+  assert.equal(stats.totals.paidAmount, 10000);
+});
+
+test("parallel receipt retries and later registration never create a second receipt", integration, async () => {
+  const actor = await addUser("90990099");
+  await repository.importStudentFeeRoster([second]);
+  const request = paymentRequest({stdNo:second.stdNo});
+  const [left,right] = await Promise.all([repository.processStudentFeePayments(request,actor),repository.processStudentFeePayments(request,actor)]);
+  assert.equal(left.payments[0].paymentId,right.payments[0].paymentId);
+  const userId = await addUser(second.stdNo);
+  await Promise.all([repository.linkInitialStudentFeeRecord(userId,second.stdNo),repository.processStudentFeePayments(paymentRequest({stdNo:second.stdNo}),actor)]);
+  const rows = await db.select().from(schema.studentFeePayments);
+  assert.equal(rows.length, 2);
+  assert.ok(rows.every(row=>row.userId===userId));
 });

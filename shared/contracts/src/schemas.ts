@@ -720,7 +720,8 @@ export const UpdateStudentFeeStatusSchema = z
   );
 
 const StudentFeePaymentInputSchema = z.object({
-  userId: z.string().uuid(),
+  userId: z.string().uuid().optional(),
+  stdNo: z.string().regex(/^\d{8}$/).optional(),
   amount: z.number().int().min(0).max(100_000_000),
   paymentType: z.enum(["SIX_SEMESTER_LUMP_SUM", "PRIOR_PAYMENT_BALANCE"]),
   paymentMethod: z.enum(["BANK_TRANSFER", "CASH", "OTHER"]),
@@ -728,7 +729,7 @@ const StudentFeePaymentInputSchema = z.object({
   coverageSemesters: z.number().int().min(1).max(6),
   paidAt: z.string().datetime(),
   note: z.string().trim().max(500).nullable().optional(),
-});
+}).refine(value => Boolean(value.userId) !== Boolean(value.stdNo), { message: "one_fee_person_identifier_required" });
 
 export const BulkProcessStudentFeePaymentsSchema = z.object({
   idempotencyKey: z
@@ -957,3 +958,21 @@ export const StudentFeePolicySchema = z.object({
   coverageSemesters: z.number().int().min(1).max(6).default(6),
 }).strict();
 export type StudentFeePolicy = z.infer<typeof StudentFeePolicySchema>;
+
+export const SaveStudentFeeRosterSchema = z.object({
+  records: z.array(z.object({
+    stdNo: z.string().regex(/^\d{8}$/),
+    nameKo: z.string().trim().min(1).max(100).nullable(),
+    admissionYear: z.number().int().min(1900).max(2200).nullable(),
+    paidSemesters: z.number().int().min(0).max(32767),
+    paidAmount: z.number().int().min(0).max(2147483647),
+    note: z.string().trim().max(1000).nullable(),
+    expectedUpdatedAt: z.string().datetime({ offset: true }).nullable(),
+  }).strict()).min(1).max(2000),
+}).strict().superRefine((value, ctx) => {
+  const seen = new Set<string>();
+  value.records.forEach((record, index) => {
+    if (seen.has(record.stdNo)) ctx.addIssue({ code: "custom", path: ["records", index, "stdNo"], message: "duplicate_student_number" });
+    seen.add(record.stdNo);
+  });
+});

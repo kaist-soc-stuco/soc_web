@@ -57,6 +57,8 @@ services:
       db-migrate:
         condition: service_completed_successfully
     command: ["sh", "-c", "pnpm db:seed"]
+    volumes:
+      - security_e2e_uploads:/app/apps/api/uploads/assets
 
   api:
     build:

@@ -53,3 +53,10 @@ test("payment batches require a bounded idempotency key", () => {
     true,
   );
 });
+
+test("payment targets accept a registered account or an unregistered student number exclusively", () => {
+  const target = { idempotencyKey: "target-check-0001", payments: [{ ...basePayment, userId: undefined, stdNo: "20990001" }] };
+  assert.equal(BulkProcessStudentFeePaymentsSchema.safeParse(target).success, true);
+  assert.equal(BulkProcessStudentFeePaymentsSchema.safeParse({...target,payments:[{...basePayment,stdNo:"20990001"}]}).success, false);
+  assert.equal(BulkProcessStudentFeePaymentsSchema.safeParse({...target,payments:[{...basePayment,userId:undefined}]}).success, false);
+});

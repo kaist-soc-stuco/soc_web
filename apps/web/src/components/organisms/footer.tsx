@@ -20,8 +20,8 @@ export function Footer() {
           <div className="home-footer-contact">
             <span className="home-footer-address">
               {lang === "ko"
-                ? "(34141) 대전광역시 유성구 대학로 291 KAIST N1(김병호·김삼열 IT융합빌딩) 318호"
-                : "(34141) KAIST N1 (Kim Byung-Ho · Kim Sam-Yeol IT Convergence Building), 291 Daehak-ro, Yuseong-gu, Daejeon, Room 318"}
+                ? "(34141) 대전광역시 유성구 대학로 291 KAIST N1 318호"
+                : "(34141) KAIST N1, 291 Daehak-ro, Yuseong-gu, Daejeon, Room 318"}
             </span>
             <span aria-hidden="true" className="home-footer-separator">·</span>
             <a className="rounded-sm transition-colors hover:text-brand-primary" href="mailto:kaist.helloworld@gmail.com">

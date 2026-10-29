@@ -479,41 +479,6 @@ export class SurveysService {
       },
     });
 
-    if (!publishedForTheFirstTime || !this.surveySheetsService) return updated;
-
-    try {
-      // The database publication is committed before the external Google API
-      // call. A Sheets outage must not turn a successful survey publication
-      // into a failed mutation; the connection status is persisted by the
-      // Sheets service and can be retried from the response page.
-      const connected = await this.surveySheetsService.connect(id, actorUserId);
-      if (connected) {
-        return {
-          ...updated,
-          spreadsheetId: connected.spreadsheetId,
-          spreadsheetUrl: connected.spreadsheetUrl,
-          spreadsheetSyncStatus: connected.spreadsheetSyncStatus,
-          spreadsheetLastSyncedAt: connected.spreadsheetLastSyncedAt,
-        };
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Survey response sheet creation failed after publication (${id}): ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-      const failedConnection = await this.surveysRepo.findById(id);
-      if (failedConnection) {
-        return {
-          ...updated,
-          spreadsheetId: failedConnection.spreadsheetId,
-          spreadsheetUrl: failedConnection.spreadsheetUrl,
-          spreadsheetSyncStatus: failedConnection.spreadsheetSyncStatus,
-          spreadsheetLastSyncedAt: failedConnection.spreadsheetLastSyncedAt,
-        };
-      }
-    }
-
     return updated;
   }
 

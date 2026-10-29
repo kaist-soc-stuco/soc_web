@@ -34,7 +34,7 @@ const ADMIN_MENU: AdminMenuItem[] = [
   { label: "일정 관리", labelEn: "Calendar", to: "/admin/calendar", bits: [Permissions.MANAGE_CALENDAR], icon: CalendarDays },
   { label: "유저 관리", labelEn: "Users", to: "/admin/users", bits: [Permissions.MANAGE_USERS], icon: Users },
   { label: "권한 관리", labelEn: "Permissions", to: "/admin/permissions", bits: [Permissions.MANAGE_ROLES], icon: ShieldCheck },
-  { label: "과비 관리", labelEn: "Student fees", to: "/admin/finance", bits: [Permissions.MANAGE_FINANCE], icon: WalletCards },
+  { label: "과비 관리", labelEn: "Student fees", to: "/admin/finance", bits: [Permissions.VIEW_FINANCE, Permissions.MANAGE_FINANCE], icon: WalletCards },
   { label: "설문조사 관리", labelEn: "Surveys", to: "/admin/surveys", bits: [Permissions.MANAGE_SURVEY], icon: ClipboardList },
   { label: "투표 관리", labelEn: "Votes", to: "/admin/votes", bits: [Permissions.MANAGE_VOTE], icon: Vote },
   { label: "이메일 발송", labelEn: "Email", to: "/admin/emails", bits: [Permissions.SEND_BULK_EMAIL], icon: Mail },

@@ -47,10 +47,11 @@ if ENV.get("NODE_ENV") != "development" or ENV.get("SSO_CLIENT_ID") not in {"soc
     raise SystemExit("Run configure_env.py or the isolated security E2E harness in a development environment first.")
 HOST = ENV.get("LOCAL_QA_BIND", "127.0.0.1")
 PORT = int(ENV.get("LOCAL_QA_PORT", "8765"))
-if not ipaddress.ip_address(HOST).is_private or ipaddress.ip_address(HOST).is_unspecified:
+CONTAINER_FIXTURE = os.environ.get("LOCAL_QA_CONTAINER_FIXTURE") == "true" and ENV["SSO_CLIENT_ID"] == "soc-security-e2e"
+if (not ipaddress.ip_address(HOST).is_private or ipaddress.ip_address(HOST).is_unspecified) and not (CONTAINER_FIXTURE and HOST == "0.0.0.0"):
     raise SystemExit("Bind only to an explicit loopback/private LAN address.")
 UPSTREAM = urlsplit(ENV.get("LOCAL_QA_UPSTREAM", "http://127.0.0.1:8080"))
-if UPSTREAM.scheme != "http" or UPSTREAM.hostname not in ("127.0.0.1", "localhost"):
+if UPSTREAM.scheme != "http" or UPSTREAM.hostname not in (("127.0.0.1", "localhost", "nginx") if CONTAINER_FIXTURE else ("127.0.0.1", "localhost")):
     raise SystemExit("The QA reverse proxy upstream must be loopback HTTP.")
 CALLBACK_URL = ENV.get("LOCAL_QA_CALLBACK_URL", "/api/auth/login")
 LOCK = threading.Lock()

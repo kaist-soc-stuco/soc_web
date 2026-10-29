@@ -121,33 +121,11 @@ function createHarness({ connect } = {}) {
   };
 }
 
-test("creates the response sheet on the first survey publication", async () => {
-  const { service, calls } = createHarness();
-
+test("publishing a survey never creates or connects a Google response sheet", async () => {
+  const { service, calls } = createHarness({ connect: () => assert.fail("retired Sheets connection attempted") });
   const result = await service.update("survey-1", { isPublished: true });
-
-  assert.equal(calls.filter((call) => call.kind === "connect").length, 1);
   assert.equal(result.isPublished, true);
-  assert.equal(result.spreadsheetId, "sheet-1");
-  assert.equal(result.spreadsheetSyncStatus, "CONNECTED");
-});
-
-test("keeps publication successful when response sheet creation fails", async () => {
-  const failedSurvey = makeSurvey({
-    isPublished: true,
-    lifecycleStatus: "PUBLISHED",
-    spreadsheetSyncStatus: "ERROR",
-  });
-  const { service, repository } = createHarness({
-    connect: async () => {
-      throw new Error("oauth unavailable");
-    },
-  });
-  repository.findById = async (_id, tx) =>
-    tx ? makeSurvey() : failedSurvey;
-
-  const result = await service.update("survey-1", { isPublished: true });
-
-  assert.equal(result.isPublished, true);
-  assert.equal(result.spreadsheetSyncStatus, "ERROR");
+  assert.equal(result.spreadsheetId, null);
+  assert.equal(result.spreadsheetSyncStatus, "NOT_CONNECTED");
+  assert.equal(calls.filter(call => call.kind === "connect").length, 0);
 });

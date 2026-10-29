@@ -1,4 +1,4 @@
-import { StudentFeePolicySchema, type StudentFeePolicy } from "@soc/contracts";
+import { SaveStudentFeeRosterSchema, StudentFeePolicySchema, type SaveStudentFeeRosterRequest, type StudentFeePolicy } from "@soc/contracts";
 import { Body, Controller, Get, Header, Headers, Param, Post, Put, Query, Req, StreamableFile, UseGuards } from "@nestjs/common";
 import { Request } from "express";
 import * as XLSX from "xlsx";
@@ -11,7 +11,7 @@ import {
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 
-import { AuthGuard, RequirePermissions } from "../auth/guards";
+import { AuthGuard, RequireAnyPermissions, RequirePermissions } from "../auth/guards";
 import { auditMetadataFromRequest } from "../audit/audit-context";
 import { requireDownloadReason } from "../audit/download-reason";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
@@ -225,9 +225,43 @@ export class UsersController {
     });
   }
 
-  @Get("fee-status/policy")
+  @Get("fee-status/roster")
+  @Header("Cache-Control", "private, no-store")
+  @RequireAnyPermissions(Permissions.VIEW_FINANCE, Permissions.MANAGE_FINANCE)
+  listStudentFeeRoster(@Req() req: AuthenticatedRequest, @Query("semester") semester?: string) { return this.usersService.listStudentFeeRoster(auditMetadataFromRequest(req), semester); }
+
+  @Get("fee-status/roster/detail/:identifier")
+  @Header("Cache-Control", "private, no-store")
+  @RequireAnyPermissions(Permissions.VIEW_FINANCE, Permissions.MANAGE_FINANCE)
+  getStudentFeeRosterDetail(@Param("identifier") identifier: string, @Query("semester") semester: string | undefined, @Req() req: AuthenticatedRequest) {
+    return this.usersService.getStudentFeeRosterDetail(identifier, semester, auditMetadataFromRequest(req));
+  }
+
+  @Put("fee-status/roster")
   @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
+  saveStudentFeeRoster(@Body(new ZodValidationPipe(SaveStudentFeeRosterSchema)) body: SaveStudentFeeRosterRequest, @Req() req: AuthenticatedRequest) {
+    return this.usersService.saveStudentFeeRoster(body.records, auditMetadataFromRequest(req));
+  }
+
+  @Get("fee-status/roster/export.xlsx")
+  @Header("Cache-Control", "private, no-store")
+  @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+  @Header("Content-Disposition", 'attachment; filename="student-fee-roster.xlsx"')
+  @RequirePermissions(Permissions.EXPORT_FINANCE)
+  @RequireAnyPermissions(Permissions.VIEW_FINANCE, Permissions.MANAGE_FINANCE)
+  async exportStudentFeeRoster(@Req() req: AuthenticatedRequest, @Headers("x-download-reason") reason?: string, @Query("semester") semester?: string) {
+    requireDownloadReason(reason);
+    const { records } = await this.usersService.exportStudentFeeRoster(auditMetadataFromRequest(req), reason, semester);
+    const sheet = XLSX.utils.json_to_sheet(records.map(row => ({ "학번": row.stdNo, "이름": row.nameKo ?? "", "입학 연도": row.admissionYear ?? "",
+      "초기 납부 학기 수": row.paidSemesters, "초기 납부 금액": row.paidAmount, "비고": row.note ?? "", "가입 일시": row.joinedAt ?? "", "누적 수납액": row.totalPaidAmount ?? 0, "상태": row.status ?? "UNPAID" })));
+    const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, "납부 관리");
+    return new StreamableFile(XLSX.write(book, { type: "buffer", bookType: "xlsx" }));
+  }
+
+  @Get("fee-status/policy")
+  @Header("Cache-Control", "private, no-store")
+  @RequireAnyPermissions(Permissions.VIEW_FINANCE, Permissions.MANAGE_FINANCE)
   getStudentFeePolicy(@Query("semester") semester?: string) {
     return this.usersService.getStudentFeePolicy(/^\d{4}-[12]$/.test(semester ?? "") ? semester! : "2026-1");
   }
@@ -241,7 +275,7 @@ export class UsersController {
 
   @Get("fee-status/list")
   @Header("Cache-Control", "private, no-store")
-  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  @RequireAnyPermissions(Permissions.VIEW_FINANCE, Permissions.MANAGE_FINANCE)
   async listStudentsByFeeStatus(
     @Req() req: AuthenticatedRequest,
     @Query("status") status?: string,
@@ -286,7 +320,7 @@ export class UsersController {
 
   @Get("fee-status/stats")
   @Header("Cache-Control", "private, no-store")
-  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  @RequireAnyPermissions(Permissions.VIEW_FINANCE, Permissions.MANAGE_FINANCE)
   async getStudentFeeStats(
     @Query("dateFrom") dateFrom?: string,
     @Query("dateTo") dateTo?: string,
@@ -358,7 +392,8 @@ export class UsersController {
   @Header("Cache-Control", "private, no-store")
   @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   @Header("Content-Disposition", 'attachment; filename="student_fee_status.xlsx"')
-  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  @RequirePermissions(Permissions.EXPORT_FINANCE)
+  @RequireAnyPermissions(Permissions.VIEW_FINANCE, Permissions.MANAGE_FINANCE)
   async exportStudentFeeStatus(
     @Req() req: AuthenticatedRequest,
     @Query("status") status?: string,
@@ -466,7 +501,7 @@ export class UsersController {
 
   @Get("fee-status/detail/:userId")
   @Header("Cache-Control", "private, no-store")
-  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  @RequireAnyPermissions(Permissions.VIEW_FINANCE, Permissions.MANAGE_FINANCE)
   async getStudentFeeDetail(
     @Req() req: AuthenticatedRequest,
     @Param("userId") userId: string,
@@ -483,7 +518,7 @@ export class UsersController {
 
   @Get(":userId/fee-status")
   @Header("Cache-Control", "private, no-store")
-  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  @RequireAnyPermissions(Permissions.VIEW_FINANCE, Permissions.MANAGE_FINANCE)
   async getStudentFeeStatus(
     @Req() req: AuthenticatedRequest,
     @Param("userId") userId: string,

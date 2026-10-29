@@ -41,7 +41,7 @@ describe("privacy retention on an isolated PostgreSQL database", { skip: !databa
   const count = async table => Number((await pool.query(`SELECT count(*) AS count FROM ${table}`)).rows[0].count);
   test("the fresh baseline is applied once and rerunning migrations preserves existing rows", async () => {
     const before = (await pool.query("SELECT id, hash, created_at FROM drizzle.__drizzle_migrations ORDER BY id")).rows;
-    assert.equal(before.length, 1);
+    assert.equal(before.length, require("drizzle-orm/migrator").readMigrationFiles({ migrationsFolder: path.join(__dirname, "../drizzle") }).length);
     await migrate(drizzle(pool), { migrationsFolder: path.join(__dirname, "../drizzle") });
     assert.deepEqual((await pool.query("SELECT id, hash, created_at FROM drizzle.__drizzle_migrations ORDER BY id")).rows, before);
     assert.equal(await count("users"), 1);

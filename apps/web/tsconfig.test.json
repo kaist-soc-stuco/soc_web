@@ -12,6 +12,7 @@
   "include": [
     "src/lib/list-query-options.ts",
     "src/lib/contact-spreadsheet.ts",
+    "src/lib/fee-roster.ts",
     "src/lib/auth-session.ts",
     "src/lib/board-metadata.ts",
     "src/lib/asset-reference-url.ts",

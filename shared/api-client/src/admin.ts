@@ -1,5 +1,7 @@
 import type {
   StudentFeePolicy,
+  StudentFeeRosterResponse,
+  SaveStudentFeeRosterRequest,
   AdminUserRecord,
   BulkProcessStudentFeePaymentsRequest,
   BulkProcessStudentFeePaymentsResponse,
@@ -376,6 +378,11 @@ export const createAdminApi = ({
       { retryOnUnauthorized: true },
     );
   },
+
+  getStudentFeeRosterDetail: (identifier: string, semester: string) => requestJson<import("@soc/contracts").StudentFeeRosterDetailResponse>(`${usersBaseUrl}/fee-status/roster/detail/${encodeURIComponent(identifier)}?semester=${encodeURIComponent(semester)}`, { method: "GET" }, { retryOnUnauthorized: true }),
+  listStudentFeeRoster: (semester?: string) => requestJson<StudentFeeRosterResponse>(`${usersBaseUrl}/fee-status/roster${semester ? `?semester=${encodeURIComponent(semester)}` : ""}`, { method: "GET" }, { retryOnUnauthorized: true }),
+  saveStudentFeeRoster: (body: SaveStudentFeeRosterRequest) => requestJson<{ count: number }>(`${usersBaseUrl}/fee-status/roster`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, { retryOnUnauthorized: true }),
+  exportStudentFeeRoster: (reason: string, semester?: string) => requestBlob(`${usersBaseUrl}/fee-status/roster/export.xlsx${semester ? `?semester=${encodeURIComponent(semester)}` : ""}`, { method: "GET", headers: { "x-download-reason": reason } }, { retryOnUnauthorized: true }),
 
   getStudentFeePolicy: (semester: string) => requestJson<StudentFeePolicy>(`${usersBaseUrl}/fee-status/policy?semester=${encodeURIComponent(semester)}`, { method: "GET" }),
   createStudentFeePolicy: (policy: StudentFeePolicy) => requestJson<StudentFeePolicy>(`${usersBaseUrl}/fee-status/policy`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(policy) }),
