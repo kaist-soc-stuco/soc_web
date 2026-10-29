@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, ChevronRight, EyeOff, MapPin, MoreHorizontal, Pencil } from "lucide-react";
 import { MobileEmptyState } from "@/components/ui/mobile-empty-state";
 
+import { formatNumericDate } from "@/lib/date-display";
 import type { Language } from "@/hooks/use-language";
 import { stripCalendarPrefix, type CalendarEvent } from "@/lib/events-surveys";
 import { formatCalendarScheduleText, getCalendarEventLocation, getCalendarEventStyles } from "./events-surveys-calendar-utils";
@@ -20,6 +21,7 @@ interface EventsSurveysDayDetailsProps {
   lang: Language;
   selectedDateStr: string;
   embedded?: boolean;
+  agenda?: boolean;
 }
 
 export function EventsSurveysDayDetails({
@@ -27,6 +29,7 @@ export function EventsSurveysDayDetails({
   lang,
   selectedDateStr,
   embedded = false,
+  agenda = false,
 }: EventsSurveysDayDetailsProps) {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const queryClient = useQueryClient();
@@ -118,7 +121,7 @@ export function EventsSurveysDayDetails({
   return (
     <>
       <aside
-        className={embedded ? "flex min-h-40 flex-col bg-white" : "scroll-mt-4 flex h-full min-h-0 flex-col self-start rounded-lg border border-card-border-subtle bg-white p-5 shadow-none lg:sticky lg:top-24 lg:min-h-[500px]"}
+        className={agenda ? "mobile-calendar-day-events flex flex-col bg-white" : embedded ? "flex min-h-40 flex-col bg-white" : "scroll-mt-4 flex h-full min-h-0 flex-col self-start rounded-lg border border-card-border-subtle bg-white p-5 shadow-none lg:sticky lg:top-24 lg:min-h-[500px]"}
         id={embedded ? undefined : "calendar-day-details"}
       >
       {!embedded ? <div className="shrink-0 border-b border-slate-100 pb-4 select-none">
@@ -133,7 +136,7 @@ export function EventsSurveysDayDetails({
           </p>
         </div></>
       ) : (
-        <div className="scrollbar-hidden flex-1 space-y-2.5 overflow-y-auto py-4 pr-1">
+        <div className={agenda ? "mobile-calendar-agenda-events" : "scrollbar-hidden flex-1 space-y-2.5 overflow-y-auto py-4 pr-1"}>
           {events.map((event, idx) => {
             const style = getCalendarEventStyles(
               event.kind,
@@ -145,6 +148,13 @@ export function EventsSurveysDayDetails({
             const scheduleText = formatCalendarScheduleText(event, lang);
             const location = getCalendarEventLocation(event, lang);
             const eventHref = getCalendarEventHref(event);
+            const start = event.startAt ?? event.date, end = event.endAt ?? start;
+            const allDay = event.isAllDay || event.sourceType === "KAIST_ACADEMIC";
+            const timeFormat = new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+            const academic = event.category === "ACADEMIC" || event.sourceType === "KAIST_ACADEMIC";
+            const kindLabel = academic ? lang === "ko" ? "학사일정" : "Academic" : event.kind === "SURVEY" ? lang === "ko" ? "설문" : "Survey" : lang === "ko" ? "행사" : "Event";
+            const range = start.toDateString() !== end.toDateString() ? `${formatNumericDate(start)} — ${formatNumericDate(end)}` : null;
+            const mobileMeta = [range, kindLabel, location].filter(Boolean).join(" · ");
             const showAdminMenu =
               !eventHref &&
               canManage &&
@@ -155,7 +165,9 @@ export function EventsSurveysDayDetails({
             const cardContent = (
               <>
                 <div className="calendar-agenda-event flex items-start gap-2.5">
+                  {agenda && <div className="mobile-calendar-event-time">{allDay ? lang === "ko" ? "종일" : "All day" : <><span>{timeFormat.format(start)}</span>{timeFormat.format(start) !== timeFormat.format(end) && !range && <small>{timeFormat.format(end)}</small>}</>}</div>}
                   <span
+                    data-calendar-kind={academic ? "academic" : event.kind === "SURVEY" ? "survey" : "event"}
                     className={`calendar-agenda-marker my-0.5 w-[3px] shrink-0 self-stretch rounded-full ${style.bullet}`}
                     aria-hidden="true"
                   />
@@ -168,6 +180,7 @@ export function EventsSurveysDayDetails({
                         {event.description}
                       </p>
                     )}
+                    {agenda ? <p className="mobile-calendar-event-meta">{mobileMeta}</p> : <>
                     <div className="mt-2 flex items-center gap-2 text-xs font-normal text-slate-600 select-none">
                       <span className="min-w-0 break-words whitespace-normal">{scheduleText}</span>
                     </div>
@@ -175,6 +188,7 @@ export function EventsSurveysDayDetails({
                       <MapPin aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
                       <span className="min-w-0 break-words">{location}</span>
                     </div>}
+                    </>}
                   </div>
                   {eventHref ? (
                     <ChevronRight

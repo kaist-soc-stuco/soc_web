@@ -405,13 +405,13 @@ function CommentRow({
             {(canDelete || canHide || canRestore) && (
               <DropdownMenu.Root modal={false}>
                 <DropdownMenu.Trigger asChild>
-                  <Button type="button" variant="ghost" size="icon" aria-label={lang === "ko" ? "댓글 더보기" : "Comment actions"} className="mobile-more-trigger !size-7 !min-h-0 rounded-md border-0 text-slate-500">
+                  <Button type="button" variant="ghost" size="icon" aria-label={lang === "ko" ? "댓글 더보기" : "Comment actions"} className="mobile-more-trigger !size-7 min-h-0 rounded-md border-0 text-slate-500">
                     <MoreVertical className="size-4" />
                   </Button>
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Portal>
                   <DropdownMenu.Content asChild align="end" sideOffset={4}>
-                    <AdminActionMenuPanel className="mobile-detail-menu z-50 !w-max !min-w-28">
+                    <AdminActionMenuPanel className="mobile-detail-menu z-50 w-max min-w-28">
                       {canDelete ? <DropdownMenu.Item asChild onSelect={() => { setEditText(comment.content); setEditing(true); }}>
                         <AdminActionMenuItem icon={<Edit2 />}>{lang === "ko" ? "수정" : "Edit"}</AdminActionMenuItem>
                       </DropdownMenu.Item> : null}

@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { KoreanHolidayRecord } from "@soc/contracts";
-import { localDate, nowDate } from "@soc/shared";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { DatePicker } from "@/components/ui/date-picker";
+import { localDate } from "@soc/shared";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import type { Language } from "@/hooks/use-language";
 import { formatShortDateWithWeekday } from "@/lib/date-display";
@@ -22,6 +20,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { Modal } from "@/components/ui/modal";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { MobilePublicCalendar } from "./mobile-public-calendar";
 
 interface EventsSurveysCalendarProps {
   calendarEvents: CalendarEvent[];
@@ -92,10 +91,9 @@ export function EventsSurveysCalendar({
     lang === "ko"
       ? ["일", "월", "화", "수", "목", "금", "토"]
       : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  if (isMobile) return <MobileWeekAgenda calendarEvents={calendarEvents} currentDate={currentDate} lang={lang}
+  if (isMobile) return <MobilePublicCalendar calendarEvents={calendarEvents} lang={lang}
     onCurrentDateChange={onCurrentDateChange} onSelectedDateChange={onSelectedDateChange}
-    selectedDate={selectedDate} calendarQuery={calendarQuery} onCalendarQueryChange={onCalendarQueryChange}
-    holidays={holidays} isFetching={isFetching} />;
+    selectedDate={selectedDate} holidays={holidays} isFetching={isFetching} />;
   return (
     <div className="calendar-workspace space-y-6">
       <div className="calendar-workspace-layout grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[minmax(0,1fr)_calc(25%+2rem)]">
@@ -185,59 +183,4 @@ export function EventsSurveysCalendar({
       </Modal>
     </div>
   );
-}
-
-function MobileWeekAgenda({ calendarEvents, lang, onCurrentDateChange, onSelectedDateChange, selectedDate,
-  holidays, isFetching }: EventsSurveysCalendarProps) {
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
-  const dateValue = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  const weekStart = localDate(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - selectedDate.getDay());
-  const days = Array.from({ length: 7 }, (_, index) => localDate(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + index));
-  const weekdays = lang === "ko" ? ["일", "월", "화", "수", "목", "금", "토"] : ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-  const holidayMap = useMemo(() => new Map(holidays.map(holiday => [holiday.locdate, holiday])), [holidays]);
-  const selectDate = (date: Date) => {
-    onSelectedDateChange(date);
-    onCurrentDateChange(localDate(date.getFullYear(), date.getMonth(), 1));
-  };
-  const moveWeek = (direction: number) => selectDate(localDate(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + direction * 7));
-  const moveMonth = (direction: number) => {
-    const month = localDate(selectedDate.getFullYear(), selectedDate.getMonth() + direction, 1);
-    const lastDay = localDate(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-    selectDate(localDate(month.getFullYear(), month.getMonth(), Math.min(selectedDate.getDate(), lastDay)));
-  };
-  const events = calendarEvents.filter((event) => isCalendarEventOnDay(event, selectedDate));
-  const selectedDateStr = formatShortDateWithWeekday(selectedDate, lang);
-  return <section className="mobile-week-agenda" aria-label={lang === "ko" ? "주간 일정" : "Weekly agenda"}>
-    <div className="mobile-calendar-navigation flex items-center justify-between gap-1">
-      <div className="mobile-calendar-month-group">
-      <IconButton tone="outline" className="mobile-calendar-step" aria-label={lang === "ko" ? "이전 달" : "Previous month"} onClick={() => moveMonth(-1)}><ChevronLeft /></IconButton>
-      <h2 className="min-w-0 text-lg font-semibold text-slate-900"><DatePicker value={selectedDate} onChange={selectDate} lang={lang}><Button type="button" variant="outline" className="mobile-calendar-month-trigger"><span>{formatMonthTitle(selectedDate.getFullYear(), selectedDate.getMonth(), lang)}</span><ChevronDown className="size-4 shrink-0" aria-hidden="true" /></Button></DatePicker></h2>
-      <IconButton tone="outline" className="mobile-calendar-step" aria-label={lang === "ko" ? "다음 달" : "Next month"} onClick={() => moveMonth(1)}><ChevronRight /></IconButton>
-      </div>
-      <Button variant="outline" className="mobile-calendar-today" onClick={() => selectDate(nowDate())}>{lang === "ko" ? "오늘" : "Today"}</Button>
-    </div>
-    <div className="mobile-week-strip" onTouchStart={(event) => setTouchStart({ x: event.touches[0].clientX, y: event.touches[0].clientY })}
-      onTouchCancel={() => setTouchStart(null)}
-      onTouchEnd={(event) => { if (touchStart !== null) { const distance = event.changedTouches[0].clientX - touchStart.x; const verticalDistance = event.changedTouches[0].clientY - touchStart.y; if (Math.abs(distance) > 50 && Math.abs(distance) > Math.abs(verticalDistance)) moveWeek(distance < 0 ? 1 : -1); } setTouchStart(null); }}>
-      {days.map((date, index) => {
-        const active = date.getTime() === localDate(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()).getTime();
-        const hasEvents = calendarEvents.some((event) => isCalendarEventOnDay(event, date));
-        const holiday = holidayMap.get(toDateKey(date));
-        const holidayName = holiday?.isHoliday ? getKoreanHolidayName(holiday.dateName, lang) : "";
-        const tone = holiday?.isHoliday || index === 0 ? "red" : index === 6 ? "blue" : undefined;
-        return <button key={date.getTime()} type="button" className="mobile-week-day" aria-pressed={active} data-outside-month={date.getMonth() !== selectedDate.getMonth() || date.getFullYear() !== selectedDate.getFullYear()}
-          data-date={dateValue(date)} data-tone={tone}
-          aria-current={dateValue(date) === dateValue(nowDate()) ? "date" : undefined}
-          aria-label={`${formatShortDateWithWeekday(date, lang)}${holidayName ? `, ${holidayName}` : ""}`} onClick={() => selectDate(date)}>
-          <span className={index === 0 ? "text-rose-500" : index === 6 ? "text-sky-600" : "text-slate-500"}>{weekdays[index]}</span>
-          <strong>{date.getDate()}</strong><span className={`mobile-week-event-dot ${hasEvents ? "is-visible" : ""}`} aria-hidden="true" />
-        </button>;
-      })}
-    </div>
-    <div className="mobile-agenda-list">
-      <h3 className="text-base font-semibold text-slate-900">{selectedDateStr}</h3>
-      {isFetching && events.length === 0 ? <div className="min-h-40" aria-busy="true" /> : <EventsSurveysDayDetails events={events} lang={lang} selectedDateStr={selectedDateStr} embedded />}
-    </div>
-
-  </section>;
 }

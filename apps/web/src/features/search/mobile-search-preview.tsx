@@ -6,25 +6,28 @@ import { LoaderCircle } from "lucide-react";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { canPreviewSearch } from "./search-preview-query";
 
 type PreviewItem = { key: string; href: string; title: string; kind: string };
 
-export function MobileSearchPreview({ query, lang, onSelect }: { query: string; lang: string; onSelect: () => void }) {
+export function MobileSearchPreview({ query, composing = false, lang, onSelect }: { query: string; composing?: boolean; lang: string; onSelect: () => void }) {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isPending: sessionPending } = useCurrentSession();
   const value = query.trim();
+  const eligible = canPreviewSearch(value, composing);
   const { data: boardDirectory, isPending: boardsLoading } = useQuery({
     queryKey: ["search", "board-directory"], queryFn: () => client.getBoards(),
-    enabled: Boolean(value), staleTime: 5 * 60_000, retry: false,
+    enabled: eligible, staleTime: 5 * 60_000, retry: false,
   });
   useEffect(() => {
-    const timeout = window.setTimeout(() => setDebouncedQuery(value), 250);
+    if (!eligible) { setDebouncedQuery(""); return; }
+    const timeout = window.setTimeout(() => setDebouncedQuery(value), 300);
     return () => window.clearTimeout(timeout);
-  }, [value]);
+  }, [eligible, value]);
   const { data, isFetching, isError } = useQuery({
     queryKey: ["mobile-search-preview", session?.userId ?? "anonymous", session?.permission ?? 0, debouncedQuery],
-    enabled: Boolean(value && debouncedQuery) && !sessionPending && !boardsLoading,
+    enabled: eligible && value === debouncedQuery && !sessionPending && !boardsLoading,
     staleTime: 30_000,
     retry: false,
     queryFn: async () => {
@@ -59,11 +62,11 @@ export function MobileSearchPreview({ query, lang, onSelect }: { query: string; 
       return [...new Map(items.map(item => [item.key, item])).values()].slice(0, 5);
     },
   });
-  if (!value) return null;
+  if (!eligible || value !== debouncedQuery) return null;
   const waiting = value !== debouncedQuery || isFetching || boardsLoading || sessionPending;
-  return <section className="mobile-search-preview" aria-label={lang === "ko" ? "검색 결과 미리보기" : "Search preview"} aria-busy={waiting}>
-    <div className="mobile-search-preview-heading"><span>{lang === "ko" ? "검색 결과" : "Results"}</span>{waiting && <LoaderCircle className="size-4 animate-spin" aria-label={lang === "ko" ? "검색 중" : "Searching"} />}</div>
+  return <section className="mobile-search-preview" aria-label={lang === "ko" ? "추천 검색 항목" : "Search suggestions"} aria-busy={waiting}>
+    {waiting && <div className="mobile-search-preview-loading"><LoaderCircle className="size-4 animate-spin" aria-label={lang === "ko" ? "검색 중" : "Searching"} /></div>}
     {value === debouncedQuery && data?.map(item => <Link key={item.key} to={item.href} onClick={onSelect} className="mobile-search-preview-row"><span>{item.kind}</span><strong>{item.title}</strong></Link>)}
-    {!waiting && (!data || data.length === 0) && <p role="status">{lang === "ko" ? isError ? "검색 미리보기를 불러오지 못했습니다." : "미리보기 결과가 없습니다. 전체 검색으로 확인해 주세요." : isError ? "Search preview is unavailable." : "No preview results. Try the full search."}</p>}
+    {!waiting && (!data || data.length === 0) && <p role="status">{lang === "ko" ? isError ? "검색하지 못했습니다. 잠시 후 다시 시도해 주세요." : "검색 결과가 없습니다." : isError ? "Search is unavailable. Please try again." : "No results found."}</p>}
   </section>;
 }

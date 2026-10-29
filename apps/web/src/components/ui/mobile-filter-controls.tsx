@@ -7,7 +7,7 @@ export function MobileFilterButton({ active = false, open, onClick, label = "필
 }) {
   return <Button type="button" variant="outline" className="mobile-filter-trigger shrink-0" aria-label={label} aria-haspopup="dialog" aria-expanded={open} onClick={onClick}>
     <SlidersHorizontal className="size-4" aria-hidden="true" />
-    {active && <span className="mobile-filter-active-dot" aria-label="필터 적용됨" />}
+    {active && !open && <span className="mobile-filter-active-dot" aria-hidden="true" />}
   </Button>;
 }
 

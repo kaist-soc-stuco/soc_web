@@ -4,6 +4,24 @@ import type { Language } from "@/hooks/use-language";
 import type { CalendarEvent } from "@/lib/events-surveys";
 import { formatNumericDate } from "../../lib/date-display";
 
+/** Multi-day entries appear once, on the selected day if already in progress. */
+export function buildMobileAgendaGroups(events: CalendarEvent[], selectedDate: Date) {
+  const selected = localDate(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+  const seen = new Set<string>();
+  const grouped = new Map<number, { date: Date; events: CalendarEvent[] }>();
+  for (const event of [...events].sort((a, b) => (a.startAt ?? a.date).valueOf() - (b.startAt ?? b.date).valueOf())) {
+    if (event.isAlways || seen.has(event.id)) continue;
+    const start = event.startAt ?? event.date;
+    const end = event.endAt ?? start;
+    if (!Number.isFinite(start.valueOf()) || !Number.isFinite(end.valueOf()) || end.valueOf() < selected.valueOf()) continue;
+    const date = start < selected ? selected : localDate(start.getFullYear(), start.getMonth(), start.getDate());
+    seen.add(event.id);
+    if (!grouped.has(date.valueOf())) grouped.set(date.valueOf(), { date, events: [] });
+    grouped.get(date.valueOf())!.events.push(event);
+  }
+  return [...grouped.values()].sort((a, b) => a.date.valueOf() - b.date.valueOf());
+}
+
 export function getCalendarEventLocation(event: CalendarEvent, lang: Language) {
   return event.kind === "EVENT" ? (lang === "en" ? event.locationEn || event.location : event.location)?.trim() || "" : "";
 }

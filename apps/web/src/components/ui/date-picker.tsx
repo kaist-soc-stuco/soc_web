@@ -3,6 +3,7 @@ import { CalendarIcon } from "lucide-react";
 import { enUS, ko } from "react-day-picker/locale";
 
 import { useLanguage } from "@/hooks/use-language";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { formatPickerDate, parsePickerDate, replacePickerDate } from "@/lib/date-picker";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
@@ -18,6 +19,11 @@ export function DatePicker({ value, onChange, lang = "ko", children }: {
   children?: React.ReactElement;
 }) {
   const [open, setOpen] = React.useState(false);
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  if (isMobile) return <span className="relative inline-flex min-w-0">
+    <span aria-hidden="true" inert>{children ?? <Button type="button" variant="outline" className="shadcn-datepicker-control font-normal"><CalendarIcon aria-hidden="true" />{value ? formatPickerDate(value) : lang === "ko" ? "날짜 선택" : "Pick a date"}</Button>}</span>
+    <input type="date" aria-label={lang === "ko" ? "날짜 선택" : "Pick a date"} value={value ? formatPickerDate(value) : ""} className="absolute inset-0 h-full w-full min-w-0 cursor-pointer opacity-0" onChange={event => { const date = parsePickerDate(event.currentTarget.value); if (date) onChange(date); }} />
+  </span>;
   return <Popover open={open} onOpenChange={setOpen}>
     <PopoverTrigger asChild>{children ?? <Button type="button" variant="outline" data-filter-trigger className="shadcn-datepicker shadcn-datepicker-control justify-start font-normal"><CalendarIcon aria-hidden="true" />{value ? formatPickerDate(value) : lang === "ko" ? "날짜 선택" : "Pick a date"}</Button>}</PopoverTrigger>
     <PopoverContent className="shadcn-datepicker w-auto p-0" align="start" aria-label={lang === "ko" ? "날짜 선택" : "Pick a date"}>
@@ -30,6 +36,7 @@ export function DatePicker({ value, onChange, lang = "ko", children }: {
 export const DatePickerInput = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   ({ className, type = "date", value, defaultValue, disabled, readOnly, onChange, onFocus, onInvalid, ...props }, forwardedRef) => {
     const { lang } = useLanguage();
+    const isMobile = useMediaQuery("(max-width: 767px)");
     const koLanguage = lang === "ko";
     const withTime = type === "datetime-local";
     const [open, setOpen] = React.useState(false);
@@ -51,7 +58,7 @@ export const DatePickerInput = React.forwardRef<HTMLInputElement, React.InputHTM
     const locale = koLanguage ? ko : enUS;
     const placeholder = withTime ? (koLanguage ? "날짜 선택" : "Pick a date") : props.placeholder || (koLanguage ? "날짜 선택" : "Pick a date");
 
-    React.useImperativeHandle(forwardedRef, () => inputRef.current!, []);
+    React.useImperativeHandle(forwardedRef, () => inputRef.current!, [isMobile]);
     React.useLayoutEffect(() => {
       const input = inputRef.current;
       const label = input?.labels?.[0] ?? input?.parentElement?.parentElement?.querySelector("label");
@@ -77,6 +84,8 @@ export const DatePickerInput = React.forwardRef<HTMLInputElement, React.InputHTM
     const controlClassName = cn("shadcn-datepicker-control h-[var(--ui-control-height)] min-w-0 rounded-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white px-3 text-sm font-normal text-[#344054] outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60", className);
     const widthClassName = className?.split(/\s+/).filter(token => /^(?:[\w-]+:)*(?:w-|min-w-|max-w-)/.test(token)).join(" ");
     const notifyBlur = () => inputRef.current?.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+
+    if (isMobile) return <input {...props} id={id} ref={inputRef} type={type} value={currentValue} disabled={disabled} readOnly={readOnly} className={cn(controlClassName, "native-date-input w-full max-w-full")} onFocus={onFocus} onInvalid={onInvalid} onChange={event => { setUncontrolledValue(event.currentTarget.value); onChange?.(event); }} />;
 
     return <span className={cn("shadcn-datepicker relative w-full min-w-0 max-w-full", withTime ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2" : "inline-flex", widthClassName)} data-slot="date-picker-input">
       <input {...props} id={id} ref={inputRef} type={type} value={value} defaultValue={defaultValue} disabled={disabled} readOnly={readOnly} tabIndex={-1} className="sr-only" aria-hidden="true"

@@ -230,7 +230,7 @@ export function BoardDetailArticleCard({
 
         <RichTextContent
           content={content}
-          className="text-base font-medium leading-7 text-app-text-body md:text-[0.94rem]"
+          className="text-[0.9375rem] font-medium leading-7 text-app-text-body md:text-[0.94rem]"
         />
       </div>
 
@@ -241,7 +241,7 @@ export function BoardDetailArticleCard({
       />
 
       {article.survey && (
-        <div className="mt-6 flex justify-start" data-survey-cta>
+        <div className={`mt-6 flex ${category === "_EVENT" ? "justify-end md:justify-start" : "justify-start"}`} data-survey-cta>
           {registrationClosed ? <Button type="button" variant="secondary" disabled className="w-auto bg-slate-100 text-slate-500 disabled:opacity-100">
             {lang === "ko" ? "신청이 마감되었습니다" : "Registration is closed"}
           </Button> : <Button asChild className="w-auto">

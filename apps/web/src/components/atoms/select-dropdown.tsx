@@ -6,6 +6,8 @@ import { ChevronDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { registerOverlayBranch } from "@/components/ui/use-overlay-behavior";
 import { useLanguage } from "@/hooks/use-language";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { UiSelect } from "@/components/ui/form-control";
 
 export interface DropdownOption {
   value: string;
@@ -45,7 +47,22 @@ const DROPDOWN_MAX_HEIGHT = 240;
 
 const openDropdownListeners = new Set<(instanceId: string) => void>();
 
-export function SelectDropdown({
+export function SelectDropdown(props: SelectDropdownProps) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  return isMobile ? <NativeSelectDropdown {...props} /> : <DesktopSelectDropdown {...props} />;
+}
+
+function NativeSelectDropdown({ id, value, options, onChange, placeholder, className, ariaLabel, ariaLabelledBy, ariaDescribedBy, buttonClassName, disabled, autoFocus, ariaInvalid, onOpenChange }: SelectDropdownProps) {
+  const { lang } = useLanguage();
+  return <div className={`native-select-dropdown min-w-0 ${className || ""}`}>
+    <UiSelect id={id} value={value} disabled={disabled} autoFocus={autoFocus} aria-label={ariaLabel} aria-labelledby={ariaLabelledBy} aria-describedby={ariaDescribedBy} aria-invalid={ariaInvalid || undefined} className={`w-full ${buttonClassName || ""}`} onPointerDown={() => onOpenChange?.(true)} onBlur={() => onOpenChange?.(false)} onChange={event => { onChange(event.currentTarget.value); onOpenChange?.(false); }}>
+      {!options.some(option => option.value === value) && <option value={value} disabled>{placeholder || (lang === "ko" ? "선택하세요" : "Select")}</option>}
+      {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </UiSelect>
+  </div>;
+}
+
+function DesktopSelectDropdown({
   id,
   value,
   options,

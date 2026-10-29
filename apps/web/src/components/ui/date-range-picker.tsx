@@ -8,6 +8,7 @@ import { Calendar } from "./calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { formatPickerDate, parsePickerDate } from "@/lib/date-picker";
+import { UiInput } from "./form-control";
 
 export type DateRange = { from: string; to: string };
 export type DateRangePresetType = "past" | "future";
@@ -43,7 +44,10 @@ export function DateRangePicker({
       {(value.from || value.to) && <button type="button" aria-label={isKorean ? "기간 선택 해제" : "Clear date range"} className="absolute right-1 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring" onClick={() => { onChange({ from: "", to: "" }); setOpen(false); }}><X aria-hidden="true" className="size-3.5" /></button>}
     </div>
     <PopoverContent align={align} className="shadcn-datepicker w-auto max-h-[var(--radix-popover-content-available-height)] overflow-y-auto p-0" aria-label={label}>
-      <Calendar mode="range" selected={selected} defaultMonth={selected?.from} onSelect={range => onChange({ from: range?.from ? formatPickerDate(range.from) : "", to: range?.to ? formatPickerDate(range.to) : "" })} numberOfMonths={isMobile ? 1 : 2} locale={isKorean ? ko : enUS} disabled={disableFuture ? { after: today } : undefined} endMonth={disableFuture ? today : undefined} autoFocus />
+      {isMobile ? <div className="grid w-[min(22rem,calc(100vw-2rem))] grid-cols-2 gap-3 p-4">
+        <label className="min-w-0 space-y-1 text-xs text-slate-600"><span>{isKorean ? "시작일" : "From"}</span><UiInput type="date" value={value.from} max={value.to || (disableFuture ? formatPickerDate(today) : undefined)} onChange={event => onChange({ from: event.currentTarget.value, to: value.to && event.currentTarget.value > value.to ? event.currentTarget.value : value.to })} /></label>
+        <label className="min-w-0 space-y-1 text-xs text-slate-600"><span>{isKorean ? "종료일" : "To"}</span><UiInput type="date" value={value.to} min={value.from || undefined} max={disableFuture ? formatPickerDate(today) : undefined} onChange={event => onChange({ from: value.from && event.currentTarget.value && event.currentTarget.value < value.from ? event.currentTarget.value : value.from, to: event.currentTarget.value })} /></label>
+      </div> : <Calendar mode="range" selected={selected} defaultMonth={selected?.from} onSelect={range => onChange({ from: range?.from ? formatPickerDate(range.from) : "", to: range?.to ? formatPickerDate(range.to) : "" })} numberOfMonths={2} locale={isKorean ? ko : enUS} disabled={disableFuture ? { after: today } : undefined} endMonth={disableFuture ? today : undefined} autoFocus />}
     </PopoverContent>
   </Popover>;
 }

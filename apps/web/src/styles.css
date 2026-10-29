@@ -5308,13 +5308,17 @@ input[type="search"]:focus-visible,
   html { scrollbar-width: none; }
   html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; }
   #ch-plugin-script.ch-desk-messenger {
-    left: 0 !important; top: 52px !important; width: 100% !important; height: calc(100dvh - 52px) !important;
+    left: 0 !important; top: calc(48px + env(safe-area-inset-top)) !important; width: 100% !important; height: calc(100dvh - 48px - env(safe-area-inset-top)) !important;
     min-width: 0 !important; min-height: 0 !important; max-width: 100vw !important; max-height: 100dvh !important; border-radius: 0 !important;
+    background: #f7f7f8 !important;
   }
   body.channel-talk-messenger-open { overflow: hidden; }
   body.channel-talk-messenger-open #ch-plugin { z-index: 90 !important; }
-  .channel-mobile-close-bar { position: fixed; inset: 0 0 auto; z-index: 91; display: flex; align-items: center; justify-content: flex-end; height: 52px; padding-inline: .5rem; background: #fff; }
-  .channel-mobile-close { width: 44px; height: 44px; min-height: 44px; border-radius: 50%; background: #f1f5f9; }
+  .channel-mobile-close-bar { position: fixed; inset: 0 0 auto; z-index: 91; display: flex; align-items: center; justify-content: flex-end; height: calc(48px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) .5rem 0; background: #f7f7f8; }
+  .channel-mobile-close-bar .channel-mobile-close { position: relative; width: 44px; height: 44px; min-height: 44px; border: 0; background: transparent; color: #fff; }
+  .channel-mobile-close::before { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: #85878e; }
+  .channel-mobile-close:hover::before { background: #696b73; }
+  .channel-mobile-close > svg { position: relative; width: 18px; height: 18px; stroke-width: 3; }
   .home-page-shell [data-home-hero] { display: none; }
   .site-header-home { margin-bottom: 0; background: #fff; }
   .site-header-home::before { background: #fff; opacity: 1; }
@@ -5436,7 +5440,7 @@ input[type="search"]:focus-visible,
   .mobile-filter-toolbar input { height: 44px; min-height: 44px; font-size: 1rem; font-weight: 400; }
   .mobile-filter-toolbar button.absolute { height: 44px; width: 44px; min-height: 44px; }
   .mobile-filter-trigger { position: relative; height: 44px; min-height: 44px; padding-inline: .75rem; gap: .375rem; font-size: .875rem; font-weight: 500; }
-  .mobile-filter-active-dot { position: absolute; top: 6px; right: 6px; width: 5px; height: 5px; border-radius: 50%; background: #008754; }
+  .mobile-filter-active-dot { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: #008754; box-shadow: 0 0 0 2px #fff; }
   .mobile-filter-sheet { inset: auto 0 0 !important; width: 100%; max-width: none; max-height: min(85dvh,42rem); border: 0; border-radius: 1.5rem 1.5rem 0 0; padding-inline: 1.25rem; }
   .mobile-filter-sheet > .filter-sheet-header { margin-bottom: .75rem; }
   .mobile-filter-sheet > .filter-sheet-header h2 { font-size: 1.25rem; }
@@ -5448,6 +5452,10 @@ input[type="search"]:focus-visible,
   .mobile-filter-fieldset :is(select,input[type="date"],input[type="month"]) { width: 100%; min-width: 0; height: 44px; min-height: 44px; padding-inline: .625rem; border: 1px solid #dfe7e7; border-radius: .5rem; background: #fff; color: #1e293b; font-size: 1rem; }
   .mobile-filter-date-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .75rem; }
   .mobile-filter-date-fields label { min-width: 0; }
+  .native-date-input { display: block; min-width: 0; min-height: 44px; font-size: 1rem; }
+  .native-date-input::-webkit-date-and-time-value { min-height: 1.25em; text-align: left; }
+  .native-select-dropdown > span { width: 100%; }
+  .native-select-dropdown select { min-width: 0; min-height: 44px; font-size: 1rem; }
   .mobile-filter-date-fields label > span { display: block; margin-bottom: .375rem; color: #64748b; font-size: .75rem; }
   .mobile-filter-footer { display: flex; gap: .5rem; padding-top: .75rem; background: #fff; }
   .mobile-filter-footer > button { flex: 1; height: 44px; min-height: 44px; font-size: .875rem; font-weight: 500; }
@@ -5484,11 +5492,14 @@ input[type="search"]:focus-visible,
   }
 }
 @media (max-width: 767px) {
-  .mobile-calendar-subscription .calendar-subscription-content { padding-bottom: .25rem; }
-  .mobile-calendar-subscription .calendar-subscription-content button { width: 44px; height: 44px; min-height: 44px; }
-  .mobile-calendar-subscription .calendar-subscription-content a { min-height: 44px; font-size: .875rem; }
-  .mobile-course-sheet .roadmap-course-details { padding-top: 0; }
-  .mobile-course-sheet .roadmap-details-scroll { max-height: none; overflow: visible; }
+  .mobile-calendar-subscription { min-height: min(50dvh,23rem); }
+  .mobile-calendar-subscription .calendar-subscription-content { padding-block: .5rem; }
+  .mobile-calendar-subscription .calendar-subscription-content :is(button,a) { width: 100%; height: auto; min-height: 56px; font-size: .875rem; }
+  .mobile-calendar-subscription .calendar-subscription-content button > span { min-width: 0; white-space: nowrap; }
+  .mobile-course-sheet { height: min(85dvh,42rem); }
+  .mobile-course-sheet-body { display: flex; overflow: hidden; }
+  .mobile-course-sheet .roadmap-course-details { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; padding-top: 0; }
+  .mobile-course-sheet .roadmap-details-scroll { flex: 1; min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior: contain; }
   .mobile-course-sheet .roadmap-course-details [role="tab"] { font-size: .875rem; font-weight: 500; }
   .mobile-active-vote-card { padding: 1rem; }
   .mobile-active-vote-card h3 { font-size: 1.125rem; line-height: 1.45; }

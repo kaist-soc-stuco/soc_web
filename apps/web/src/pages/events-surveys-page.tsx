@@ -12,6 +12,8 @@ import { EventsSurveysLoadMore } from "@/features/events-surveys/events-surveys-
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { Permissions } from "@/lib/permissions";
 import "@/features/events-surveys/events-surveys-calendar.css";
+import { WriteFloatingAction } from "@/components/ui/write-floating-action";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import {
   PageHeader,
   PageContainer,
@@ -57,6 +59,7 @@ function getEmptyStateMessage(
 }
 
 export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const [searchParams] = useSearchParams();
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
@@ -128,12 +131,12 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
               <CalendarSubscriptionButton feedUrl={calendarFeedUrl} lang={lang} />
             ) : currentTab === "survey" &&
             Permissions.has(session?.permission ?? 0, Permissions.MANAGE_SURVEY) ? (
-              <Button asChild>
+              <Button asChild className="hidden md:inline-flex">
                 <Link to="/admin/surveys/new">{lang === "ko" ? "등록" : "Create"}</Link>
               </Button>
             ) : currentTab === "event" &&
               Permissions.has(session?.permission ?? 0, Permissions.WRITE_OFFICIAL) ? (
-              <Button asChild>
+              <Button asChild className="hidden md:inline-flex">
                 <Link to="/events/write">
                   {lang === "ko" ? "등록" : "Create"}
                 </Link>
@@ -228,6 +231,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
           )}
         </PageContainer>
       </PageMain>
+      {isMobile && currentTab === "event" && Permissions.has(session?.permission ?? 0, Permissions.WRITE_OFFICIAL) && <WriteFloatingAction to="/events/write" label={lang === "ko" ? "행사 등록" : "Create event"} />}
     </PageShell>
   );
 }

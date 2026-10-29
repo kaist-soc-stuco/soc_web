@@ -6,6 +6,8 @@ import { IconButton } from "@/components/ui/icon-button";
 import { useOverlayBehavior } from "@/components/ui/use-overlay-behavior";
 import { cn } from "@/lib/utils";
 import { SheetHandle } from "@/components/ui/sheet-handle";
+import { useSheetMotion } from "@/components/ui/use-sheet-motion";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 const ModalDepthContext = createContext(0);
 let openModalCount = 0;
@@ -39,16 +41,18 @@ export function Modal({
   title: ReactNode;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const { present, requestClose } = useSheetMotion(open, surfaceRef, onClose, isMobile && placement === "bottom");
   const depth = useContext(ModalDepthContext);
   const titleId = useId();
   const handleOverlayKeyDown = useOverlayBehavior({
-    onClose,
-    open,
+    onClose: requestClose,
+    open: present,
     surfaceRef,
   });
 
   useEffect(() => {
-    if (!open || typeof document === "undefined") return;
+    if (!present || typeof document === "undefined") return;
 
     openModalCount += 1;
     document.body.classList.add("ui-modal-open");
@@ -56,9 +60,9 @@ export function Modal({
       openModalCount -= 1;
       if (openModalCount === 0) document.body.classList.remove("ui-modal-open");
     };
-  }, [open]);
+  }, [present]);
 
-  if (!open) return null;
+  if (!present) return null;
 
   return createPortal(
     <ModalDepthContext.Provider value={depth + 1}>
@@ -68,7 +72,7 @@ export function Modal({
         aria-label="닫기"
         tabIndex={-1}
         className="ui-modal__scrim absolute inset-0 bg-slate-950/30"
-        onClick={onClose}
+        onClick={requestClose}
       />
       <div
         ref={surfaceRef}
@@ -86,7 +90,7 @@ export function Modal({
           className,
         )}
       >
-        {placement === "bottom" && <SheetHandle onClose={onClose} />}
+        {placement === "bottom" && <SheetHandle onClose={requestClose} />}
         <div
           className={cn(
             "ui-modal__header flex shrink-0 items-center justify-between gap-3 px-5 pt-5",
@@ -96,7 +100,7 @@ export function Modal({
           <div className="flex shrink-0 items-center gap-1.5">
             {headerActions}
             {showClose ? (
-              <IconButton aria-label="닫기" onClick={onClose} tone="navigation">
+              <IconButton aria-label="닫기" onClick={requestClose} tone="navigation">
                 <X aria-hidden="true" />
               </IconButton>
             ) : null}

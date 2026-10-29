@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArticleListTitle } from "@/components/ui/article-list-title";
 import type { CurrentUserResponse, MyScrapItem } from "@soc/contracts";
 import { isoToMs, nowMs } from "@soc/shared";
-import { Bookmark, Clock3, FileText, LockKeyhole, MessageCircle, RefreshCw, RotateCcw, SearchX, ShieldCheck, User, WifiOff, type LucideIcon } from "lucide-react";
+import { Bookmark, ChevronRight, Clock3, FileText, LockKeyhole, MessageCircle, RefreshCw, RotateCcw, SearchX, ShieldCheck, User, WifiOff, type LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { ListState, ListStateAction } from "@/components/ui/data-state";
@@ -217,6 +217,7 @@ interface ProfilePanelProps {
   isAdmin: boolean;
   lang: string;
   userInfo: UserInfo;
+  onActivitySelect?: (tab: ActivityTab) => void;
 }
 
 export function MyPageProfilePanel({
@@ -224,6 +225,7 @@ export function MyPageProfilePanel({
   isAdmin,
   lang,
   userInfo,
+  onActivitySelect,
 }: ProfilePanelProps) {
   const department =
     lang === "ko"
@@ -268,18 +270,22 @@ export function MyPageProfilePanel({
   ] as const;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="mb-1.5 select-none">
+    <div className="mypage-profile-panel flex flex-col gap-4">
+      <div className="mobile-mypage-identity md:hidden">
+        <span className="mobile-profile-avatar"><User aria-hidden="true" /></span>
+        <div><h2>{displayName}</h2><p>{[userInfo?.studentNumber, primaryMajor !== "-" ? primaryMajor : null].filter(Boolean).join(" · ")}</p></div>
+      </div>
+      <div className="hidden md:block mb-1.5 select-none">
         <h1 className="text-[length:var(--ui-text-page-title-mobile-size)] font-bold leading-8 tracking-tight text-slate-900 sm:text-[length:var(--ui-text-page-title-size)] sm:leading-9">
           {lang === "ko" ? "내 정보" : "Profile"}
         </h1>
       </div>
 
-      <div className="grid grid-cols-1 gap-x-8 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 sm:p-5 select-text">
-        {profileRows.map(([label, value]) => (
+      <div className="mypage-profile-fields grid grid-cols-1 gap-x-8 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 sm:p-5 select-text">
+        {profileRows.map(([label, value], index) => (
           <div
             key={label}
-            className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3 border-b border-slate-100 py-2 text-[length:var(--ui-text-body-sm-size)] last:border-b-0 sm:[&:nth-last-child(2)]:border-b-0"
+            className={`${index < 2 ? "hidden md:grid" : "grid"} min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3 border-b border-slate-100 py-2 text-[length:var(--ui-text-body-sm-size)] last:border-b-0 sm:[&:nth-last-child(2)]:border-b-0`}
           >
             <span className="font-normal text-xs text-slate-400">{label}</span>
             <span className="min-w-0 break-words font-normal text-sm text-slate-800">
@@ -289,6 +295,10 @@ export function MyPageProfilePanel({
         ))}
       </div>
       <FeeConsentPanel lang={lang} />
+      {onActivitySelect && <nav className="mobile-mypage-shortcuts md:hidden" aria-label={lang === "ko" ? "내 활동 바로가기" : "My activity"}>
+        {([{ id: "post", ko: "작성한 글", en: "My posts", icon: FileText }, { id: "comment", ko: "댓글 단 글", en: "Commented posts", icon: MessageCircle },
+          { id: "scraps", ko: "스크랩", en: "Saved content", icon: Bookmark }, { id: "survey", ko: "설문 응답", en: "Survey responses", icon: Clock3 }] as const).map(item => <button key={item.id} type="button" onClick={() => onActivitySelect(item.id)}><item.icon aria-hidden="true" /><span>{lang === "ko" ? item.ko : item.en}</span><ChevronRight aria-hidden="true" /></button>)}
+      </nav>}
     </div>
   );
 }
@@ -401,7 +411,7 @@ export function MyPageActivityPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="mb-1.5 select-none">
+      <div className="hidden md:block mb-1.5 select-none">
         <h1 className="text-[length:var(--ui-text-page-title-mobile-size)] font-bold leading-8 tracking-tight text-slate-900 sm:text-[length:var(--ui-text-page-title-size)] sm:leading-9">
           {lang === "ko" ? "활동 내역" : "Activity"}
         </h1>

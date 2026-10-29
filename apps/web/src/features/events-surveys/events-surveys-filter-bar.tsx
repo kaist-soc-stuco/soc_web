@@ -14,9 +14,9 @@ const stateFilters: Array<{
   labelKo: string;
   labelEn: string;
 }> = [
+  { value: "all", labelKo: "전체", labelEn: "All" },
   { value: "active", labelKo: "예정·진행 중", labelEn: "Upcoming & ongoing" },
   { value: "closed", labelKo: "지난 행사", labelEn: "Past events" },
-  { value: "all", labelKo: "전체", labelEn: "All" },
 ];
 
 interface EventsSurveysFilterBarProps {
@@ -49,10 +49,9 @@ export function EventsSurveysFilterBar({
   const isMobile = useMediaQuery("(max-width: 767px)");
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState({ state: stateFilter, from: dateFrom, to: dateTo });
-  const filters = isSurvey ? [stateFilters[0], { value: "always" as const, labelKo: "상시", labelEn: "Always open" }, { ...stateFilters[1], labelKo: "종료된 설문", labelEn: "Ended surveys" }, stateFilters[2]] : stateFilters;
+  const filters = isSurvey ? [stateFilters[0], stateFilters[1], { value: "always" as const, labelKo: "상시", labelEn: "Always open" }, { ...stateFilters[2], labelKo: "종료된 설문", labelEn: "Ended surveys" }] : stateFilters;
   const options = filters.map(filter => ({ value: filter.value, label: <span className="inline-flex items-center gap-1"><span>{lang === "ko" ? filter.labelKo : filter.labelEn}</span><span className="tabular-nums text-[length:var(--ui-text-caption-size)] text-slate-400">{stateCounts[filter.value]}</span></span> }));
   if (isMobile) return <>
-    {isSurvey && <div className="mb-3 min-w-0 max-w-full overflow-x-auto"><SegmentedControl ariaLabel={lang === "ko" ? "설문 상태" : "Survey status"} className="clean-segmented-control" options={options} value={stateFilter} onChange={onStateFilterChange} /></div>}
     <div className="mobile-filter-toolbar mb-5">
     <PageSearchField ariaLabel={lang === "ko" ? "행사·설문 검색" : "Search events and surveys"} className="!w-full min-w-0" value={query} onChange={onQueryChange} onClear={() => onQueryChange("")} placeholder={lang === "ko" ? "제목, 내용 검색" : "Search titles and content"} />
     <MobileFilterButton label={lang === "ko" ? "필터" : "Filter"} active={stateFilter !== "active" || Boolean(dateFrom || dateTo)} open={open} onClick={() => { setDraft({ state: stateFilter, from: dateFrom, to: dateTo }); setOpen(true); }} />

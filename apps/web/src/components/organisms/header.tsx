@@ -36,6 +36,10 @@ import { getBoardLabelFromMetadata, isLegacyPublicBoardCode } from "@/lib/board-
 import { Permissions } from "@/lib/permissions";
 import { VOTING_ENABLED } from "@/lib/feature-flags";
 import { MobileSearchPreview } from "@/features/search/mobile-search-preview";
+import { canPreviewSearch } from "@/features/search/search-preview-query";
+import { FilterSheet } from "@/components/ui/filter-sheet";
+import { MobileNavigationProfile } from "./mobile-navigation-profile";
+import { getMobileAdminHome } from "@/lib/mobile-admin";
 
 interface HeaderProps {
   variant?: "default" | "home";
@@ -69,6 +73,8 @@ export function Header({ variant = "default" }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchComposing, setSearchComposing] = useState(false);
+  useEffect(() => { if (!searchOpen) setSearchComposing(false); }, [searchOpen]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedMobileSection, setExpandedMobileSection] = useState<string | null | undefined>(undefined);
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -320,7 +326,7 @@ export function Header({ variant = "default" }: HeaderProps) {
 
       if (!isInsideSearch) setSearchOpen(false);
       if (!isInsideProfile) setDropdownOpen(false);
-      if (!isInsideNotifications) setNotificationOpen(false);
+      if (!isInsideNotifications && !window.matchMedia("(max-width: 767px)").matches) setNotificationOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -498,12 +504,76 @@ export function Header({ variant = "default" }: HeaderProps) {
 
   const activeNavIndex = navItems.findIndex(isNavItemActive);
   const expandedMobileHref = expandedMobileSection === undefined
-    ? navItems[activeNavIndex]?.href ?? navItems[0]?.href
+    ? navItems[activeNavIndex]?.href ?? (isMobile ? null : navItems[0]?.href)
     : expandedMobileSection;
   const indicatorIndex = indicatorHoverIndex ?? activeNavIndex;
   const { rootRef: navRef, indicatorRef } = useNavigationIndicator<HTMLElement>(
     indicatorIndex >= 0 ? `[data-nav-index="${indicatorIndex}"] > a` : null, lang,
   );
+
+  const notificationContent = <>
+                  <div className="notification-content-heading flex h-14 items-center justify-between border-b border-slate-100 px-4">
+                    <p className="text-base font-bold text-slate-900">
+                      {lang === "ko" ? "알림" : "Notifications"}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={unreadNotificationCount === 0}
+                      className="h-8 rounded-md border-0 bg-transparent px-2 text-xs font-medium text-slate-400 shadow-none hover:bg-slate-100 hover:text-slate-600 disabled:pointer-events-none disabled:opacity-60"
+                      onClick={() => {
+                        void apiClient.markAllNotificationsRead().then(() => {
+                          setUnreadNotificationCount(0);
+                          setNotifications([]);
+                        });
+                      }}
+                    >
+                      {lang === "ko" ? "모두 읽음으로 표시" : "Mark all as read"}
+                    </Button>
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="flex min-h-36 flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+                      <Bell aria-hidden="true" className="size-5 text-slate-400" />
+                      <p className="text-sm font-normal text-slate-400">
+                        {lang === "ko" ? "새로운 알림이 없습니다." : "There are no new notifications."}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="scrollbar-hidden max-h-80 overflow-y-auto">
+                      {notifications.map((notification) => (
+                        <Button variant="ghost"
+                          key={notification.notificationId}
+                          type="button"
+                          className={`flex min-h-14 w-full flex-col items-start gap-0.5 whitespace-normal rounded-none border-0 border-b border-slate-100 px-3.5 py-2.5 text-left transition-colors last:border-b-0 hover:bg-slate-50 ${notification.isRead ? "bg-white" : "bg-emerald-50/45"}`}
+                          onClick={() => {
+                            void apiClient
+                              .markNotificationRead(notification.notificationId)
+                              .then(() => {
+                                setNotifications((items) =>
+                                  items.filter(
+                                    (item) => item.notificationId !== notification.notificationId,
+                                  ),
+                                );
+                                setUnreadNotificationCount((count) => Math.max(0, count - (notification.isRead ? 0 : 1)));
+                                setNotificationOpen(false);
+                                if (notification.link) navigate(notification.link);
+                              });
+                          }}
+                        >
+                          <span className="text-[length:var(--home-event-description-size)] font-medium text-slate-800">
+                            {notification.titleKo}
+                          </span>
+                          {notification.bodyKo && (
+                            <span className="line-clamp-2 text-[length:var(--home-calendar-event-size)] font-normal leading-4 text-slate-500">
+                              {notification.bodyKo}
+                            </span>
+                          )}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+  </>;
 
   return (
     <header
@@ -702,6 +772,7 @@ export function Header({ variant = "default" }: HeaderProps) {
               <IconButton
                 ref={notificationTriggerRef}
                 aria-label={lang === "ko" ? "알림" : "Notifications"}
+                disabled={mobileMenuOpen}
                 aria-expanded={notificationOpen}
                 onClick={() => {
                   setNotificationOpen((value) => !value);
@@ -718,70 +789,8 @@ export function Header({ variant = "default" }: HeaderProps) {
                 )}
               </IconButton>
 
-              {notificationOpen && (
-                <PopoverPanel className="site-header-notification-panel right-0 top-full w-[min(25rem,calc(100vw-2rem))]">
-                  <div className="flex h-14 items-center justify-between border-b border-slate-100 px-4">
-                    <p className="text-base font-bold text-slate-900">
-                      {lang === "ko" ? "알림" : "Notifications"}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={unreadNotificationCount === 0}
-                      className="h-8 rounded-md border-0 bg-transparent px-2 text-xs font-medium text-slate-400 shadow-none hover:bg-slate-100 hover:text-slate-600 disabled:pointer-events-none disabled:opacity-60"
-                      onClick={() => {
-                        void apiClient.markAllNotificationsRead().then(() => {
-                          setUnreadNotificationCount(0);
-                          setNotifications([]);
-                        });
-                      }}
-                    >
-                      {lang === "ko" ? "모두 읽음으로 표시" : "Mark all as read"}
-                    </Button>
-                  </div>
-                  {notifications.length === 0 ? (
-                    <div className="flex min-h-36 flex-col items-center justify-center gap-3 px-4 py-8 text-center">
-                      <Bell aria-hidden="true" className="size-5 text-slate-400" />
-                      <p className="text-sm font-normal text-slate-400">
-                        {lang === "ko" ? "새로운 알림이 없습니다." : "There are no new notifications."}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="scrollbar-hidden max-h-80 overflow-y-auto">
-                      {notifications.map((notification) => (
-                        <Button variant="ghost"
-                          key={notification.notificationId}
-                          type="button"
-                          className={`flex min-h-14 w-full flex-col items-start gap-0.5 whitespace-normal rounded-none border-0 border-b border-slate-100 px-3.5 py-2.5 text-left transition-colors last:border-b-0 hover:bg-slate-50 ${notification.isRead ? "bg-white" : "bg-emerald-50/45"}`}
-                          onClick={() => {
-                            void apiClient
-                              .markNotificationRead(notification.notificationId)
-                              .then(() => {
-                                setNotifications((items) =>
-                                  items.filter(
-                                    (item) => item.notificationId !== notification.notificationId,
-                                  ),
-                                );
-                                setUnreadNotificationCount((count) => Math.max(0, count - (notification.isRead ? 0 : 1)));
-                                setNotificationOpen(false);
-                                if (notification.link) navigate(notification.link);
-                              });
-                          }}
-                        >
-                          <span className="text-[length:var(--home-event-description-size)] font-medium text-slate-800">
-                            {notification.titleKo}
-                          </span>
-                          {notification.bodyKo && (
-                            <span className="line-clamp-2 text-[length:var(--home-calendar-event-size)] font-normal leading-4 text-slate-500">
-                              {notification.bodyKo}
-                            </span>
-                          )}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </PopoverPanel>
+              {notificationOpen && !isMobile && (
+                <PopoverPanel className="site-header-notification-panel right-0 top-full w-[min(25rem,calc(100vw-2rem))]">{notificationContent}</PopoverPanel>
               )}
             </div>
           )}
@@ -790,8 +799,10 @@ export function Header({ variant = "default" }: HeaderProps) {
             <div ref={profileRef} className="relative">
               <IconButton
                 aria-label={lang === "ko" ? `${user.name} 프로필` : `${user.name} profile`}
-                aria-expanded={dropdownOpen}
+                disabled={mobileMenuOpen}
+                aria-expanded={isMobile ? undefined : dropdownOpen}
                 onClick={() => {
+                  if (isMobile) { closePopovers(); navigate("/mypage"); return; }
                   setDropdownOpen((value) => !value);
                   setSearchOpen(false);
                 }}
@@ -800,7 +811,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                 <User aria-hidden="true" />
               </IconButton>
 
-              {dropdownOpen && (
+              {dropdownOpen && !isMobile && (
                 <PopoverPanel className="right-0 top-full w-52">
                   <div className="border-b border-slate-100 px-3.5 py-3">
                     <p className="min-w-0 truncate text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-900">
@@ -847,6 +858,7 @@ export function Header({ variant = "default" }: HeaderProps) {
           ) : isTemporarySession ? (
             <IconButton
               aria-label={lang === "ko" ? "임시 세션 로그아웃" : "Log out temporary session"}
+              disabled={mobileMenuOpen}
               onClick={() => void handleLogout()}
               className={variant === "home" ? "home-header-icon" : undefined}
             >
@@ -884,6 +896,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             onClick={() => {
               if (!mobileMenuOpen) setExpandedMobileSection(undefined);
               setMobileMenuOpen((value) => !value);
+              setNotificationOpen(false);
               setSearchOpen(false);
               setDropdownOpen(false);
             }}
@@ -920,6 +933,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             <h2 id="mobile-primary-navigation-title" className="sr-only">
               {lang === "ko" ? "모바일 주요 메뉴" : "Mobile primary navigation"}
             </h2>
+            <MobileNavigationProfile lang={lang} onNavigate={() => { setMobileMenuOpen(false); closePopovers(); }} onLogin={() => void handleStartLogin()} />
             <nav
               className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4"
               aria-label={lang === "ko" ? "모바일 주요 메뉴" : "Mobile primary navigation"}
@@ -985,72 +999,31 @@ export function Header({ variant = "default" }: HeaderProps) {
             </div>
             </nav>
 
-          <div className="mobile-nav-account shrink-0 grid gap-3 border-t border-slate-100 bg-white px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
-            <Button type="button" variant="ghost" className="mobile-nav-language justify-between" onClick={() => setLanguage(lang === "ko" ? "en" : "ko")} aria-label={lang === "ko" ? "영어로 전환" : "Switch to Korean"}>
-              <span>{lang === "ko" ? "언어" : "Language"}</span><span>{lang === "ko" ? "English" : "한국어"}</span>
-            </Button>
-            {user ? (
-              <div
-                className={`grid items-center gap-2 ${
-                  canUseAdminDashboard
-                    ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.75rem]"
-                    : "grid-cols-[minmax(0,1fr)_2.75rem]"
-                }`}
-              >
-                <Link
-                  to="/mypage"
-                  onClick={handleMobileNavigation}
-                  className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl border border-slate-200 px-2 text-center text-xs font-medium text-slate-700"
-                >
-                  {lang === "ko" ? "마이페이지" : "My Page"}
-                </Link>
-                {canUseAdminDashboard && (
-                  <Link
-                    to="/admin/content"
-                    onClick={handleMobileNavigation}
-                    className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-kaist-darkgreen px-2 text-center text-xs font-medium text-white"
-                  >
-                    {lang === "ko" ? "관리자" : "Admin"}
-                  </Link>
-                )}
-                <Button variant="ghost"
-                  type="button"
-                  onClick={() => void handleLogout()}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-red-200 text-red-600"
-                  aria-label={lang === "ko" ? "로그아웃" : "Logout"}
-                >
-                  <LogOut aria-hidden="true" className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <div className="mobile-nav-login grid grid-cols-2 items-center gap-2">
-                <Button variant="ghost"
-                  type="button"
-                  onClick={() => void handleStartLogin()}
-                  disabled={loginStarting}
-                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-kaist-darkgreen px-4 text-xs font-medium text-white disabled:opacity-60"
-                >
-                  {lang === "ko" ? "로그인" : "Login"}
-                </Button>
-              </div>
-            )}
+          <div className="mobile-nav-account mobile-nav-account-minimal shrink-0 border-t border-slate-100 bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
+            <div className="mobile-nav-language-toggle"><span>{lang === "ko" ? "언어" : "Language"}</span><div><button type="button" aria-pressed={lang === "ko"} onClick={() => setLanguage("ko")}>한국어</button><button type="button" aria-pressed={lang === "en"} onClick={() => setLanguage("en")}>English</button></div></div>
+            {user && <div className="mobile-nav-utility-links">
+              {canUseAdminDashboard && getMobileAdminHome(user.permission) && <Link to={getMobileAdminHome(user.permission)!} onClick={handleMobileNavigation}><LayoutDashboard aria-hidden="true" />{lang === "ko" ? "관리자 콘솔" : "Admin console"}</Link>}
+              <button type="button" onClick={() => void handleLogout()}><LogOut aria-hidden="true" />{lang === "ko" ? "로그아웃" : "Sign out"}</button>
+            </div>}
           </div>
           </div>
         </>, document.body,
       )}
 
+      {isMobile && <FilterSheet open={notificationOpen} onClose={() => setNotificationOpen(false)} title={lang === "ko" ? "알림" : "Notifications"} closeLabel={lang === "ko" ? "알림 닫기" : "Close notifications"} className="mobile-notification-sheet" bodyClassName="!overflow-visible">{notificationContent}</FilterSheet>}
+
       {isMobile && searchOpen && createPortal(
         <div ref={mobileSearchRef} role="dialog" aria-modal="true" aria-label={lang === "ko" ? "통합검색" : "Site search"}
           tabIndex={-1} onKeyDown={handleMobileSearchKeyDown} className="mobile-search-overlay">
-          <form role="search" onSubmit={handleSearchSubmit} className="mobile-search-form">
+          <form role="search" onSubmit={handleSearchSubmit} onKeyDown={event => { if (event.key === "Enter" && (searchComposing || event.nativeEvent.isComposing)) event.preventDefault(); }} className="mobile-search-form">
             <Search aria-hidden="true" className="size-5 shrink-0 text-slate-400" />
             <input ref={mobileSearchInputRef} id="mobile-site-search-input" type="search" aria-label={lang === "ko" ? "통합검색 검색어" : "Site search query"}
               placeholder={lang === "ko" ? "무엇을 찾으시나요?" : "What are you looking for?"}
-              value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} autoComplete="off" enterKeyHint="search" />
+              value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onCompositionStart={() => setSearchComposing(true)} onCompositionEnd={() => setSearchComposing(false)} autoComplete="off" enterKeyHint="search" />
             <IconButton aria-label={lang === "ko" ? "검색 닫기" : "Close search"} onClick={() => { setSearchOpen(false); requestAnimationFrame(() => searchTriggerRef.current?.focus()); }}><X /></IconButton>
           </form>
-          <MobileSearchPreview query={searchQuery} lang={lang} onSelect={closePopovers} />
-          {searchQuery.trim() && <button type="button" className="mobile-search-submit" onClick={() => {
+          <MobileSearchPreview query={searchQuery} composing={searchComposing} lang={lang} onSelect={closePopovers} />
+          {canPreviewSearch(searchQuery, searchComposing) && <button type="button" className="mobile-search-submit" onClick={() => {
             navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`); closePopovers();
           }}><Search className="size-4 text-slate-400" aria-hidden="true" /><span>{lang === "ko" ? "전체 검색 결과 보기" : "View all search results"}</span></button>}
         </div>, document.body,

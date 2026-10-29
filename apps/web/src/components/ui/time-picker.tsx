@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Clock3, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { Button } from "./button";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 
@@ -15,6 +16,7 @@ type TimePickerProps = Pick<React.InputHTMLAttributes<HTMLInputElement>, "id" | 
 /** App-styled time selection composed from shadcn Popover and Button. */
 export function TimePicker({ value, onChange, onBlur, label, lang, min, max, step, className, disabled, readOnly, required, ...props }: TimePickerProps) {
   const [open, setOpen] = React.useState(false);
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const contentRef = React.useRef<HTMLDivElement>(null);
   const korean = lang === "ko";
   const hasSeconds = Number(step ?? 60) < 60 || Boolean(value.split(":")[2]);
@@ -42,6 +44,8 @@ export function TimePicker({ value, onChange, onBlur, label, lang, min, max, ste
   const columns = korean ? ["시", "분", "초"] : ["Hour", "Minute", "Second"];
   const minuteStep = Number(step ?? 60) >= 60 && Number(step ?? 60) % 60 === 0 ? Math.min(60, Number(step ?? 60) / 60) : 1;
   const secondStep = Number(step ?? 1) > 0 && Number(step) < 60 ? Math.max(1, Math.floor(Number(step))) : 1;
+
+  if (isMobile) return <input {...props} type="time" aria-label={label} value={value} min={min} max={max} step={step} disabled={disabled} readOnly={readOnly} required={required} onBlur={onBlur} onChange={event => onChange(event.currentTarget.value)} className={cn("native-date-input h-[var(--ui-control-height)] w-full min-w-0 rounded-[var(--ui-control-radius)] border border-slate-200 bg-white px-3 text-sm text-slate-700 disabled:opacity-60", className)} />;
 
   return <Popover open={open && !disabled && !readOnly} onOpenChange={next => { if (!disabled && !readOnly) setOpen(next); }}>
     <PopoverTrigger asChild>

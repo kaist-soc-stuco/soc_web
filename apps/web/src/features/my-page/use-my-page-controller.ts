@@ -72,6 +72,7 @@ export function useMyPageController() {
   };
   const setActiveMenu = (menu: MyPageMenu) => updateParams({ menu, page: "" });
   const setActiveTab = (tab: ActivityTab) => updateParams({ tab, page: "" });
+  const openActivityTab = (tab: ActivityTab) => updateParams({ menu: "activity", tab, page: "" });
   const setCurrentPage = (page: number) => updateParams({ page: page === 1 ? "" : String(page) });
   const setActivityQuery = (q: string) => updateParams({ q, page: "" }, true);
   const canUseMyPage = hasPersistedProfile(session ?? null);
@@ -241,6 +242,7 @@ export function useMyPageController() {
     setActivityQuery,
     setActiveMenu,
     setActiveTab,
+    openActivityTab,
     setCurrentPage,
     totalPages,
     userInfo,

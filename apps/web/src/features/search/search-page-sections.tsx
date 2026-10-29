@@ -218,7 +218,7 @@ export function SearchStatus({
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 px-1 text-sm font-normal text-slate-500">
+    <div className="search-query-status flex items-center justify-between gap-4 px-1 text-sm font-normal text-slate-500">
       <span>
         {lang === "ko" ? (
           <>

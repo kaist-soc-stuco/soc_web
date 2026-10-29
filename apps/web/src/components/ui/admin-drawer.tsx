@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 export function AdminDrawer({
   children,
+  className,
   footer,
   onClose,
   open,
@@ -16,6 +17,7 @@ export function AdminDrawer({
   width = "max-w-xl",
 }: {
   children: ReactNode;
+  className?: string;
   footer?: ReactNode;
   onClose: () => void;
   open: boolean;
@@ -52,6 +54,7 @@ export function AdminDrawer({
         className={cn(
           "absolute inset-y-0 right-0 flex w-full flex-col border-l border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.2)]",
           width,
+          className,
         )}
       >
         <header className="flex min-h-16 items-center justify-between gap-4 px-6">

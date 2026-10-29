@@ -1,13 +1,19 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { ChevronDown } from "lucide-react";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { Button } from "@/components/ui/button";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
 
 export function FeeConsentPanel({ lang }: { lang: string }) {
   const ko = lang === "ko";
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const location = useLocation();
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => { if (location.hash === "#fee-consent") setExpanded(true); }, [location.hash]);
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const queryClient = useQueryClient();
   const { data: session } = useCurrentSession();
@@ -23,8 +29,9 @@ export function FeeConsentPanel({ lang }: { lang: string }) {
     onError: () => { setAccepted(false); void consent.refetch(); },
   });
   const semester = consent.data?.semester.replace(/^(\d{4})-([12])$/, ko ? "$1학년도 $2학기" : "$1 · Semester $2");
-  return <section id="fee-consent" className="scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-    <h2 className="text-sm font-semibold text-slate-900">{ko ? "과비 개인정보 동의" : "Student-fee privacy consent"}</h2>
+  return <section id="fee-consent" className="mypage-fee-consent scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+    {isMobile ? <button type="button" className="mobile-fee-disclosure" aria-expanded={expanded} aria-controls="fee-consent-content" onClick={() => setExpanded(value => !value)}><span><strong>{ko ? "과비 개인정보 동의" : "Student-fee privacy consent"}</strong><small>{consent.data ? `${semester} · ${consent.data.consented ? ko ? "동의 완료" : "Consented" : ko ? "동의 필요" : "Consent required"}` : ko ? "동의 상태 확인" : "Review consent"}</small></span><ChevronDown aria-hidden="true" className={expanded ? "rotate-180" : ""} /></button> : <h2 className="text-sm font-semibold text-slate-900">{ko ? "과비 개인정보 동의" : "Student-fee privacy consent"}</h2>}
+    <div id="fee-consent-content" hidden={isMobile && !expanded}>
     {consent.isLoading ? <p className="mt-3 text-sm text-slate-500">{ko ? "불러오는 중…" : "Loading…"}</p> : consent.isError ?
       <div className="mt-3 text-sm"><p>{ko ? "동의 상태를 불러오지 못했습니다." : "Could not load your consent status."}</p><Button variant="outline" size="sm" className="mt-3" onClick={() => void consent.refetch()}>{ko ? "다시 시도" : "Retry"}</Button></div> : consent.data ? <>
         <p className="mt-2 text-sm text-slate-600">{semester} · {consent.data.consented ? ko ? "동의 완료" : "Consented" : ko ? "동의 필요" : "Consent required"}</p>
@@ -36,5 +43,6 @@ export function FeeConsentPanel({ lang }: { lang: string }) {
         </>}
         {save.isError && <p role="alert" className="mt-3 text-sm text-rose-700">{ko ? "저장하지 못했습니다. 동의 내용을 다시 확인한 뒤 시도해 주세요." : "Could not save. Please review the current notice and try again."}</p>}
       </> : null}
+    </div>
   </section>;
 }

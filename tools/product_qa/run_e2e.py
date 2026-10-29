@@ -68,6 +68,10 @@ def main() -> None:
         if args.headed:
             command.append("--headed")
         subprocess.run(command, cwd=ROOT, env=env, check=True)
+        mobile_command = [sys.executable, "tools/product_qa/browser_mobile_e2e.py"]
+        if args.headed:
+            mobile_command.append("--headed")
+        subprocess.run(mobile_command, cwd=ROOT, env=env, check=True)
     finally:
         with (ARTIFACTS / "services.log").open("w", encoding="utf-8") as log:
             subprocess.run(compose + ["logs", "--no-color", "--tail", "150"], cwd=ROOT, env=env,

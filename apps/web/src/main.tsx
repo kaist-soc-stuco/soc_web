@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
 import './styles.css';
 import './styles/date-picker.css';
+import './styles/mobile-refinement.css';
+import './styles/admin-navigation.css';
 import { ToastProvider } from './components/ui/toast';
 
 const queryClient = new QueryClient({

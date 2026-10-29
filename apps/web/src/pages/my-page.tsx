@@ -1,4 +1,3 @@
-import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { ErrorState } from "@/components/ui/data-state";
 import { Footer } from "@/components/organisms/footer";
 import {
@@ -36,13 +35,14 @@ export function MyPage() {
     setActiveMenu,
     setActivityQuery,
     setActiveTab,
+    openActivityTab,
     setCurrentPage,
     totalPages,
     userInfo,
   } = useMyPageController();
 
   return (
-    <PageShell className="mobile-state-page text-slate-950">
+    <PageShell className="mobile-state-page mobile-mypage text-slate-950">
       {!initialLoading && !canUseMyPage ? <MobileDetailHeader title="" backTo="/" lang={lang} /> : null}
       <main className="mx-auto flex min-w-0 w-full max-w-7xl flex-1 flex-col items-stretch gap-6 px-4 py-6 sm:px-6 md:flex-row md:items-start md:gap-8 md:px-8 md:py-8">
         {canUseMyPage ? (
@@ -57,7 +57,12 @@ export function MyPage() {
         ) : null}
 
         <section className="w-full min-w-0 flex-1">
-          {canUseMyPage && !initialLoading ? <h1 className="mb-5 md:hidden"><SelectDropdown ariaLabel={lang === "ko" ? "마이페이지 메뉴 선택" : "Choose a My Page section"} value={activeMenu} options={menuItems.map(item => ({ value: item.id, label: item.label }))} onChange={value => { const menu = menuItems.find(item => item.id === value); if (menu) setActiveMenu(menu.id); }} className="w-fit min-w-40" buttonClassName="mypage-mobile-heading" /></h1> : null}
+          {canUseMyPage && !initialLoading ? <div className="mobile-mypage-heading md:hidden">
+            <h1>{lang === "ko" ? "마이페이지" : "My page"}</h1>
+            <div className="mobile-mypage-tabs" role="tablist" aria-label={lang === "ko" ? "마이페이지 메뉴" : "My page sections"}>
+              {menuItems.map(item => <button key={item.id} type="button" role="tab" aria-selected={activeMenu === item.id} onClick={() => setActiveMenu(item.id)}>{item.label}</button>)}
+            </div>
+          </div> : null}
           {initialLoading ? (
             <MyPageLoadingState lang={lang} />
           ) : !canUseMyPage ? (
@@ -73,6 +78,7 @@ export function MyPage() {
                   isAdmin={isAdmin}
                   lang={lang}
                   userInfo={userInfo}
+                  onActivitySelect={openActivityTab}
                 />
               )}
 

@@ -22,8 +22,43 @@ import {
 const ChannelTalkSupportContext = createContext<() => void>(() => {});
 export function useOpenChannelTalk() { return useContext(ChannelTalkSupportContext); }
 
+function styleChannelTalkMobileSurface() {
+  const frame = document.querySelector<HTMLIFrameElement>("#ch-plugin-script-iframe");
+  let frameDocument: Document | null | undefined;
+  try { frameDocument = frame?.contentDocument; } catch { return; }
+  if (!frameDocument?.head) return;
+  const media = window.innerWidth < 768 ? "all" : "not all";
+  const css = `
+    html, body, #ch-plugin-root, #ch-plugin-root > div,
+    [class*="Layoutstyled__FullPageWrapper"],
+    #ch-plugin-root header, #ch-plugin-root [class*="BaseHeaderstyled__Wrapper"] {
+      background-color: #f7f7f8 !important;
+    }
+    #ch-plugin-root header > div { background-color: transparent !important; }
+    /* The SDK renders this fixed close control outside its header. */
+    [data-ch-testid="fixed-close-button"] {
+      display: grid !important; place-items: center !important;
+      width: 44px !important; height: 44px !important; min-width: 44px !important;
+      border: 0 !important; background: transparent !important; color: #fff !important;
+    }
+    [data-ch-testid="fixed-close-button"]::before {
+      content: ""; position: absolute; inset: 6px; border-radius: 50%; background: #737780;
+    }
+    [data-ch-testid="fixed-close-button"] svg {
+      position: relative; z-index: 1; width: 20px; height: 20px;
+    }
+    [data-ch-testid="fixed-close-button"] svg,
+    [data-ch-testid="fixed-close-button"] svg * { color: #fff !important; fill: #fff !important; }
+  `;
+  let style = frameDocument.getElementById("soc-channel-mobile-surface") as HTMLStyleElement | null;
+  if (!style) { style = frameDocument.createElement("style"); style.id = "soc-channel-mobile-surface"; frameDocument.head.append(style); }
+  if (style.media !== media) style.media = media;
+  if (style.textContent !== css) style.textContent = css;
+}
+
 function updateChannelTalkLauncherLayer(offsetBottom: boolean, hideLauncher: boolean) {
   if (typeof document === "undefined") return;
+  styleChannelTalkMobileSurface();
 
   const shadowHost = document.querySelector<HTMLElement>("#ch-plugin-entry > div");
   const shadowRoot = shadowHost?.shadowRoot;
@@ -276,6 +311,6 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
   }, [data, hideChannelTalk, isAdminRoute, supportRequested]);
 
   return <ChannelTalkSupportContext.Provider value={openSupport}>{children}{needsMobileCloseBar && createPortal(
-    <div className="channel-mobile-close-bar"><IconButton className="channel-mobile-close" aria-label={data?.language === "en" ? "Close chat" : "상담 창 닫기"} onClick={hideMessenger}><X /></IconButton></div>, document.body,
+    <div className="channel-mobile-close-bar"><IconButton className="channel-mobile-close" aria-label={data?.language === "en" ? "Close chat" : "상담 창 닫기"} onClick={hideMessenger}><X aria-hidden="true" strokeWidth={3} /></IconButton></div>, document.body,
   )}</ChannelTalkSupportContext.Provider>;
 }

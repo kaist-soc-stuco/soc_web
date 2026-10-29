@@ -1,4 +1,4 @@
-import { ArrowUpRight, CalendarPlus, Check, Copy, EllipsisVertical } from "lucide-react";
+import { ArrowUpRight, CalendarPlus, Check, Copy } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { useToast } from "@/components/ui/toast";
@@ -88,14 +88,14 @@ export function CalendarSubscriptionButton({
       <Button
         type="button"
         variant={isMobile ? "ghost" : "outline"}
-        className={isMobile ? "mobile-more-trigger !size-11 !min-h-11 !p-0" : undefined}
-        aria-label={isMobile ? (lang === "ko" ? "일정 옵션" : "Calendar options") : undefined}
+        className={isMobile ? "mobile-calendar-connect" : undefined}
+        aria-label={isMobile ? (lang === "ko" ? "캘린더 연동" : "Connect calendar") : undefined}
         aria-controls={isMobile ? undefined : panelId}
         aria-haspopup={isMobile ? "dialog" : undefined}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        {isMobile ? <EllipsisVertical aria-hidden="true" /> : <><CalendarPlus aria-hidden="true" />{lang === "ko" ? "캘린더 연동" : "Connect calendar"}</>}
+        <><CalendarPlus aria-hidden="true" /><span>{lang === "ko" ? "캘린더 연동" : "Connect calendar"}</span></>
       </Button>
       {isMobile ? <FilterSheet className="mobile-filter-sheet mobile-calendar-subscription" open={open} onClose={() => setOpen(false)} title={lang === "ko" ? "캘린더 연동" : "Connect calendar"} closeLabel={lang === "ko" ? "캘린더 연동 닫기" : "Close calendar connection"}>{content}</FilterSheet> : open ? (
         <PopoverPanel id={panelId} className="left-0 top-full mt-2 w-[min(20rem,calc(100vw-3rem))] p-2 sm:left-auto sm:right-0">

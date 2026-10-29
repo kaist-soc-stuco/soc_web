@@ -37,6 +37,8 @@
     "src/lib/survey-results-display.ts",
     "src/lib/session-idle.ts",
     "src/features/admin-finance/fee-trend.ts",
-    "src/features/events-surveys/events-surveys-calendar-utils.ts"
+    "src/features/events-surveys/events-surveys-calendar-utils.ts",
+    "src/features/search/search-preview-query.ts",
+    "src/lib/mobile-admin.ts"
   ]
 }
