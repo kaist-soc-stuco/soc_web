@@ -79,6 +79,9 @@ export const createAdminApi = ({
   roleGroupsBaseUrl,
   usersBaseUrl,
 }: ApiClientContext) => ({
+  getStudentFeeConsent: () => requestJson<import("@soc/contracts").StudentFeeSemesterConsent>(`${usersBaseUrl}/me/fee-consent`, { method: "GET", cache: "no-store" }),
+  setStudentFeeConsent: (input: { semester: string; noticeVersion: string; consented: boolean }) =>
+    requestJson<import("@soc/contracts").StudentFeeSemesterConsent>(`${usersBaseUrl}/me/fee-consent`, { method: "PUT", body: JSON.stringify(input), headers: { "Content-Type": "application/json" } }),
   getMyArticles: async (
     options?: ListQueryOptions,
   ): Promise<MyArticleListResponse> => {

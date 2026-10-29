@@ -4,6 +4,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -23,6 +24,7 @@ export const paidStudentRecords = pgTable("paid_student_records", {
   admissionYear: integer("admission_year"),
   paidSemesters: smallint("paid_semesters").notNull(),
   paidAmount: integer("paid_amount").notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
   note: text("note"),
   importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -34,6 +36,7 @@ export const studentFeeStatus = pgTable("student_fee_status", {
     .references(() => users.userId),
   coverageSemesters: smallint("coverage_semesters").notNull().default(6),
   paidAmount: integer("paid_amount").notNull().default(0),
+  initialPaidAmount: integer("initial_paid_amount").notNull().default(0),
   status: varchar("status", { length: 20 }).notNull(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   verifiedBy: uuid("verified_by")
@@ -107,3 +110,12 @@ export const studentFeePolicies = pgTable("student_fee_policy", {
   createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Semester-specific permission to use fee information; never changes payment status. */
+export const studentFeeConsents = pgTable("student_fee_consent", {
+  userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+  semester: varchar("semester", { length: 6 }).notNull(),
+  noticeVersion: varchar("notice_version", { length: 40 }).notNull(),
+  consentedAt: timestamp("consented_at", { withTimezone: true }).notNull().defaultNow(),
+  withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+}, table => [primaryKey({ columns: [table.userId, table.semester] })]);

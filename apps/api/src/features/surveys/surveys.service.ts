@@ -59,6 +59,7 @@ type EligibilityFeeStatus = Awaited<
 type EligibilityContext = {
   user: EligibilityUser;
   feeStatus: EligibilityFeeStatus;
+  feeConsented?: boolean;
 };
 
 const surveyAuditSnapshot = (survey: SurveyRecord): Record<string, unknown> => ({
@@ -161,6 +162,7 @@ export class SurveysService {
 
   private async loadEligibilityContext(
     caller?: SurveyCaller,
+    requiresFeeConsent = false,
   ): Promise<EligibilityContext | null> {
     if (!caller || !this.usersService) return null;
 
@@ -181,10 +183,9 @@ export class SurveysService {
     const user = await this.usersService.findById(caller.id);
     if (!user) return { user: null, feeStatus: null };
 
-    return {
-      user,
-      feeStatus: await this.usersService.getStudentFeeStatus(caller.id),
-    };
+    const feeStatus = await this.usersService.getStudentFeeStatus(caller.id);
+    const feeConsented = requiresFeeConsent && feeStatus?.status === "PAID" && (await this.usersService.getStudentFeeConsent(caller.id)).consented;
+    return { user, feeStatus, feeConsented };
   }
 
   private getParticipationEligibility(
@@ -239,6 +240,8 @@ export class SurveysService {
     }
     if (survey.feePayersOnly && context.feeStatus?.status !== "PAID") {
       reasons.push("FEE_PAYER_REQUIRED");
+    } else if (survey.feePayersOnly && !context.feeConsented) {
+      reasons.push("FEE_CONSENT_REQUIRED");
     }
 
     return reasons.length > 0
@@ -278,7 +281,7 @@ export class SurveysService {
       ...(input.publicList ? { publicList: true, state: input.state, from: input.from, to: input.to } : {}),
     });
     const surveys = result.items;
-    const eligibilityContext = await this.loadEligibilityContext(caller);
+    const eligibilityContext = await this.loadEligibilityContext(caller, surveys.some(s => s.feePayersOnly));
     const items = surveys.map((s) => {
       const computedState = this.computeState(s);
       const withState = {
@@ -322,7 +325,7 @@ export class SurveysService {
       }),
     );
 
-    const eligibilityContext = await this.loadEligibilityContext(caller);
+    const eligibilityContext = await this.loadEligibilityContext(caller, survey.feePayersOnly);
 
     const existingResponse = caller?.id
       ? await this.responsesRepo.findByUserAndSurvey(id, caller.id)

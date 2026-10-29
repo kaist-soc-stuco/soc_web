@@ -25,6 +25,7 @@ const money = (value: number) => `${value.toLocaleString("ko-KR")}원`;
 const stamp = (value: string | null | undefined) => value ? isoToDate(value).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" }) : "—";
 const semesterLabel = (value: string) => value.replace(/^(\d{4})-([12])$/, "$1학년도 $2학기");
 const currentSemester = () => { const now = nowDate(); return `${now.getFullYear()}-${now.getMonth() < 6 ? 1 : 2}`; };
+const remainingFee = (row: FeeRosterRow) => row.status === "PAID" ? 0 : row.remainingAmount ?? 0;
 export function FeeManagementPage() {
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const queryClient = useQueryClient();
@@ -52,7 +53,6 @@ export function FeeManagementPage() {
   const [paymentNote, setPaymentNote] = useState("");
   const [paymentType, setPaymentType] = useState<"SIX_SEMESTER_LUMP_SUM" | "PRIOR_PAYMENT_BALANCE">("SIX_SEMESTER_LUMP_SUM");
   const [paymentMethod, setPaymentMethod] = useState<"BANK_TRANSFER" | "CASH" | "OTHER">("BANK_TRANSFER");
-  const [coverage, setCoverage] = useState("6");
   const [error, setError] = useState<string | null>(null);
   const idempotency = useRef<{ fingerprint: string; key: string } | null>(null);
   const [correction, setCorrection] = useState<FeeRosterRow | null>(null);
@@ -85,17 +85,24 @@ export function FeeManagementPage() {
   };
   const beginPayment = (rows: FeeRosterRow[]) => {
     if (!policy || !rows.length || dirty) return;
+    if (rows.some(row => remainingFee(row) <= 0)) return;
     if (rows.length > 1000) {toast({type:"error",message:"한 번에 최대 1,000명까지 납부 처리할 수 있습니다."});return;}
-    setTargets(rows); setError(null); setDate(nowIso().slice(0,10)); setPaymentNote(""); setPaymentMethod("BANK_TRANSFER"); setCoverage(String(policy.coverageSemesters));
+    setTargets(rows); setError(null); setDate(nowIso().slice(0,10)); setPaymentNote(""); setPaymentMethod("BANK_TRANSFER");
     const previous = rows.length === 1 ? rows[0].totalPaidAmount ?? 0 : 0;
-    setPaymentType(previous > 0 && previous < policy.amount ? "PRIOR_PAYMENT_BALANCE" : "SIX_SEMESTER_LUMP_SUM");
-    setAmount(String(previous > 0 && previous < policy.amount ? policy.amount - previous : policy.amount));
+    setPaymentType(previous > 0 ? "PRIOR_PAYMENT_BALANCE" : "SIX_SEMESTER_LUMP_SUM");
+    setAmount(String(remainingFee(rows[0])));
   };
   const submitPayment = async () => {
     if (!targets || busy) return;
-    if (!amount.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isInteger(Number(amount)) || Number(amount) < 0 || !Number.isInteger(Number(coverage)) || Number(coverage) < 1 || Number(coverage) > 6) { setError("금액·납부 일자·적용 학기 수를 확인해 주세요."); return; }
-    const payments: BulkProcessStudentFeePaymentsRequest["payments"] = targets.map(row => ({ ...(row.userId ? { userId: row.userId } : { stdNo: row.stdNo }), amount: Number(amount), paymentType, paymentMethod,
-      coverageSemesters: Number(coverage), effectiveStartSemester: semester, paidAt: isoToDate(`${date}T00:00:00.000+09:00`).toISOString(), note: paymentNote.trim() || null }));
+    const paidAt = isoToDate(`${date}T00:00:00.000+09:00`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(paidAt.valueOf()) ||
+      (targets.length === 1 && (!amount.trim() || !Number.isInteger(Number(amount)) || Number(amount) <= 0 || Number(amount) > remainingFee(targets[0])))) {
+      setError("납부 일자와 금액을 확인해 주세요. 미납 차액을 초과할 수 없습니다."); return;
+    }
+    const recordingSemester = `${date.slice(0, 4)}-${Number(date.slice(5, 7)) <= 6 ? 1 : 2}`;
+    const payments: BulkProcessStudentFeePaymentsRequest["payments"] = targets.map(row => ({ ...(row.userId ? { userId: row.userId } : { stdNo: row.stdNo }), amount: targets.length > 1 ? remainingFee(row) : Number(amount),
+      paymentType: targets.length > 1 ? (row.totalPaidAmount ?? 0) > 0 ? "PRIOR_PAYMENT_BALANCE" : "SIX_SEMESTER_LUMP_SUM" : paymentType, paymentMethod,
+      coverageSemesters: 6, effectiveStartSemester: recordingSemester, paidAt: paidAt.toISOString(), note: paymentNote.trim() || null }));
     const fingerprint = JSON.stringify(payments);
     if (idempotency.current?.fingerprint !== fingerprint) idempotency.current = {fingerprint, key:randomId()};
     setBusy(true); setError(null);
@@ -110,10 +117,10 @@ export function FeeManagementPage() {
     catch { setError("정정하지 못했습니다. 입력값 또는 다른 관리자의 변경 여부를 확인해 주세요."); }
     finally { setBusy(false); }
   };
-  const eligible = selected.filter(row => row.status === "UNPAID" && (row.totalPaidAmount ?? 0) === 0);
+  const eligible = selected.filter(row => remainingFee(row) > 0);
   return <AuthGuard requireAnyPermission={[Permissions.VIEW_FINANCE, Permissions.MANAGE_FINANCE]}><AdminPageShell className={`admin-fee-page ${tab === "payments" ? "admin-fee-page--payments" : ""}`}>
     <AdminPageMain className="admin-fee-management !max-w-none !gap-4 md:!px-6 xl:!px-6">
-      <AdminPageHeader title="과비 관리" actions={<AdminSelectDropdown className="w-48" ariaLabel="혜택 판정 학기" value={semester} disabled={dirty || busy} onChange={value => {setSemester(value); setDetailId(null);}} options={semesters} />} />
+      <AdminPageHeader title="과비 관리" actions={<AdminSelectDropdown className="w-48" ariaLabel="조회 학기" value={semester} disabled={dirty || busy} onChange={value => {setSemester(value); setDetailId(null);}} options={semesters} />} />
       <div className="flex flex-wrap items-center justify-between gap-3"><SegmentedControl variant="underline" role="tablist" className="w-fit" ariaLabel="과비 관리 보기" value={tab} onChange={value => {if (!dirty) setTab(value);}} options={[{value:"payments",label:"납부 관리"},{value:"stats",label:"통계"},...(canEdit ? [{value:"settings",label:"설정"}] : [])]} />
 
       </div>
@@ -125,19 +132,19 @@ export function FeeManagementPage() {
     <AdminDrawer open={Boolean(detailId)} onClose={()=>{detailRequest.current++;setDetailId(null);}} title={detail?.record.nameKo ? `${detail.record.nameKo} 납부 상세` : "납부 상세"} width="max-w-2xl">
       {detailLoading ? <AdminLoadingState /> : detail ? <div className="space-y-6">
         <div><h3 className="text-lg font-semibold">{detail.record.nameKo}</h3><p className="mt-1 text-sm text-slate-500">{detail.record.stdNo || "학번 없음"} · {detail.record.userId ? "가입" : "미가입"}{detail.record.email ? ` · ${detail.record.email}` : ""}</p></div>
-        <dl className="grid grid-cols-2 gap-4 rounded-lg border border-slate-200 p-4 text-sm"><div><dt className="text-slate-500">납부 상태</dt><dd className="mt-2"><AdminStatusBadge tone={detail.record.status === "PAID" ? "positive" : detail.record.status === "PARTIAL" ? "warning" : "neutral"}>{detail.record.status === "PAID" ? "완납" : detail.record.status === "PARTIAL" ? "부분 납부" : "미납"}</AdminStatusBadge></dd></div><div><dt className="text-slate-500">누적 수납액</dt><dd className="mt-2 font-semibold tabular-nums">{money(detail.record.totalPaidAmount ?? 0)}</dd></div><div><dt className="text-slate-500">판정 학기</dt><dd className="mt-2">{semesterLabel(semester)}</dd></div><div><dt className="text-slate-500">최근 납부</dt><dd className="mt-2">{stamp(detail.record.paidAt)}</dd></div></dl>
-        <section><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold">납부 이력</h3>{canEdit && <Button size="sm" disabled={dirty || !policy} onClick={()=>beginPayment([feeRosterRow(detail.record)])}>납부 내역 추가</Button>}</div>
+        <dl className="grid grid-cols-2 gap-4 rounded-lg border border-slate-200 p-4 text-sm"><div><dt className="text-slate-500">납부 상태</dt><dd className="mt-2"><AdminStatusBadge tone={detail.record.status === "PAID" ? "positive" : detail.record.status === "PARTIAL" ? "warning" : "neutral"}>{detail.record.status === "PAID" ? "완납" : detail.record.status === "PARTIAL" ? "부분 납부" : "미납"}</AdminStatusBadge></dd></div><div><dt className="text-slate-500">누적 수납액</dt><dd className="mt-2 font-semibold tabular-nums">{money(detail.record.totalPaidAmount ?? 0)}</dd></div><div><dt className="text-slate-500">미납 차액</dt><dd className="mt-2">{money(detail.record.remainingAmount ?? 0)}</dd></div><div><dt className="text-slate-500">최근 납부</dt><dd className="mt-2">{stamp(detail.record.paidAt)}</dd></div></dl>
+        <section><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold">납부 이력</h3>{canEdit && <Button size="sm" disabled={dirty || !policy || remainingFee(feeRosterRow(detail.record)) <= 0} onClick={()=>beginPayment([feeRosterRow(detail.record)])}>납부 내역 추가</Button>}</div>
           {!detail.history.length && <p className="text-sm text-slate-500">등록된 납부 이력이 없습니다.</p>}
-          <div className="divide-y divide-slate-100">{detail.history.map(payment=><div className="py-3 text-sm" key={payment.paymentId}><p className="font-medium">{money(payment.amount)} · {semesterLabel(payment.effectiveStartSemester)}부터 {payment.coverageSemesters}학기</p><p className="mt-1 text-xs text-slate-500">{stamp(payment.paidAt)} · {payment.paymentType === "PRIOR_PAYMENT_BALANCE" ? "기납부 차액" : "6학기 일시납"} · {payment.paymentMethod === "BANK_TRANSFER" ? "계좌이체" : payment.paymentMethod === "CASH" ? "현금" : "기타"}{payment.note ? ` · ${payment.note}` : ""}</p></div>)}</div></section>
+          <div className="divide-y divide-slate-100">{detail.history.map(payment=><div className="py-3 text-sm" key={payment.paymentId}><p className="font-medium">{money(payment.amount)} · {semesterLabel(payment.effectiveStartSemester)} 납부 기록</p><p className="mt-1 text-xs text-slate-500">{stamp(payment.paidAt)} · {payment.paymentType === "PRIOR_PAYMENT_BALANCE" ? "기납부 차액" : "6학기 일시납"} · {payment.paymentMethod === "BANK_TRANSFER" ? "계좌이체" : payment.paymentMethod === "CASH" ? "현금" : "기타"}{payment.note ? ` · ${payment.note}` : ""}</p></div>)}</div></section>
         <section className="rounded-lg border border-slate-200 p-4"><div className="flex items-center justify-between"><h3 className="text-sm font-semibold">기초자료</h3>{canEdit && detail.record.stdNo && <Button size="sm" variant="outline" disabled={dirty} onClick={()=>{setError(null);setCorrection(feeRosterRow(detail.record));}}>기초자료 정정</Button>}</div><p className="mt-3 text-sm">초기 납부 금액 {money(detail.record.paidAmount)} · {detail.record.paidSemesters}학기</p>{detail.record.note && <p className="mt-2 text-sm text-slate-500">{detail.record.note}</p>}</section>
       </div> : <p className="text-sm text-slate-500">상세 정보를 불러오지 못했습니다.</p>}
     </AdminDrawer>
     <Modal open={Boolean(targets)} onClose={()=>{if(!busy)setTargets(null);}} title="납부 내역 추가" footer={<><Button variant="outline" disabled={busy} onClick={()=>setTargets(null)}>취소</Button><Button loading={busy} disabled={busy} onClick={()=>void submitPayment()}>납부 처리</Button></>}>
-      <p className="mb-4 text-sm">{targets?.length === 1 ? targets[0].nameKo : `${targets?.length ?? 0}명`} · {semesterLabel(semester)}부터 적용합니다.{targets && targets.length > 1 ? " 대상자마다 같은 금액을 기록합니다." : ""}</p>
-      <div className="grid gap-4 sm:grid-cols-2"><AdminFormField label="납부 금액 (원)"><UiInput type="number" min={0} value={amount} onChange={event=>setAmount(event.target.value)} /></AdminFormField><AdminFormField label="납부 일자"><UiInput type="date" value={date} onChange={event=>setDate(event.target.value)} /></AdminFormField>
+      <p className="mb-4 text-sm">{targets?.length === 1 ? targets[0].nameKo : `${targets?.length ?? 0}명`} · {targets && targets.length > 1 ? "각 대상자의 미납 차액만 기록합니다." : `미납 차액 ${money(targets ? remainingFee(targets[0]) : 0)}`}</p>
+      <div className="grid gap-4 sm:grid-cols-2">{targets?.length === 1 && <AdminFormField label="납부 금액 (원)"><UiInput type="number" min={1} max={remainingFee(targets[0])} value={amount} onChange={event=>setAmount(event.target.value)} /></AdminFormField>}<AdminFormField label="납부 일자"><UiInput type="date" value={date} onChange={event=>setDate(event.target.value)} /></AdminFormField>
         <AdminFormField label="납부 유형"><AdminSelectDropdown value={paymentType} onChange={value=>setPaymentType(value as typeof paymentType)} options={[{value:"SIX_SEMESTER_LUMP_SUM",label:"6학기 일시납"},{value:"PRIOR_PAYMENT_BALANCE",label:"기납부 차액"}]} /></AdminFormField>
         <AdminFormField label="납부 방법"><AdminSelectDropdown value={paymentMethod} onChange={value=>setPaymentMethod(value as typeof paymentMethod)} options={[{value:"BANK_TRANSFER",label:"계좌이체"},{value:"CASH",label:"현금"},{value:"OTHER",label:"기타"}]} /></AdminFormField>
-        <AdminFormField label="적용 학기 수"><UiInput type="number" min={1} max={6} value={coverage} onChange={event=>setCoverage(event.target.value)} /></AdminFormField><AdminFormField label="메모"><UiInput value={paymentNote} maxLength={500} onChange={event=>setPaymentNote(event.target.value)} /></AdminFormField></div>{error && <p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
+        <AdminFormField label="메모"><UiInput value={paymentNote} maxLength={500} onChange={event=>setPaymentNote(event.target.value)} /></AdminFormField></div>{error && <p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
     </Modal>
     <Modal open={Boolean(correction)} onClose={()=>{if(!busy)setCorrection(null);}} title="기초자료 정정" footer={<><Button variant="outline" disabled={busy} onClick={()=>setCorrection(null)}>취소</Button><Button loading={busy} onClick={()=>void correct()}>저장</Button></>}>
       <p className="mb-4 text-sm">초기 자료의 오류를 정정합니다. 신규 납부 이력은 변경되지 않습니다.</p>

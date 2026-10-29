@@ -9,7 +9,7 @@ const { UsersRepository } = require("../dist/apps/api/src/features/users/reposit
 const { GoogleFeeSheetsService } = require("../dist/apps/api/src/features/users/google-fee-sheets.service.js");
 
 const databaseUrl = process.env.FEE_ROSTER_TEST_DATABASE_URL;
-if (databaseUrl && !new URL(databaseUrl).pathname.startsWith("/soc_fee_roster_test_")) throw new Error("isolated_fee_roster_test_database_required");
+if (databaseUrl && !/^\/(soc_fee_roster_test_\w+|soc_web_test)$/.test(new URL(databaseUrl).pathname)) throw new Error("isolated_fee_roster_test_database_required");
 const integration = { skip: !databaseUrl };
 const first = { stdNo: "90990001", nameKo: "합성 사용자", admissionYear: 2026, paidSemesters: 6, paidAmount: 30000 };
 const second = { ...first, stdNo: "90990002", nameKo: "합성 미가입자", paidSemesters: 2, paidAmount: 10000 };
@@ -151,7 +151,7 @@ test("unregistered receipts survive login with the same IDs, totals, history and
   assert.deepEqual(await repository.processStudentFeePayments(request, actor), created);
   let detail = await repository.getStudentFeeRosterDetail(second.stdNo, "2026-2");
   assert.equal(detail.record.totalPaidAmount, 15000);
-  assert.equal(detail.record.status, "PAID");
+  assert.equal(detail.record.status, "PARTIAL");
   const userId = await addUser(second.stdNo);
   await repository.linkInitialStudentFeeRecord(userId, second.stdNo);
   await repository.linkInitialStudentFeeRecord(userId, second.stdNo);
@@ -160,13 +160,13 @@ test("unregistered receipts survive login with the same IDs, totals, history and
   assert.equal(detail.history.length, 1);
   assert.equal(detail.history[0].paymentId, created.payments[0].paymentId);
   assert.equal(detail.history[0].userId, userId);
-  assert.equal((await repository.getStudentFeeStatus(userId)).status, "PAID");
+  assert.equal((await repository.getStudentFeeStatus(userId)).status, "PARTIAL");
 });
 
 test("mixed registered and unregistered payments are atomic and idempotent", integration, async () => {
   const actor = await addUser("90990099");
   const userId = await addUser(first.stdNo);
-  await repository.importStudentFeeRoster([first, second]);
+  await repository.importStudentFeeRoster([{ ...first, paidSemesters: 4 }, second]);
   const request = paymentRequest({ userId });
   request.payments.push(paymentRequest({stdNo:second.stdNo}).payments[0]);
   await repository.processStudentFeePayments(request, actor);

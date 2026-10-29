@@ -14,6 +14,14 @@ export type FeeMajorCategory = "PRIMARY";
 export type FeePaymentType = "SIX_SEMESTER_LUMP_SUM" | "PRIOR_PAYMENT_BALANCE";
 export type FeePaymentMethod = "BANK_TRANSFER" | "CASH" | "OTHER";
 
+export interface StudentFeeSemesterConsent {
+  semester: string;
+  noticeVersion: string;
+  consented: boolean;
+  consentedAt: string | null;
+  withdrawnAt: string | null;
+}
+
 export interface StudentFeeRosterRecord {
   stdNo: string;
   nameKo: string | null;
@@ -28,6 +36,8 @@ export interface StudentFeeRosterRecord {
   status?: FeeStatus;
   email?: string;
   paidAt?: string | null;
+  requiredAmount?: number;
+  remainingAmount?: number;
 }
 
 export interface StudentFeeRosterResponse {
@@ -60,6 +70,7 @@ export interface StudentFeeStatusRecord {
   note: string | null;
   updatedAt: string;
   requiredAmount?: number;
+  remainingAmount?: number;
   coverageStartSemester?: string | null;
   paymentType?: FeePaymentType | null;
   paymentMethod?: FeePaymentMethod | null;

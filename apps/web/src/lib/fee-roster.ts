@@ -13,6 +13,8 @@ export interface FeeRosterRow {
   joinedAt: string | null;
   updatedAt: string | null;
   totalPaidAmount?: number;
+  requiredAmount?: number;
+  remainingAmount?: number;
   status?: "PAID" | "PARTIAL" | "UNPAID";
   email?: string;
   paidAt?: string | null;

@@ -7,6 +7,7 @@ import {
   InternalServerErrorException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { resolveFeeReferenceSemester } from "../fee-semester";
 import { DEFAULT_AUTHENTICATED_PERMISSION_BITS } from "@soc/contracts";
 import Redis from "ioredis";
 
@@ -26,6 +27,7 @@ import {
   studentFeeStatus,
   paidStudentRecords,
   studentFeePolicies,
+  studentFeeConsents,
   userRoleGroups,
   users,
   articles,
@@ -42,7 +44,8 @@ import { hashStudentFeePaymentPayload } from "../fee-payment-idempotency";
 import type { StudentFeeBootstrapRecord } from "../student-fee-bootstrap-loader";
 import { INITIAL_FEE_ROSTER_NOTE, initialFeeRosterLinkAllowed, initialFeeRosterStatus } from "../student-fee-roster";
 import type { PostgresTransaction } from "../../../infrastructure/postgres/postgres.provider";
-import { effectiveFeeStatusSql } from "../fee-status";
+import { currentFeeAmountSql, effectiveFeeStatusSql, feeTotalPaidSql } from "../fee-status";
+import { resolveStudentFee, STUDENT_FEE_PRIVACY_VERSION } from "../fee-policy";
 import { readableArticleFilter } from "../../board/article-query-access";
 import type {
   StudentFeePolicy,
@@ -769,10 +772,12 @@ export class UsersRepository {
     if (!records.length) return [];
     return tx.insert(studentFeeStatus).values(records.map((record) => ({
       userId: record.userId, coverageSemesters: record.paidSemesters, paidAmount: record.paidAmount,
+      initialPaidAmount: record.paidAmount,
       status: initialFeeRosterStatus(record.paidSemesters), note: INITIAL_FEE_ROSTER_NOTE,
     }))).onConflictDoUpdate({
       target: studentFeeStatus.userId,
       set: { coverageSemesters: sql`excluded.coverage_semesters`, paidAmount: sql`excluded.paid_amount`,
+        initialPaidAmount: sql`excluded.initial_paid_amount`,
         status: sql`excluded.status`, note: INITIAL_FEE_ROSTER_NOTE, updatedAt: nowDate() },
       setWhere: and(initialFeeRosterLinkAllowed(), sql`(
         ${studentFeeStatus.coverageSemesters} IS DISTINCT FROM excluded.coverage_semesters OR
@@ -791,6 +796,7 @@ export class UsersRepository {
         const inserted = await tx.insert(paidStudentRecords).values(records.slice(index, index + 500).map(record => ({
           stdNo: record.stdNo, nameKo: record.nameKo ?? null, admissionYear: record.admissionYear,
           paidSemesters: record.paidSemesters, paidAmount: record.paidAmount,
+          completedAt: record.paidSemesters >= 6 ? nowDate() : null,
         }))).onConflictDoNothing({ target: paidStudentRecords.stdNo }).returning({ stdNo: paidStudentRecords.stdNo });
         insertedCount += inserted.length;
       }
@@ -813,14 +819,14 @@ export class UsersRepository {
     }).from(paidStudentRecords).leftJoin(users, eq(users.stdNo, paidStudentRecords.stdNo)).orderBy(asc(paidStudentRecords.stdNo));
   }
 
-  async listStudentFeeRoster(referenceSemester?: string): Promise<StudentFeeRosterRecord[]> {
-    const reference = this.semesterOrdinal(referenceSemester) ? referenceSemester! : this.currentReferenceSemester();
-    const [sources, members, statuses, payments] = await Promise.all([
+  async listStudentFeeRoster(_referenceSemester?: string): Promise<StudentFeeRosterRecord[]> {
+    const [sources, members, statuses, payments, policy] = await Promise.all([
       this.db.select().from(paidStudentRecords),
       this.db.select().from(users).where(notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS])),
       this.db.select().from(studentFeeStatus),
       this.db.select(getTableColumns(studentFeePayments)).from(studentFeePayments).leftJoin(users, eq(users.userId, studentFeePayments.userId))
         .where(or(isNull(studentFeePayments.userId), notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]))),
+      this.getStudentFeePolicy(this.currentReferenceSemester()),
     ]);
     const memberByNumber = new Map(members.filter(member => member.stdNo).map(member => [member.stdNo!, member]));
     const statusByUser = new Map(statuses.map(status => [status.userId, status]));
@@ -837,13 +843,11 @@ export class UsersRepository {
       const entries = [...new Map([...(member ? byUser.get(member.userId) ?? [] : []), ...(source ? byNumber.get(source.stdNo) ?? [] : [])].map(payment => [payment.paymentId, payment])).values()];
       entries.sort((a, b) => b.paidAt.valueOf() - a.paidAt.valueOf());
       const legacy = member ? statusByUser.get(member.userId) : undefined;
-      const baseline = source?.paidAmount ?? (entries.length ? 0 : legacy?.paidAmount ?? 0);
-      const status = this.feeStatusAt(legacy ?? { status: initialFeeRosterStatus(source?.paidSemesters ?? 0), paidAt: null, paidAmount: baseline, coverageSemesters: source?.paidSemesters ?? 0 }, entries, reference);
+      const balance = this.feeBalance(legacy, entries, policy.amount, source);
       result.push({ stdNo: source?.stdNo ?? member?.stdNo ?? "", nameKo: source?.nameKo ?? member?.nameKo ?? null,
         admissionYear: source?.admissionYear ?? null, paidSemesters: source?.paidSemesters ?? 0, paidAmount: source?.paidAmount ?? 0,
         note: source?.note ?? legacy?.note ?? null, userId: member?.userId ?? null, joinedAt: member ? msToIso(member.createdAt.valueOf()) : null,
-        updatedAt: source ? msToIso(source.updatedAt.valueOf()) : null, email: member?.email ?? "", status,
-        totalPaidAmount: baseline + entries.reduce((sum, payment) => sum + payment.amount, 0),
+        updatedAt: source ? msToIso(source.updatedAt.valueOf()) : null, email: member?.email ?? "", ...balance,
         paidAt: entries[0] ? msToIso(entries[0].paidAt.valueOf()) : legacy?.paidAt ? msToIso(legacy.paidAt.valueOf()) : null });
     };
     for (const source of sources) append(source, memberByNumber.get(source.stdNo));
@@ -862,6 +866,7 @@ export class UsersRepository {
   }
 
   async saveStudentFeeRoster(records: StudentFeeRosterUpdate[]): Promise<number> {
+    const policy = await this.getStudentFeePolicy(this.currentReferenceSemester());
     return this.db.transaction(async tx => {
       const now = nowDate();
       for (const record of [...records].sort((a, b) => a.stdNo.localeCompare(b.stdNo))) {
@@ -870,10 +875,11 @@ export class UsersRepository {
           throw new ConflictException("fee_roster_changed");
         }
         const { stdNo, expectedUpdatedAt: _version, ...values } = record;
+        const completedAt = existing?.completedAt ?? (Math.max(existing?.paidSemesters ?? 0, record.paidSemesters) >= 6 || record.paidAmount >= policy.amount ? now : null);
         if (existing) {
-          await tx.update(paidStudentRecords).set({ ...values, updatedAt: msToDate(Math.max(now.valueOf(), existing.updatedAt.valueOf() + 1)) }).where(eq(paidStudentRecords.stdNo, stdNo));
+          await tx.update(paidStudentRecords).set({ ...values, completedAt, updatedAt: msToDate(Math.max(now.valueOf(), existing.updatedAt.valueOf() + 1)) }).where(eq(paidStudentRecords.stdNo, stdNo));
         } else {
-          const inserted = await tx.insert(paidStudentRecords).values({ stdNo, ...values, updatedAt: now })
+          const inserted = await tx.insert(paidStudentRecords).values({ stdNo, ...values, completedAt, updatedAt: now })
             .onConflictDoNothing({ target: paidStudentRecords.stdNo }).returning({ stdNo: paidStudentRecords.stdNo });
           if (!inserted.length) throw new ConflictException("fee_roster_changed");
         }
@@ -890,6 +896,7 @@ export class UsersRepository {
   async linkInitialStudentFeeRecord(userId: string, stdNo: string | null | undefined) {
     const normalized = stdNo?.trim();
     if (!normalized || !/^\d{8}$/.test(normalized)) return { record: null, changed: false };
+    const policy = await this.getStudentFeePolicy(this.currentReferenceSemester());
     const row = await this.db.transaction(async (tx) => {
       const [source] = await tx.select().from(paidStudentRecords).where(eq(paidStudentRecords.stdNo, normalized)).for("update").limit(1);
       if (!source) return { record: null, changed: false };
@@ -900,8 +907,12 @@ export class UsersRepository {
         .where(and(eq(studentFeePayments.stdNo, normalized), isNull(studentFeePayments.userId))).returning();
       if (attached.length) {
         const latest = attached.sort((a, b) => b.paidAt.valueOf() - a.paidAt.valueOf())[0];
-        await tx.insert(studentFeeStatus).values({ userId, status: "PAID", paidAmount: latest.amount, coverageSemesters: latest.coverageSemesters,
-          paidAt: latest.paidAt, verifiedBy: latest.recordedBy, verifiedAt: nowDate(), note: latest.note }).onConflictDoNothing({ target: studentFeeStatus.userId });
+        const [current] = await tx.select().from(studentFeeStatus).where(eq(studentFeeStatus.userId, userId));
+        const history = await tx.select().from(studentFeePayments).where(or(eq(studentFeePayments.userId, userId), eq(studentFeePayments.stdNo, normalized)));
+        const balance = this.feeBalance(current, history, policy.amount, source);
+        const values = { userId, status: balance.status, paidAmount: balance.totalPaidAmount, initialPaidAmount: source.paidAmount,
+          coverageSemesters: 6, paidAt: latest.paidAt, verifiedBy: latest.recordedBy, verifiedAt: nowDate(), note: latest.note };
+        await tx.insert(studentFeeStatus).values(values).onConflictDoUpdate({ target: studentFeeStatus.userId, set: values });
       }
       const [linked] = await this.linkInitialFeeRecords(tx, [{ userId, paidSemesters: source.paidSemesters, paidAmount: source.paidAmount }]);
       if (linked) return { record: linked, changed: true };
@@ -913,12 +924,46 @@ export class UsersRepository {
 
   async getStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord | null> {
     const [row] = await this.db
-      .select({ record: studentFeeStatus, status: effectiveFeeStatusSql() })
+      .select({ record: studentFeeStatus, status: effectiveFeeStatusSql(), total: feeTotalPaidSql(), required: currentFeeAmountSql(), updatedAt: users.updatedAt })
       .from(users)
       .leftJoin(studentFeeStatus, eq(studentFeeStatus.userId, users.userId))
       .where(eq(users.userId, userId))
       .limit(1);
-    return row?.record ? { ...this.mapFeeStatusRow(row.record), status: row.status } : null;
+    if (!row) return null;
+    const total = Number(row.total);
+    const required = Number(row.required);
+    return { ...(row.record ? this.mapFeeStatusRow(row.record) : { userId, coverageSemesters: 6, paidAt: null,
+      verifiedBy: null, verifiedAt: null, note: null, updatedAt: msToIso(row.updatedAt.valueOf()) }),
+      status: row.status, paidAmount: total, requiredAmount: required, remainingAmount: row.status === "PAID" ? 0 : Math.max(0, required - total) };
+  }
+
+  async getStudentFeeConsent(userId: string) {
+    const semester = this.currentReferenceSemester();
+    const [row] = await this.db.select().from(studentFeeConsents)
+      .where(and(eq(studentFeeConsents.userId, userId), eq(studentFeeConsents.semester, semester))).limit(1);
+    return { semester, noticeVersion: STUDENT_FEE_PRIVACY_VERSION,
+      consented: Boolean(row && !row.withdrawnAt && row.noticeVersion === STUDENT_FEE_PRIVACY_VERSION),
+      consentedAt: row ? msToIso(row.consentedAt.valueOf()) : null,
+      withdrawnAt: row?.withdrawnAt ? msToIso(row.withdrawnAt.valueOf()) : null };
+  }
+
+  async setStudentFeeConsent(userId: string, input: { semester: string; noticeVersion: string; consented: boolean }) {
+    if (input.semester !== this.currentReferenceSemester() || input.noticeVersion !== STUDENT_FEE_PRIVACY_VERSION)
+      throw new ConflictException("fee_consent_notice_changed");
+    await this.db.transaction(async tx => {
+      const [member] = await tx.select({ id: users.userId }).from(users).where(eq(users.userId, userId)).for("update");
+      if (!member) throw new BadRequestException("fee_user_not_found");
+      if (input.consented) {
+        await tx.insert(studentFeeConsents).values({ userId, semester: input.semester, noticeVersion: input.noticeVersion })
+          .onConflictDoUpdate({ target: [studentFeeConsents.userId, studentFeeConsents.semester],
+            set: { noticeVersion: input.noticeVersion, consentedAt: nowDate(), withdrawnAt: null },
+            setWhere: or(isNotNull(studentFeeConsents.withdrawnAt), sql`${studentFeeConsents.noticeVersion} <> ${input.noticeVersion}`) });
+      } else {
+        await tx.update(studentFeeConsents).set({ withdrawnAt: nowDate() })
+          .where(and(eq(studentFeeConsents.userId, userId), eq(studentFeeConsents.semester, input.semester), isNull(studentFeeConsents.withdrawnAt)));
+      }
+    });
+    return this.getStudentFeeConsent(userId);
   }
 
   private mapFeePaymentRow(row: typeof studentFeePayments.$inferSelect): StudentFeePaymentRecord {
@@ -953,18 +998,17 @@ export class UsersRepository {
     };
   }
 
-  private feeStatusAt(
-    legacy: { status: string | null; paidAt: Date | null; paidAmount: number | null; coverageSemesters: number | null },
-    payments: { effectiveStartSemester: string; coverageSemesters: number }[],
-    reference: string,
-  ): FeeStatus {
-    const covered = payments.some(payment => this.isSemesterCovered(payment.effectiveStartSemester, payment.coverageSemesters, reference));
-    const legacyActive = legacy.paidAt === null || this.isSemesterCovered(this.semesterFromDate(legacy.paidAt), legacy.coverageSemesters ?? 6, reference);
-    if (covered || (legacy.status === "PAID" && legacyActive)) return "PAID";
-    return legacy.status === "PARTIAL" && (legacy.paidAmount ?? 0) > 0 && legacyActive ? "PARTIAL" : "UNPAID";
+  private feeBalance(
+    legacy: { status: string | null; paidAmount: number | null; initialPaidAmount?: number | null } | null | undefined,
+    payments: { amount: number }[], requiredAmount: number,
+    source?: { paidAmount: number; paidSemesters: number; completedAt?: Date | null },
+  ) {
+    return resolveStudentFee({ recognizedComplete: legacy?.status === "PAID" || Boolean(source?.completedAt) || (source?.paidSemesters ?? 0) >= 6,
+      initialAmount: source?.paidAmount ?? (payments.length ? legacy?.initialPaidAmount ?? 0 : Math.max(legacy?.initialPaidAmount ?? 0, legacy?.paidAmount ?? 0)),
+      payments, requiredAmount });
   }
 
-  async getStudentFeeDetail(userId: string, referenceSemester?: string): Promise<StudentFeeDetailResponse | null> {
+  async getStudentFeeDetail(userId: string, _referenceSemester?: string): Promise<StudentFeeDetailResponse | null> {
     const [user, statusRecord, history] = await Promise.all([
       this.db
         .select({
@@ -978,7 +1022,7 @@ export class UsersRepository {
         .from(users)
         .where(eq(users.userId, userId))
         .limit(1),
-      this.db.select().from(studentFeeStatus).where(eq(studentFeeStatus.userId, userId)).limit(1),
+      this.getStudentFeeStatus(userId),
       this.db
         .select()
         .from(studentFeePayments)
@@ -987,7 +1031,7 @@ export class UsersRepository {
     ]);
 
     if (!user[0]) return null;
-    const status = statusRecord[0] ? this.mapFeeStatusRow(statusRecord[0]) : await this.ensureStudentFeeStatus(userId);
+    const status = statusRecord ?? await this.ensureStudentFeeStatus(userId);
 
     return {
       user: {
@@ -998,8 +1042,7 @@ export class UsersRepository {
         email: user[0].email,
         primaryMajor: user[0].primaryMajor,
       },
-      status: { ...status, status: this.feeStatusAt({ ...status, paidAt: status.paidAt ? isoToDate(status.paidAt) : null }, history,
-        referenceSemester && /^\d{4}-[12]$/.test(referenceSemester) ? referenceSemester : this.currentReferenceSemester()) },
+      status,
       history: history.map((row) => this.mapFeePaymentRow(row)),
     };
   }
@@ -1076,6 +1119,7 @@ export class UsersRepository {
     const idempotencyKey = input.idempotencyKey.trim();
     if (!idempotencyKey) throw new BadRequestException("idempotency_key_required");
     const payloadHash = hashStudentFeePaymentPayload(input);
+    const policy = await this.getStudentFeePolicy(this.currentReferenceSemester());
 
     const result = await this.db.transaction(async (tx) => {
       const [claimedBatch] = await tx
@@ -1122,51 +1166,48 @@ export class UsersRepository {
       const payments: StudentFeePaymentRecord[] = [];
 
       // Lock all roster targets first, then accounts, in a deterministic order.
-      const rosterNumbers = [...new Set(input.payments.flatMap(payment => payment.stdNo ? [payment.stdNo] : []))].sort();
+      const accountIds = input.payments.flatMap(payment => payment.userId ? [payment.userId] : []);
+      const accountNumbers = accountIds.length ? await tx.select({ stdNo: users.stdNo }).from(users).where(inArray(users.userId, accountIds)) : [];
+      const rosterNumbers = [...new Set([...input.payments.flatMap(payment => payment.stdNo ? [payment.stdNo] : []),
+        ...accountNumbers.flatMap(member => member.stdNo ? [member.stdNo] : [])])].sort();
       if (rosterNumbers.length) await tx.select().from(paidStudentRecords).where(inArray(paidStudentRecords.stdNo, rosterNumbers)).orderBy(asc(paidStudentRecords.stdNo)).for("update");
       const identifiers: SQL[] = [];
-      const accountIds = input.payments.flatMap(payment => payment.userId ? [payment.userId] : []);
       if (accountIds.length) identifiers.push(inArray(users.userId, accountIds));
       if (rosterNumbers.length) identifiers.push(inArray(users.stdNo, rosterNumbers));
-      if (identifiers.length) await tx.select({ userId: users.userId }).from(users).where(or(...identifiers)).orderBy(asc(users.userId)).for("update");
+      // Keep payment batches' actor FK locks compatible when an admin pays their own fee.
+      if (identifiers.length) await tx.select({ userId: users.userId }).from(users).where(or(...identifiers)).orderBy(asc(users.userId)).for("no key update");
       const ordered = [...input.payments].sort((a, b) => (a.userId ?? a.stdNo ?? "").localeCompare(b.userId ?? b.stdNo ?? ""));
       for (const target of ordered) {
-        let payment = target;
-        if (target.stdNo) {
-          const [source] = await tx.select().from(paidStudentRecords).where(eq(paidStudentRecords.stdNo, target.stdNo));
-          if (!source) throw new BadRequestException("fee_person_not_found");
-          const [member] = await tx.select({ userId: users.userId }).from(users).where(eq(users.stdNo, target.stdNo));
-          if (member) payment = { ...target, userId: member.userId };
-          else {
-            const [saved] = await tx.insert(studentFeePayments).values({ stdNo: target.stdNo, amount: target.amount, paymentType: target.paymentType,
-              paymentMethod: target.paymentMethod, effectiveStartSemester: target.effectiveStartSemester, coverageSemesters: target.coverageSemesters,
-              paidAt: isoToDate(target.paidAt), note: target.note ?? null, recordedBy: actorUserId }).returning();
-            payments.push({ ...this.mapFeePaymentRow(saved), stdNo: saved.stdNo });
-            continue;
-          }
-        }
-        if (!payment.userId) throw new BadRequestException("fee_person_not_found");
-        const lockedUser = await tx
-          .select({ userId: users.userId })
-          .from(users)
-          .where(eq(users.userId, payment.userId))
-          .for("update")
-          .limit(1);
-        if (!lockedUser[0]) {
-          throw new BadRequestException("fee_user_not_found");
-        }
-
+        if (!Number.isInteger(target.amount) || target.amount <= 0) throw new BadRequestException("fee_payment_amount_invalid");
+        const [member] = await tx.select({ userId: users.userId, stdNo: users.stdNo }).from(users)
+          .where(target.userId ? eq(users.userId, target.userId) : eq(users.stdNo, target.stdNo!));
+        if (target.userId && !member) throw new BadRequestException("fee_user_not_found");
+        const stdNo = target.stdNo ?? member?.stdNo;
+        const [source] = stdNo ? await tx.select().from(paidStudentRecords).where(eq(paidStudentRecords.stdNo, stdNo)) : [];
+        if (!member && !source) throw new BadRequestException("fee_person_not_found");
+        const [current] = member ? await tx.select().from(studentFeeStatus).where(eq(studentFeeStatus.userId, member.userId)).for("update") : [];
+        const person: SQL[] = [];
+        if (member) person.push(eq(studentFeePayments.userId, member.userId));
+        if (source) person.push(eq(studentFeePayments.stdNo, source.stdNo));
+        const history = await tx.select().from(studentFeePayments).where(or(...person));
+        const before = this.feeBalance(current, history, policy.amount, source);
+        if (before.status === "PAID") throw new ConflictException("fee_already_paid");
+        if (target.amount > before.remainingAmount) throw new BadRequestException("fee_payment_exceeds_balance");
+        const balance = resolveStudentFee({ recognizedComplete: false, initialAmount: before.totalPaidAmount,
+          payments: [{ amount: target.amount }], requiredAmount: policy.amount });
+        const initialPaidAmount = source?.paidAmount ?? (history.length ? current?.initialPaidAmount ?? 0 : Math.max(current?.initialPaidAmount ?? 0, current?.paidAmount ?? 0));
         const [insertedPayment] = await tx
           .insert(studentFeePayments)
           .values({
-            userId: payment.userId,
-            amount: payment.amount,
-            paymentType: payment.paymentType,
-            paymentMethod: payment.paymentMethod,
-            effectiveStartSemester: payment.effectiveStartSemester,
-            coverageSemesters: payment.coverageSemesters,
-            paidAt: isoToDate(payment.paidAt),
-            note: payment.note ?? null,
+            userId: member?.userId ?? null,
+            stdNo: source?.stdNo ?? null,
+            amount: target.amount,
+            paymentType: target.paymentType,
+            paymentMethod: target.paymentMethod,
+            effectiveStartSemester: target.effectiveStartSemester,
+            coverageSemesters: target.coverageSemesters,
+            paidAt: isoToDate(target.paidAt),
+            note: target.note ?? null,
             recordedBy: recordedBy ?? null,
             updatedAt: nowDate(),
           })
@@ -1175,21 +1216,18 @@ export class UsersRepository {
         if (!insertedPayment) {
           throw new InternalServerErrorException("fee_payment_insert_failed");
         }
-        payments.push(this.mapFeePaymentRow(insertedPayment));
-
-        const [current] = await tx
-          .select()
-          .from(studentFeeStatus)
-          .where(eq(studentFeeStatus.userId, payment.userId))
-          .for("update")
-          .limit(1);
+        payments.push({ ...this.mapFeePaymentRow(insertedPayment), stdNo: insertedPayment.stdNo });
+        if (source && balance.status === "PAID") await tx.update(paidStudentRecords)
+          .set({ completedAt: nowDate(), updatedAt: nowDate() }).where(eq(paidStudentRecords.stdNo, source.stdNo));
+        if (!member) continue;
         const nextRecord = {
-          userId: payment.userId,
-          status: "PAID",
-          coverageSemesters: payment.coverageSemesters,
-          paidAmount: payment.amount,
-          paidAt: isoToDate(payment.paidAt),
-          note: payment.note ?? current?.note ?? null,
+          userId: member.userId,
+          status: balance.status,
+          coverageSemesters: 6,
+          initialPaidAmount,
+          paidAmount: balance.totalPaidAmount,
+          paidAt: isoToDate(target.paidAt),
+          note: target.note ?? current?.note ?? null,
           verifiedBy: recordedBy ?? current?.verifiedBy ?? null,
           verifiedAt: nowDate(),
           updatedAt: nowDate(),
@@ -1198,16 +1236,18 @@ export class UsersRepository {
           ? await tx
               .update(studentFeeStatus)
               .set(nextRecord)
-              .where(eq(studentFeeStatus.userId, payment.userId))
+              .where(eq(studentFeeStatus.userId, member.userId))
               .returning()
           : await tx.insert(studentFeeStatus).values(nextRecord).returning();
 
         if (!saved) throw new InternalServerErrorException("fee_status_update_failed");
         updated.push({
           userId: saved.userId,
-          status: "PAID",
+          status: saved.status as FeeStatus,
           coverageSemesters: saved.coverageSemesters,
           paidAmount: saved.paidAmount,
+          requiredAmount: balance.requiredAmount,
+          remainingAmount: balance.remainingAmount,
           paidAt: saved.paidAt ? msToIso(saved.paidAt.valueOf()) : null,
           verifiedBy: saved.verifiedBy,
           verifiedAt: saved.verifiedAt ? msToIso(saved.verifiedAt.valueOf()) : null,
@@ -1377,8 +1417,7 @@ export class UsersRepository {
   }
 
   private currentReferenceSemester(): string {
-    const now = nowDate();
-    return `${now.getUTCFullYear()}-${now.getUTCMonth() < 6 ? 1 : 2}`;
+    return resolveFeeReferenceSemester();
   }
 
   private semesterOrdinal(value: string | null | undefined): number | null {
@@ -1390,17 +1429,6 @@ export class UsersRepository {
   private semesterFromDate(value: Date | null | undefined): string | null {
     if (!value) return null;
     return `${value.getUTCFullYear()}-${value.getUTCMonth() < 6 ? 1 : 2}`;
-  }
-
-  private isSemesterCovered(
-    startSemester: string | null | undefined,
-    coverageSemesters: number | null | undefined,
-    referenceSemester: string,
-  ): boolean {
-    const start = this.semesterOrdinal(startSemester);
-    const reference = this.semesterOrdinal(referenceSemester);
-    if (start === null || reference === null) return false;
-    return reference >= start && reference < start + Math.max(1, coverageSemesters ?? 6);
   }
 
   async listStudentsByFeeStatus(
@@ -1467,7 +1495,7 @@ export class UsersRepository {
     const normalizedReference = this.semesterOrdinal(referenceSemester)
       ? referenceSemester!
       : this.currentReferenceSemester();
-    const feePolicy = await this.getStudentFeePolicy(normalizedReference);
+    const balances = new Map((await this.listStudentFeeRoster()).filter(row => row.userId).map(row => [row.userId!, row]));
     const paymentRows = rows.length
       ? await this.db
           .select()
@@ -1485,13 +1513,12 @@ export class UsersRepository {
 
     const mapped = rows.map((row) => {
       const payments = paymentsByUser.get(row.userId) ?? [];
-      const resolvedStatus = this.feeStatusAt(row, payments, normalizedReference);
+      const balance = balances.get(row.userId)!;
+      const resolvedStatus = balance.status!;
       const eligible = resolvedStatus === "PAID";
       const legacyStartSemester = this.semesterFromDate(row.paidAt);
       const latestPayment = payments[0];
-      const totalPaidAmount = payments.length
-        ? payments.reduce((sum, payment) => sum + payment.amount, 0)
-        : row.paidAmount ?? 0;
+      const totalPaidAmount = balance.totalPaidAmount ?? 0;
       return {
         status: resolvedStatus,
         eligible,
@@ -1510,7 +1537,8 @@ export class UsersRepository {
         paymentType: (latestPayment?.paymentType ?? null) as FeePaymentType | null,
         paymentMethod: (latestPayment?.paymentMethod ?? null) as FeePaymentMethod | null,
         paidAmount: totalPaidAmount,
-        requiredAmount: feePolicy.amount,
+        requiredAmount: balance.requiredAmount,
+        remainingAmount: balance.remainingAmount,
         paidAt: latestPayment?.paidAt
           ? msToIso(latestPayment.paidAt.valueOf())
           : row.paidAt
@@ -1619,7 +1647,8 @@ export class UsersRepository {
     return { totals: { totalStudents: people.length, paidStudents: paid, paidStudentCount: paid, paymentCount: selected.length,
       partialStudents: partial, unpaidStudents: people.length - paid - partial, paymentRate: people.length ? Math.round(paid / people.length * 1000) / 10 : 0,
       paidAmount: selected.reduce((sum, payment) => sum + payment.amount, 0), collectedAmount: collected,
-      targetAmount: people.length * policy.amount, outstandingAmount: Math.max(0, people.length * policy.amount - collected) }, trend,
+      targetAmount: collected + people.reduce((sum, person) => sum + (person.remainingAmount ?? (person.status === "PAID" ? 0 : Math.max(0, policy.amount - (person.totalPaidAmount ?? 0)))), 0),
+      outstandingAmount: people.reduce((sum, person) => sum + (person.remainingAmount ?? (person.status === "PAID" ? 0 : Math.max(0, policy.amount - (person.totalPaidAmount ?? 0)))), 0) }, trend,
       paymentHalfBreakdown: [...halves].sort(([a], [b]) => a.localeCompare(b)).map(([period, group]) => ({ period, paidAmount: group.amount, paymentCount: group.count, paidStudents: group.people.size })),
       majorBreakdown: [{ category: "PRIMARY" as const, label: "주전공", totalStudents: primary.length, paidStudents: primaryPaid, partialStudents: primaryPartial,
         unpaidStudents: primary.length - primaryPaid - primaryPartial, paymentRate: primary.length ? Math.round(primaryPaid / primary.length * 1000) / 10 : 0,

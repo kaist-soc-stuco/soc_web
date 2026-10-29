@@ -188,6 +188,7 @@ export class SurveyResponsesService {
       if (!feeStatus || feeStatus.status !== "PAID") {
         throw new ForbiddenException("fee_payer_only");
       }
+      if (!(await this.usersService.getStudentFeeConsent(caller.id)).consented) throw new ForbiddenException("fee_consent_required");
     }
 
     const questions = this.sectionsRepo && this.questionsRepo
@@ -220,6 +221,7 @@ export class SurveyResponsesService {
     if (submission.status === "fee_payer_only") {
       throw new ForbiddenException("fee_payer_only");
     }
+    if (submission.status === "fee_consent_required") throw new ForbiddenException("fee_consent_required");
     if (submission.status === "already_submitted") {
       throw new ConflictException("already_submitted");
     }
@@ -358,6 +360,7 @@ export class SurveyResponsesService {
     if (update.status === "fee_payer_only") {
       throw new ForbiddenException("fee_payer_only");
     }
+    if (update.status === "fee_consent_required") throw new ForbiddenException("fee_consent_required");
     if (update.status === "response_edit_not_allowed") {
       throw new ConflictException("response_edit_not_allowed");
     }

@@ -63,36 +63,38 @@ async function feeUser(name, { status = "UNPAID", paidAt = null, paidAmount = 0,
   return userId;
 }
 
-test("fee list, session/survey eligibility, member filters and mail recipients agree on the current semester", opts, async () => {
+test("financial status agrees across filters and mail while semester consent independently gates surveys", opts, async () => {
   const ref = users.currentReferenceSemester();
   const year = Number(ref.slice(0, 4)), half = Number(ref.at(-1));
   const currentDate = new Date(Date.UTC(year, half === 1 ? 1 : 7, 10));
   const oldDate = new Date(Date.UTC(year - 4, 1, 10));
   const next = half === 1 ? `${year}-2` : `${year + 1}-1`;
   const cases = [
-    ["expired", { status: "PAID", paidAt: oldDate, paidAmount: 45000 }, "UNPAID"],
+    ["expired", { status: "PAID", paidAt: oldDate, paidAmount: 45000 }, "PAID"],
     ["current", { status: "PAID", paidAt: currentDate, paidAmount: 45000 }, "PAID"],
     ["legacy", { status: "PAID", paidAt: null, paidAmount: 45000 }, "PAID"],
     ["ledger", { status: "UNPAID", payments: [{ effectiveStartSemester: ref, coverageSemesters: 1 }] }, "PAID"],
-    ["future", { status: "PAID", paidAt: oldDate, payments: [{ effectiveStartSemester: next, coverageSemesters: 1 }] }, "UNPAID"],
+    ["future", { status: "PAID", paidAt: oldDate, payments: [{ effectiveStartSemester: next, coverageSemesters: 1 }] }, "PAID"],
     ["partial", { status: "PARTIAL", paidAt: currentDate, paidAmount: 10000 }, "PARTIAL"],
-    ["partial-expired", { status: "PARTIAL", paidAt: oldDate, paidAmount: 10000 }, "UNPAID"],
+    ["partial-expired", { status: "PARTIAL", paidAt: oldDate, paidAmount: 10000 }, "PARTIAL"],
     ["partial-zero", { status: "PARTIAL", paidAt: null }, "UNPAID"],
   ];
   const rows = [];
   for (const [name, input, expected] of cases) rows.push({ userId: await feeUser(name, input), expected });
   const ids = rows.map(row => row.userId);
   const feeList = await users.listStudentsByFeeStatus(undefined, 1, 100, "name", "asc", undefined, undefined, undefined, ref, ids);
-  const surveys = new SurveysService({}, {}, {}, {}, {}, { findById: id => users.findById(id), getStudentFeeStatus: id => users.getStudentFeeStatus(id) });
+  const surveys = new SurveysService({}, {}, {}, {}, {}, { findById: id => users.findById(id), getStudentFeeStatus: id => users.getStudentFeeStatus(id), getStudentFeeConsent: id => users.getStudentFeeConsent(id) });
   const paidMail = await users.listEmailRecipients("PAID_STUDENTS", { query: prefix });
   const unpaidMail = await users.listEmailRecipients("UNPAID_STUDENTS", { query: prefix });
   for (const { userId, expected } of rows) {
     assert.equal((await users.getStudentFeeStatus(userId)).status, expected);
     assert.equal(feeList.students.find(row => row.userId === userId).status, expected);
     const caller = { id: userId, permission: 0 };
-    const eligibility = surveys.getParticipationEligibility({ feePayersOnly: true }, caller, await surveys.loadEligibilityContext(caller));
+    const consent = await users.getStudentFeeConsent(userId);
+    await users.setStudentFeeConsent(userId, { ...consent, consented: true });
+    const eligibility = surveys.getParticipationEligibility({ feePayersOnly: true }, caller, await surveys.loadEligibilityContext(caller, true));
     assert.equal(eligibility.status, expected === "PAID" ? "ELIGIBLE" : "NOT_ELIGIBLE");
-    assert.equal(await db.transaction(tx => new SurveyResponsesRepository(db).satisfiesFeeRequirement(tx, userId, "PAID_ONLY")), expected === "PAID");
+    assert.equal(await db.transaction(tx => new SurveyResponsesRepository(db).feeRequirementFailure(tx, userId, "PAID_ONLY")), expected === "PAID" ? null : "fee_payer_only");
     assert.equal(paidMail.some(row => row.email === `${userId}@example.test`), expected === "PAID");
     assert.equal(unpaidMail.some(row => row.email === `${userId}@example.test`), expected === "UNPAID");
   }
@@ -101,8 +103,8 @@ test("fee list, session/survey eligibility, member filters and mail recipients a
     assert.deepEqual(new Set(members.items.map(row => row.userId)), new Set(rows.filter(row => row.expected === status).map(row => row.userId)));
     assert.ok(members.items.every(row => row.feeStatus === status));
     assert.equal(members.total, rows.filter(row => row.expected === status).length);
-    assert.equal(members.facets.paid, 3);
-    assert.equal(members.facets.partial, 1);
+    assert.equal(members.facets.paid, 5);
+    assert.equal(members.facets.partial, 2);
     const candidates = await new RoleGroupsRepository(db).listRoleGroupCandidates(0, { q: prefix, feeStatus: status, pageSize: 100 });
     assert.deepEqual(new Set(candidates.items.map(row => row.userId)), new Set(rows.filter(row => row.expected === status).map(row => row.userId)));
   }
@@ -113,12 +115,12 @@ test("fee list, session/survey eligibility, member filters and mail recipients a
   for (const row of rows) assert.equal(voters.find(voter => voter.userId === row.userId).feeStatus, row.expected);
 });
 
-test("historical fee detail still resolves the requested semester from stored history", opts, async () => {
+test("historical fee completion no longer expires when viewing a later semester", opts, async () => {
   const year = Number(users.currentReferenceSemester().slice(0, 4)) - 4;
   const id = await feeUser("history", { status: "PAID", paidAt: new Date(Date.UTC(year, 2, 1)), paidAmount: 45000 });
-  assert.equal((await users.getStudentFeeStatus(id)).status, "UNPAID");
+  assert.equal((await users.getStudentFeeStatus(id)).status, "PAID");
   assert.equal((await users.getStudentFeeDetail(id, `${year}-1`)).status.status, "PAID");
-  assert.equal((await users.getStudentFeeDetail(id)).status.status, "UNPAID");
+  assert.equal((await users.getStudentFeeDetail(id)).status.status, "PAID");
 });
 
 test("revoking consent deletes the contact without creating an external Sheets job", opts, async () => {

@@ -22,6 +22,13 @@
       "when": 1793265027960,
       "tag": "0002_unified_fee_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793283803968,
+      "tag": "0003_lifetime_fee_policy",
+      "breakpoints": true
     }
   ]
 }

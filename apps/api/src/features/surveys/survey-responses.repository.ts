@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { msToIso, nowDate } from "@soc/shared";
-import { effectiveFeeStatusSql } from "../users/fee-status";
+import { currentFeeConsentSql, effectiveFeeStatusSql } from "../users/fee-status";
 import { enqueueSpreadsheetSync } from "../../infrastructure/google/enqueue-spreadsheet-sync";
 
 import {
@@ -88,6 +88,9 @@ type InsertSubmissionResult =
       status: "fee_payer_only";
     }
   | {
+      status: "fee_consent_required";
+    }
+  | {
       status: "answer_file_not_owned";
     };
 
@@ -104,6 +107,7 @@ type UpdateSubmissionResult =
         | "survey_not_open_yet"
         | "survey_closed"
         | "fee_payer_only"
+        | "fee_consent_required"
         | "answer_file_not_owned"
         | "response_edit_not_allowed"
         | "multiple_response_edit_not_supported"
@@ -310,21 +314,24 @@ export class SurveyResponsesRepository {
     return getReachableSurveyQuestions(sections, answers);
   }
 
-  private async satisfiesFeeRequirement(
+  private async feeRequirementFailure(
     tx: PostgresTransaction,
     userId: string | null,
     feeRequirementPolicy: string,
-  ): Promise<boolean> {
-    if (feeRequirementPolicy !== "PAID_ONLY") return true;
-    if (!userId) return false;
+  ): Promise<"fee_payer_only" | "fee_consent_required" | null> {
+    if (feeRequirementPolicy !== "PAID_ONLY") return null;
+    if (!userId) return "fee_payer_only";
+    // Consent withdrawal and payment changes lock this same account row.
+    await tx.select({ id: users.userId }).from(users).where(eq(users.userId, userId)).for("share");
 
     const [feeStatus] = await tx
-      .select({ status: effectiveFeeStatusSql() })
+      .select({ status: effectiveFeeStatusSql(), consented: currentFeeConsentSql() })
       .from(users)
       .leftJoin(studentFeeStatus, eq(studentFeeStatus.userId, users.userId))
       .where(eq(users.userId, userId))
       .limit(1);
-    return feeStatus?.status === "PAID";
+    if (feeStatus?.status !== "PAID") return "fee_payer_only";
+    return feeStatus.consented ? null : "fee_consent_required";
   }
 
   /**
@@ -509,15 +516,8 @@ export class SurveyResponsesRepository {
         if (stateFailure) {
           return { status: stateFailure } as const;
         }
-        if (
-          !(await this.satisfiesFeeRequirement(
-            tx,
-            input.userId,
-            lockedSurvey.feeRequirementPolicy,
-          ))
-        ) {
-          return { status: "fee_payer_only" } as const;
-        }
+        const feeFailure = await this.feeRequirementFailure(tx, input.userId, lockedSurvey.feeRequirementPolicy);
+        if (feeFailure) return { status: feeFailure } as const;
 
         const questions = await this.findReachableQuestionsForSurvey(
           tx,
@@ -674,15 +674,8 @@ export class SurveyResponsesRepository {
       if (stateFailure) {
         return { status: stateFailure } as const;
       }
-      if (
-        !(await this.satisfiesFeeRequirement(
-          tx,
-          input.userId,
-          lockedSurvey.feeRequirementPolicy,
-        ))
-      ) {
-        return { status: "fee_payer_only" } as const;
-      }
+      const feeFailure = await this.feeRequirementFailure(tx, input.userId, lockedSurvey.feeRequirementPolicy);
+      if (feeFailure) return { status: feeFailure } as const;
       if (!lockedSurvey.allowResponseEdit) {
         return { status: "response_edit_not_allowed" } as const;
       }

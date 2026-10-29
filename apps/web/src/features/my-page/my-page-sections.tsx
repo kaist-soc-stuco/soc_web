@@ -18,6 +18,7 @@ import type {
   MyPageMenu,
 } from "./use-my-page-controller";
 import { Button } from "@/components/ui/button";
+import { FeeConsentPanel } from "./fee-consent-panel";
 
 const formatRelative = (value: string | null | undefined, lang: string) => {
   if (!value) return "-";
@@ -287,6 +288,7 @@ export function MyPageProfilePanel({
           </div>
         ))}
       </div>
+      <FeeConsentPanel lang={lang} />
     </div>
   );
 }

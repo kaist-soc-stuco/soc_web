@@ -722,7 +722,7 @@ export const UpdateStudentFeeStatusSchema = z
 const StudentFeePaymentInputSchema = z.object({
   userId: z.string().uuid().optional(),
   stdNo: z.string().regex(/^\d{8}$/).optional(),
-  amount: z.number().int().min(0).max(100_000_000),
+  amount: z.number().int().min(1).max(100_000_000),
   paymentType: z.enum(["SIX_SEMESTER_LUMP_SUM", "PRIOR_PAYMENT_BALANCE"]),
   paymentMethod: z.enum(["BANK_TRANSFER", "CASH", "OTHER"]),
   effectiveStartSemester: z.string().regex(/^\d{4}-[12]$/, "invalid_reference_semester"),
@@ -730,6 +730,12 @@ const StudentFeePaymentInputSchema = z.object({
   paidAt: z.string().datetime(),
   note: z.string().trim().max(500).nullable().optional(),
 }).refine(value => Boolean(value.userId) !== Boolean(value.stdNo), { message: "one_fee_person_identifier_required" });
+
+export const StudentFeeConsentSchema = z.object({
+  semester: z.string().regex(/^\d{4}-[12]$/),
+  noticeVersion: z.string().min(1).max(40),
+  consented: z.boolean(),
+});
 
 export const BulkProcessStudentFeePaymentsSchema = z.object({
   idempotencyKey: z

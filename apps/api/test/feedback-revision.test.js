@@ -37,10 +37,10 @@ test("fee states, contact history, and atomic quorum on isolated PostgreSQL", { 
     const all = await users.listStudentsByFeeStatus(undefined, 1, 20, "name", "asc", undefined, undefined, undefined, "2026-2", ids);
     assert.equal(all.students.find((row) => row.userId === ids[0]).status, "UNPAID");
     assert.equal(all.students.find((row) => row.userId === ids[1]).status, "PARTIAL");
-    assert.equal(all.students.find((row) => row.userId === ids[2]).status, "UNPAID");
-    assert.equal(all.summary.partialStudents, 1);
+    assert.equal(all.students.find((row) => row.userId === ids[2]).status, "PARTIAL");
+    assert.equal(all.summary.partialStudents, 2);
     const partial = await users.listStudentsByFeeStatus("PARTIAL", 1, 20, "name", "asc", undefined, undefined, undefined, "2026-2", ids);
-    assert.deepEqual(partial.students.map((row) => row.userId), [ids[1]]);
+    assert.deepEqual(new Set(partial.students.map((row) => row.userId)), new Set([ids[1], ids[2]]));
     assert.equal((await users.getStudentFeeStatus(ids[0])).status, "UNPAID");
     await users.createStudentFeePolicy({ effectiveSemester: "2099-1", amount: 55000, coverageSemesters: 6 }, ids[0]);
     assert.equal((await users.getStudentFeePolicy("2098-2")).amount, 45000);

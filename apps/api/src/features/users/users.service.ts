@@ -308,6 +308,16 @@ export class UsersService {
     return this.usersRepository.getStudentFeeStatus(userId);
   }
 
+  getStudentFeeConsent(userId: string) { return this.usersRepository.getStudentFeeConsent(userId); }
+
+  async setStudentFeeConsent(userId: string, input: { semester: string; noticeVersion: string; consented: boolean }, audit: AuditMetadata) {
+    const result = await this.usersRepository.setStudentFeeConsent(userId, input);
+    await this.auditLogService.record({ action: input.consented ? "student_fee.consent.accept" : "student_fee.consent.withdraw",
+      actorUserId: userId, ipAddress: audit.ipAddress, targetType: "student_fee_consent", targetId: userId,
+      payload: { semester: input.semester, noticeVersion: input.noticeVersion } });
+    return result;
+  }
+
   async getStudentFeeStatusForAdmin(
     userId: string,
     audit?: AuditMetadata,

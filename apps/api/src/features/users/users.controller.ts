@@ -8,6 +8,7 @@ import {
   UpdateStudentFeeStatusSchema,
   UpdateUserActiveStatusSchema,
   UpdateUserPostingSuspensionSchema,
+  StudentFeeConsentSchema,
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 
@@ -49,6 +50,21 @@ export class UsersController {
     private readonly usersService: UsersService,
     private readonly googleFeeSheetsService: GoogleFeeSheetsService,
   ) {}
+
+  @Get("me/fee-consent")
+  @UseGuards(AuthGuard)
+  @Header("Cache-Control", "private, no-store")
+  getMyFeeConsent(@Req() req: AuthenticatedRequest) {
+    return this.usersService.getStudentFeeConsent(req.user!.id);
+  }
+
+  @Put("me/fee-consent")
+  @UseGuards(AuthGuard)
+  @Header("Cache-Control", "private, no-store")
+  setMyFeeConsent(@Req() req: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(StudentFeeConsentSchema)) input: { semester: string; noticeVersion: string; consented: boolean }) {
+    return this.usersService.setStudentFeeConsent(req.user!.id, input, auditMetadataFromRequest(req));
+  }
 
   @Get("me/articles")
   @UseGuards(AuthGuard)
