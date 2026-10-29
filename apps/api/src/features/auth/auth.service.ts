@@ -19,6 +19,7 @@ import { AuthPayloadCipher } from "./auth-payload-crypto";
 import { PendingLoginRepository } from "./pending-login.repository";
 import { InitialAdminService } from "./initial-admin.service";
 import { readResponseTextWithLimit } from "../../shared/http/bounded-fetch";
+import { describeSsoExchangeFailure } from "./sso-exchange-diagnostics";
 
 interface SsoConfig {
   clientId: string;
@@ -225,6 +226,7 @@ export class AuthService {
       }
 
       stage = "exchange";
+      const diagnosticSecrets = [config.clientSecret, body.code, body.state, storedState.nonce];
       const response = await fetch(config.authApiUrl, {
         method: "POST",
         headers: {
@@ -239,18 +241,27 @@ export class AuthService {
         signal: AbortSignal.timeout(15_000),
       });
 
-      if (!response.ok) {
-        this.logger.warn(`SSO callback failed at exchange: HTTP ${response.status}`);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(await readResponseTextWithLimit(response, 512 * 1024));
+      } catch (error) {
+        this.logger.warn(describeSsoExchangeFailure({ kind: !response.ok ? "http_error" : error instanceof SyntaxError ? "invalid_json" : "response_read_error", response, error }));
         return this.redirectResult("error", "sso_exchange_failed");
       }
 
-      const parsed: unknown = JSON.parse(await readResponseTextWithLimit(response, 512 * 1024));
+      if (!response.ok) {
+        this.logger.warn(describeSsoExchangeFailure({ kind: "http_error", response, payload: parsed, secrets: diagnosticSecrets }));
+        return this.redirectResult("error", "sso_exchange_failed");
+      }
+
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        this.logger.warn(describeSsoExchangeFailure({ kind: "invalid_response", response }));
         return this.redirectResult("error", "sso_response_invalid");
       }
       const parsedResponse = parsed as SsoApiErrorResponse | SsoApiSuccessResponse;
 
       if (isSsoApiErrorResponse(parsedResponse)) {
+        this.logger.warn(describeSsoExchangeFailure({ kind: "provider_error", response, payload: parsedResponse, secrets: diagnosticSecrets }));
         return this.redirectResult("error", "sso_exchange_failed");
       }
 
@@ -392,9 +403,8 @@ export class AuthService {
         transactionToken,
       };
     } catch (error) {
-      this.logger.warn(
-        `SSO callback failed at ${stage}: ${error instanceof Error ? error.name : "unknown_error"}`,
-      );
+      this.logger.warn(stage === "exchange" ? describeSsoExchangeFailure({ kind: "exception", error })
+        : `SSO callback failed at ${stage}: ${error instanceof Error ? error.name : "unknown_error"}`);
       const reasons = {
         state: "login_state_unavailable",
         exchange: "sso_exchange_failed",

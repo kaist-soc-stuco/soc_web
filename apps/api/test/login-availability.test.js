@@ -139,6 +139,84 @@ test("SSO HTTP errors and invalid JSON shapes fail without issuing sessions", as
   }
 });
 
+for (const marker of [null, "", "  ", false]) {
+  test(`SSO diagnostics preserve existing handling of empty error fields (${JSON.stringify(marker)})`, async t => {
+    const { service, sessions } = harness();
+    const start = await service.createLoginStartPayload();
+    const warnings = t.mock.method(service.logger, "warn", () => {});
+    mockResponse(t, start, { error: marker, errorCode: marker });
+    const result = await service.handleLoginCallback({ state: start.state, code: "synthetic-code" }, start.state);
+    assert.match(result.redirectUrl, /sso_exchange_failed/);
+    assert.equal(sessions.size, 0);
+    assert.match(warnings.mock.calls[0].arguments[0], /provider_error/);
+  });
+}
+
+test("SSO provider errors report official diagnostic codes without logging profiles or credentials", async t => {
+  const { service, sessions } = harness();
+  const start = await service.createLoginStartPayload();
+  const warnings = t.mock.method(service.logger, "warn", () => {});
+  mockResponse(t, start, { errorCode: "ESA007", error: "server_error" });
+  const result = await service.handleLoginCallback({ state: start.state, code: "synthetic-code" }, start.state);
+  assert.match(result.redirectUrl, /sso_exchange_failed/);
+  assert.equal(sessions.size, 0);
+  const messages = warnings.mock.calls.map(call => call.arguments[0]).join("\n");
+  assert.match(messages, /ESA007/);
+  assert.match(messages, /provider_error/);
+  for (const secret of [start.state, start.nonce, "synthetic-code", "synthetic@example.invalid", "90990001", "synthetic-client-secret"]) assert.ok(!messages.includes(secret));
+});
+
+test("SSO HTTP rejections retain safe provider codes but never raw response text", async t => {
+  const { service } = harness();
+  const start = await service.createLoginStartPayload();
+  const warnings = t.mock.method(service.logger, "warn", () => {});
+  t.mock.method(global, "fetch", async () => new Response(JSON.stringify({ errorCode: "ESA003", error: "synthetic-secret-in-error", message: "synthetic-secret-in-body" }), { status: 403 }));
+  assert.match((await service.handleLoginCallback({ state: start.state, code: "synthetic-code" }, start.state)).redirectUrl, /sso_exchange_failed/);
+  const message = warnings.mock.calls.map(call => call.arguments[0]).join("\n");
+  assert.match(message, /ESA003/);
+  assert.match(message, /403/);
+  assert.ok(!message.includes("synthetic-secret"));
+});
+
+test("SSO diagnostics keep newer machine codes and redact even code-shaped secrets", async t => {
+  const { service } = harness();
+  const start = await service.createLoginStartPayload();
+  const warnings = t.mock.method(service.logger, "warn", () => {});
+  mockResponse(t, start, { errorCode: "AUTH_IP_NOT_ALLOWED", error: "server_error" });
+  assert.match((await service.handleLoginCallback({ state: start.state, code: "synthetic-code" }, start.state)).redirectUrl, /sso_exchange_failed/);
+  assert.match(warnings.mock.calls[0].arguments[0], /AUTH_IP_NOT_ALLOWED/);
+  const { describeSsoExchangeFailure } = require("../dist/apps/api/src/features/auth/sso-exchange-diagnostics.js");
+  const message = describeSsoExchangeFailure({ kind: "provider_error", payload: { errorCode: "PRIVATE_CLIENT_KEY", error: "PRIVATE_CLIENT_KEY" }, secrets: ["PRIVATE_CLIENT_KEY"] });
+  assert.ok(!message.includes("PRIVATE_CLIENT_KEY"));
+  assert.match(message, /redacted/);
+});
+
+for (const code of ["ENOTFOUND", "CERT_HAS_EXPIRED", "UND_ERR_CONNECT_TIMEOUT"]) {
+  test(`SSO connection diagnostics identify ${code} without exposing the exception message`, async t => {
+    const { service } = harness();
+    const start = await service.createLoginStartPayload();
+    const warnings = t.mock.method(service.logger, "warn", () => {});
+    const cause = Object.assign(new Error("synthetic-secret-in-cause"), { code });
+    t.mock.method(global, "fetch", async () => { throw new TypeError("synthetic-secret-in-error", { cause }); });
+    assert.match((await service.handleLoginCallback({ state: start.state, code: "synthetic-code" }, start.state)).redirectUrl, /sso_exchange_failed/);
+    const message = warnings.mock.calls.map(call => call.arguments[0]).join("\n");
+    assert.match(message, new RegExp(code));
+    assert.ok(!message.includes("synthetic-secret"));
+  });
+}
+
+test("SSO invalid HTML responses are diagnosed without logging the HTML", async t => {
+  const { service } = harness();
+  const start = await service.createLoginStartPayload();
+  const warnings = t.mock.method(service.logger, "warn", () => {});
+  t.mock.method(global, "fetch", async () => new Response("<html>synthetic-secret-in-body</html>", { headers: { "content-type": "text/html" } }));
+  assert.match((await service.handleLoginCallback({ state: start.state, code: "synthetic-code" }, start.state)).redirectUrl, /sso_exchange_failed/);
+  const message = warnings.mock.calls.map(call => call.arguments[0]).join("\n");
+  assert.match(message, /invalid_json/);
+  assert.match(message, /text\/html/);
+  assert.ok(!message.includes("synthetic-secret"));
+});
+
 test("optional fee data never weakens browser, nonce or inactive-account checks", async t => {
   const { service, users, sessions } = harness();
   const start = await service.createLoginStartPayload();
