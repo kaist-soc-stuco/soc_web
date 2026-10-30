@@ -29,3 +29,20 @@ test("legacy year columns remain importable and malformed history is rejected", 
   assert.equal(malformed.rows.length, 0);
   assert.equal(malformed.errors.length, 1);
 });
+
+test("exported activity history preserves department punctuation and compact legacy entries", () => {
+  const result = parse([
+    ["이름", "직책", "활동 이력"],
+    ["테스트", "부원", "2026년 · 소통·복지부 · 기획/운영\n2025년 · 교육/문화부 · 부원"],
+    ["기존 양식", "부원", "2025년·기획부·부원"],
+    ["부서 미지정", "회장", "2026년 ·  · 회장"],
+  ]);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.rows[0].activities.map(({ departmentKo, roleKo }) => [departmentKo, roleKo]), [
+    ["소통·복지부", "기획/운영"], ["교육/문화부", "부원"],
+  ]);
+  assert.equal(result.rows[1].activities[0].departmentKo, "기획부");
+  assert.equal(result.rows[1].activities[0].roleKo, "부원");
+  assert.equal(result.rows[2].activities[0].departmentKo, "");
+  assert.equal(result.rows[2].activities[0].roleKo, "회장");
+});

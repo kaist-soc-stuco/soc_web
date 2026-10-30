@@ -6,7 +6,7 @@ import { isoToDate } from "@soc/shared";
 
 import { RequireAnyPermissions, RequirePermissions } from "../auth/guards";
 import { auditMetadataFromRequest } from "./audit-context";
-import { requireDownloadReason } from "./download-reason";
+import { requireDownloadReason, requireDownloadReasonHeader } from "./download-reason";
 import { AuditLogService } from "./audit-log.service";
 
 interface AuthenticatedRequest extends Request {
@@ -63,7 +63,7 @@ export class AuditLogController {
     @Query("dateTo") dateTo?: string,
     @Headers("x-download-reason") downloadReason?: string,
   ): Promise<StreamableFile> {
-    const reason = requireDownloadReason(downloadReason);
+    const reason = requireDownloadReasonHeader(downloadReason);
     const items = await this.auditLogService.export({
       action,
       query,

@@ -136,7 +136,7 @@ export function EventsSurveysDayDetails({
           </p>
         </div></>
       ) : (
-        <div className={agenda ? "mobile-calendar-agenda-events" : "scrollbar-hidden flex-1 space-y-2.5 overflow-y-auto py-4 pr-1"}>
+        <div className={agenda ? "mobile-calendar-agenda-events mobile-timeline-cards" : "scrollbar-hidden flex-1 space-y-2.5 overflow-y-auto py-4 pr-1"}>
           {events.map((event, idx) => {
             const style = getCalendarEventStyles(
               event.kind,
@@ -152,26 +152,27 @@ export function EventsSurveysDayDetails({
             const allDay = event.isAllDay || event.sourceType === "KAIST_ACADEMIC";
             const timeFormat = new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
             const academic = event.category === "ACADEMIC" || event.sourceType === "KAIST_ACADEMIC";
-            const kindLabel = academic ? lang === "ko" ? "학사일정" : "Academic" : event.kind === "SURVEY" ? lang === "ko" ? "설문" : "Survey" : lang === "ko" ? "행사" : "Event";
+            const holiday = event.category === "HOLIDAY";
+            const badgeKind = holiday ? "holiday" : academic ? "academic" : event.kind === "SURVEY" ? "survey" : "event";
+            const kindLabel = holiday ? lang === "ko" ? "공휴일" : "Holiday" : academic ? lang === "ko" ? "학사일정" : "Academic" : event.kind === "SURVEY" ? lang === "ko" ? "설문" : "Survey" : lang === "ko" ? "행사" : "Event";
             const range = start.toDateString() !== end.toDateString() ? `${formatNumericDate(start)} — ${formatNumericDate(end)}` : null;
-            const mobileMeta = [range, kindLabel, location].filter(Boolean).join(" · ");
             const showAdminMenu =
               !eventHref &&
               canManage &&
               Boolean(event.calendarEventId) &&
               openMenuId === event.calendarEventId;
             const cardClassName =
-              `group relative block min-h-11 w-full shrink-0 select-none rounded-lg bg-transparent px-1 py-3 transition-colors hover:bg-slate-50 ${showAdminMenu ? "z-20" : "z-0"}`;
+              `group ${agenda ? "mobile-calendar-event-card " : ""}relative block min-h-11 w-full shrink-0 select-none rounded-lg bg-transparent px-1 py-3 transition-colors hover:bg-slate-50 ${showAdminMenu ? "z-20" : "z-0"}`;
             const cardContent = (
               <>
                 <div className="calendar-agenda-event flex items-start gap-2.5">
-                  {agenda && <div className="mobile-calendar-event-time">{allDay ? lang === "ko" ? "종일" : "All day" : <><span>{timeFormat.format(start)}</span>{timeFormat.format(start) !== timeFormat.format(end) && !range && <small>{timeFormat.format(end)}</small>}</>}</div>}
-                  <span
+                  {!agenda && <span
                     data-calendar-kind={academic ? "academic" : event.kind === "SURVEY" ? "survey" : "event"}
                     className={`calendar-agenda-marker my-0.5 w-[3px] shrink-0 self-stretch rounded-full ${style.bullet}`}
                     aria-hidden="true"
-                  />
+                  />}
                   <div className="min-w-0 flex-1">
+                    {agenda && <div className="mobile-calendar-event-time">{range && <span>{range} · </span>}{allDay ? lang === "ko" ? "종일" : "All day" : <span>{timeFormat.format(start)}{timeFormat.format(start) !== timeFormat.format(end) && <> – {timeFormat.format(end)}</>}</span>}</div>}
                     <h4 className="break-words text-[0.9375rem] font-medium leading-5 tracking-tight text-slate-800">
                       {shortTitle}
                     </h4>
@@ -180,7 +181,10 @@ export function EventsSurveysDayDetails({
                         {event.description}
                       </p>
                     )}
-                    {agenda ? <p className="mobile-calendar-event-meta">{mobileMeta}</p> : <>
+                    {agenda ? <div className="mobile-calendar-event-meta">
+                      <span className="mobile-calendar-event-badge" data-calendar-kind={badgeKind}>{kindLabel}</span>
+                      {location && <span className="mobile-calendar-event-location"><MapPin aria-hidden="true" /><span>{location}</span></span>}
+                    </div> : <>
                     <div className="mt-2 flex items-center gap-2 text-xs font-normal text-slate-600 select-none">
                       <span className="min-w-0 break-words whitespace-normal">{scheduleText}</span>
                     </div>

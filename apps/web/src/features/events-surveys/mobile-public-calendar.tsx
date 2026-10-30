@@ -6,14 +6,15 @@ import type { Language } from "@/hooks/use-language";
 import type { CalendarEvent } from "@/lib/events-surveys";
 import { isCalendarEventOnDay } from "@/lib/events-surveys";
 import { getKoreanHolidayName } from "@/lib/korean-holidays";
-import { formatShortDateWithWeekday } from "@/lib/date-display";
-import { SelectDropdown } from "@/components/atoms/select-dropdown";
+import { formatShortDate, formatShortDateWithWeekday } from "@/lib/date-display";
+import { CalendarSubscriptionButton } from "./calendar-subscription-button";
 import { EventsSurveysDayDetails } from "./events-surveys-day-details";
 import {
   buildCalendarGrid,
   buildMobileAgendaGroups,
   toDateKey,
 } from "./events-surveys-calendar-utils";
+import "./mobile-timeline.css";
 
 function eventKind(event: CalendarEvent) {
   return event.sourceType === "KAIST_ACADEMIC" || event.category === "ACADEMIC"
@@ -31,6 +32,7 @@ export function MobilePublicCalendar({
   holidays,
   lang,
   isFetching,
+  feedUrl,
 }: {
   calendarEvents: CalendarEvent[];
   selectedDate: Date;
@@ -39,9 +41,9 @@ export function MobilePublicCalendar({
   holidays: KoreanHolidayRecord[];
   lang: Language;
   isFetching: boolean;
+  feedUrl: string;
 }) {
   const [expanded, setExpanded] = useState(true);
-  const [filter, setFilter] = useState("all");
   const year = selectedDate.getFullYear(),
     month = selectedDate.getMonth();
   const today = nowDate(),
@@ -50,16 +52,9 @@ export function MobilePublicCalendar({
     () => new Map(holidays.map((holiday) => [holiday.locdate, holiday])),
     [holidays],
   );
-  const visible = useMemo(
-    () =>
-      calendarEvents.filter(
-        (event) => filter === "all" || eventKind(event) === filter,
-      ),
-    [calendarEvents, filter],
-  );
   const groups = useMemo(
-    () => buildMobileAgendaGroups(visible, selectedDate),
-    [visible, selectedDate],
+    () => buildMobileAgendaGroups(calendarEvents, selectedDate),
+    [calendarEvents, selectedDate],
   );
   const weekdays =
     lang === "ko"
@@ -98,7 +93,7 @@ export function MobilePublicCalendar({
       ? `${year}년 ${month + 1}월`
       : new Intl.DateTimeFormat("en-US", {
           year: "numeric",
-          month: "long",
+          month: "short",
         }).format(selectedDate);
   return (
     <section
@@ -114,7 +109,7 @@ export function MobilePublicCalendar({
             aria-controls="mobile-calendar-dates"
             onClick={() => setExpanded((value) => !value)}
           >
-            {monthTitle}
+            <span>{monthTitle}</span>
             <ChevronDown
               aria-hidden="true"
               className={expanded ? "rotate-180" : ""}
@@ -158,6 +153,7 @@ export function MobilePublicCalendar({
             >
               <ChevronRight aria-hidden="true" />
             </button>
+            <CalendarSubscriptionButton feedUrl={feedUrl} lang={lang} compact />
           </div>
         </div>
         <div className="mobile-calendar-weekdays" aria-hidden="true">
@@ -176,7 +172,7 @@ export function MobilePublicCalendar({
               holiday = holidayMap.get(key);
             const kinds = [
               ...new Set(
-                visible
+                calendarEvents
                   .filter((event) => isCalendarEventOnDay(event, cell.date))
                   .map(eventKind),
               ),
@@ -215,25 +211,6 @@ export function MobilePublicCalendar({
           })}
         </div>
       </div>
-      <div className="mobile-calendar-agenda-heading">
-        <h2>{lang === "ko" ? "다가오는 일정" : "Upcoming events"}</h2>
-        <SelectDropdown
-          value={filter}
-          onChange={setFilter}
-          ariaLabel={lang === "ko" ? "일정 종류" : "Calendar category"}
-          className="mobile-calendar-category"
-          buttonClassName="mobile-calendar-category-trigger"
-          options={[
-            { value: "all", label: lang === "ko" ? "전체 일정" : "All events" },
-            { value: "event", label: lang === "ko" ? "행사" : "Events" },
-            {
-              value: "academic",
-              label: lang === "ko" ? "학사일정" : "Academic",
-            },
-            { value: "survey", label: lang === "ko" ? "설문" : "Surveys" },
-          ]}
-        />
-      </div>
       {isFetching && groups.length === 0 ? (
         <div
           className="mobile-calendar-agenda-loading"
@@ -242,23 +219,25 @@ export function MobilePublicCalendar({
         />
       ) : (
         <>
-          {!groups.some((group) => toDateKey(group.date) === selectedKey) && (
+          {groups.length > 0 && !groups.some((group) => toDateKey(group.date) === selectedKey) && (
             <p className="mobile-calendar-no-day">
               {lang === "ko"
                 ? `${formatShortDateWithWeekday(selectedDate, lang)}에는 일정이 없습니다.`
                 : `No events on ${formatShortDateWithWeekday(selectedDate, lang)}.`}
             </p>
           )}
+          <div className="mobile-calendar-timeline mobile-timeline">
           {groups.map((group) => (
             <section
-              className="mobile-calendar-agenda-group"
+              className="mobile-calendar-agenda-group mobile-timeline-day"
               key={toDateKey(group.date)}
+              data-today={toDateKey(group.date) === toDateKey(today)}
             >
-              <h3>
-                {formatShortDateWithWeekday(group.date, lang)}
-                {toDateKey(group.date) === toDateKey(today) && (
-                  <span>{lang === "ko" ? "오늘" : "Today"}</span>
-                )}
+              <h3 className="mobile-timeline-heading">
+                <time dateTime={`${group.date.getFullYear()}-${String(group.date.getMonth() + 1).padStart(2, "0")}-${String(group.date.getDate()).padStart(2, "0")}`} aria-current={toDateKey(group.date) === toDateKey(today) ? "date" : undefined}>
+                  {lang === "ko" ? formatShortDate(group.date, lang, today) : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", ...(group.date.getFullYear() !== today.getFullYear() ? { year: "numeric" } as const : {}) }).format(group.date)}
+                  <span>{new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", { weekday: "long" }).format(group.date)}</span>
+                </time>
               </h3>
               <EventsSurveysDayDetails
                 events={group.events}
@@ -269,6 +248,7 @@ export function MobilePublicCalendar({
               />
             </section>
           ))}
+          </div>
           {groups.length === 0 && (
             <p className="mobile-calendar-no-day">
               {lang === "ko"

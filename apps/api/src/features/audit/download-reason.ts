@@ -1,5 +1,14 @@
 import { BadRequestException } from "@nestjs/common";
 
+export function requireDownloadReasonHeader(value: unknown): string {
+  let decoded = value;
+  if (typeof value === "string") {
+    try { decoded = decodeURIComponent(value); }
+    catch { throw new BadRequestException("download_reason_required"); }
+  }
+  return requireDownloadReason(decoded);
+}
+
 export function requireDownloadReason(value: unknown): string {
   if (typeof value !== "string") {
     throw new BadRequestException("download_reason_required");

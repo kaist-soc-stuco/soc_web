@@ -108,7 +108,7 @@ test("Google publication is limited to site-managed calendar events", () => {
   assert.equal(service.isAnyGoogleSyncEnabled(), false, "the site-only KAIST feed must not start the Google worker");
 });
 
-test("manual Calendar publication, failure retry, and stale-worker fence on PostgreSQL", { skip: !process.env.CALENDAR_SYNC_TEST_DATABASE_URL }, async () => {
+test("manual Calendar publication, failure retry, and stale-worker fence on PostgreSQL", { skip: !process.env.CALENDAR_SYNC_TEST_DATABASE_URL }, async (t) => {
   const name = `calendar_sync_test_${randomUUID().replaceAll('-', '')}`;
   const admin = new Pool({ connectionString: process.env.CALENDAR_SYNC_TEST_DATABASE_URL });
   let pool;
@@ -154,6 +154,31 @@ test("manual Calendar publication, failure retry, and stale-worker fence on Post
     release(); await oldWorker;
     assert.equal((await db.select().from(schema.calendarEvents))[0].googleSyncStatus, 'PENDING');
     assert.equal((await db.select().from(schema.calendarSyncJobs))[0].status, 'PENDING');
+    await t.test("academic sync retains records during failure and reconciles after recovery", async () => {
+      const academic = { titleKo: '한글날', startAt: new Date('2031-10-08T15:00:00Z'), endAt: new Date('2031-10-09T14:59:59.999Z'), sourceUid: 'academic-2031-holiday', sourceYear: 2031, sourceHash: 'original' };
+      let fetched = { items: [academic], failedMonths: [] };
+      service.kaistSource = { fetchYear: async () => fetched };
+      assert.equal((await service.syncKaistAcademicCalendar(2031)).insertedCount, 1);
+      assert.equal((await service.syncKaistAcademicCalendar(2031)).unchangedCount, 1);
+      const academicRows = () => db.select().from(schema.calendarEvents).where(eq(schema.calendarEvents.sourceType, 'KAIST_ACADEMIC'));
+      const [saved] = await academicRows();
+      await db.update(schema.calendarEvents).set({ isHiddenByAdmin: true }).where(eq(schema.calendarEvents.calendarEventId, saved.calendarEventId));
+      fetched = { items: [], failedMonths: [10] };
+      assert.equal((await service.syncKaistAcademicCalendar(2031)).archivedCount, 0);
+      assert.equal((await academicRows())[0].isActive, true);
+      service.kaistSource.fetchYear = async () => { throw new Error('synthetic_academic_outage'); };
+      await assert.rejects(service.syncKaistAcademicCalendar(2031), /synthetic_academic_outage/);
+      assert.equal((await academicRows())[0].isActive, true);
+      service.kaistSource.fetchYear = async () => fetched;
+      fetched = { items: [{ ...academic, titleKo: '한글날 (변경)', sourceHash: 'updated' }], failedMonths: [] };
+      assert.equal((await service.syncKaistAcademicCalendar(2031)).updatedCount, 1);
+      assert.equal((await academicRows()).length, 1);
+      assert.equal((await academicRows())[0].isHiddenByAdmin, true, 'sync must retain the administrator visibility setting');
+      fetched = { items: [], failedMonths: [] };
+      assert.equal((await service.syncKaistAcademicCalendar(2031)).archivedCount, 1);
+      assert.equal((await academicRows())[0].isActive, false);
+      assert.equal((await db.select().from(schema.calendarEvents).where(eq(schema.calendarEvents.calendarEventId, event.calendarEventId)))[0].isActive, true);
+    });
   } finally {
     await pool?.end();
     assert.match(name, /^calendar_sync_test_[a-f0-9]+$/);

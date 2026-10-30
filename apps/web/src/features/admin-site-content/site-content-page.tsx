@@ -209,6 +209,9 @@ function SiteContentPageContent() {
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: CONTENT_BLOCK_QUERY_KEY });
+    // Update the list before selecting a newly created block.
+    const refreshed = queryClient.getQueryData<{ items: ContentBlockRecord[] }>(CONTENT_BLOCK_QUERY_KEY);
+    if (refreshed) setOrderedBlocks(refreshed.items);
   };
 
   const uploadImage = async (file: File, apply: (imageReference: string) => void) => {

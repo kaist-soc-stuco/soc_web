@@ -71,3 +71,31 @@
 .discovery-survey-cta { display: inline-flex; align-items: center; gap: .375rem; flex: none; margin-left: auto; padding: .125rem 0; color: #087654; font-size: .875rem; font-weight: 500; line-height: 1.5; white-space: nowrap; }
 .discovery-survey-cta svg { width: 1rem; height: 1rem; stroke-width: 1.75; }
 .discovery-card-link:hover .discovery-survey-cta { color: #065f46; text-decoration: underline; text-underline-offset: .2em; }
+
+@media (width < 768px) {
+  .mobile-white-page.mobile-event-page {
+    --ui-surface-canvas: var(--ui-timeline-surface);
+    --discovery-ink: #18181b;
+    --discovery-muted: #72727a;
+    --discovery-media-size: 6rem;
+    background: var(--ui-surface-canvas);
+  }
+  .mobile-event-page .mobile-filter-toolbar { margin-bottom: 1.5rem; }
+  .mobile-event-page .mobile-filter-toolbar input { border-color: #e4e4e7; background: #fff; }
+  .mobile-event-timeline .discovery-card { border: 0; border-radius: 1rem; box-shadow: none; background: #fff; }
+  .mobile-event-timeline .discovery-card-link { gap: .875rem; min-height: 0; padding: .875rem; }
+  .mobile-event-timeline .discovery-card-copy { min-height: var(--discovery-media-size); }
+  .mobile-event-timeline .discovery-card-date { margin-bottom: .375rem; color: #71717a; font-size: .875rem; font-weight: 400; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; }
+  .mobile-event-timeline .discovery-card-title { color: var(--discovery-ink); font-size: 1.125rem; font-weight: 500; line-height: 1.4; letter-spacing: -.025em; }
+  .mobile-event-timeline .discovery-card-detail { font-size: .8125rem; line-height: 1.5; }
+  .mobile-event-timeline .discovery-card-badges { gap: .375rem; margin-top: .5rem; }
+  .mobile-event-timeline .discovery-badge { min-height: 1.25rem; border: 0; border-radius: .25rem; padding: .125rem .375rem; font-weight: 400; }
+  .mobile-event-timeline .discovery-card-image { border-radius: .625rem; }
+  .mobile-event-timeline .discovery-card-link:active { background: #fcfcfd; }
+}
+
+@media (width < 360px) {
+  .mobile-white-page.mobile-event-page { --discovery-media-size: 5rem; }
+  .mobile-event-timeline .discovery-card-link { gap: .625rem; padding: .75rem; }
+  .mobile-event-timeline .discovery-card-title { font-size: 1.0625rem; }
+}

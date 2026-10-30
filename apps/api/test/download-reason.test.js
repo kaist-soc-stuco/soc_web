@@ -4,7 +4,7 @@ const { BadRequestException } = require("@nestjs/common");
 
 const { AuditLogController } = require("../dist/apps/api/src/features/audit/audit-log.controller.js");
 const { AuditLogService } = require("../dist/apps/api/src/features/audit/audit-log.service.js");
-const { requireDownloadReason } = require("../dist/apps/api/src/features/audit/download-reason.js");
+const { requireDownloadReason, requireDownloadReasonHeader } = require("../dist/apps/api/src/features/audit/download-reason.js");
 
 test("download reason is required and bounded", () => {
   for (const value of [undefined, "", " ", "a", "x".repeat(201)]) {
@@ -48,6 +48,16 @@ test("personal-data download records reason, actor, IP, target, and count", asyn
     reason: "응답 검토",
   });
   assert.deepEqual(recordOptions, { required: true });
+});
+
+test("download headers decode Unicode and percent signs before length validation", () => {
+  for (const reason of ["업무 인수인계 100%", "한".repeat(200)]) {
+    assert.equal(requireDownloadReasonHeader(encodeURIComponent(reason)), reason);
+  }
+  for (const reason of ["%E0%A4%A", "%", encodeURIComponent("한".repeat(201))]) {
+    assert.throws(() => requireDownloadReasonHeader(reason), BadRequestException);
+  }
+  assert.equal(requireDownloadReason("업무 100% 검토"), "업무 100% 검토");
 });
 
 test("personal-data download rejects a missing reason", async () => {

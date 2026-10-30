@@ -15,6 +15,7 @@ const ADMIN_ENTRY_ROUTES = [
   { to: "emails", bit: Permissions.SEND_BULK_EMAIL },
   { to: "permissions", bit: Permissions.MANAGE_ROLES },
   { to: "finance", bit: Permissions.MANAGE_FINANCE },
+  { to: "finance", bit: Permissions.VIEW_FINANCE },
   { to: "boards", bit: Permissions.MANAGE_BOARDS },
   { to: "moderation", bit: Permissions.MODERATE_CONTENT },
 ];

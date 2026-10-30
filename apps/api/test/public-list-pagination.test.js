@@ -116,6 +116,32 @@ test("public list query rejects invalid dates and states", () => {
   assert.deepEqual(parsePublicListFilters({ state: "open", from: "2026-10-25" }), { state: "open", from: "2026-10-25" });
   assert.deepEqual(parsePublicListFilters({ state: "active" }), { state: "active" });
   assert.deepEqual(parsePublicListFilters({ state: "always" }), { state: "always" });
+  assert.deepEqual(parsePublicListFilters({ eventOrder: "date" }), { eventOrder: "date" });
+  assert.throws(() => parsePublicListFilters({ eventOrder: "invalid" }), /invalid_public_list_filters/);
+});
+
+test("event timeline orders the full result by event date before pagination without changing default priority", opts, async () => {
+  const names = ["early", "late", "same-day", "long", "undated", "end-only", "past", "recent-past"];
+  const starts = [24, 72, 25, 48, null, null, -72, -24];
+  const created = await db.insert(schema.articles).values(names.map((name, i) => ({
+    boardId, authorUserId: userId, titleKo: `${prefix}-timeline-${name}`, contentKo: "합성 행사",
+    eventStartDate: starts[i] == null ? null : new Date(now + starts[i] * hour),
+    eventEndDate: i === 4 ? null : new Date(now + (i === 5 ? 6 : starts[i] + 2) * hour),
+  }))).returning();
+  await db.insert(schema.surveys).values([0, 1].map(i => ({
+    creatorId: userId, kind: "APPLICATION", titleKo: `${prefix}-timeline-registration-${i}`,
+    connectedArticleId: created[i].articleId, lifecycleStatus: "PUBLISHED", isPublished: true,
+    openAt: new Date(now - hour), closeAt: new Date(now + (i === 0 ? 12 : 1) * hour),
+  })));
+  const page = (n, filters) => articles.listByBoardId(boardId, n, 2, ["PUBLIC"], `${prefix}-timeline-`, undefined, false, "title", filters);
+  const pages = await Promise.all([1, 2, 3, 4].map(n => page(n, { eventOrder: "date" })));
+  const rows = pages.flatMap(result => result.items);
+  assert.equal(pages[0].total, 8);
+  assert.equal(new Set(rows.map(row => row.articleId)).size, 8);
+  assert.deepEqual(rows.map(row => row.titleKo), ["past", "recent-past", "early", "same-day", "long", "late", "end-only", "undated"].map(name => `${prefix}-timeline-${name}`));
+  assert.equal((await page(1, { state: "active" })).items[0].titleKo, `${prefix}-timeline-late`);
+  assert.equal((await page(1, { state: "active", eventOrder: "date" })).items[0].titleKo, `${prefix}-timeline-early`);
+  assert.deepEqual((await page(1, { state: "closed", eventOrder: "date" })).items.map(row => row.titleKo), ["recent-past", "past"].map(name => `${prefix}-timeline-${name}`));
 });
 
 test("active events sort by registration deadline across pages and retain closed registration", opts, async () => {

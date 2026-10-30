@@ -1,16 +1,19 @@
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const test = require("node:test");
+const { createApiClient } = require("@soc/api-client");
 
-test("personal-data exports require and record a download reason", () => {
-  const files = [
-    "src/features/admin-audit/audit-log-page.tsx",
-    "src/features/admin-surveys/survey-responses-panel.tsx",
-    "src/pages/admin/vote-editor-page.tsx",
-  ].map((file) => fs.readFileSync(path.join(__dirname, "..", file), "utf8"));
-
-  for (const source of files) assert.match(source, /promptDownloadReason\(\)/);
-  assert.match(files[1], /recordPersonalDataDownload/);
-  assert.match(files[2], /recordPersonalDataDownload/);
+test("all spreadsheet exports safely carry a Korean download reason in HTTP headers", async () => {
+  const reason = "업무 인수인계 100%";
+  const paths = [];
+  const client = createApiClient({ baseUrl: "/api", fetcher: async (url, init) => {
+    const headers = new Headers(init.headers);
+    assert.equal(decodeURIComponent(headers.get("x-download-reason")), reason);
+    paths.push(String(url));
+    return new Response("workbook");
+  }});
+  await client.exportStudentFeeRoster(reason);
+  await client.downloadContactsXlsx(reason);
+  await client.downloadAuditLogsXlsx(reason);
+  await client.downloadStudentFeeXlsx(reason);
+  assert.equal(new Set(paths).size, 4);
 });

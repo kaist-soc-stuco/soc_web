@@ -76,6 +76,7 @@ export const buildListQuery = (options?: ListQueryOptions): string => {
   if (options.state) params.set("state", options.state);
   if (options.from) params.set("from", options.from);
   if (options.to) params.set("to", options.to);
+  if (options.eventOrder) params.set("eventOrder", options.eventOrder);
 
   if (options.page !== undefined) {
     params.set("page", String(options.page));

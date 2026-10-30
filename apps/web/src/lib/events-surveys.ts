@@ -209,6 +209,51 @@ export function getDiscoveryDateTime(item: UnifiedItem, lang: string) {
   return `${getDiscoveryPeriod(start, lang)} ${time}`;
 }
 
+export function groupEventTimelineItems(items: UnifiedItem[], lang: string, referenceMs = nowMs()) {
+  const groups = new Map<string, { key: string; label: string; weekday: string; isToday: boolean; items: UnifiedItem[] }>();
+  const today = msToTimeObj(referenceMs, EVENT_TIME_ZONE);
+  const currentYear = today.year;
+  const locale = lang === "ko" ? "ko-KR" : "en-US";
+
+  for (const item of items) {
+    const time = item.opensAt ? isoToMs(item.opensAt) : Number.NaN;
+    const date = Number.isFinite(time) ? msToTimeObj(time, EVENT_TIME_ZONE) : null;
+    const key = date ? `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}` : "undated";
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        key,
+        isToday: Boolean(date && date.year === today.year && date.month === today.month && date.day === today.day),
+        label: date ? lang === "ko"
+          ? `${date.year !== currentYear ? `${date.year}년 ` : ""}${date.month}월 ${date.day}일`
+          : new Intl.DateTimeFormat(locale, {
+            timeZone: EVENT_TIME_ZONE, month: "short", day: "numeric",
+            ...(date.year !== currentYear ? { year: "numeric" } as const : {}),
+          }).format(time) : lang === "ko" ? "일정 미정" : "Date to be announced",
+        weekday: date ? new Intl.DateTimeFormat(locale, { timeZone: EVENT_TIME_ZONE, weekday: "long" }).format(time) : "",
+        items: [],
+      };
+      groups.set(key, group);
+    }
+    group.items.push(item);
+  }
+
+  // The server owns ordering across pages. Merge days without reordering dated events.
+  const undated = groups.get("undated");
+  groups.delete("undated");
+  return [...groups.values(), ...(undated ? [undated] : [])];
+}
+
+export function getEventTimelineTime(item: UnifiedItem, lang: string) {
+  if (!item.opensAt) return item.closesAt ? getDiscoveryDateTime(item, lang) : lang === "ko" ? "시간 미정" : "Time to be announced";
+  const time = getDiscoveryTime(item, lang, true);
+  if (!item.closesAt || isSameLocalDay(isoToDate(item.opensAt), isoToDate(item.closesAt))) return time;
+  const end = { ...item, opensAt: item.closesAt, closesAt: null };
+  return time === "종일" || time === "All day"
+    ? `${time} · ${getDiscoveryPeriod(end, lang)}${lang === "ko" ? "까지" : " (end)"}`
+    : `${time} – ${getDiscoveryPeriod(end, lang)} ${getDiscoveryTime(end, lang, true)}`;
+}
+
 type DiscoveryBadgeItem = Pick<UnifiedItem,
   | "kind" | "computedState" | "opensAt" | "closesAt" | "isAlwaysOpen"
   | "maxResponses" | "responseCount" | "linkedSurveyState" | "linkedSurveyClosesAt"

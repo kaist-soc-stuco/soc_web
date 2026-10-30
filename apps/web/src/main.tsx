@@ -1,3 +1,5 @@
+// react-data-grid uses this API; older browsers still need the scoped polyfill.
+import 'core-js/actual/weak-map/get-or-insert-computed';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

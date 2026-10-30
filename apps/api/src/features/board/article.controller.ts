@@ -64,6 +64,7 @@ export class ArticleController {
     @Query("state") state?: import("@soc/contracts").PublicListFilters["state"],
     @Query("from") from?: string,
     @Query("to") to?: string,
+    @Query("eventOrder") eventOrder?: import("@soc/contracts").PublicListFilters["eventOrder"],
   ): Promise<ArticleListResponse> {
     const currentUser =
       await this.authSessionService.getOptionalCurrentUser(accessToken);
@@ -75,7 +76,7 @@ export class ArticleController {
         q,
         searchBy,
         ...(code === "_EVENT" && publicList === "true"
-          ? { publicList: true, ...parsePublicListFilters({ state, from, to }) } : {}),
+          ? { publicList: true, ...parsePublicListFilters({ state, from, to, eventOrder }) } : {}),
         includeContentPreview: code === "faq" || code === "notice",
       },
       currentUser,

@@ -3,6 +3,19 @@ const test = require("node:test");
 
 const { createApiClient } = require("@soc/api-client");
 
+test("event date ordering is explicitly requested and absent from the default feed", async () => {
+  const urls = [];
+  const client = createApiClient({ baseUrl: "/api", fetcher: async url => {
+    urls.push(new URL(url, "http://localhost"));
+    return new Response(JSON.stringify({ items: [], total: 0, page: 1, limit: 12 }), { headers: { "Content-Type": "application/json" } });
+  } });
+  await client.getArticles("_EVENT", { publicList: true, eventOrder: "date", page: 2, limit: 12 });
+  await client.getArticles("_EVENT", { publicList: true });
+  assert.equal(urls[0].searchParams.get("eventOrder"), "date");
+  assert.equal(urls[0].searchParams.get("page"), "2");
+  assert.equal(urls[1].searchParams.has("eventOrder"), false);
+});
+
 const createStorage = () => {
   const values = new Map();
   return {

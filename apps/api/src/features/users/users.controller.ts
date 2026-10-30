@@ -14,7 +14,7 @@ import { Permissions } from "@soc/contracts";
 
 import { AuthGuard, RequireAnyPermissions, RequirePermissions } from "../auth/guards";
 import { auditMetadataFromRequest } from "../audit/audit-context";
-import { requireDownloadReason } from "../audit/download-reason";
+import { requireDownloadReasonHeader } from "../audit/download-reason";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { resolveFeeReferenceSemester } from "./fee-semester";
 import { UsersService } from "./users.service";
@@ -267,8 +267,8 @@ export class UsersController {
   @RequirePermissions(Permissions.EXPORT_FINANCE)
   @RequireAnyPermissions(Permissions.VIEW_FINANCE, Permissions.MANAGE_FINANCE)
   async exportStudentFeeRoster(@Req() req: AuthenticatedRequest, @Headers("x-download-reason") reason?: string, @Query("semester") semester?: string) {
-    requireDownloadReason(reason);
-    const { records } = await this.usersService.exportStudentFeeRoster(auditMetadataFromRequest(req), reason, semester);
+    const decodedReason = requireDownloadReasonHeader(reason);
+    const { records } = await this.usersService.exportStudentFeeRoster(auditMetadataFromRequest(req), decodedReason, semester);
     const sheet = XLSX.utils.json_to_sheet(records.map(row => ({ "학번": row.stdNo, "이름": row.nameKo ?? "", "입학 연도": row.admissionYear ?? "",
       "초기 납부 학기 수": row.paidSemesters, "초기 납부 금액": row.paidAmount, "비고": row.note ?? "", "가입 일시": row.joinedAt ?? "", "누적 수납액": row.totalPaidAmount ?? 0, "상태": row.status ?? "UNPAID" })));
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, "납부 관리");
@@ -422,7 +422,7 @@ export class UsersController {
     @Query("userIds") userIds?: string,
     @Headers("x-download-reason") downloadReason?: string,
   ) {
-    const reason = requireDownloadReason(downloadReason);
+    const reason = requireDownloadReasonHeader(downloadReason);
     const feeStatus: FeeStatus | undefined =
       status === "PAID" || status === "PARTIAL" || status === "UNPAID" ? status : undefined;
     const feeSortBy =

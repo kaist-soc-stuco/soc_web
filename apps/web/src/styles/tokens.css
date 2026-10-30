@@ -47,6 +47,12 @@
   --ui-nav-column-width: 9.25rem;
   --ui-menu-divider: rgb(229 233 236);
   --ui-menu-item-text: rgb(52 64 84);
+  --ui-timeline-surface: #f7f7f8;
+  --ui-timeline-ink: #27272a;
+  --ui-timeline-muted: #71717a;
+  --ui-timeline-line: #e0e0e5;
+  --ui-timeline-dot: #c8c8cd;
+  --ui-timeline-today-dot: color-mix(in srgb, var(--color-brand-primary) 38%, white);
   --board-col-category: 5.5rem;
   --board-col-author: 10.5rem;
   --board-col-date: 7rem;

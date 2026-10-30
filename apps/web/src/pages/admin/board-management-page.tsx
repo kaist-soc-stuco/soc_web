@@ -148,8 +148,7 @@ function BoardManagementPageContent() {
         const { code: _code, ...update } = form;
         await apiClient.updateBoard(editingCode, update);
       } else {
-        const { isActive: _isActive, ...createInput } = form;
-        await apiClient.createBoard({ ...createInput, code: form.code.trim() });
+        await apiClient.createBoard({ ...form, code: form.code.trim() });
       }
       setFormOpen(false);
       toast({ type: "success", message: "게시판 설정을 저장했습니다." });

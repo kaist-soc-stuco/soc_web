@@ -6,6 +6,7 @@ import type { ArticleEngagementKind, KoreanHolidayRecord, PublicListStateCounts 
 import { isoToDate, localDate, nowDate } from "@soc/shared";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { rememberAuthReturnPath } from "@/lib/auth-storage";
@@ -48,6 +49,8 @@ export function useEventsSurveysPageController({
     [],
   );
   const [params, setParams] = useSearchParams();
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const eventOrder = isMobile && currentTab === "event" ? "date" as const : undefined;
   const requestedState = params.get("state");
   const stateFilter: EventsSurveysStateFilter = requestedState === "all" || requestedState === "closed" || (requestedState === "always" && currentTab === "survey") ? requestedState : "active";
   const itemQuery = params.get("q") ?? "";
@@ -124,17 +127,18 @@ export function useEventsSurveysPageController({
 
   const listQuery = useInfiniteQuery<PublicItemsPage, Error, InfiniteData<PublicItemsPage>, readonly unknown[], number>({
     queryKey: ["events-surveys", "list", currentTab, listViewerKey, session?.permission,
-      itemQuery.trim(), stateFilter, dateFrom, dateTo],
+      itemQuery.trim(), stateFilter, dateFrom, dateTo, eventOrder],
     initialPageParam: 1,
     placeholderData: (previous, previousQuery) => previousQuery?.queryKey[2] === currentTab
-      && previousQuery.queryKey[3] === listViewerKey && previousQuery.queryKey[4] === session?.permission ? previous : undefined,
+      && previousQuery.queryKey[3] === listViewerKey && previousQuery.queryKey[4] === session?.permission
+      && previousQuery.queryKey[9] === eventOrder ? previous : undefined,
     queryFn: async ({ pageParam: page, signal }): Promise<PublicItemsPage> => {
       const filters = { page, publicList: true, state: stateFilter, from: dateFrom || undefined, to: dateTo || undefined, signal };
       if (currentTab === "survey") {
         const result = await apiClient.getPublicSurveys({ ...filters, pageSize: PUBLIC_ITEMS_PAGE_SIZE, query: itemQuery });
         return { ...result, items: buildUnifiedItems(result.items, []) };
       }
-      const result = await apiClient.getArticles("_EVENT", { ...filters, limit: PUBLIC_ITEMS_PAGE_SIZE, q: itemQuery, searchBy: "title_content" });
+      const result = await apiClient.getArticles("_EVENT", { ...filters, eventOrder, limit: PUBLIC_ITEMS_PAGE_SIZE, q: itemQuery, searchBy: "title_content" });
       const events = result.items.map(event => ({ ...event, imageUrl: event.thumbnailStorageKey?.trim() ? resolveAssetUrl(event.thumbnailStorageKey.trim()) : null }));
       return { ...result, items: buildUnifiedItems([], events) };
     },

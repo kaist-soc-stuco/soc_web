@@ -119,11 +119,11 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
 
 
   return (
-    <PageShell className={`mobile-white-page${currentTab === "calendar" ? " calendar-page" : " discovery-page"}`}>
+    <PageShell className={`mobile-white-page${currentTab === "calendar" ? " calendar-page" : " discovery-page"}${currentTab === "event" ? " mobile-event-page" : ""}`}>
 
 
       <PageMain className={currentTab === "calendar" ? "calendar-page-main" : undefined}>
-        <PageHeader
+        {currentTab === "calendar" && isMobile ? <h1 className="sr-only">{lang === "ko" ? "일정" : "Calendar"}</h1> : <PageHeader
           className={currentTab === "calendar" ? "calendar-page-heading" : undefined}
           containerClassName={currentTab === "calendar" ? "mobile-calendar-page-heading events-list-page-heading max-w-[100rem] pt-4 sm:items-center" : "events-list-page-heading"}
           actions={
@@ -150,7 +150,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
                 ? lang === "ko" ? "설문" : "Surveys"
                 : lang === "ko" ? "행사" : "Events"
           }
-        />
+        />}
 
         <PageContainer className={currentTab === "calendar" ? "calendar-page-body max-w-[100rem] pb-4" : "pb-8"}>
           {currentTab !== "calendar" && !loading ? (
@@ -184,6 +184,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
             />
           ) : currentTab === "calendar" ? (
             <EventsSurveysCalendar
+              feedUrl={calendarFeedUrl}
               calendarEvents={calendarEvents}
               isFetching={isCalendarFetching}
               calendarQuery={calendarQuery}
@@ -218,6 +219,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
             <>
               <div className="discovery-list" aria-busy={isListUpdating} inert={isListUpdating || undefined}>
                 <EventsSurveysGrid
+                  mobileTimeline={isMobile && currentTab === "event"}
                   hideDate={currentTab === "survey" && stateFilter === "always"}
                   engagementSubmitting={engagementSubmitting}
                   isAuthenticated={Boolean(session?.canUsePersistentFeatures)}

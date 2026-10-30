@@ -4,15 +4,17 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { stripRichText } from "@/components/ui/rich-text-content";
-import { formatCompactDateTime, getCardPeriodText, getDiscoveryBadge, getDiscoveryDateTime, isClosedItem, type UnifiedItem } from "@/lib/events-surveys";
+import { formatCompactDateTime, getCardPeriodText, getDiscoveryBadge, getDiscoveryDateTime, getEventTimelineTime, groupEventTimelineItems, isClosedItem, type UnifiedItem } from "@/lib/events-surveys";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import "./events-surveys-cards.css";
+import "./mobile-timeline.css";
 
 interface EventsSurveysGridProps {
   isAuthenticated: boolean;
   items: UnifiedItem[];
   lang: string;
   hideDate?: boolean;
+  mobileTimeline?: boolean;
   engagementSubmitting?: string | null;
   onEngagementToggle?: (item: UnifiedItem, kind: ArticleEngagementKind, active: boolean) => void;
 }
@@ -35,14 +37,13 @@ function audienceText(item: UnifiedItem, lang: string) {
   return "";
 }
 
-export function EventsSurveysGrid({ isAuthenticated, items, lang, hideDate = false, engagementSubmitting, onEngagementToggle }: EventsSurveysGridProps) {
-  return <div className="events-surveys-card-grid discovery-grid">
-    {items.map(item => {
+export function EventsSurveysGrid({ isAuthenticated, items, lang, hideDate = false, mobileTimeline = false, engagementSubmitting, onEngagementToggle }: EventsSurveysGridProps) {
+  const renderCard = (item: UnifiedItem) => {
       const event = item.kind === "EVENT";
       const title = stripRichText(lang === "ko" ? item.titleKo : item.titleEn || item.titleKo);
       const description = stripRichText(lang === "ko" ? item.descriptionKo : item.descriptionEn || item.descriptionKo);
       const href = event ? `/events/${item.id}` : isClosedItem(item) && item.resultVisibility === "PUBLIC" ? `/survey/${item.id}/results` : `/survey/${item.id}`;
-      const dateTime = getDiscoveryDateTime(item, lang);
+      const dateTime = mobileTimeline && event ? getEventTimelineTime(item, lang) : getDiscoveryDateTime(item, lang);
       const badge = getDiscoveryBadge(item, lang);
       const audience = audienceText(item, lang);
       const surveyBadges = [
@@ -82,6 +83,16 @@ export function EventsSurveysGrid({ isAuthenticated, items, lang, hideDate = fal
           <Bookmark aria-hidden="true" fill={saved ? "currentColor" : "none"} strokeWidth={saved ? 0 : 1.6} />
         </button>}
       </article>;
-    })}
+  };
+
+  if (mobileTimeline) return <div className="mobile-event-timeline mobile-timeline">
+    {groupEventTimelineItems(items, lang).map(group => <section className="mobile-event-day mobile-timeline-day" key={group.key} data-today={group.isToday} aria-labelledby={`event-day-${group.key}`}>
+      <h2 className="mobile-event-day-heading mobile-timeline-heading" id={`event-day-${group.key}`}>
+        {group.key === "undated" ? group.label : <time dateTime={group.key} aria-current={group.isToday ? "date" : undefined}>{group.label}<span>{group.weekday}</span></time>}
+      </h2>
+      <div className="mobile-event-day-cards mobile-timeline-cards">{group.items.map(renderCard)}</div>
+    </section>)}
   </div>;
+
+  return <div className="events-surveys-card-grid discovery-grid">{items.map(renderCard)}</div>;
 }

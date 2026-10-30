@@ -183,7 +183,7 @@ export class BoardRepository {
         allowLike: input.allowLike,
         allowGuestRead: input.allowGuestRead,
         sortOrder: input.sortOrder,
-        isActive: true,
+        isActive: input.isActive ?? true,
       })
       .returning();
 

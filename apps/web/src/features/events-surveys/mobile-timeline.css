@@ -1,0 +1,16 @@
+@media (width < 768px) {
+  .mobile-timeline { min-width: 0; padding-left: .25rem; }
+  .mobile-timeline-day { position: relative; min-width: 0; padding: 0 0 1.5rem 1.25rem; }
+  .mobile-timeline-day::before { content: ""; position: absolute; left: 0; top: .5rem; width: .5rem; height: .5rem; border-radius: 50%; background: var(--ui-timeline-dot); }
+  .mobile-timeline-day[data-today="true"]::before { background: var(--ui-timeline-today-dot); }
+  .mobile-timeline-day:not(:last-child)::after { content: ""; position: absolute; left: calc(.25rem - .5px); top: 1.25rem; bottom: 0; border-left: 1px dashed var(--ui-timeline-line); }
+  .mobile-timeline-day:last-child { padding-bottom: 0; }
+  .mobile-timeline-heading { margin: 0 0 .875rem; color: var(--ui-timeline-ink); font-size: 1rem; font-weight: 600; line-height: 1.5; letter-spacing: -.02em; }
+  .mobile-timeline-heading time { display: flex; flex-wrap: wrap; align-items: baseline; gap: .375rem; }
+  .mobile-timeline-heading span { color: var(--ui-timeline-muted); font-weight: 400; }
+  .mobile-timeline-cards { display: grid; gap: .75rem; }
+}
+
+@media (width < 360px) {
+  .mobile-timeline-day { padding-left: 1rem; }
+}

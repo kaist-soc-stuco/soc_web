@@ -10,9 +10,11 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 export function CalendarSubscriptionButton({
   feedUrl,
   lang,
+  compact = false,
 }: {
   feedUrl: string;
   lang: string;
+  compact?: boolean;
 }) {
   const { toast } = useToast();
   const isMobile = useMediaQuery("(width < 768px)");
@@ -88,14 +90,14 @@ export function CalendarSubscriptionButton({
       <Button
         type="button"
         variant={isMobile ? "ghost" : "outline"}
-        className={isMobile ? "mobile-calendar-connect" : undefined}
+        className={isMobile ? `mobile-calendar-connect${compact ? " mobile-calendar-connect--compact" : ""}` : undefined}
         aria-label={isMobile ? (lang === "ko" ? "캘린더 연동" : "Connect calendar") : undefined}
         aria-controls={isMobile ? undefined : panelId}
         aria-haspopup={isMobile ? "dialog" : undefined}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        <><CalendarPlus aria-hidden="true" /><span>{lang === "ko" ? "캘린더 연동" : "Connect calendar"}</span></>
+        <><CalendarPlus aria-hidden="true" /><span className={isMobile && compact ? "sr-only" : undefined}>{lang === "ko" ? "캘린더 연동" : "Connect calendar"}</span></>
       </Button>
       {isMobile ? <FilterSheet className="mobile-filter-sheet mobile-calendar-subscription" open={open} onClose={() => setOpen(false)} title={lang === "ko" ? "캘린더 연동" : "Connect calendar"} closeLabel={lang === "ko" ? "캘린더 연동 닫기" : "Close calendar connection"}>{content}</FilterSheet> : open ? (
         <PopoverPanel id={panelId} className="left-0 top-full mt-2 w-[min(20rem,calc(100vw-3rem))] p-2 sm:left-auto sm:right-0">

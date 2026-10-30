@@ -281,7 +281,12 @@ export class ArticleRepository {
       )
       .where(selectedFilter)
       .orderBy(
-        ...(publicList ? [
+        ...(publicList?.eventOrder === "date" ? [
+          publicList.state === "closed"
+            ? sql`${articles.eventStartDate} DESC NULLS LAST`
+            : sql`${articles.eventStartDate} ASC NULLS LAST`,
+          desc(articles.articleId),
+        ] : publicList ? [
           sql`CASE WHEN ${eventState} = 'closed' THEN 3
             WHEN ${connectedSurveyFields.surveyComputedState} = 'closed'
               OR (${surveys.maxResponseCount} > 0 AND ${connectedSurveyFields.surveyResponseCount} >= ${surveys.maxResponseCount}) THEN 2

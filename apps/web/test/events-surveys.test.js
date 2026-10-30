@@ -9,12 +9,47 @@ const {
   getDiscoveryBadge,
   getDiscoveryPeriod,
   getDiscoveryTime,
+  getEventTimelineTime,
+  groupEventTimelineItems,
   getEventArticleState,
   sortVisibleItems,
   stripCalendarPrefix,
 } = require("../dist/test-src/lib/events-surveys.js");
 
 const NOW = Date.parse("2026-05-30T00:00:00.000Z");
+
+test("mobile event days merge page boundaries using KST and put undated events last", () => {
+  const [first] = buildUnifiedItems([], [article({ eventStartDate: "2026-11-03T14:30:00Z", eventEndDate: "2026-11-03T14:45:00Z" })], NOW);
+  const second = { ...first, id: "second", opensAt: "2026-11-03T14:50:00Z" };
+  const tomorrow = { ...first, id: "tomorrow", opensAt: "2026-11-03T15:00:00Z" };
+  const undated = { ...first, id: "undated", opensAt: null, closesAt: null };
+  const groups = groupEventTimelineItems([undated, first, second, tomorrow], "ko", NOW);
+  assert.deepEqual(groups.map(group => group.key), ["2026-11-03", "2026-11-04", "undated"]);
+  assert.deepEqual(groups[0].items.map(item => item.id), [first.id, "second"]);
+  assert.equal(groups[0].label, "11월 3일");
+  assert.equal(groups[0].weekday, "화요일");
+  assert.equal(groups[2].label, "일정 미정");
+  assert.match(groupEventTimelineItems([{ ...first, opensAt: "2027-01-01T00:00:00Z" }], "en", NOW)[0].label, /2027/);
+  assert.equal(groupEventTimelineItems([], "ko", NOW).length, 0);
+});
+
+test("mobile event today nodes use the KST day boundary and exclude undated events", () => {
+  const [first] = buildUnifiedItems([], [article({ eventStartDate: "2026-11-03T14:30:00Z" })], NOW);
+  const tomorrow = { ...first, id: "tomorrow", opensAt: "2026-11-03T15:00:00Z" };
+  const undated = { ...first, id: "undated", opensAt: null };
+  const values = [first, tomorrow, undated];
+  assert.deepEqual(groupEventTimelineItems(values, "ko", Date.parse("2026-11-03T14:59:59Z")).map(group => group.isToday), [true, false, false]);
+  assert.deepEqual(groupEventTimelineItems(values, "ko", Date.parse("2026-11-03T15:00:00Z")).map(group => group.isToday), [false, true, false]);
+});
+
+test("mobile event time preserves multi-day, all-day and missing schedule information", () => {
+  const [event] = buildUnifiedItems([], [article({ eventStartDate: "2026-11-03T09:00:00Z", eventEndDate: "2026-11-03T11:00:00Z" })], NOW);
+  assert.equal(getEventTimelineTime(event, "ko"), "오후 6:00");
+  assert.match(getEventTimelineTime({ ...event, closesAt: "2026-11-04T11:00:00Z" }, "ko"), /오후 6:00 – 11월 4일.*오후 8:00/);
+  assert.match(getEventTimelineTime({ ...event, opensAt: "2026-11-02T15:00:00Z", closesAt: "2026-11-04T14:59:59Z" }, "ko"), /종일.*11월 4일.*까지/);
+  assert.equal(getEventTimelineTime({ ...event, opensAt: null, closesAt: null }, "ko"), "시간 미정");
+  assert.match(getEventTimelineTime({ ...event, opensAt: null }, "en"), /deadline/);
+});
 
 test("registration that has not opened is neutral even with a close deadline", () => {
   const [event] = buildUnifiedItems([], [article({ survey: {

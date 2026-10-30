@@ -225,6 +225,7 @@ export const SsoCallbackBodySchema = z.object({
     allowSecret: z.boolean().default(false),
     allowLike: z.boolean().default(true),
     allowGuestRead: z.boolean().default(true),
+    isActive: z.boolean().optional(),
     sortOrder: z.number().int().default(0),
   });
 

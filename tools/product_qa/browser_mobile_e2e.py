@@ -199,10 +199,19 @@ class MobileSuite(AcceptanceSuite):
         ids = page.locator(".mobile-calendar-agenda-group a[href]").evaluate_all("nodes=>nodes.map(el=>el.getAttribute('href'))")
         assert len(ids) == len(set(ids)), ids
         self.capture(page, "11-calendar")
-        category = page.get_by_role("combobox", name="일정 종류", exact=True)
-        category.select_option("academic")
-        expect(category).to_have_value("academic")
-        expect(page.locator('.mobile-calendar-agenda-group [data-calendar-kind="event"]')).to_have_count(0)
+        expect(page.get_by_role("combobox", name="일정 종류", exact=True)).to_have_count(0)
+        expect(page.get_by_text("다가오는 일정", exact=True)).to_have_count(0)
+        expect(page.locator(".calendar-page-heading")).to_have_count(0)
+        expect(page.locator(".mobile-calendar-event-card").first).to_be_visible()
+        expect(page.locator(".mobile-calendar-timeline .calendar-agenda-marker")).to_have_count(0)
+        connect = calendar.get_by_role("button", name="캘린더 연동", exact=True)
+        next_month = calendar.get_by_role("button", name="다음 달", exact=True)
+        assert connect.bounding_box()["x"] > next_month.bounding_box()["x"]
+        connect.click()
+        sheet = page.get_by_role("dialog", name="캘린더 연동", exact=True)
+        expect(sheet.get_by_role("link", name="Google 캘린더에 추가", exact=True)).to_be_visible()
+        sheet.get_by_role("button", name="캘린더 연동 닫기", exact=True).click()
+        expect(sheet).to_be_hidden()
         self.no_overflow(page)
 
     def test_desktop_views_and_admin_access_remain(self):
@@ -240,8 +249,10 @@ def main():
         for name in names:
             print("RUN", name, flush=True)
             started = time.monotonic()
+            suite.page_errors.clear()
             try:
                 getattr(suite, name)()
+                assert not suite.page_errors, "Unhandled browser errors: " + "\n".join(suite.page_errors)
                 print("PASS", name, flush=True)
                 results.append({"test": name, "passed": True, "seconds": round(time.monotonic() - started, 1)})
             except Exception as error:

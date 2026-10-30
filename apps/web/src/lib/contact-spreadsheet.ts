@@ -117,8 +117,10 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
     if (historyText) {
       const activities: ContactActivity[] = [];
       for (const entry of historyText.split(/\r?\n/).filter((line) => line.trim())) {
-        const match = entry.match(/^\s*(\d{4})년?\s*[·/]\s*(.*?)\s*[·/]\s*(.+?)\s*$/);
-        if (!match || Number(match[1]) < 1900 || Number(match[1]) > 3000 || !match[2]) {
+        // Exported separators include spaces; bare punctuation belongs to the name.
+        const match = entry.match(/^\s*(\d{4})년?\s*[·/]\s*(.*?)\s+[·/]\s+(.+?)\s*$/)
+          ?? entry.match(/^\s*(\d{4})년?\s*[·/]\s*(.*?)\s*[·/]\s*(.+?)\s*$/);
+        if (!match || Number(match[1]) < 1900 || Number(match[1]) > 3000) {
           errors.push(`${lineNumber}행: 활동 이력은 '2026년 · 부서 · 직책' 형식으로 입력해 주세요.`);
           return;
         }

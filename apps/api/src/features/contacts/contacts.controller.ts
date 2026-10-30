@@ -12,7 +12,7 @@ import {
 import { Permissions } from "@soc/contracts";
 import { RequirePermissions } from "../auth/guards";
 import { auditMetadataFromRequest } from "../audit/audit-context";
-import { requireDownloadReason } from "../audit/download-reason";
+import { requireDownloadReasonHeader } from "../audit/download-reason";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { ContactsService } from "./contacts.service";
 import type {
@@ -69,7 +69,7 @@ export class ContactsController {
     @Query("privacyConsented") privacyConsented?: string,
     @Headers("x-download-reason") downloadReason?: string,
   ): Promise<StreamableFile> {
-    const reason = requireDownloadReason(downloadReason);
+    const reason = requireDownloadReasonHeader(downloadReason);
     const items = await this.contactsService.exportManaged(
       parseContactListOptions({ query, cohort, department, privacyConsented }),
       auditMetadataFromRequest(request),

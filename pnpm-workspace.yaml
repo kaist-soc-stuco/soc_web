@@ -3,6 +3,7 @@ packages:
   - 'shared/*'
 allowBuilds:
   '@nestjs/core': true
+  core-js: false
   esbuild: true
 overrides:
   body-parser: 2.4.0

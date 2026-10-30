@@ -33,6 +33,7 @@ interface EventsSurveysCalendarProps {
   onCalendarQueryChange: (value: string) => void;
   selectedDate: Date;
   isFetching?: boolean;
+  feedUrl: string;
 }
 
 function formatMonthTitle(year: number, monthIndex: number, lang: Language) {
@@ -57,6 +58,7 @@ export function EventsSurveysCalendar({
   onCalendarQueryChange,
   selectedDate,
   isFetching = false,
+  feedUrl,
 }: EventsSurveysCalendarProps) {
   const isMobile = useMediaQuery("(width < 768px)");
   const [daySheetOpen, setDaySheetOpen] = useState(false);
@@ -93,7 +95,7 @@ export function EventsSurveysCalendar({
       : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   if (isMobile) return <MobilePublicCalendar calendarEvents={calendarEvents} lang={lang}
     onCurrentDateChange={onCurrentDateChange} onSelectedDateChange={onSelectedDateChange}
-    selectedDate={selectedDate} holidays={holidays} isFetching={isFetching} />;
+    selectedDate={selectedDate} holidays={holidays} isFetching={isFetching} feedUrl={feedUrl} />;
   return (
     <div className="calendar-workspace space-y-6">
       <div className="calendar-workspace-layout grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[minmax(0,1fr)_calc(25%+2rem)]">
