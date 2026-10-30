@@ -4260,6 +4260,7 @@
 }
 
 .roadmap-edge-flow .react-flow__edge-path { stroke-dasharray: 6 5; animation: roadmap-edge-flow 2s linear infinite; }
+.roadmap-course-code { display: inline-flex; flex-shrink: 0; white-space: nowrap; border-radius: .375rem; padding: .25rem .375rem; background: #f1f3f5; color: #64748b; font-size: .6875rem; font-weight: 500; line-height: 1; }
 @keyframes roadmap-edge-flow { to { stroke-dashoffset: -22; } }
 @media (prefers-reduced-motion: reduce) { .roadmap-edge-flow .react-flow__edge-path { animation: none; stroke-dasharray: none; } }
 @media (min-width: 1280px) {
@@ -5447,6 +5448,7 @@ input[type="search"]:focus-visible,
   .mobile-filter-sheet > .filter-sheet-header button { width: 44px; height: 44px; min-height: 44px; }
   .mobile-filter-fieldset { min-width: 0; margin-bottom: 1rem; }
   .mobile-filter-fieldset legend { margin-bottom: .375rem; font-size: .8125rem; font-weight: 600; color: #64748b; }
+  .mobile-date-range-fieldset legend { margin-bottom: .875rem; }
   .mobile-filter-option { display: flex; align-items: center; gap: .75rem; min-height: 44px; padding: .5rem .25rem; font-size: .9375rem; color: #334155; cursor: pointer; }
   .mobile-filter-option > input { width: 18px; height: 18px; flex-shrink: 0; accent-color: #007b50; }
   .mobile-filter-fieldset :is(select,input[type="date"],input[type="month"]) { width: 100%; min-width: 0; height: 44px; min-height: 44px; padding-inline: .625rem; border: 1px solid #dfe7e7; border-radius: .5rem; background: #fff; color: #1e293b; font-size: 1rem; }

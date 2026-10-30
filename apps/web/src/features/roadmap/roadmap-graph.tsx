@@ -879,7 +879,7 @@ export function RoadmapGraph({
         </details>
         </>}
 
-        {isMobile ? <FilterSheet className="mobile-filter-sheet mobile-course-sheet" open={Boolean(selectedCourseCode)} onClose={() => onSelectedCourseChange(null)} title={selectedCourseCode ? roadmapCourseByCode.get(selectedCourseCode)?.name[lang] ?? (lang === "ko" ? "과목 상세" : "Course details") : ""} closeLabel={lang === "ko" ? "과목 상세 닫기" : "Close course details"}>
+        {isMobile ? <FilterSheet className="mobile-filter-sheet mobile-course-sheet" bodyClassName="mobile-course-sheet-body" open={Boolean(selectedCourseCode)} onClose={() => onSelectedCourseChange(null)} title={<span className="flex min-w-0 items-center gap-2"><span className="min-w-0">{selectedCourseCode ? roadmapCourseByCode.get(selectedCourseCode)?.name[lang] ?? (lang === "ko" ? "과목 상세" : "Course details") : ""}</span>{selectedCourseCode && <span className="roadmap-course-code">{displayCodeByCourse.get(selectedCourseCode) ?? selectedCourseCode}</span>}</span>} closeLabel={lang === "ko" ? "과목 상세 닫기" : "Close course details"}>
           <CourseDetails courseCode={selectedCourseCode} courseByCode={roadmapCourseByCode} displayCodeByCourse={displayCodeByCourse} lang={lang} relations={roadmapRelations} offeringsByCourse={offeringsByCourse} selectedTerm={selectedTerm} onClose={() => onSelectedCourseChange(null)} onCourseClick={onSelectedCourseChange} sheet />
         </FilterSheet> : selectedCourseCode ? (
           <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 pb-5">
@@ -1218,19 +1218,17 @@ function CourseDetails({
 
   return (
     <section className="roadmap-course-details pt-5" aria-live="polite">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <span className="block text-xs font-semibold leading-4 text-kaist-darkgreen">
-            {displayCodeByCourse.get(item.code) ?? item.code}
-          </span>
-          {!sheet && <h2 className="mt-0.5 text-lg font-semibold leading-tight tracking-tight text-slate-950">{item.name[lang]}</h2>}
+      {!sheet && <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="min-w-0 text-lg font-semibold leading-tight tracking-tight text-slate-950">{item.name[lang]}</h2>
+          <span className="roadmap-course-code">{displayCodeByCourse.get(item.code) ?? item.code}</span>
         </div>
         {!sheet && <IconButton aria-label={lang === "ko" ? "과목 상세 닫기" : "Close details"} onClick={onClose}>
           <X aria-hidden="true" className="size-4" />
         </IconButton>}
-      </div>
+      </div>}
 
-      <div className="mt-4 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1" role="tablist" aria-label={lang === "ko" ? "과목 상세 탭" : "Course detail tabs"}>
+      <div className={cn("grid shrink-0 grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1", !sheet && "mt-4")} role="tablist" aria-label={lang === "ko" ? "과목 상세 탭" : "Course detail tabs"}>
         <button
           type="button"
           role="tab"

@@ -19,7 +19,7 @@ export function MobileFilterActions({ onReset, onApply, lang }: { onReset: () =>
 export function MobileDateRangeFields({ from, to, onChange, lang }: {
   from: string; to: string; onChange: (value: { from: string; to: string }) => void; lang: string;
 }) {
-  return <fieldset className="mobile-filter-fieldset"><legend>{lang === "ko" ? "기간" : "Period"}</legend>
+  return <fieldset className="mobile-filter-fieldset mobile-date-range-fieldset"><legend>{lang === "ko" ? "기간" : "Period"}</legend>
     <div className="mobile-filter-date-fields">
       <label><span>{lang === "ko" ? "시작일" : "From"}</span><UiInput type="date" aria-label={lang === "ko" ? "시작일" : "From"} value={from} max={to || undefined} onChange={e => onChange({ from: e.target.value, to: to && e.target.value > to ? e.target.value : to })} /></label>
       <label><span>{lang === "ko" ? "종료일" : "To"}</span><UiInput type="date" aria-label={lang === "ko" ? "종료일" : "To"} value={to} min={from || undefined} onChange={e => onChange({ from: from && e.target.value && e.target.value < from ? e.target.value : from, to: e.target.value })} /></label>
