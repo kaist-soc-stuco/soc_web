@@ -34,10 +34,7 @@ type FaqFilter = "all" | (typeof FAQ_SECTIONS)[number]["key"];
 
 const FAQ_FILTERS: Array<{ value: FaqFilter; titleKo: string; titleEn: string }> = [
   { value: "all", titleKo: "전체", titleEn: "All" },
-  { value: "account", titleKo: "계정·이용", titleEn: "Account & access" },
-  { value: "fees", titleKo: "과비 납부", titleEn: "Student fees" },
-  { value: "events-surveys", titleKo: "행사·설문", titleEn: "Events & surveys" },
-  { value: "other", titleKo: "기타", titleEn: "Other" },
+  ...FAQ_SECTIONS.map(section => ({ value: section.key, titleKo: section.titleKo, titleEn: section.titleEn })),
 ];
 
 
@@ -253,7 +250,7 @@ export function FaqPage() {
                                     return next;
                                   });
                                 }}
-                                className="flex min-h-14 w-full items-center justify-between gap-4 rounded-none border-0 px-4 py-3 text-left text-[length:var(--ui-text-section-size)] font-medium leading-6 text-slate-800 hover:bg-slate-50 sm:px-6"
+                                className="faq-question flex min-h-14 w-full items-center justify-between gap-4 rounded-none border-0 px-4 py-3 text-left text-[length:var(--ui-text-section-size)] font-medium leading-6 text-slate-800 hover:bg-slate-50 sm:px-6"
                               >
                                 <span className="flex min-w-0 flex-1 items-baseline whitespace-normal">
                                  <span className="break-keep [overflow-wrap:anywhere]">{title}</span>
@@ -270,7 +267,8 @@ export function FaqPage() {
                                 role="region"
                                 aria-labelledby={questionId}
                                 aria-hidden={!isOpen}
-                                className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out ${
+                                inert={!isOpen}
+                                className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none ${
                                   isOpen
                                     ? "grid-rows-[1fr] opacity-100"
                                     : "pointer-events-none grid-rows-[0fr] opacity-0"

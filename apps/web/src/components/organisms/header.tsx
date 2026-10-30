@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
   ChevronDown,
+  ExternalLink,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -35,11 +36,12 @@ import { clearStoredAuthState, rememberAuthReturnPath } from "@/lib/auth-storage
 import { getBoardLabelFromMetadata, isLegacyPublicBoardCode } from "@/lib/board-metadata";
 import { Permissions } from "@/lib/permissions";
 import { VOTING_ENABLED } from "@/lib/feature-flags";
-import { MobileSearchPreview } from "@/features/search/mobile-search-preview";
+import { MobileSearchPreview, MOBILE_SEARCH_FILTERS, type MobileSearchFilter } from "@/features/search/mobile-search-preview";
 import { canPreviewSearch } from "@/features/search/search-preview-query";
 import { FilterSheet } from "@/components/ui/filter-sheet";
 import { MobileNavigationProfile } from "./mobile-navigation-profile";
 import { getMobileAdminHome } from "@/lib/mobile-admin";
+import { useMenuMotion } from "@/components/ui/use-menu-motion";
 
 interface HeaderProps {
   variant?: "default" | "home";
@@ -73,9 +75,11 @@ export function Header({ variant = "default" }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchFilter, setSearchFilter] = useState<MobileSearchFilter>("all");
   const [searchComposing, setSearchComposing] = useState(false);
   useEffect(() => { if (!searchOpen) setSearchComposing(false); }, [searchOpen]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuPresent = useMenuMotion(mobileMenuOpen, mobileMenuRef);
   const [expandedMobileSection, setExpandedMobileSection] = useState<string | null | undefined>(undefined);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
@@ -86,7 +90,7 @@ export function Header({ variant = "default" }: HeaderProps) {
   const { lang, setLanguage } = useLanguage();
   const handleMobileMenuKeyDown = useOverlayBehavior({
     onClose: () => setMobileMenuOpen(false),
-    open: mobileMenuOpen,
+    open: mobileMenuPresent,
     surfaceRef: mobileMenuRef,
   });
   const handleMobileSearchKeyDown = useOverlayBehavior({
@@ -258,7 +262,10 @@ export function Header({ variant = "default" }: HeaderProps) {
     const query = searchQuery.trim();
     setSearchOpen(false);
     setDropdownOpen(false);
-    navigate(query ? `/search?q=${encodeURIComponent(query)}` : "/search");
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (isMobile && searchFilter !== "all") params.set("type", searchFilter);
+    navigate(`/search${params.size ? `?${params}` : ""}`);
   };
 
   const handleStartLogin = async () => {
@@ -691,7 +698,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                               onClick={closeNavigation}
                               target={child.newTab ? "_blank" : undefined}
                               rel={child.newTab ? "noopener noreferrer" : undefined}
-                              className={`flex h-11 w-full items-center justify-center whitespace-nowrap rounded-none px-3 text-center text-sm font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${
+                              className={`relative flex h-11 w-full items-center justify-center whitespace-nowrap rounded-none px-3 text-center text-sm font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${child.newTab ? "pr-8" : ""} ${
                                 homeHeaderDark
                                   ? childActive
                                     ? "text-white hover:bg-slate-50 focus-visible:ring-white/30"
@@ -702,6 +709,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                               }`}
                             >
                               {child.label}
+                              {child.newTab && <ExternalLink aria-hidden="true" className="absolute right-3 size-3.5 text-slate-400" />}
                             </Link>
                           </li>
                         );
@@ -911,13 +919,14 @@ export function Header({ variant = "default" }: HeaderProps) {
         </div>
       </div>
 
-      {mobileMenuOpen && createPortal(
+      {mobileMenuPresent && createPortal(
         <>
           <button
             type="button"
             aria-label={lang === "ko" ? "메뉴 닫기" : "Close menu"}
             tabIndex={-1}
-            className="fixed inset-x-0 bottom-0 top-[var(--ui-header-height)] z-40 cursor-default bg-slate-950/20 backdrop-blur-[1px] xl:hidden"
+            data-open={mobileMenuOpen}
+            className="mobile-navigation-scrim fixed inset-x-0 bottom-0 top-[var(--ui-header-height)] z-40 cursor-default bg-slate-950/20 backdrop-blur-[1px] xl:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
           <div
@@ -926,6 +935,8 @@ export function Header({ variant = "default" }: HeaderProps) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="mobile-primary-navigation-title"
+            aria-hidden={!mobileMenuOpen}
+            inert={!mobileMenuOpen}
             tabIndex={-1}
             onKeyDown={handleMobileMenuKeyDown}
             className="fixed inset-x-0 bottom-0 top-[var(--ui-header-height)] z-50 flex w-full flex-col overflow-hidden border-t border-slate-100 bg-white shadow-xl xl:hidden sm:inset-x-auto sm:left-auto sm:right-0 sm:max-w-[30rem] sm:border-l"
@@ -933,6 +944,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             <h2 id="mobile-primary-navigation-title" className="sr-only">
               {lang === "ko" ? "모바일 주요 메뉴" : "Mobile primary navigation"}
             </h2>
+            <div className="mobile-nav-language"><button type="button" className="mobile-nav-language-link" onClick={() => setLanguage(lang === "ko" ? "en" : "ko")} aria-label={lang === "ko" ? "영어로 전환" : "Switch to Korean"}>{lang === "ko" ? "English" : "한국어"}</button></div>
             <MobileNavigationProfile lang={lang} onNavigate={() => { setMobileMenuOpen(false); closePopovers(); }} onLogin={() => void handleStartLogin()} />
             <nav
               className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4"
@@ -977,7 +989,8 @@ export function Header({ variant = "default" }: HeaderProps) {
                       {item.label}
                     </Link>}
                     {children.length > 0 ? (
-                      <div id={groupId} hidden={!expanded} className="mobile-navigation-links mt-1 grid gap-1 pl-3">
+                      <div id={groupId} className="mobile-navigation-collapse" data-open={expanded} aria-hidden={!expanded} inert={!expanded}>
+                      <div className="mobile-navigation-links mt-1 grid gap-1 pl-3">
                         {children.map((child) => (
                           <Link
                             key={child.href}
@@ -988,9 +1001,11 @@ export function Header({ variant = "default" }: HeaderProps) {
                             rel={child.newTab ? "noopener noreferrer" : undefined}
                             className="mobile-navigation-link flex min-h-11 items-center justify-start rounded-lg border border-slate-200 bg-white px-3 text-left text-[length:var(--ui-text-caption-size)] font-medium text-slate-600 hover:bg-slate-50 hover:text-brand-primary"
                           >
-                            {mobileAboutLabels[child.href] ?? child.label}
+                            <span className="min-w-0">{mobileAboutLabels[child.href] ?? child.label}</span>
+                            {child.newTab && <ExternalLink aria-hidden="true" className="ml-auto size-3.5 shrink-0 text-slate-400" />}
                           </Link>
                         ))}
+                      </div>
                       </div>
                     ) : null}
                   </div>
@@ -999,13 +1014,12 @@ export function Header({ variant = "default" }: HeaderProps) {
             </div>
             </nav>
 
-          <div className="mobile-nav-account mobile-nav-account-minimal shrink-0 border-t border-slate-100 bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
-            <div className="mobile-nav-language-toggle"><span>{lang === "ko" ? "언어" : "Language"}</span><div><button type="button" aria-pressed={lang === "ko"} onClick={() => setLanguage("ko")}>한국어</button><button type="button" aria-pressed={lang === "en"} onClick={() => setLanguage("en")}>English</button></div></div>
-            {user && <div className="mobile-nav-utility-links">
+          {user && <div className="mobile-nav-account mobile-nav-account-minimal shrink-0 border-t border-slate-100 bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
+            <div className="mobile-nav-utility-links">
               {canUseAdminDashboard && getMobileAdminHome(user.permission) && <Link to={getMobileAdminHome(user.permission)!} onClick={handleMobileNavigation}><LayoutDashboard aria-hidden="true" />{lang === "ko" ? "관리자 콘솔" : "Admin console"}</Link>}
               <button type="button" onClick={() => void handleLogout()}><LogOut aria-hidden="true" />{lang === "ko" ? "로그아웃" : "Sign out"}</button>
-            </div>}
-          </div>
+            </div>
+          </div>}
           </div>
         </>, document.body,
       )}
@@ -1022,9 +1036,14 @@ export function Header({ variant = "default" }: HeaderProps) {
               value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onCompositionStart={() => setSearchComposing(true)} onCompositionEnd={() => setSearchComposing(false)} autoComplete="off" enterKeyHint="search" />
             <IconButton aria-label={lang === "ko" ? "검색 닫기" : "Close search"} onClick={() => { setSearchOpen(false); requestAnimationFrame(() => searchTriggerRef.current?.focus()); }}><X /></IconButton>
           </form>
-          <MobileSearchPreview query={searchQuery} composing={searchComposing} lang={lang} onSelect={closePopovers} />
+          <div className="mobile-search-filter-chips scrollbar-hidden" role="group" aria-label={lang === "ko" ? "검색 종류" : "Search type"}>
+            {MOBILE_SEARCH_FILTERS.map(filter => <button key={filter.value} type="button" aria-pressed={searchFilter === filter.value} onClick={() => setSearchFilter(filter.value)}>{lang === "ko" ? filter.ko : filter.en}</button>)}
+          </div>
+          <MobileSearchPreview query={searchQuery} filter={searchFilter} composing={searchComposing} lang={lang} onSelect={closePopovers} />
           {canPreviewSearch(searchQuery, searchComposing) && <button type="button" className="mobile-search-submit" onClick={() => {
-            navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`); closePopovers();
+            const params = new URLSearchParams({ q: searchQuery.trim() });
+            if (searchFilter !== "all") params.set("type", searchFilter);
+            navigate(`/search?${params}`); closePopovers();
           }}><Search className="size-4 text-slate-400" aria-hidden="true" /><span>{lang === "ko" ? "전체 검색 결과 보기" : "View all search results"}</span></button>}
         </div>, document.body,
       )}

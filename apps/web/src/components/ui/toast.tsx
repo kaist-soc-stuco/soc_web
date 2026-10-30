@@ -25,6 +25,8 @@ type ToastAction = {
 
 type ToastOptions = {
   message: string;
+  /** Reuse one visible toast when an action is safe to repeat. */
+  dedupeKey?: string;
   action?: ToastAction;
   duration?: number;
   type?: ToastType;
@@ -52,8 +54,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const toast = useCallback((options: ToastOptions) => {
     const revision = ++nextId.current;
-    // Action toasts stay distinct: identical labels can refer to different operations.
-    const id = options.action ? `toast-${revision}` : `toast-${JSON.stringify([options.type ?? "info", options.message])}`;
+    // Action toasts only merge with an explicit key: undo may refer to different operations.
+    const id = options.dedupeKey
+      ? `toast-key-${options.dedupeKey}`
+      : options.action
+        ? `toast-${revision}`
+        : `toast-${JSON.stringify([options.type ?? "info", options.message])}`;
     setToasts((current) => {
       const item = { ...options, id, revision };
       return current.some(existing => existing.id === id)
@@ -133,8 +139,9 @@ function ToastCard({
 
   useEffect(() => {
     window.clearTimeout(exitTimer.current);
+    let feedback: Animation | undefined;
     if (previousRevision.current !== item.revision && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      cardRef.current?.animate([
+      feedback = cardRef.current?.animate([
         { transform: "translateX(0)" }, { transform: "translateX(-4px)" },
         { transform: "translateX(3px)" }, { transform: "translateX(-2px)" }, { transform: "translateX(0)" },
       ], { duration: 320, easing: "ease-out" });
@@ -143,6 +150,7 @@ function ToastCard({
     leaving.current = false;
     remaining.current = item.duration ?? 4500;
     setIsLeaving(false);
+    return () => feedback?.cancel();
   }, [item.revision, item.duration]);
 
   useEffect(() => {

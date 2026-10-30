@@ -4443,6 +4443,25 @@ html { scrollbar-gutter: stable; }
   box-shadow: 0 1px 2px rgb(15 23 42 / 3%);
 }
 
+/* A disclosure changes the content below its trigger, never the scroll anchor. */
+:is(.faq-page-container, .mobile-navigation-sections, .tree-pledge-list, .roadmap-mobile-fields, .mypage-fee-consent) {
+  overflow-anchor: none;
+}
+
+@supports (interpolate-size: allow-keywords) {
+  :is(.tree-pledge-item, .roadmap-mobile-fields) { interpolate-size: allow-keywords; }
+  :is(.tree-pledge-item, .roadmap-mobile-fields)::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition: block-size 220ms ease-out, content-visibility 220ms allow-discrete;
+  }
+  :is(.tree-pledge-item, .roadmap-mobile-fields)[open]::details-content { block-size: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.tree-pledge-item, .roadmap-mobile-fields)::details-content { transition: none; }
+}
+
 @media (max-width: 767px) {
   .faq-page-tools {
     align-items: stretch;

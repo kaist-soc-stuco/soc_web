@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
-import type { PublicListFilters, PublicListStateCounts } from "@soc/contracts";
+import type { FaqCategory, PublicListFilters, PublicListStateCounts } from "@soc/contracts";
 import { publicListDateFilter, publicListStateFields, publicListStateFilter } from "../../../shared/public-list";
 import {
   and,
@@ -1090,7 +1090,7 @@ export class ArticleRepository {
       isAnonymous?: boolean;
       allowComment?: boolean;
       updatedAt: Date;
-      faqCategory?: "account" | "fees" | "events-surveys" | "other";
+      faqCategory?: FaqCategory;
       eventStartDate?: Date | null;
       eventEndDate?: Date | null;
       eventLocation?: string | null;

@@ -32,23 +32,43 @@ export const FAQ_CATEGORIES = [
     ]),
   },
   {
-    key: "other",
-    titleKo: "기타",
-    titleEn: "Other",
+    key: "communication",
+    titleKo: "소통·건의",
+    titleEn: "Feedback & support",
     titles: new Set([
       "학생회에 사업이나 정책을 건의하려면 어떻게 하나요?",
       "비밀 건의사항과 공식 답변은 누가 볼 수 있나요?",
       "댓글이나 공식 답변 알림은 어디서 확인하나요?",
       "사이트 오류는 어떻게 신고하나요?",
       "행사나 동아리 홍보글 게시를 요청하려면 어떻게 하나요?",
+    ]),
+  },
+  {
+    key: "academics",
+    titleKo: "학사·학부 정보",
+    titleEn: "Academic & department info",
+    titles: new Set([
       "학번별 단체 카카오톡방에 참여하려면 어떻게 하나요?",
       "졸업 요건과 교과목 이수 순서는 어디서 확인하나요?",
       "연구실, 교수진, 시설 정보는 어디서 확인하나요?",
+    ]),
+  },
+  {
+    key: "council",
+    titleKo: "학생회",
+    titleEn: "Student Council",
+    titles: new Set([
       "집행위원회 모집은 언제 하나요?",
       "학생회 활동인증서는 어디에 요청하나요?",
       "기업 후원이나 제휴를 제안하려면 어떻게 하나요?",
       "전산학부 학생회칙은 어디서 확인하나요?",
     ]),
+  },
+  {
+    key: "other",
+    titleKo: "기타",
+    titleEn: "Other",
+    titles: new Set<string>(),
   },
 ] as const;
 

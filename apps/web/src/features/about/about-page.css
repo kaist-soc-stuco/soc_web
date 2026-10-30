@@ -97,7 +97,6 @@
 .about-tree-page .tree-pledge-status { height: 1.5rem; padding-inline: .5rem; font-size: .8125rem; font-weight: 500; white-space: nowrap; }
 .about-tree-page .tree-pledge-item > div { padding-block: .25rem 1rem; }
 .about-tree-page .tree-pledge-item p { font-size: 1rem; color: var(--tree-muted); line-height: 1.85; white-space: pre-line; }
-.about-tree-page .tree-pledge-item[open] > div { animation: tree-content-enter 200ms ease; }
 .about-tree-page .tree-empty { color: var(--tree-muted); padding-block: 1rem; font-size: 1rem; }
 .about-tree-page .tree-org-image { width: min(100%, 60rem); margin-inline: auto; }
 .about-tree-page .tree-org-image img { display: block; width: auto; max-width: 100%; height: auto; max-height: 30rem; margin-inline: auto; object-fit: contain; }
@@ -127,8 +126,9 @@
 .about-tree-page .tree-partner-logos { margin-top: 2.5rem; }
 .about-tree-page .tree-partner-caption { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .about-tree-page .tree-partner-caption p { margin: 0; font-size: .875rem; font-weight: 500; line-height: 1.6; }
-.about-tree-page .tree-partner-window { overflow: hidden; padding-block: 1.25rem; mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent); } /* taste-skill-ignore: user-requested edge fade for the moving logos, not a surface fill. */
-.about-tree-page .tree-partner-track { display: flex; width: max-content; animation: tree-partner-marquee 40s linear infinite; }
+.about-tree-page .tree-partner-window { overflow: hidden; opacity: 0; transition: opacity 420ms ease-out; padding-block: 1.25rem; mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent); } /* taste-skill-ignore: user-requested edge fade for the moving logos, not a surface fill. */
+.about-tree-page .tree-partner-logos[data-visible="true"] .tree-partner-window { opacity: 1; }
+.about-tree-page .tree-partner-track { display: flex; width: max-content; animation: tree-partner-marquee 40s linear infinite; will-change: transform; }
 .about-tree-page .tree-partner-group { display: flex; align-items: center; gap: 4rem; flex-shrink: 0; margin: 0; padding: 0 4rem 0 0; list-style: none; }
 .about-tree-page .tree-partner-group li { display: flex; align-items: center; justify-content: center; flex: 0 0 10rem; width: 10rem; height: 3.5rem; }
 .about-tree-page .tree-partner-logo { display: block; width: auto; max-width: min(100%, 10rem); height: auto; max-height: 2.5rem; object-fit: contain; filter: grayscale(1); opacity: .62; }
@@ -193,8 +193,9 @@
   .about-tree-page .tree-intro-body h2 { font-size: 1.25rem; }
   .about-tree-page .tree-intro-body p { font-size: 1.0625rem; }
   .about-tree-page .tree-program-layout { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
-  .about-tree-page .tree-program-index { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
-  .about-tree-page .tree-program-index button { justify-content: center; padding: .75rem .5rem; font-size: .875rem; text-align: center; }
+  .about-tree-page .tree-program-index { display: flex; flex-wrap: nowrap; gap: 1rem; overflow-x: auto; scrollbar-width: none; }
+  .about-tree-page .tree-program-index::-webkit-scrollbar { display: none; }
+  .about-tree-page .tree-program-index button { flex-shrink: 0; justify-content: center; padding: .75rem .125rem; font-size: .875rem; text-align: center; white-space: nowrap; }
   .about-tree-page .tree-program-group > header { margin-bottom: 1.25rem; }
   .about-tree-page .tree-program-group h3 { font-size: 1.375rem; }
   .about-tree-page .tree-program-pair { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
@@ -217,6 +218,7 @@
   .about-tree-page *, .about-tree-page *::before, .about-tree-page *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .about-tree-page .tree-program-pair article:hover, .about-tree-page .tree-program-pair article:hover .tree-program-media img { transform: none; }
   .about-tree-page .tree-partner-window { mask-image: none; -webkit-mask-image: none; }
+  .about-tree-page .tree-partner-window { opacity: 1; }
   .about-tree-page .tree-partner-track { width: 100%; }
   .about-tree-page .tree-partner-group { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; padding: 0; gap: 1.5rem; }
   .about-tree-page .tree-partner-group li { width: 100%; min-width: 0; }

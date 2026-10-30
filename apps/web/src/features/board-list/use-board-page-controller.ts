@@ -254,6 +254,7 @@ export function useBoardPageController() {
   ) => {
     if (!session?.canUsePersistentFeatures) {
       toast({
+        dedupeKey: "login-required",
         type: "info",
         message:
           lang === "ko"

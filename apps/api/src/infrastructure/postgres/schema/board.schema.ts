@@ -15,6 +15,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import type { FaqCategory } from "@soc/contracts";
 
 import { permissions, users } from "./auth.schema";
 
@@ -48,7 +49,7 @@ export const articles = pgTable("article", {
     .references(() => users.userId),
   titleKo: varchar("title_ko", { length: 255 }).notNull(),
   titleEn: varchar("title_en", { length: 255 }),
-  faqCategory: varchar("faq_category", { length: 30 }).$type<"account" | "fees" | "events-surveys" | "other">(),
+  faqCategory: varchar("faq_category", { length: 30 }).$type<FaqCategory>(),
   contentKo: text("content_ko").notNull(),
   contentEn: text("content_en"),
   status: varchar("status", { length: 20 }).notNull().default("PUBLISHED"),
@@ -74,7 +75,7 @@ export const articles = pgTable("article", {
   eventDescriptionKo: text("event_description_ko"),
   eventDescriptionEn: text("event_description_en"),
 }, (table) => [
-  check("article_faq_category_check", sql`${table.faqCategory} IN ('account', 'fees', 'events-surveys', 'other')`),
+  check("article_faq_category_check", sql`${table.faqCategory} IN ('account', 'fees', 'events-surveys', 'communication', 'academics', 'council', 'other')`),
   index("article_board_idx").on(table.boardId),
   index("article_board_status_posted_idx").on(
     table.boardId,

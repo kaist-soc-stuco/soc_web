@@ -50,7 +50,7 @@ function lockBodyScroll() {
 function getFocusableElements(surface: HTMLElement) {
   return Array.from(surface.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
     (element) =>
-      element.getAttribute("aria-hidden") !== "true" &&
+      !element.closest('[inert], [aria-hidden="true"]') &&
       element.tabIndex >= 0 &&
       element.offsetWidth > 0 &&
       element.offsetHeight > 0,

@@ -85,6 +85,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
 
   const showLoginRequiredToast = () => {
     toast({
+      dedupeKey: "login-required",
       type: "info",
       message:
         lang === "ko"

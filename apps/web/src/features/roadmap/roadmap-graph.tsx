@@ -32,6 +32,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { TextInput } from "@/components/ui/text-input";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { Switch } from "@/components/ui/switch";
+import { UiSelect } from "@/components/ui/form-control";
 import { FilterSheet } from "@/components/ui/filter-sheet";
 import { MobileFilterActions, MobileFilterButton } from "@/components/ui/mobile-filter-controls";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -845,7 +846,7 @@ export function RoadmapGraph({
           </div>
           <FilterSheet className="mobile-filter-sheet" open={filterOpen} onClose={() => setFilterOpen(false)} title={lang === "ko" ? "과목 필터" : "Course filters"} closeLabel={lang === "ko" ? "필터 닫기" : "Close filters"} footer={<MobileFilterActions lang={lang} onReset={() => setDraftFilters({ term: termOptions.find(option => option.value === "2026-fall")?.value ?? termOptions[0]?.value ?? selectedTerm, offeredOnly: false, tracks: new Set() })} onApply={() => { setSelectedTerm(draftFilters.term); setOfferedOnly(draftFilters.offeredOnly); setSelectedTrackIds(draftFilters.tracks); setFilterOpen(false); }} />}>
             <fieldset className="mobile-filter-fieldset"><legend>{lang === "ko" ? "학기" : "Semester"}</legend>
-              <select aria-label={lang === "ko" ? "학기" : "Semester"} value={draftFilters.term} onChange={event => setDraftFilters(previous => ({ ...previous, term: event.target.value as RoadmapOfferingTerm }))}>{termOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+              <UiSelect className="w-full" aria-label={lang === "ko" ? "학기" : "Semester"} value={draftFilters.term} onChange={event => setDraftFilters(previous => ({ ...previous, term: event.target.value as RoadmapOfferingTerm }))}>{termOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</UiSelect>
               <label className="mobile-filter-option"><Switch checked={draftFilters.offeredOnly} onCheckedChange={value => setDraftFilters(previous => ({ ...previous, offeredOnly: value }))} aria-label={lang === "ko" ? "선택한 학기 개설 과목만" : "Offered this semester only"} /><span>{lang === "ko" ? "선택한 학기 개설 과목만" : "Offered this semester only"}</span></label>
             </fieldset>
             <fieldset className="mobile-filter-fieldset"><legend>{lang === "ko" ? "교육 분야" : "Fields"}</legend>{ROADMAP_TRACKS.map(track => <label key={track.id} className="mobile-filter-option"><input type="checkbox" checked={draftFilters.tracks.has(track.id)} onChange={() => setDraftFilters(previous => { const tracks = new Set(previous.tracks); if (tracks.has(track.id)) tracks.delete(track.id); else tracks.add(track.id); return { ...previous, tracks }; })} /><span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: track.color }} /><span>{track.label[lang]}</span></label>)}</fieldset>
@@ -1369,13 +1370,13 @@ function OfferingList({
               </div>
               {offering.time ? (
                 <p className="flex items-start gap-1.5 break-keep leading-4 text-slate-600">
-                  <Clock3 aria-hidden="true" className="relative top-0.5 mt-1 size-3 shrink-0 text-slate-400" />
+                  <Clock3 aria-hidden="true" className="relative top-0.5 size-3 shrink-0 text-slate-400" />
                   <span className="whitespace-pre-line">{offering.time}</span>
                 </p>
               ) : null}
               {offering.room ? (
                 <p className="flex items-start gap-1.5 break-keep leading-4 text-slate-600">
-                  <MapPin aria-hidden="true" className="relative top-0.5 mt-1 size-3 shrink-0 text-slate-400" />
+                  <MapPin aria-hidden="true" className="relative top-0.5 size-3 shrink-0 text-slate-400" />
                   <span className="whitespace-pre-line">{offering.room}</span>
                 </p>
               ) : null}

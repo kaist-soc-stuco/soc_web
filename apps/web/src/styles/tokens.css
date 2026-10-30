@@ -128,3 +128,7 @@
     --ui-space-page-x: var(--ui-space-page-x-narrow);
   }
 }
+
+@media (max-width: 767px) {
+  :root { --ui-header-height: 3.75rem; }
+}

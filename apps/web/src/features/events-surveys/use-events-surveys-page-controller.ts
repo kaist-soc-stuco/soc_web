@@ -240,6 +240,7 @@ export function useEventsSurveysPageController({
     if (item.kind !== "EVENT") return;
     if (!session?.canUsePersistentFeatures) {
       toast({
+        dedupeKey: "login-required",
         type: "info",
         message:
           lang === "ko"
