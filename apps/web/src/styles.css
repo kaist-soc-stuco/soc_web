@@ -4956,6 +4956,7 @@ button[data-tooltip]:focus-visible::after {
 }
 .ui-checkbox:indeterminate { background-image: linear-gradient(white,white); background-size: 0.5rem 2px; }
 .ui-checkbox:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 3px; }
+.service-consent .ui-checkbox:focus-visible { outline-color: #94a3b8; }
 .ui-checkbox:disabled { opacity: 0.45; cursor: not-allowed; }
 @media (forced-colors: active) { .ui-checkbox { appearance: auto; } }
 

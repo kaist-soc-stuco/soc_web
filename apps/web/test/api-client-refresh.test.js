@@ -350,3 +350,41 @@ test("void and proxy error responses also retain request ids", async () => {
   const client = createApiClient({ baseUrl: "/api", fetcher: async () => new Response("upstream unavailable", { status: 502, headers: { "x-request-id": "proxy-request-id" } }) });
   await assert.rejects(client.deleteArticle("_EVENT", "1"), error => error.status === 502 && error.requestId === "proxy-request-id");
 });
+
+for (const operation of ["role update", "session refresh"]) {
+  test(`a forbidden ${operation} rejects only that request without redirecting to login`, async () => {
+    const originalWindow = global.window;
+    const originalDocument = global.document;
+    const originalNavigator = global.navigator;
+    const localStorage = createStorage();
+    const sessionStorage = createStorage();
+    const requests = [];
+    const redirects = [];
+    localStorage.setItem("soc.auth.last-activity-at", Date.now());
+    sessionStorage.setItem("soc.auth.state", JSON.stringify({ storageMode: "persisted" }));
+    global.window = {
+      localStorage, sessionStorage,
+      location: { assign: value => redirects.push(value), origin: "https://stuco.test", pathname: "/admin/permissions", search: "", hash: "" },
+    };
+    global.document = { cookie: "" };
+    Object.defineProperty(global, "navigator", { configurable: true, value: { locks: createLockManager() } });
+    try {
+      const client = createApiClient({ baseUrl: "/api/v1", fetcher: async url => {
+        requests.push(String(url));
+        return new Response(JSON.stringify({ message: "insufficient_permission" }), { status: 403, headers: { "Content-Type": "application/json" } });
+      } });
+      await assert.rejects(
+        operation === "role update" ? client.updateRoleGroup(1, { nameKo: "운영", permissionIds: [] }) : client.refreshSession(),
+        error => error.status === 403 && error.code === "insufficient_permission",
+      );
+      assert.deepEqual(redirects, []);
+      assert.equal(requests.length, 1);
+      assert.ok(requests[0].endsWith(operation === "role update" ? "/role-groups/1" : "/auth/refresh"));
+      assert.equal(sessionStorage.getItem("soc.auth.state"), JSON.stringify({ storageMode: "persisted" }));
+    } finally {
+      global.window = originalWindow;
+      global.document = originalDocument;
+      Object.defineProperty(global, "navigator", { configurable: true, value: originalNavigator });
+    }
+  });
+}

@@ -64,6 +64,7 @@ function focusSurface(surface: HTMLElement, last = false) {
 }
 
 interface UseOverlayBehaviorOptions {
+  initialFocus?: "control" | "surface";
   onClose: () => void;
   open: boolean;
   surfaceRef: RefObject<HTMLElement | null>;
@@ -74,6 +75,7 @@ interface UseOverlayBehaviorOptions {
  * restoration, Escape handling, and a small focus trap for the active overlay.
  */
 export function useOverlayBehavior({
+  initialFocus = "control",
   onClose,
   open,
   surfaceRef,
@@ -97,6 +99,10 @@ export function useOverlayBehavior({
 
     const focusFrame = window.requestAnimationFrame(() => {
       if (overlayStack.at(-1) !== surface) return;
+      if (initialFocus === "surface") {
+        surface.focus({ preventScroll: true });
+        return;
+      }
       const focusable = getFocusableElements(surface);
       const preferred = focusable.find(element => element.hasAttribute("data-initial-focus"));
       if (preferred) preferred.focus({ preventScroll: true });
@@ -142,7 +148,7 @@ export function useOverlayBehavior({
         });
       }
     };
-  }, [open, surfaceRef]);
+  }, [initialFocus, open, surfaceRef]);
 
   return useCallback((event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== "Tab") return;
@@ -160,10 +166,10 @@ export function useOverlayBehavior({
     if (Array.from(overlayBranches).some(([root, branch]) => surface.contains(branch.owner) && root.contains(activeElement))) return;
     const first = focusable[0];
     const last = focusable.at(-1);
-    if (event.shiftKey && (activeElement === first || !surface.contains(activeElement))) {
+    if (event.shiftKey && (activeElement === surface || activeElement === first || !surface.contains(activeElement))) {
       event.preventDefault();
       last?.focus({ preventScroll: true });
-    } else if (!event.shiftKey && (activeElement === last || !surface.contains(activeElement))) {
+    } else if (!event.shiftKey && (activeElement === surface || activeElement === last || !surface.contains(activeElement))) {
       event.preventDefault();
       first.focus({ preventScroll: true });
     }

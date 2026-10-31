@@ -6,7 +6,7 @@ const { getAuthSessionSummary, createEmptyAuthSession } = require("../dist/test-
 
 const session = { authenticated: true, canUsePersistentFeatures: true, requiresConsent: false, storageMode: "persisted", userId: "test-user", permission: 1 };
 
-for (const error of [new TypeError("Network request failed"), new ApiClientHttpError(500), new ApiClientHttpError(503)]) {
+for (const error of [new TypeError("Network request failed"), new ApiClientHttpError(403), new ApiClientHttpError(429), new ApiClientHttpError(500), new ApiClientHttpError(503)]) {
   test(`background session failure preserves cached login: ${error.message}`, async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const queryKey = ["auth", "session"];
@@ -21,7 +21,7 @@ for (const error of [new TypeError("Network request failed"), new ApiClientHttpE
   });
 }
 
-for (const status of [401, 403]) {
+for (const status of [401]) {
   test(`confirmed authentication failure replaces cached login: ${status}`, async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const queryKey = ["auth", "session"];

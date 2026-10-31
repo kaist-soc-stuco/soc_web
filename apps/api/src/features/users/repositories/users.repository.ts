@@ -798,6 +798,7 @@ export class UsersRepository {
           stdNo: record.stdNo, nameKo: record.nameKo ?? null, admissionYear: record.admissionYear,
           paidSemesters: record.paidSemesters, paidAmount: 0,
           completedAt: record.paidSemesters >= 6 ? nowDate() : null,
+          note: INITIAL_FEE_ROSTER_NOTE,
         }))).onConflictDoNothing({ target: paidStudentRecords.stdNo }).returning({ stdNo: paidStudentRecords.stdNo });
         insertedCount += inserted.length;
         const insertedNumbers = new Set(inserted.map(row => row.stdNo));
@@ -805,7 +806,7 @@ export class UsersRepository {
         if (initialPayments.length) await tx.insert(studentFeePayments).values(initialPayments.map(record => ({
           stdNo: record.stdNo, amount: record.paidAmount, paymentType: "INITIAL_RECORD",
           effectiveStartSemester: this.currentReferenceSemester(), coverageSemesters: 6,
-          paidAt: nowDate(), note: "기초자료",
+          paidAt: nowDate(), note: INITIAL_FEE_ROSTER_NOTE,
         })));
       }
       const matched = await tx.select({ userId: users.userId, paidSemesters: paidStudentRecords.paidSemesters, paidAmount: paidStudentRecords.paidAmount })

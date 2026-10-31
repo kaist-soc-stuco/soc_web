@@ -67,7 +67,6 @@ def main():
         "LOCAL_QA_PORT": str(args.port),
         "LOCAL_QA_UPSTREAM": "http://127.0.0.1:8080",
         "EMAIL_DRY_RUN": "true",
-        "BULK_EMAIL_SCHEDULER_ENABLED": "false",
         "GOOGLE_CALENDAR_SYNC_ENABLED": "false",
         "KAIST_CALENDAR_SYNC_ENABLED": "false",
         "ASSET_ORPHAN_CLEANUP_ENABLED": "false",

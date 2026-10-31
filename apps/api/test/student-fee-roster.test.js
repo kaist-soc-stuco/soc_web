@@ -7,6 +7,7 @@ const { eq } = require("drizzle-orm");
 const schema = require("../dist/apps/api/src/infrastructure/postgres/postgres.schema.js");
 const { UsersRepository } = require("../dist/apps/api/src/features/users/repositories/users.repository.js");
 const { GoogleFeeSheetsService } = require("../dist/apps/api/src/features/users/google-fee-sheets.service.js");
+const { parseStudentFeeBootstrapRecords } = require("../dist/apps/api/src/features/users/student-fee-bootstrap-loader.js");
 
 const databaseUrl = process.env.FEE_ROSTER_TEST_DATABASE_URL;
 if (databaseUrl && !/^\/(soc_fee_roster_test_\w+|soc_web_test)$/.test(new URL(databaseUrl).pathname)) throw new Error("isolated_fee_roster_test_database_required");
@@ -34,7 +35,11 @@ async function addUser(stdNo, id = randomUUID()) {
 test("import retains unregistered students and replays never overwrite the authoritative ledger", integration, async () => {
   const userId = await addUser(first.stdNo);
   assert.deepEqual(await repository.importStudentFeeRoster([first, second]), { insertedCount: 2, linkedCount: 1 });
-  assert.equal((await db.select().from(schema.paidStudentRecords)).length, 2);
+  const imported = await db.select().from(schema.paidStudentRecords);
+  assert.equal(imported.length, 2);
+  assert.ok(imported.every(row => row.note === "기초자료"));
+  const initialEntries = await db.select().from(schema.studentFeePayments);
+  assert.ok(initialEntries.every(row => row.paymentType === "INITIAL_RECORD" && row.note === "기초자료"));
   const before = await repository.getStudentFeeStatus(userId);
   assert.equal(before.status, "PAID");
   assert.deepEqual(await repository.importStudentFeeRoster([{ ...first, paidSemesters: 1, paidAmount: 1 }, second]), { insertedCount: 0, linkedCount: 0 });
@@ -61,6 +66,31 @@ test("a later SSO account links from DB without reading the bootstrap file", int
     if (previous === undefined) delete process.env.STUDENT_FEE_BOOTSTRAP_PATH;
     else process.env.STUDENT_FEE_BOOTSTRAP_PATH = previous;
   }
+});
+
+test("historical balances import as baseline credits: completion stays paid, partial balances rise by 15,000", integration, async () => {
+  const completeUser = await addUser(first.stdNo);
+  const partialUser = await addUser(second.stdNo);
+  const records = parseStudentFeeBootstrapRecords([
+    { stdNo: first.stdNo, nameKo: "합성 완납자", remainingAmount: 0 },
+    { stdNo: second.stdNo, nameKo: null, remainingAmount: 20000 },
+  ]);
+  await repository.importStudentFeeRoster(records);
+  const complete = await repository.getStudentFeeStatus(completeUser);
+  const partial = await repository.getStudentFeeStatus(partialUser);
+  assert.equal(complete.status, "PAID");
+  assert.equal(complete.paidAmount, 30000);
+  assert.equal(complete.remainingAmount, 0);
+  assert.equal(partial.status, "PARTIAL");
+  assert.equal(partial.paidAmount, 10000);
+  assert.equal(partial.remainingAmount, 35000);
+  const roster = await repository.listStudentFeeRoster();
+  assert.ok(roster.every(row => row.note === "기초자료"));
+  const entries = await db.select().from(schema.studentFeePayments);
+  assert.equal(entries.length, 2);
+  assert.ok(entries.every(row => row.paymentType === "INITIAL_RECORD" && row.note === "기초자료"));
+  await repository.importStudentFeeRoster(records);
+  assert.equal((await db.select().from(schema.studentFeePayments)).length, 2);
 });
 
 test("import and login preserve administrator decisions and existing payment transactions", integration, async () => {

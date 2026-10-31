@@ -278,7 +278,10 @@ function BulkEmailPageContent() {
     학번: currentUser?.studentNumber ?? "",
     이메일: currentUser?.email ?? "",
   };
-  const previewContent = renderEmailTemplate(content, previewVariables);
+  const editorContent = contentType === "plain" ? escapeEmailHtml(content).replace(/\r?\n/g, "<br>") : content;
+  const previewContent = contentType === "html"
+    ? renderEmailTemplate(content, previewVariables, true)
+    : escapeEmailHtml(renderEmailTemplate(content, previewVariables)).replace(/\r?\n/g, "<br>");
   const previewSubject = renderEmailTemplate(subject, previewVariables);
 
   const applyLocalDraftToForm = (draft: StoredEmailDraft) => {
@@ -683,7 +686,7 @@ function BulkEmailPageContent() {
               <div className="min-w-0 overflow-hidden">
                 <RichTextEditor
                   className="email-composer-editor max-w-none"
-                  content={content}
+                  content={editorContent}
                   fileInputRef={fileInputRef}
                   lang="ko"
                   onImageUpload={handleInlineImageUpload}
@@ -725,7 +728,7 @@ function BulkEmailPageContent() {
                 <UiTextarea
                   autoResize={false}
                   aria-label="HTML 본문"
-                  value={content}
+                  value={editorContent}
                   onChange={(event) => {
                     setContent(event.target.value);
                     setContentType("html");
@@ -933,14 +936,20 @@ function formatStudentNumberFilter(value: string | undefined): string | undefine
   return value;
 }
 
+function escapeEmailHtml(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
+
 function renderEmailTemplate(
   content: string,
   variables: { 이름: string; 학번: string; 이메일: string },
+  html = false,
 ): string {
   const values: Record<string, string> = variables;
-  return content
-    .replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, key: string) => values[key.trim()] ?? match)
-    .replace(/\{(이름|학번|이메일)\}/g, (match, key: string) => values[key] ?? match);
+  return content.replace(/\{\{\s*([^{}]+?)\s*\}\}|\{(이름|학번|이메일)\}/g, (match, doubleKey: string | undefined, singleKey: string | undefined) => {
+    const value = values[(doubleKey ?? singleKey ?? "").trim()];
+    return value === undefined ? match : html ? escapeEmailHtml(value) : value;
+  });
 }
 
 function normalizeFilters(filters: RecipientFilters): RecipientFilters {

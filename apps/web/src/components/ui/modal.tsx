@@ -18,6 +18,7 @@ export function Modal({
   bodyClassName,
   footer,
   headerActions,
+  initialFocus,
   mobileFullscreen = false,
   placement = "center",
   onClose,
@@ -32,6 +33,7 @@ export function Modal({
   dividerless?: boolean;
   footer?: ReactNode;
   headerActions?: ReactNode;
+  initialFocus?: "control" | "surface";
   mobileFullscreen?: boolean;
   placement?: "center" | "bottom";
   onClose: () => void;
@@ -46,6 +48,7 @@ export function Modal({
   const depth = useContext(ModalDepthContext);
   const titleId = useId();
   const handleOverlayKeyDown = useOverlayBehavior({
+    initialFocus,
     onClose: requestClose,
     open: present,
     surfaceRef,

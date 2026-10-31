@@ -1,10 +1,14 @@
 import { useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { ShieldAlert, WifiOff } from "lucide-react";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { rememberAuthReturnPath } from "@/lib/auth-storage";
 import { Permissions } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
+import { useLanguage } from "@/hooks/use-language";
+import { Button } from "@/components/ui/button";
+import { ResponseStateCard, responseStateActionClassName } from "@/features/survey/response-state-card";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -24,7 +28,8 @@ export function AuthGuard({
   fallback = null,
 }: AuthGuardProps) {
   const navigate = useNavigate();
-  const { data: session, isFetching, isLoading, refetch } = useCurrentSession();
+  const { lang } = useLanguage();
+  const { data: session, isError, isFetching, isLoading, refetch } = useCurrentSession();
   const permissionRecheckAttempted = useRef(false);
 
   const isAuthenticated = hasPersistedProfile(session ?? null);
@@ -40,7 +45,7 @@ export function AuthGuard({
   const hasPermission = hasRequiredPermission && hasAnyRequiredPermission;
 
   useEffect(() => {
-    if (isLoading || isFetching) {
+    if (isLoading || isFetching || (isError && !session)) {
       return;
     }
 
@@ -66,26 +71,40 @@ export function AuthGuard({
       return;
     }
 
-    if (!hasPermission) {
-      navigate(permissionRedirectTo, { replace: true });
-    }
   }, [
     hasPermission,
     isFetching,
+    isError,
     isAuthenticated,
     isLoading,
     navigate,
-    permissionRedirectTo,
     refetch,
     redirectTo,
+    session,
   ]);
 
   if (isLoading) {
     return <>{fallback}</>;
   }
 
-  if (!isAuthenticated || !hasPermission) {
+  if (isError && !session) {
+    return <ResponseStateCard embedded icon={WifiOff} role="alert" className="px-6 py-16"
+      title={lang === "ko" ? "로그인 상태를 확인하지 못했습니다" : "Could not check your sign-in status"}
+      description={lang === "ko" ? "잠시 후 다시 시도해 주세요." : "Please try again shortly."}
+      actions={<Button variant="outline" className={responseStateActionClassName} loading={isFetching} onClick={() => void refetch()}>{lang === "ko" ? "다시 시도" : "Try again"}</Button>}
+    />;
+  }
+
+  if (!isAuthenticated) {
     return null;
+  }
+
+  if (!hasPermission) {
+    return <ResponseStateCard embedded icon={ShieldAlert} role="alert" className="px-6 py-16"
+      title={lang === "ko" ? "이 기능을 이용할 권한이 없습니다" : "You do not have access to this feature"}
+      description={lang === "ko" ? "다른 메뉴는 계속 이용할 수 있습니다." : "You can continue using other parts of the site."}
+      actions={<Button asChild variant="outline" className={responseStateActionClassName}><Link to={permissionRedirectTo}>{lang === "ko" ? "돌아가기" : "Go back"}</Link></Button>}
+    />;
   }
 
   return <>{children}</>;

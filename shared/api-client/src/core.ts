@@ -129,7 +129,7 @@ const resolveResourceBaseUrl = (
 };
 
 const isAuthExpiredStatus = (status: number): boolean =>
-  status === 401 || status === 403;
+  status === 401;
 
 const redirectToLogin = (): void => {
   if (typeof window === "undefined") {

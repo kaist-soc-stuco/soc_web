@@ -233,11 +233,6 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       'EMAIL_DRY_RUN',
       !isProduction,
     ),
-    BULK_EMAIL_SCHEDULER_ENABLED: asOptionalBoolean(
-      config.BULK_EMAIL_SCHEDULER_ENABLED,
-      'BULK_EMAIL_SCHEDULER_ENABLED',
-      true,
-    ),
     BULK_EMAIL_SCHEDULER_INTERVAL_MS: asOptionalPositiveInt(
       config.BULK_EMAIL_SCHEDULER_INTERVAL_MS,
       'BULK_EMAIL_SCHEDULER_INTERVAL_MS',

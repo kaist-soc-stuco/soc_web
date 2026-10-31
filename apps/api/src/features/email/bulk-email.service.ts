@@ -29,7 +29,7 @@ import type {
   UpdateBulkEmailTemplateRequest,
 } from "@soc/contracts";
 import { UsersService } from "../users/users.service";
-import sanitizeHtml from "sanitize-html";
+import { hasBulkEmailTemplateTokens, prepareEmailBody, renderBulkEmailTemplate, type EmailAttachment as DeliveryAttachment, type EmailRecipient } from "./email-rendering";
 import { isoToDate, msToDate, nowDate, nowMs } from "@soc/shared";
 import { AuditLogService } from "../audit/audit-log.service";
 import type { AuditMetadata } from "../audit/audit-context";
@@ -83,14 +83,6 @@ const BULK_EMAIL_TEMPLATES: BulkEmailTemplate[] = [
   },
 ];
 
-type DeliveryAttachment = {
-  assetId: string;
-  filename: string;
-  content: Buffer;
-  contentType: string;
-  cid?: string;
-};
-
 type EmailCompose = {
   subject: string;
   content: string;
@@ -98,12 +90,6 @@ type EmailCompose = {
   recipientType: SendBulkEmailRequest["recipientType"];
   filters: SendBulkEmailRequest["filters"];
   attachmentAssetIds: string[];
-};
-
-type EmailRecipient = {
-  email: string;
-  nameKo: string;
-  studentNumber: string | null;
 };
 
 type EmailDeliverySummary = {
@@ -141,20 +127,16 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    const enabled = this.configService.get<boolean>(
-      "BULK_EMAIL_SCHEDULER_ENABLED",
-      true,
-    );
     const intervalMs = Math.max(
       1_000,
       this.configService.get<number>("BULK_EMAIL_SCHEDULER_INTERVAL_MS", 30_000),
     );
     this.schedulerInterval = setInterval(() => {
       void this.recoverInterruptedDeliveries();
-      if (enabled) void this.processScheduledEmails();
+      void this.processScheduledEmails();
     }, intervalMs);
     void this.recoverInterruptedDeliveries();
-    this.logger.log(`Bulk email maintenance started; scheduledSending=${enabled}; interval=${intervalMs}ms`);
+    this.logger.log(`Bulk email maintenance started; interval=${intervalMs}ms`);
   }
 
   onModuleDestroy(): void {
@@ -463,13 +445,11 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       studentNumber: sender?.stdNo ?? null,
     };
     const subject = renderBulkEmailTemplate(`[테스트] ${dto.subject}`, testRecipient);
-    const content = renderBulkEmailTemplate(dto.content, testRecipient);
+    const content = renderBulkEmailTemplate(dto.content, testRecipient, dto.contentType === "html");
     const delivery = await this.emailDeliveryService.send({
       recipients: [recipientEmail],
       subject,
-      content: dto.contentType === "html" ? stripHtml(content) : content,
-      ...(dto.contentType === "html" ? { html: sanitizeBulkEmailHtml(inlineImageSources(content, attachments)) } : {}),
-      ...(attachments.length ? { attachments: toMailAttachments(attachments) } : {}),
+      ...prepareEmailBody(content, dto.contentType, attachments),
     });
 
     const result: SendBulkEmailTestResponse = {
@@ -741,14 +721,7 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
         : await this.emailDeliveryService.send({
             recipients: input.recipients.map((recipient) => recipient.email),
             subject: input.compose.subject,
-            content:
-              input.compose.contentType === "html"
-                ? stripHtml(input.compose.content)
-                : input.compose.content,
-            ...(input.compose.contentType === "html"
-              ? { html: sanitizeBulkEmailHtml(inlineImageSources(input.compose.content, attachments)) }
-              : {}),
-            ...(attachments.length ? { attachments: toMailAttachments(attachments) } : {}),
+            ...prepareEmailBody(input.compose.content, input.compose.contentType, attachments),
             messageId,
           });
     } catch (error) {
@@ -851,14 +824,12 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       deliveries.push(...await Promise.allSettled(
         recipients.slice(offset, offset + 5).map((recipient, index) => {
           const subject = renderBulkEmailTemplate(compose.subject, recipient);
-          const content = renderBulkEmailTemplate(compose.content, recipient);
+          const content = renderBulkEmailTemplate(compose.content, recipient, compose.contentType === "html");
           return this.emailDeliveryService.send({
             recipients: [recipient.email],
             subject,
-            content: compose.contentType === "html" ? stripHtml(content) : content,
-            ...(compose.contentType === "html" ? { html: sanitizeBulkEmailHtml(inlineImageSources(content, attachments)) } : {}),
-            ...(attachments.length ? { attachments: toMailAttachments(attachments) } : {}),
-            messageId: `${messageId}.${offset + index + 1}`,
+            ...prepareEmailBody(content, compose.contentType, attachments),
+            messageId: messageId.includes("@") ? messageId.replace("@", `.${offset + index + 1}@`) : `${messageId}.${offset + index + 1}`,
           });
         }),
       ));
@@ -1054,43 +1025,3 @@ function responseForExistingRecord(record: BulkEmailStoredRecord): SendBulkEmail
   };
 }
 
-function stripHtml(value: string): string {
-  return sanitizeHtml(value, { allowedTags: [], allowedAttributes: {} }).replace(/\s+/g, " ").trim();
-}
-
-function sanitizeBulkEmailHtml(value: string): string {
-  return sanitizeHtml(value, {
-    allowedSchemes: ["http", "https", "mailto", "cid"],
-  });
-}
-
-function inlineImageSources(value: string, attachments: DeliveryAttachment[]): string {
-  return attachments.reduce((html, attachment) => {
-    if (!attachment.cid || !attachment.contentType.startsWith("image/")) return html;
-    const assetId = attachment.assetId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const sourcePattern = new RegExp(
-      `(?:https?:\\/\\/[^"'\\s<>]+)?(?:\\/api\\/v1|\\/v1|\\/api)?\\/assets\\/${assetId}\\/content|asset:${assetId}`,
-      "g",
-    );
-    return html.replace(sourcePattern, `cid:${attachment.cid}`);
-  }, value);
-}
-
-function toMailAttachments(attachments: DeliveryAttachment[]) {
-  return attachments.map(({ assetId: _assetId, ...attachment }) => attachment);
-}
-
-function hasBulkEmailTemplateTokens(value: string): boolean {
-  return /\{\{\s*(이름|학번|이메일)\s*\}\}|\{(이름|학번|이메일)\}/.test(value);
-}
-
-function renderBulkEmailTemplate(value: string, recipient: EmailRecipient): string {
-  const variables: Record<string, string> = {
-    이름: recipient.nameKo,
-    학번: recipient.studentNumber ?? "",
-    이메일: recipient.email,
-  };
-  return value
-    .replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, key: string) => variables[key.trim()] ?? match)
-    .replace(/\{(이름|학번|이메일)\}/g, (match, key: string) => variables[key] ?? match);
-}

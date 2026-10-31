@@ -592,7 +592,7 @@ export function BoardWriteSettings({
       </summary>
       <div className="board-write-settings__body space-y-4 px-4 pb-5 md:px-8 md:py-5">
         <div
-          className={`grid grid-cols-1 items-center gap-x-8 gap-y-4 ${
+          className={`grid grid-cols-1 items-end gap-x-8 gap-y-4 ${
             stacked ? "" : "md:grid-cols-2"
           }`}
         >
@@ -631,7 +631,7 @@ export function BoardWriteSettings({
             </div>
           )}
 
-          <div className="w-full self-center space-y-3">
+          <div className="w-full space-y-3">
           {isEvent ? (
             <p className="text-xs font-semibold text-slate-700">
               {lang === "ko" ? "공개 및 게시 옵션" : "Visibility and publishing options"}
@@ -639,7 +639,7 @@ export function BoardWriteSettings({
           ) : null}
             <div className={isEvent ? "grid grid-cols-2 gap-x-4 gap-y-3" : stacked ? "grid grid-cols-1 gap-y-3" : "flex flex-wrap gap-x-10 gap-y-4"}>
             {allowSecret && (
-              <label className="flex min-h-11 items-center gap-2.5 cursor-pointer group">
+              <label className="flex min-h-[var(--ui-control-height)] items-center gap-2.5 cursor-pointer group">
                 <UiInput
                   type="checkbox"
                   checked={isSecret}
@@ -652,7 +652,7 @@ export function BoardWriteSettings({
             )}
 
             {boardCode !== "suggestions" ? (
-              <label className="flex min-h-11 items-center gap-2.5 cursor-pointer group">
+              <label className="flex min-h-[var(--ui-control-height)] items-center gap-2.5 cursor-pointer group">
                 <UiInput
                   type="checkbox"
                   checked={allowComment}
@@ -665,7 +665,7 @@ export function BoardWriteSettings({
             ) : null}
 
             {isEvent && canConfigurePostSettings && onHomeVisibleChange ? (
-              <label className="flex min-h-11 cursor-pointer items-center gap-2.5 group">
+              <label className="flex min-h-[var(--ui-control-height)] cursor-pointer items-center gap-2.5 group">
                 <UiInput
                   type="checkbox"
                   checked={homeVisible}

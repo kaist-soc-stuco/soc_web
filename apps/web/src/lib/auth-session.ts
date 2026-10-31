@@ -50,7 +50,7 @@ export const getAuthSessionSummary = async (
   } catch (error) {
     if (
       error instanceof ApiClientHttpError &&
-      (error.status === 401 || error.status === 403)
+      error.status === 401
     ) {
       if (readStoredAuthState()?.temporarySession?.accessToken !== temporaryAccessTokenAtStart) {
         // Keep a newer login and its cached session when an older request fails.

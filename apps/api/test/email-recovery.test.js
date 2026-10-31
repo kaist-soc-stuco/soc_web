@@ -85,13 +85,13 @@ test("concurrent recovery workers claim each stale job once", opts, async () => 
   assert.deepEqual(new Set(recovered), new Set(ids));
 });
 
-test("startup and periodic recovery remain active when scheduled sending is disabled", async t => {
+test("startup recovery and scheduled delivery run without a separate enable switch", async t => {
   t.mock.timers.enable({ apis: ["setInterval"] });
   let recoveries = 0, scheduledQueries = 0;
   const service = new BulkEmailService({
     recoverInterruptedDeliveries: async () => { recoveries++; return []; },
     findDueScheduled: async () => { scheduledQueries++; return []; },
-  }, {}, {}, { get: (key, fallback) => key === "BULK_EMAIL_SCHEDULER_ENABLED" ? false : fallback });
+  }, {}, {}, { get: (key, fallback) => fallback });
   service.logger.log = () => {};
   try {
     service.onModuleInit();
@@ -100,6 +100,6 @@ test("startup and periodic recovery remain active when scheduled sending is disa
     t.mock.timers.tick(30_000);
     await new Promise(setImmediate);
     assert.equal(recoveries, 2);
-    assert.equal(scheduledQueries, 0);
+    assert.equal(scheduledQueries, 1);
   } finally { service.onModuleDestroy(); }
 });
