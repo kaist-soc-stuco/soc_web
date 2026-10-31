@@ -8,7 +8,7 @@ const basePayment = {
   userId: "00000000-0000-4000-8000-000000000001",
   amount: 1000,
   paymentType: "SIX_SEMESTER_LUMP_SUM",
-  paymentMethod: "BANK_TRANSFER",
+  
   effectiveStartSemester: "2026-1",
   coverageSemesters: 6,
   paidAt: "2026-09-08T00:00:00.000Z",

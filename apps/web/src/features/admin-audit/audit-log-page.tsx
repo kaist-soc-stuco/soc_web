@@ -20,7 +20,6 @@ import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { downloadBlob } from "@/lib/download-blob";
-import { useDownloadReasonDialog } from "@/components/ui/download-reason-dialog";
 import { Permissions } from "@/lib/permissions";
 
 type SortBy = "createdAt" | "actor" | "action";
@@ -66,7 +65,6 @@ const fieldLabels: Record<string, string> = {
   isActive: "활성 상태",
   note: "관리자 메모",
   paidAmount: "실납부액",
-  paymentMethod: "결제 수단",
   paymentType: "납부 유형",
   status: "납부 상태",
 };
@@ -152,7 +150,6 @@ const dateInputToday = () => {
 };
 
 export function AuditLogPage() {
-  const { promptDownloadReason, DownloadReasonDialog } = useDownloadReasonDialog();
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const canViewAuditLogs = Permissions.has(session?.permission ?? 0, Permissions.VIEW_AUDIT_LOG);
@@ -204,8 +201,7 @@ export function AuditLogPage() {
     exportLock.current = true;
     setExporting(true);
     try {
-      const reason = await promptDownloadReason();
-      if (!reason) return;
+      const reason = "";
       const blob = await client.downloadAuditLogsXlsx(reason, {
         q: query,
         sortBy,
@@ -223,7 +219,7 @@ export function AuditLogPage() {
   return (
     <AuthGuard requirePermission={Permissions.VIEW_AUDIT_LOG}>
       <AdminPageShell>
-      {DownloadReasonDialog}
+      
         <AdminPageMain tableLayout className="!max-w-6xl">
           <AdminPageHeader
             title="운영 로그"

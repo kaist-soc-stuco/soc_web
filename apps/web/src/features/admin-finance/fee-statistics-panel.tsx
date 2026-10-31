@@ -7,17 +7,15 @@ import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { buildFeeTrend } from "./fee-trend";
 
-type FeeSemesterOption = { value: string; label: string };
 const money = (value: number) => `${value.toLocaleString("ko-KR")}원`;
 
-function Metric({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return <div className="min-w-0 px-5 py-4"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-2xl font-medium tabular-nums text-slate-900">{value}</p><p className="mt-1 min-h-4 text-xs text-slate-500">{detail}</p></div>;
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-0 px-5 py-4"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-2xl font-medium tabular-nums text-slate-900">{value}</p></div>;
 }
 
 export function FeeStatisticsPanel({ loading, stats, range, displayedRange = range, onRangeChange, error, onRetry }: {
   error?: string | null; onRetry?: () => void;
-  semester: string; semesterOptions: readonly FeeSemesterOption[]; loading: boolean;
-  onSemesterChange: (value: string) => void; stats: StudentFeeStatsResponse | null;
+  loading: boolean; stats: StudentFeeStatsResponse | null;
   range: DateRange; displayedRange?: DateRange; onRangeChange: (range: DateRange) => void;
 }) {
   const [mode, setMode] = useState<"period" | "cumulative">("period");
@@ -45,23 +43,23 @@ export function FeeStatisticsPanel({ loading, stats, range, displayedRange = ran
     {error ? <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600"><span>{error}</span><Button type="button" variant="ghost" size="sm" onClick={onRetry}>다시 시도</Button></div> : null}
     <AdminCard className="overflow-visible">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-        <div><h2 className="text-base font-medium text-slate-900">누적 납부 인정 현황</h2><p className="mt-1 text-xs text-slate-500">미가입자를 포함한 전체 명부의 현재 납부 인정 상태입니다.</p></div>
+        <div><h2 className="text-base font-medium text-slate-900">납부 현황</h2></div>
       </div>
       <div className={`grid divide-y divide-slate-100 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-y-0 ${loading ? "opacity-60" : ""}`}>
         <Metric label="대상 인원" value={totals ? `${totals.totalStudents.toLocaleString()}명` : "—"} />
-        <Metric label="납부 인정" value={totals ? `${totals.paidStudents.toLocaleString()}명` : "—"} detail={totals ? `납부 인정률 ${totals.paymentRate}%` : undefined} />
+        <Metric label="완납" value={totals ? `${totals.paidStudents.toLocaleString()}명` : "—"} />
         <Metric label="부분 납부" value={totals ? `${totals.partialStudents.toLocaleString()}명` : "—"} />
         <Metric label="미납" value={totals ? `${totals.unpaidStudents.toLocaleString()}명` : "—"} />
       </div>
     </AdminCard>
     <AdminCard className="overflow-visible">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-        <div><h2 className="text-base font-medium text-slate-900">기간별 수납 내역</h2><p className="mt-1 text-xs text-slate-500">학기와 관계없이 실제 수납일(한국 시간) 기준으로 집계합니다.</p></div>
+        <div><h2 className="text-base font-medium text-slate-900">기간별 수납 내역</h2></div>
         <DateRangePicker label="수납 기간" value={range} onChange={onRangeChange} disableFuture />
       </div>
       <div className={`grid divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0 ${loading ? "opacity-60" : ""}`}>
         <Metric label="기간 내 수납액" value={totals ? money(totals.paidAmount) : "—"} />
-        <Metric label="납부 인원" value={totals ? `${receiptStudents.toLocaleString()}명` : "—"} detail="중복 납부자를 제외한 인원" />
+        <Metric label="납부 인원" value={totals ? `${receiptStudents.toLocaleString()}명` : "—"} />
         <Metric label="납부 건수" value={totals ? `${totals.paymentCount.toLocaleString()}건` : "—"} />
       </div>
       <div className="border-t border-slate-100 p-5">
@@ -82,4 +80,3 @@ export function FeeStatisticsPanel({ loading, stats, range, displayedRange = ran
     </AdminCard>
   </div>;
 }
-export type { FeeSemesterOption };

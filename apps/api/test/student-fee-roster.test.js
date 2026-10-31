@@ -129,7 +129,7 @@ test("new roster entries are additive and repeated creates cannot replace a row"
 });
 
 function paymentRequest(target, idempotencyKey = randomUUID()) {
-  return { idempotencyKey, payments: [{ ...target, amount: 5000, paymentType: "PRIOR_PAYMENT_BALANCE", paymentMethod: "BANK_TRANSFER", effectiveStartSemester: "2026-2", coverageSemesters: 6, paidAt: "2026-10-29T00:00:00.000Z", note: "합성 추가 납부" }] };
+  return { idempotencyKey, payments: [{ ...target, amount: 5000, paymentType: "PRIOR_PAYMENT_BALANCE", effectiveStartSemester: "2026-2", coverageSemesters: 6, paidAt: "2026-10-29T00:00:00.000Z", note: "합성 추가 납부" }] };
 }
 
 test("unified fees include accounts without initial rows and retain unregistered students", integration, async () => {

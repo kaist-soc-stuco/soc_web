@@ -61,7 +61,6 @@ export const studentFeePayments = pgTable("student_fee_payment", {
   stdNo: varchar("std_no", { length: 8 }).references(() => paidStudentRecords.stdNo),
   amount: integer("amount").notNull().default(0),
   paymentType: varchar("payment_type", { length: 40 }).notNull(),
-  paymentMethod: varchar("payment_method", { length: 30 }).notNull(),
   effectiveStartSemester: varchar("effective_start_semester", { length: 7 }).notNull(),
   coverageSemesters: smallint("coverage_semesters").notNull().default(6),
   paidAt: timestamp("paid_at", { withTimezone: true }).notNull(),

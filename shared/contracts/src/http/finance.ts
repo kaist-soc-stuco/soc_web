@@ -11,8 +11,7 @@ import type {
 
 export type FeeStatus = "PAID" | "PARTIAL" | "UNPAID";
 export type FeeMajorCategory = "PRIMARY";
-export type FeePaymentType = "SIX_SEMESTER_LUMP_SUM" | "PRIOR_PAYMENT_BALANCE";
-export type FeePaymentMethod = "BANK_TRANSFER" | "CASH" | "OTHER";
+export type FeePaymentType = "SIX_SEMESTER_LUMP_SUM" | "PRIOR_PAYMENT_BALANCE" | "INITIAL_RECORD";
 
 export interface StudentFeeRosterRecord {
   stdNo: string;
@@ -65,7 +64,6 @@ export interface StudentFeeStatusRecord {
   remainingAmount?: number;
   coverageStartSemester?: string | null;
   paymentType?: FeePaymentType | null;
-  paymentMethod?: FeePaymentMethod | null;
 }
 
 export type UpdateStudentFeeStatusRequest = z.infer<
@@ -86,7 +84,6 @@ export interface StudentFeePaymentRecord {
   stdNo?: string | null;
   amount: number;
   paymentType: FeePaymentType;
-  paymentMethod: FeePaymentMethod;
   effectiveStartSemester: string;
   coverageSemesters: number;
   paidAt: string;
@@ -165,7 +162,6 @@ export interface StudentFeeListResponse {
     requiredAmount?: number;
     coverageStartSemester?: string | null;
     paymentType?: FeePaymentType | null;
-    paymentMethod?: FeePaymentMethod | null;
     eligible?: boolean;
   }>;
   total: number;

@@ -59,7 +59,7 @@ async function feeUser(name, { status = "UNPAID", paidAt = null, paidAmount = 0,
   fixtureUsers.push(userId);
   await db.insert(schema.users).values({ userId, kaistUid: userId.slice(0, 20), nameKo: `${prefix}-${name}`, email: `${userId}@example.test`, primaryMajor: "School of Computing", isActive: true });
   await db.insert(schema.studentFeeStatus).values({ userId, status, paidAt, paidAmount, coverageSemesters });
-  if (payments.length) await db.insert(schema.studentFeePayments).values(payments.map(payment => ({ userId, amount: 45000, paymentType: "FULL", paymentMethod: "BANK_TRANSFER", paidAt: new Date(), ...payment })));
+  if (payments.length) await db.insert(schema.studentFeePayments).values(payments.map(payment => ({ userId, amount: 45000, paymentType: "FULL", paidAt: new Date(), ...payment })));
   return userId;
 }
 

@@ -24,7 +24,7 @@ beforeEach(async () => {
   await db.insert(schema.users).values({ userId: actor, kaistUid: "fee-import-admin", nameKo: "합성 관리자", email: "admin@example.invalid" });
 });
 after(async () => { await pool?.end(); });
-const entry = (stdNo, nameKo, amount, paidDate = "2026-10-30") => ({ stdNo, nameKo, amount, paidDate, paymentMethod: "BANK_TRANSFER", note: null });
+const entry = (stdNo, nameKo, amount, paidDate = "2026-10-30") => ({ stdNo, nameKo, amount, paidDate, note: null });
 const commit = (entries, key = randomUUID(), confirmDuplicates = false) => service.importStudentFeePayments({ entries, idempotencyKey: key, confirmDuplicates }, { actorUserId: actor });
 
 test("Excel receipts preserve baselines, create unregistered people, and link the same receipts after SSO", options, async () => {

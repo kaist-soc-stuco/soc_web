@@ -35,7 +35,7 @@ async function baseline(stdNo, paidAmount, paidSemesters = 2) {
   await repository.importStudentFeeRoster([{ stdNo, paidAmount, paidSemesters, admissionYear: 2020, nameKo: "합성 정책 사용자" }]);
 }
 function payment(target, amount, key = randomUUID()) {
-  return { idempotencyKey: key, payments: [{ ...target, amount, paymentType: "PRIOR_PAYMENT_BALANCE", paymentMethod: "BANK_TRANSFER",
+  return { idempotencyKey: key, payments: [{ ...target, amount, paymentType: "PRIOR_PAYMENT_BALANCE", 
     effectiveStartSemester: "2020-1", coverageSemesters: 1, paidAt: "2020-01-01T00:00:00.000Z" }] };
 }
 async function survey(userId, paidOnly = true) {

@@ -131,12 +131,9 @@ class AcceptanceSuite:
         page.wait_for_url(re.compile(r"/(?:events|board/[^/]+)/" + str(article["articleId"]) + r"$"))
         return article["articleId"]
 
-    def download_with_reason(self, page, trigger, filename):
-        trigger.click()
-        dialog = page.get_by_role("dialog", name="다운로드 사유", exact=True)
-        dialog.locator("#download-reason").fill("합성 데이터 검증")
+    def download_file(self, page, trigger, filename):
         with page.expect_download() as download:
-            dialog.get_by_role("button", name="다운로드", exact=True).click()
+            trigger.click()
         path = ARTIFACTS / f"{self.marker}-{filename}"
         download.value.save_as(path)
         return path
@@ -419,11 +416,11 @@ class AcceptanceSuite:
         admin.goto(self.base + "/admin/finance")
         grid = admin.get_by_role("grid", name="과비 납부 관리표", exact=True)
         expect(grid).to_be_visible()
-        exported = self.download_with_reason(admin, admin.get_by_role("button", name="전체 명부 내보내기", exact=True), "fee-export.xlsx")
+        exported = self.download_file(admin, admin.get_by_role("button", name="전체 명부 내보내기", exact=True), "fee-export.xlsx")
         audit = self.api(admin, "/audit-logs?action=student_fee.roster.export&pageSize=1")
-        assert json.loads(audit["items"][0]["payload"])["reason"] == "합성 데이터 검증", audit
+        assert json.loads(audit["items"][0]["payload"])["reason"] == "", audit
         rows = xlsx_rows(exported)
-        assert rows[0][:6] == ["학번", "이름", "입학 연도", "초기 납부 학기 수", "초기 납부 금액", "비고"], rows[0]
+        assert rows[0][:6] == ["학번", "이름", "입학 연도", "비고", "가입 일시", "누적 수납액"], rows[0]
         note = self.marker + " 기초자료 확인"
         current = next(row for row in self.api(admin, "/users/fee-status/roster")["records"] if row["stdNo"] == "90990002")
         self.api(admin, "/users/fee-status/roster", method="PUT", body={"records": [
@@ -445,9 +442,15 @@ class AcceptanceSuite:
         row.get_by_role("checkbox").check()
         admin.get_by_role("button", name="선택 납부 처리 (1명)", exact=True).click()
         payment = admin.get_by_role("dialog", name="납부 내역 추가", exact=True)
-        payment.get_by_role("group", name="납부 금액 (원)", exact=True).get_by_role("spinbutton").fill("5000")
-        payment.get_by_role("button", name="납부 처리", exact=True).click()
-        expect(payment).to_be_hidden()
+        amount = payment.get_by_role("group", name="납부 금액 (원)", exact=True).get_by_role("spinbutton")
+        expect(amount).to_have_value(str(member["remainingAmount"]))
+        expect(amount).to_have_attribute("readonly", "")
+        payment.get_by_role("button", name="취소", exact=True).click()
+        self.api(admin, "/users/fee-status/payments", method="POST", body={"idempotencyKey": self.marker + "-partial-setup", "payments": [
+            {"userId": member["userId"], "amount": 5000, "paymentType": "SIX_SEMESTER_LUMP_SUM", 
+             "coverageSemesters": 6, "effectiveStartSemester": "2026-2", "paidAt": "2026-10-30T15:00:00.000Z", "note": self.marker}]})
+        admin.reload()
+        admin.get_by_role("searchbox", name="납부 검색", exact=True).fill("9099000")
         expect(row).to_contain_text("부분 납부")
         row.get_by_role("checkbox").check()
         grid.get_by_role("row").filter(has_text="90990003").get_by_role("checkbox").check()
@@ -605,7 +608,7 @@ class AcceptanceSuite:
         table.get_by_role("row").filter(has_text="간단 참여").click()
         expect(admin.get_by_role("tab", name="개별 보기", exact=True)).to_have_attribute("aria-selected", "true")
         admin.get_by_role("button", name="응답 더보기", exact=True).click()
-        exported = self.download_with_reason(admin, admin.get_by_role("menuitem", name="CSV 내보내기", exact=True), "survey.csv")
+        exported = self.download_file(admin, admin.get_by_role("menuitem", name="CSV 내보내기", exact=True), "survey.csv")
         csv_rows = list(csv.reader(io.StringIO(exported.read_text(encoding="utf-8-sig"))))
         assert len(csv_rows) == 2, csv_rows
         assert csv_rows[0] == ["응답 일시", "참여 경로 선택", "관심 활동", "희망 날짜", "희망 시간", "참고 이미지"], csv_rows
@@ -1061,7 +1064,7 @@ class AcceptanceSuite:
         contact = next(item for item in contacts if item["nameKo"] == name)
         expected_history = {(2026, department + " 수정", "부원"), (2025, department + " 수정", "실무자"), (2024, "", "회장")}
         assert {(item["year"], item["departmentKo"], item["roleKo"]) for item in contact["activities"]} == expected_history, contact
-        exported = self.download_with_reason(admin, admin.get_by_role("button", name="엑셀 내보내기", exact=True), "contacts.xlsx")
+        exported = self.download_file(admin, admin.get_by_role("button", name="엑셀 내보내기", exact=True), "contacts.xlsx")
         rows = xlsx_rows(exported)
         assert len(rows) == 2 and rows[1][rows[0].index("전화번호")] == "010-0012-0034", rows
         rows[1][rows[0].index("전화번호")] = "010-0099-0088"
@@ -1338,16 +1341,14 @@ class AcceptanceSuite:
         payment = admin.get_by_role("dialog", name="납부 내역 추가", exact=True)
         expect(payment.get_by_role("group", name="납부 일자", exact=True).locator("input")).to_have_value("2026-10-31")
         amount = payment.get_by_role("group", name="납부 금액 (원)", exact=True).get_by_role("spinbutton")
-        for invalid in ("0", str(required - 10000 + 1)):
-            amount.fill(invalid)
-            payment.get_by_role("button", name="납부 처리", exact=True).click()
-            expect(payment.get_by_role("alert")).to_be_visible()
-            assert self.api(admin, base + "/detail/" + numbers[0])["history"] == []
-        amount.fill("5000")
-        with admin.expect_response(lambda r: r.request.method == "POST" and urlsplit(r.url).path == "/api/users/fee-status/payments") as partial:
-            payment.get_by_role("button", name="납부 처리", exact=True).click()
-        assert partial.value.status == 201, partial.value.text()
-        expect(payment).to_be_hidden()
+        expect(amount).to_have_value(str(required - 10000))
+        expect(amount).to_have_attribute("readonly", "")
+        payment.get_by_role("button", name="취소", exact=True).click()
+        self.api(admin, "/users/fee-status/payments", method="POST", body={"idempotencyKey": self.marker + "-partial-date-setup", "payments": [
+            {"stdNo": numbers[0], "amount": 5000, "paymentType": "PRIOR_PAYMENT_BALANCE", 
+             "coverageSemesters": 6, "effectiveStartSemester": "2026-2", "paidAt": "2026-10-30T15:00:00.000Z", "note": self.marker}]})
+        admin.reload()
+        admin.get_by_role("searchbox", name="납부 검색", exact=True).fill(self.marker)
         detail = self.api(admin, base + "/detail/" + numbers[0])
         assert detail["record"]["totalPaidAmount"] == 15000 and detail["record"]["remainingAmount"] == required - 15000
         assert detail["history"][0]["paidAt"] == "2026-10-30T15:00:00.000Z"
@@ -1443,15 +1444,15 @@ class AcceptanceSuite:
         template = ARTIFACTS / (self.marker + "-income-template.xlsx")
         downloaded.value.save_as(template)
         headers = xlsx_rows(template)[0]
-        assert headers == ["학번", "이름", "입금액", "입금일", "납부 방법", "메모"]
-        assert len(xlsx_rows(template)) == 1
-        summary = self.download_with_reason(admin, admin.get_by_role("button", name="전체 명부 내보내기", exact=True), "fee-summary.xlsx")
+        assert headers == ["학번", "이름", "입금액", "입금일", "메모"]
+        assert xlsx_rows(template)[1][1] == "홍길동(예시)"
+        summary = self.download_file(admin, admin.get_by_role("button", name="전체 명부 내보내기", exact=True), "fee-summary.xlsx")
         admin.get_by_label("입금 엑셀 파일", exact=True).set_input_files(summary)
         expect(admin.get_by_text("입금 등록 양식의 학번·이름·입금액·입금일 열이 필요합니다.", exact=False)).to_be_visible()
-        rows = [headers, [number, existing_name, 15000, "2026-10-30", "계좌이체", "추가 입금"],
-                [number, existing_name, 20000, "2026-10-31", "계좌이체", "나머지"],
-                [new_number, new_name, 12000, "2026-10-30", "현금", "첫 입금"],
-                [new_number, new_name, 5000, "2026-10-31", "계좌이체", "추가"]]
+        rows = [headers, [number, existing_name, 15000, "2026-10-30", "추가 입금"],
+                [number, existing_name, 20000, "2026-10-31", "나머지"],
+                [new_number, new_name, 12000, "2026-10-30", "첫 입금"],
+                [new_number, new_name, 5000, "2026-10-31", "추가"]]
         imported = ARTIFACTS / (self.marker + "-income.xlsx")
         write_xlsx(imported, rows)
         admin.get_by_label("입금 엑셀 파일", exact=True).set_input_files(imported)
@@ -1495,7 +1496,7 @@ class AcceptanceSuite:
         expect(dialog.get_by_role("button", name="입금 등록", exact=True)).to_be_disabled()
         dialog.get_by_role("button", name="취소", exact=True).click()
         invalid = ARTIFACTS / (self.marker + "-wrong-name.xlsx")
-        write_xlsx(invalid, [headers, [new_number, "다른 사람", 1000, "2026-10-31", "", ""]])
+        write_xlsx(invalid, [headers, [new_number, "다른 사람", 1000, "2026-10-31", ""]])
         admin.get_by_label("입금 엑셀 파일", exact=True).set_input_files(invalid)
         expect(dialog).to_contain_text("등록된 이름")
         expect(dialog.get_by_role("button", name="입금 등록", exact=True)).to_be_disabled()

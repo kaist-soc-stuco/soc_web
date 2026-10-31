@@ -6,13 +6,15 @@ const { AuditLogController } = require("../dist/apps/api/src/features/audit/audi
 const { AuditLogService } = require("../dist/apps/api/src/features/audit/audit-log.service.js");
 const { requireDownloadReason, requireDownloadReasonHeader } = require("../dist/apps/api/src/features/audit/download-reason.js");
 
-test("download reason is required and bounded", () => {
-  for (const value of [undefined, "", " ", "a", "x".repeat(201)]) {
+test("download reason is optional and bounded when supplied", () => {
+  for (const value of [" ", "a", "x".repeat(201)]) {
     assert.throws(
       () => requireDownloadReason(value),
       (error) => error instanceof BadRequestException && error.message === "download_reason_required",
     );
   }
+  assert.equal(requireDownloadReason(undefined), "");
+  assert.equal(requireDownloadReason(""), "");
   assert.equal(requireDownloadReason("  업무 인수인계  "), "업무 인수인계");
 });
 
@@ -60,15 +62,15 @@ test("download headers decode Unicode and percent signs before length validation
   assert.equal(requireDownloadReason("업무 100% 검토"), "업무 100% 검토");
 });
 
-test("personal-data download rejects a missing reason", async () => {
-  const controller = new AuditLogController({ record: async () => assert.fail("recorded") });
-  await assert.rejects(
-    controller.recordPersonalDataDownload(
-      { ip: "203.0.113.10", user: { id: "admin-user" } },
-      { kind: "vote_roster", targetId: "vote-1" },
-    ),
-    (error) => error instanceof BadRequestException && error.message === "download_reason_required",
+test("personal-data downloads without a reason still create an audit record", async () => {
+  let recorded;
+  const controller = new AuditLogController({ record: async value => { recorded = value; } });
+  await controller.recordPersonalDataDownload(
+    { ip: "203.0.113.10", user: { id: "admin-user" } },
+    { kind: "vote_roster", targetId: "vote-1" },
   );
+  assert.equal(recorded.payload.reason, "");
+  assert.equal(recorded.actorUserId, "admin-user");
 });
 
 test("required audit records propagate storage failures", async () => {

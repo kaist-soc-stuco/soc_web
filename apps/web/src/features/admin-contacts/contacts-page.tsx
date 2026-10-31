@@ -53,7 +53,6 @@ import { PageSearchField } from "@/components/ui/page-layout";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { CONTACT_XLSX_TEMPLATE_ROWS, parseContactSpreadsheet, type ParsedContactSpreadsheetRow } from "@/lib/contact-spreadsheet";
 import { downloadBlob } from "@/lib/download-blob";
-import { useDownloadReasonDialog } from "@/components/ui/download-reason-dialog";
 import { Permissions } from "@/lib/permissions";
 import { ExecutiveMemberModal, type ExecutiveMemberFormValues } from "./ExecutiveMemberModal";
 
@@ -89,7 +88,6 @@ function ContactsPageContent() {
   const contacts = contactsQuery.data ?? [];
   const setContacts = contactsQuery.setData;
   const [exporting, setExporting] = useState(false);
-  const { promptDownloadReason, DownloadReasonDialog } = useDownloadReasonDialog();
   const [departments, setDepartments] = useState<ContactDepartmentRecord[]>([]);
   const loading = contactsQuery.isPending;
   const [error, setError] = useState<string | null>(null);
@@ -367,7 +365,7 @@ function ContactsPageContent() {
 
   const headerActions = <>
     <Button type="button" variant="outline" onClick={openNewDepartmentModal}>부서 관리</Button>
-    <Button type="button" variant="outline" loading={exporting} onClick={async()=>{const reason=await promptDownloadReason();if(!reason)return;setExporting(true);try{downloadBlob(await apiClient.downloadContactsXlsx(reason, {q:query,cohort:activityYearFilter ? Number(activityYearFilter) : undefined,department:departmentFilter || undefined}),"집행위 연락망.xlsx");}catch{toast({type:"error",message:"연락망을 내려받지 못했습니다."});}finally{setExporting(false);}}}><Download />엑셀 내보내기</Button>
+    <Button type="button" variant="outline" loading={exporting} onClick={async()=>{const reason="";setExporting(true);try{downloadBlob(await apiClient.downloadContactsXlsx(reason, {q:query,cohort:activityYearFilter ? Number(activityYearFilter) : undefined,department:departmentFilter || undefined}),"집행위 연락망.xlsx");}catch{toast({type:"error",message:"연락망을 내려받지 못했습니다."});}finally{setExporting(false);}}}><Download />엑셀 내보내기</Button>
     <Button type="button" variant="outline" onClick={() => setImportGuideOpen(true)}><Upload aria-hidden="true" />엑셀 가져오기</Button>
     <Button type="button" onClick={openNewMemberModal}>부원 추가</Button>
   </>;
@@ -375,7 +373,7 @@ function ContactsPageContent() {
   return (
     <AdminPageShell>
       <main className="admin-page__main mx-auto flex w-full max-w-none flex-col gap-4 px-4 py-6 md:px-6 xl:px-6">
-        {ConfirmDialog}{DownloadReasonDialog}
+        {ConfirmDialog}
         <AdminPageHeader title="집행위 연락망" actions={headerActions} />
         <Modal open={importGuideOpen} onClose={() => setImportGuideOpen(false)} title="부원 명단 가져오기" size="standard" footer={<><Button variant="outline" onClick={() => setImportGuideOpen(false)}>취소</Button><Button onClick={() => {setImportGuideOpen(false);bulkFileInputRef.current?.click();}}>파일 선택</Button></>}>
           <div className="space-y-5 text-sm leading-6">

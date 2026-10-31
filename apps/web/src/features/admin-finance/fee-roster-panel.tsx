@@ -10,7 +10,6 @@ import { AdminLoadingState, AdminTableCard } from "@/components/ui/admin-page";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
-import { useDownloadReasonDialog } from "@/components/ui/download-reason-dialog";
 import { useToast } from "@/components/ui/toast";
 import { useUnsavedNavigation } from "@/hooks/use-unsaved-navigation";
 import { resolveApiBaseUrl } from "@/lib/api";
@@ -37,7 +36,6 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
-  const { promptDownloadReason, DownloadReasonDialog } = useDownloadReasonDialog();
   const [original, setOriginal] = useState<FeeRosterRow[]>([]);
   const [rows, setRows] = useState<FeeRosterRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,14 +100,14 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
     finally { setSaving(false); }
   };
   const exportRows = async () => {
-    const reason = await promptDownloadReason(); if (!reason) return;
+    const reason = "";
     setExporting(true);
     try { downloadBlob(await client.exportStudentFeeRoster(reason, semester), "과비 납부 관리.xlsx"); }
     catch { toast({ type: "error", message: "내려받지 못했습니다." }); }
     finally { setExporting(false); }
   };
   return <section className="fee-roster-panel min-w-0" aria-label="과비 납부 관리">
-    {ConfirmDialog}{DownloadReasonDialog}
+    {ConfirmDialog}
     <AdminTableCard className="fee-roster-card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
         <div className="flex flex-wrap gap-2">

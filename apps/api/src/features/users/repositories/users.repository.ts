@@ -74,7 +74,6 @@ import type {
   StudentFeeStatusRecord,
   StudentFeeDetailResponse,
   StudentFeePaymentRecord,
-  FeePaymentMethod,
   FeePaymentType,
   VisibilityScope,
   UserPostingSuspensionResponse,
@@ -797,10 +796,17 @@ export class UsersRepository {
       for (let index = 0; index < records.length; index += 500) {
         const inserted = await tx.insert(paidStudentRecords).values(records.slice(index, index + 500).map(record => ({
           stdNo: record.stdNo, nameKo: record.nameKo ?? null, admissionYear: record.admissionYear,
-          paidSemesters: record.paidSemesters, paidAmount: record.paidAmount,
+          paidSemesters: record.paidSemesters, paidAmount: 0,
           completedAt: record.paidSemesters >= 6 ? nowDate() : null,
         }))).onConflictDoNothing({ target: paidStudentRecords.stdNo }).returning({ stdNo: paidStudentRecords.stdNo });
         insertedCount += inserted.length;
+        const insertedNumbers = new Set(inserted.map(row => row.stdNo));
+        const initialPayments = records.slice(index, index + 500).filter(record => insertedNumbers.has(record.stdNo) && record.paidAmount > 0);
+        if (initialPayments.length) await tx.insert(studentFeePayments).values(initialPayments.map(record => ({
+          stdNo: record.stdNo, amount: record.paidAmount, paymentType: "INITIAL_RECORD",
+          effectiveStartSemester: this.currentReferenceSemester(), coverageSemesters: 6,
+          paidAt: nowDate(), note: "기초자료",
+        })));
       }
       const matched = await tx.select({ userId: users.userId, paidSemesters: paidStudentRecords.paidSemesters, paidAmount: paidStudentRecords.paidAmount })
         .from(users).innerJoin(paidStudentRecords, eq(users.stdNo, paidStudentRecords.stdNo))
@@ -850,7 +856,7 @@ export class UsersRepository {
         admissionYear: source?.admissionYear ?? null, paidSemesters: source?.paidSemesters ?? 0, paidAmount: source?.paidAmount ?? 0,
         note: source?.note ?? legacy?.note ?? null, userId: member?.userId ?? null, joinedAt: member ? msToIso(member.createdAt.valueOf()) : null,
         updatedAt: source ? msToIso(source.updatedAt.valueOf()) : null, email: member?.email ?? "", ...balance,
-        paidAt: entries.find(entry=>entry.amount>0) ? msToIso(entries.find(entry=>entry.amount>0)!.paidAt.valueOf()) : legacy?.paidAt ? msToIso(legacy.paidAt.valueOf()) : null });
+        paidAt: entries.find(entry=>entry.amount>0 && entry.paymentType !== "INITIAL_RECORD") ? msToIso(entries.find(entry=>entry.amount>0 && entry.paymentType !== "INITIAL_RECORD")!.paidAt.valueOf()) : legacy?.paidAt ? msToIso(legacy.paidAt.valueOf()) : null });
     };
     for (const source of sources) append(source, memberByNumber.get(source.stdNo));
     for (const member of members) if (!represented.has(member.userId)) append(undefined, member);
@@ -863,7 +869,7 @@ export class UsersRepository {
     const conditions: SQL[] = [];
     if (record.userId) conditions.push(eq(studentFeePayments.userId, record.userId));
     if (record.stdNo) conditions.push(eq(studentFeePayments.stdNo, record.stdNo));
-    const history = conditions.length ? await this.db.select().from(studentFeePayments).where(or(...conditions)).orderBy(desc(studentFeePayments.paidAt), desc(studentFeePayments.createdAt)) : [];
+    const history = conditions.length ? await this.db.select().from(studentFeePayments).where(or(...conditions)).orderBy(sql`CASE WHEN ${studentFeePayments.paymentType} = 'INITIAL_RECORD' THEN 1 ELSE 0 END`, desc(studentFeePayments.paidAt), desc(studentFeePayments.createdAt)) : [];
     return { record, history: history.map(payment => ({ ...this.mapFeePaymentRow(payment), stdNo: payment.stdNo })) };
   }
 
@@ -946,7 +952,6 @@ export class UsersRepository {
       stdNo: row.stdNo,
       amount: row.amount,
       paymentType: row.paymentType as FeePaymentType,
-      paymentMethod: row.paymentMethod as FeePaymentMethod,
       effectiveStartSemester: row.effectiveStartSemester,
       coverageSemesters: row.coverageSemesters,
       paidAt: msToIso(row.paidAt.valueOf()),
@@ -1130,8 +1135,8 @@ export class UsersRepository {
     const conditions = [inArray(studentFeePayments.stdNo, numbers)];
     if (members.length) conditions.push(inArray(studentFeePayments.userId, members.map(row => row.userId)));
     const history = await this.db.select().from(studentFeePayments).where(or(...conditions));
-    const key = (number: string, amount: number, date: string, method: string) => `${number}|${amount}|${date}|${method}`;
-    const seen = new Set(history.map(row => key(row.stdNo ?? numberByUser.get(row.userId!) ?? "", row.amount, isoToHtmlDatetimeLocal(msToIso(row.paidAt.valueOf())).slice(0, 10), row.paymentMethod)));
+    const key = (number: string, amount: number, date: string) => `${number}|${amount}|${date}`;
+    const seen = new Set(history.filter(row => row.paymentType !== "INITIAL_RECORD" && row.amount > 0).map(row => key(row.stdNo ?? numberByUser.get(row.userId!) ?? "", row.amount, isoToHtmlDatetimeLocal(msToIso(row.paidAt.valueOf())).slice(0, 10))));
     const balances = new Map(records.map(row => [row.stdNo, row.totalPaidAmount ?? 0]));
     const names = new Map<string, string>();
     const newPeople = new Set<string>();
@@ -1141,7 +1146,7 @@ export class UsersRepository {
       const existing = byNumber.get(entry.stdNo);
       const expectedName = memberByNumber.get(entry.stdNo)?.nameKo ?? existing?.nameKo ?? names.get(entry.stdNo);
       const before = balances.get(entry.stdNo) ?? 0;
-      const duplicateKey = key(entry.stdNo, entry.amount, entry.paidDate, entry.paymentMethod);
+      const duplicateKey = key(entry.stdNo, entry.amount, entry.paidDate);
       let error: string | null = null;
       if (expectedName && normalize(expectedName) !== normalize(entry.nameKo)) error = `등록된 이름(${expectedName})과 다릅니다.`;
       else if (existing?.status === "PAID" || before >= policy.amount) error = "이미 완납한 학생입니다.";
@@ -1252,7 +1257,7 @@ export class UsersRepository {
           const suppliedName = imported.entries.find(row => row.stdNo === stdNo)!.nameKo;
           const expectedName = member?.nameKo ?? source?.nameKo;
           if (expectedName && expectedName.replace(/\s+/g, "").toLowerCase() !== suppliedName.replace(/\s+/g, "").toLowerCase()) throw new BadRequestException("fee_import_name_mismatch");
-          if (!imported.confirmDuplicates && history.some(row => row.amount === target.amount && row.paymentMethod === target.paymentMethod && isoToHtmlDatetimeLocal(msToIso(row.paidAt.valueOf())).slice(0, 10) === isoToHtmlDatetimeLocal(target.paidAt).slice(0, 10))) throw new ConflictException("fee_import_duplicates_changed");
+          if (!imported.confirmDuplicates && history.some(row => row.paymentType !== "INITIAL_RECORD" && row.amount === target.amount && isoToHtmlDatetimeLocal(msToIso(row.paidAt.valueOf())).slice(0, 10) === isoToHtmlDatetimeLocal(target.paidAt).slice(0, 10))) throw new ConflictException("fee_import_duplicates_changed");
         }
         const before = this.feeBalance(current, history, policy.amount, source);
         if (before.status === "PAID") throw new ConflictException("fee_already_paid");
@@ -1267,7 +1272,6 @@ export class UsersRepository {
             stdNo: source?.stdNo ?? null,
             amount: target.amount,
             paymentType: imported ? before.totalPaidAmount > 0 ? "PRIOR_PAYMENT_BALANCE" : "SIX_SEMESTER_LUMP_SUM" : target.paymentType,
-            paymentMethod: target.paymentMethod,
             effectiveStartSemester: target.effectiveStartSemester,
             coverageSemesters: target.coverageSemesters,
             paidAt: isoToDate(target.paidAt),
@@ -1599,7 +1603,6 @@ export class UsersRepository {
         coverageStartSemester:
           latestPayment?.effectiveStartSemester ?? legacyStartSemester,
         paymentType: (latestPayment?.paymentType ?? null) as FeePaymentType | null,
-        paymentMethod: (latestPayment?.paymentMethod ?? null) as FeePaymentMethod | null,
         paidAmount: totalPaidAmount,
         requiredAmount: balance.requiredAmount,
         remainingAmount: balance.remainingAmount,
@@ -1668,7 +1671,7 @@ export class UsersRepository {
     const [people, policy, receipts, members] = await Promise.all([
       this.listStudentFeeRoster(reference), this.getStudentFeePolicy(reference),
       this.db.select(getTableColumns(studentFeePayments)).from(studentFeePayments).leftJoin(users, eq(users.userId, studentFeePayments.userId))
-        .where(and(gt(studentFeePayments.amount, 0), or(isNull(studentFeePayments.userId), notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS])))).orderBy(asc(studentFeePayments.paidAt)),
+        .where(and(gt(studentFeePayments.amount, 0), sql`${studentFeePayments.paymentType} <> 'INITIAL_RECORD'`, or(isNull(studentFeePayments.userId), notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS])))).orderBy(asc(studentFeePayments.paidAt)),
       this.db.select({ userId: users.userId, primaryMajor: users.primaryMajor }).from(users).where(notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS])),
     ]);
     const start = options.dateFrom ? isoToDate(`${options.dateFrom}T00:00:00.000+09:00`).valueOf() : -Infinity;

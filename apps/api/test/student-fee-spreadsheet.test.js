@@ -14,20 +14,19 @@ async function exportWorkbook(records) {
 test("an empty roster exports a usable workbook with the same headers as a populated roster", async () => {
   const book = await exportWorkbook([]);
   const rows = XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]], { header: 1 });
-  assert.deepEqual(rows[0], ["학번", "이름", "입학 연도", "초기 납부 학기 수", "초기 납부 금액", "비고", "가입 일시", "누적 수납액", "상태", "수정 일시"]);
+  assert.deepEqual(rows[0], ["학번", "이름", "입학 연도", "비고", "가입 일시", "누적 수납액", "상태", "수정 일시"]);
 });
 
-test("export preserves numeric money, literal notes, and the revision needed to reject stale imports", async () => {
+test("export preserves numeric totals, literal notes, and update timestamps", async () => {
   const updatedAt = "2026-10-31T00:00:00.000Z";
   const book = await exportWorkbook([{ stdNo: "90990001", nameKo: "합성 납부자", admissionYear: 2026,
     paidSemesters: 2, paidAmount: 10000, note: "=1+1", joinedAt: null, totalPaidAmount: 15000, status: "PARTIAL", updatedAt }]);
   const sheet = book.Sheets[book.SheetNames[0]];
   assert.equal(sheet.A2.t, "s");
-  assert.equal(sheet.E2.t, "n");
-  assert.equal(sheet.E2.v, 10000);
-  assert.equal(sheet.E2.w, "10,000");
-  assert.equal(sheet.H2.v, 15000);
-  assert.equal(sheet.F2.v, "=1+1");
-  assert.equal(sheet.F2.f, undefined);
-  assert.equal(sheet.J2.v, updatedAt);
+  assert.equal(sheet.F2.t, "n");
+  assert.equal(sheet.F2.v, 15000);
+  assert.equal(sheet.F2.w, "15,000");
+  assert.equal(sheet.D2.v, "=1+1");
+  assert.equal(sheet.D2.f, undefined);
+  assert.equal(sheet.H2.v, updatedAt);
 });

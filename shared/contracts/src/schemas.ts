@@ -726,7 +726,6 @@ const StudentFeePaymentInputSchema = z.object({
   stdNo: z.string().regex(/^\d{8}$/).optional(),
   amount: z.number().int().min(1).max(100_000_000),
   paymentType: z.enum(["SIX_SEMESTER_LUMP_SUM", "PRIOR_PAYMENT_BALANCE"]),
-  paymentMethod: z.enum(["BANK_TRANSFER", "CASH", "OTHER"]),
   effectiveStartSemester: z.string().regex(/^\d{4}-[12]$/, "invalid_reference_semester"),
   coverageSemesters: z.number().int().min(1).max(6),
   paidAt: z.string().datetime(),
@@ -757,7 +756,6 @@ export const StudentFeePaymentImportRowSchema = z.object({
     const date = new Date(`${value}T00:00:00Z`);
     return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
   }),
-  paymentMethod: z.enum(["BANK_TRANSFER", "CASH", "OTHER"]).default("BANK_TRANSFER"),
   note: z.string().trim().max(500).nullable().optional(),
 }).strict();
 

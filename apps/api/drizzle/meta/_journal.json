@@ -36,6 +36,13 @@
       "when": 1793358031098,
       "tag": "0004_faq_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793439668452,
+      "tag": "0005_simplify_fee_receipts",
+      "breakpoints": true
     }
   ]
 }

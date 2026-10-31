@@ -516,7 +516,7 @@ export class UsersService {
   async importStudentFeePayments(input: ImportStudentFeePaymentsRequest, audit: AuditMetadata) {
     const payments = input.entries.map(row => ({
       stdNo: row.stdNo, amount: row.amount, paymentType: "SIX_SEMESTER_LUMP_SUM" as const,
-      paymentMethod: row.paymentMethod, coverageSemesters: 6,
+      coverageSemesters: 6,
       effectiveStartSemester: `${row.paidDate.slice(0, 4)}-${Number(row.paidDate.slice(5, 7)) <= 6 ? 1 : 2}`,
       paidAt: isoToDate(`${row.paidDate}T00:00:00+09:00`).toISOString(), note: row.note ?? null,
     }));

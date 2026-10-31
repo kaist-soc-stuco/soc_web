@@ -10,6 +10,7 @@ export function requireDownloadReasonHeader(value: unknown): string {
 }
 
 export function requireDownloadReason(value: unknown): string {
+  if (value === undefined || value === null || value === "") return "";
   if (typeof value !== "string") {
     throw new BadRequestException("download_reason_required");
   }

@@ -254,19 +254,18 @@ export class UsersController {
     const decodedReason = requireDownloadReasonHeader(reason);
     const { records } = await this.usersService.exportStudentFeeRoster(auditMetadataFromRequest(req), decodedReason, semester);
     const sheet = XLSX.utils.aoa_to_sheet([
-      ["학번", "이름", "입학 연도", "초기 납부 학기 수", "초기 납부 금액", "비고", "가입 일시", "누적 수납액", "상태", "수정 일시"],
-      ...records.map(row => [row.stdNo, row.nameKo ?? "", row.admissionYear ?? "", row.paidSemesters, row.paidAmount,
+      ["학번", "이름", "입학 연도", "비고", "가입 일시", "누적 수납액", "상태", "수정 일시"],
+      ...records.map(row => [row.stdNo, row.nameKo ?? "", row.admissionYear ?? "",
         row.note ?? "", row.joinedAt ?? "", row.totalPaidAmount ?? 0, row.status ?? "UNPAID", row.updatedAt ?? ""]),
     ]);
-    sheet["!cols"] = [14, 18, 12, 20, 20, 40, 28, 20, 14, 28].map(wch => ({ wch }));
+    sheet["!cols"] = [14, 18, 12, 40, 28, 20, 14, 28].map(wch => ({ wch }));
     for (let row = 2; row <= records.length + 1; row++) {
-      for (const column of ["E", "H"]) if (sheet[column + row]) sheet[column + row].z = "#,##0";
+      for (const column of ["F"]) if (sheet[column + row]) sheet[column + row].z = "#,##0";
     }
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, "납부 관리");
     XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
       ["납부 현황", "이 파일은 전체 명부를 조회·보관하기 위한 파일입니다."],
       ["신규 입금", "입금 양식에 이번 입금만 입력한 뒤 입금 엑셀 가져오기로 등록하세요."],
-      ["기초자료 정정", "학생의 납부 상세 화면에서 기초자료 정정을 사용하세요."],
     ]), "이용 안내");
     return new StreamableFile(XLSX.write(book, { type: "buffer", bookType: "xlsx" }));
   }
@@ -451,7 +450,7 @@ export class UsersController {
       reason,
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["학번", "이름", "이메일", "소속", "주전공", "상태", "납부 적용 학기 수", "납부 적용 시작 학기", "총 수납액", "기준 납부액", "납부 유형", "결제 수단", "납부 일자", "비고", "사용자 ID"],
+      ["학번", "이름", "이메일", "소속", "주전공", "상태", "납부 적용 학기 수", "납부 적용 시작 학기", "총 수납액", "기준 납부액", "납부 유형", "납부 일자", "비고", "사용자 ID"],
       ...rows.map((row) => [
         row.stdNo,
         row.nameKo,
@@ -464,7 +463,6 @@ export class UsersController {
         row.paidAmount,
         row.requiredAmount,
         row.paymentType,
-        row.paymentMethod,
         row.paidAt,
         row.note,
         row.userId,
@@ -473,7 +471,7 @@ export class UsersController {
     worksheet["!cols"] = [
       { wch: 14 }, { wch: 16 }, { wch: 32 }, { wch: 18 }, { wch: 18 },
       { wch: 12 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 16 },
-      { wch: 22 }, { wch: 14 }, { wch: 18 }, { wch: 36 }, { wch: 38 },
+      { wch: 22 }, { wch: 18 }, { wch: 36 }, { wch: 38 },
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "과비 납부");
