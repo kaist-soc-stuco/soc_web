@@ -22,10 +22,6 @@ function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 }
 
-export function hasBulkEmailTemplateTokens(value: string): boolean {
-  return /\{\{\s*(이름|학번|이메일)\s*\}\}|\{(이름|학번|이메일)\}/.test(value);
-}
-
 export function renderBulkEmailTemplate(value: string, recipient: EmailRecipient, html = false): string {
   const variables: Record<string, string> = { 이름: recipient.nameKo, 학번: recipient.studentNumber ?? "", 이메일: recipient.email };
   return value.replace(/\{\{\s*([^{}]+?)\s*\}\}|\{(이름|학번|이메일)\}/g, (match, doubleKey: string | undefined, singleKey: string | undefined) => {
@@ -64,6 +60,35 @@ export function sanitizeBulkEmailHtml(value: string): string {
   });
   const $ = load(safe, null, false);
   // These styles otherwise exist only in the website's stylesheet.
+  const defaults = (selector: string, styles: Record<string, string>) => {
+    $(selector).each((_, element) => {
+      const node = $(element);
+      for (const [property, value] of Object.entries(styles)) {
+        if (!node.css(property)) node.css(property, value);
+      }
+    });
+  };
+  defaults("blockquote", {
+    "border-left": "4px solid #006e3f", "background-color": "#f5f9fb",
+    padding: "14px 20px", margin: "24px 0", color: "#485969",
+    "font-style": "italic", "border-radius": "0 8px 8px 0",
+  });
+  defaults("pre", {
+    "background-color": "#1b252b", color: "#eaf0f5", padding: "20px",
+    "border-radius": "12px", "font-family": 'Menlo, Consolas, "Courier New", monospace',
+    "font-size": "14px", "line-height": "1.48", "overflow-x": "auto",
+    "max-width": "100%", "white-space": "pre", margin: "24px 0",
+  });
+  defaults("pre code", {
+    "background-color": "transparent", color: "inherit", padding: "0",
+    "border-radius": "0", "font-size": "inherit", "font-family": "inherit",
+    "overflow-wrap": "normal", "word-break": "normal", "white-space": "inherit",
+  });
+  defaults("code", {
+    "background-color": "#eaf0f5", color: "#ad3454", padding: "2px 6px",
+    "border-radius": "4px", "font-family": 'Menlo, Consolas, "Courier New", monospace',
+    "font-size": "0.85em",
+  });
   $("p").each((_, element) => {
     const node = $(element);
     if (!node.css("margin-top")) node.css("margin-top", "0");
@@ -88,18 +113,31 @@ export function sanitizeBulkEmailHtml(value: string): string {
   return $.root().html() ?? "";
 }
 
+function inlineAssetId(source: string): string | undefined {
+  const direct = /^asset:(\d+)$/.exec(source);
+  if (direct) return direct[1];
+  try { return /^\/(?:api\/)?(?:v\d+\/)?assets\/(\d+)\/content$/.exec(new URL(source, "https://email.invalid").pathname)?.[1]; }
+  catch { return undefined; }
+}
+
+export function collectEmailAttachmentIds(assetIds: string[], content: string, contentType: "plain" | "html"): string[] {
+  const ids = new Set(assetIds);
+  if (contentType === "html") {
+    const $ = load(content, null, false);
+    $("img[src]").each((_, element) => {
+      const id = inlineAssetId($(element).attr("src")!);
+      if (id) ids.add(id);
+    });
+  }
+  return [...ids];
+}
+
 function inlineImageSources(value: string, attachments: EmailAttachment[]): string {
   const $ = load(value, null, false);
   const byId = new Map(attachments.filter(file => file.cid && file.contentType.startsWith("image/")).map(file => [file.assetId, file.cid!]));
   $("img[src]").each((_, element) => {
     const node = $(element);
-    const source = node.attr("src")!;
-    const direct = /^asset:(\d+)$/.exec(source);
-    let id = direct?.[1];
-    if (!id) {
-      try { id = /^\/(?:api\/)?(?:v\d+\/)?assets\/(\d+)\/content$/.exec(new URL(source, "https://email.invalid").pathname)?.[1]; }
-      catch { return; }
-    }
+    const id = inlineAssetId(node.attr("src")!);
     const cid = id && byId.get(id);
     if (cid) node.attr("src", `cid:${cid}`);
   });

@@ -11,14 +11,14 @@ function createService(overrides = {}) {
   return new EmailDeliveryService({ get: (key, fallback) => values[key] ?? fallback });
 }
 
-test("Gmail SSL delivery uses MAIL_* and preserves BCC, attachments, IDs and pooling", async t => {
+test("Gmail SSL delivery uses MAIL_* and uses a single To recipient and preserves attachments, IDs and pooling", async t => {
   const transports = [];
   const delivered = [];
   let closed = false;
   t.mock.method(nodemailer, "createTransport", options => {
     transports.push(options);
     return {
-      async sendMail(input) { delivered.push(input); return { messageId: input.messageId, accepted: input.bcc, rejected: [] }; },
+      async sendMail(input) { delivered.push(input); return { messageId: input.messageId, accepted: [input.to], rejected: [] }; },
       close() { closed = true; },
     };
   });
@@ -34,7 +34,8 @@ test("Gmail SSL delivery uses MAIL_* and preserves BCC, attachments, IDs and poo
   assert.equal(transports[0].pool, true);
   assert.equal(transports[0].maxRequeues, 0);
   assert.equal(delivered[0].from, mail.MAIL_FROM);
-  assert.deepEqual(delivered[0].bcc, message.recipients);
+  assert.equal(delivered[0].to, message.recipients[0]);
+  assert.equal(delivered[0].bcc, undefined);
   assert.equal(delivered[0].text, message.content);
   assert.equal(delivered[0].html, "<p>Synthetic body</p>");
   assert.deepEqual(delivered[0].attachments, attachments);
@@ -76,4 +77,9 @@ test("Gmail authentication rejection is definite while an uncertain timeout stay
   await assert.rejects(service.send(message), error => error instanceof EmailDeliveryError && error.kind === "pre_send");
   failure = Object.assign(new Error("synthetic-timeout"), { code: "ETIMEDOUT" });
   await assert.rejects(service.send(message), error => error instanceof EmailDeliveryError && error.kind === "ambiguous");
+});
+
+test("multiple recipients are rejected before contacting SMTP", async t => {
+  t.mock.method(nodemailer, "createTransport", () => assert.fail("Multiple recipients must never reach SMTP"));
+  await assert.rejects(createService().send({ ...message, recipients: ["first@example.invalid", "second@example.invalid"] }), /email_single_recipient_required/);
 });

@@ -60,6 +60,7 @@ function makeService({
   idempotencyKey = null,
   persistFailure = false,
   auditLogService,
+  recipients = [makeRecipient()],
 }) {
   const state = {
     sendCount: 0,
@@ -138,7 +139,7 @@ function makeService({
 
   const usersService = {
     async listEmailRecipients() {
-      return [makeRecipient()];
+      return recipients;
     },
   };
   const emailDeliveryService = {
@@ -346,4 +347,15 @@ test("an idempotent replay never reports an unfinished PENDING email as sent", a
   assert.equal(replay.success, false);
   assert.equal(replay.deliveryMode, "unknown");
   assert.equal(state.sendCount, 0);
+});
+
+test("ordinary mail without variables also sends a separate copy to every recipient", async () => {
+  const recipients = [makeRecipient(), { ...makeRecipient(), email: "second@example.invalid", studentNumber: "20260002" }];
+  const messages = [];
+  const { service } = makeService({ recipients, send: async input => { messages.push(input); return { dryRun: true, acceptedCount: 1 }; } });
+  const result = await service.sendBulkEmail(senderId, makeRequest("separate-ordinary-mail-test"));
+  assert.equal(result.success, true);
+  assert.equal(result.recipientCount, 2);
+  assert.deepEqual(messages.map(input => input.recipients), recipients.map(person => [person.email]));
+  assert.notEqual(messages[0].messageId, messages[1].messageId);
 });

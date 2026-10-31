@@ -1,11 +1,32 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { load } = require("cheerio");
-const { prepareEmailBody, renderBulkEmailTemplate, sanitizeBulkEmailHtml } = require("../dist/apps/api/src/features/email/email-rendering.js");
+const { collectEmailAttachmentIds, prepareEmailBody, renderBulkEmailTemplate, sanitizeBulkEmailHtml } = require("../dist/apps/api/src/features/email/email-rendering.js");
 const { BulkEmailService } = require("../dist/apps/api/src/features/email/bulk-email.service.js");
 
 const image = { assetId: "12", filename: "poster.png", content: Buffer.from("synthetic-image"), contentType: "image/png", cid: "soc-asset-12" };
 const file = { assetId: "13", filename: "안내.pdf", content: Buffer.from("synthetic-pdf"), contentType: "application/pdf" };
+
+test("quotes and code carry their own presentation without relying on website stylesheets", () => {
+  const code = "const value = 1;\n  if (value < 2) return value;";
+  const body = prepareEmailBody('<blockquote><p>인용구</p></blockquote><p><code>inline()</code></p><pre><code>const value = 1;\n  if (value &lt; 2) return value;</code></pre>', "html", []);
+  const $ = load(body.html, null, false);
+  assert.equal($("blockquote").css("border-left"), "4px solid #006e3f");
+  assert.match($("blockquote").css("background-color"), /^#/);
+  assert.equal($("blockquote").css("font-style"), "italic");
+  assert.equal($("blockquote").css("padding"), "14px 20px");
+  assert.equal($("pre").css("background-color"), "#1b252b");
+  assert.equal($("pre").css("color"), "#eaf0f5");
+  assert.match($("pre").css("font-family"), /monospace/);
+  assert.equal($("pre").css("white-space"), "pre");
+  assert.equal($("pre code").text(), code);
+  assert.equal($("pre code").css("background-color"), "transparent");
+  assert.equal($("pre code").css("color"), "inherit");
+  assert.equal($("pre code").css("padding"), "0");
+  assert.equal($("p > code").css("background-color"), "#eaf0f5");
+  assert.equal($("p > code").css("font-size"), "0.85em");
+  assert.ok(body.content.includes(code));
+});
 
 test("email HTML keeps editor formatting and safe links while dropping executable HTML and CSS", () => {
   const $ = load(sanitizeBulkEmailHtml(`<p><span style="color:#008855;background-color:rgb(255, 240, 0);font-size:24px;position:fixed;background-image:url(javascript:bad)">서식</span> <strong>굵게</strong><em>기울임</em><u>밑줄</u><s>취소선</s></p><ol start="3"><li>목록</li></ol><table><tr><td colspan="2" style="text-align:center">셀</td></tr></table><a href="https://example.invalid/?q=1&amp;r=2">링크</a><a href="javascript:alert(1)">위험</a><script>alert(1)</script><img src="cid:soc-asset-12" onerror="bad()">`), null, false);
@@ -101,4 +122,11 @@ test("personalized delivery sends each recipient their own subject and safe HTML
   assert.deepEqual(sent.map(item => item.recipients), [["a@example.invalid"], ["b@example.invalid"]]);
   assert.deepEqual(sent.map(item => item.messageId), ["<synthetic.1@example.invalid>", "<synthetic.2@example.invalid>"]);
   assert.equal(sent[1].attachments[0].cid, "soc-asset-12");
+});
+
+test("reloading a saved body reconnects its inline images without copying ordinary attachments", () => {
+  const html = '<img src="asset:12"><img src="/api/assets/12/content"><img src="https://example.invalid/api/assets/15/content"><img src="https://example.invalid/public.png">';
+  assert.deepEqual(collectEmailAttachmentIds([], html, "html"), ["12", "15"]);
+  assert.deepEqual(collectEmailAttachmentIds(["13", "12"], html, "html"), ["13", "12", "15"]);
+  assert.deepEqual(collectEmailAttachmentIds([], html, "plain"), []);
 });

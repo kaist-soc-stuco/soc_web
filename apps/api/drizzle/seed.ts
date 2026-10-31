@@ -42,6 +42,7 @@ import {
   normalizeRoadmapCourseCode,
   OPERATIONAL_SURVEY_IDS,
   PERMISSION_REGISTRY,
+  PermissionCode,
   type BoardWriteAccessScope,
 } from "@soc/contracts";
 import {
@@ -784,6 +785,62 @@ async function seedInitialAdminRole() {
   console.log(
     `Upserted the initial administrator system role with ${permissionRows.length} explicit permission(s)`,
   );
+}
+
+async function seedDefaultOperationalRoles() {
+  const presets = [
+    {
+      nameKo: "부장",
+      description: "부서 운영 담당자",
+      permissionCodes: [
+        PermissionCode.WRITE_OFFICIAL,
+        PermissionCode.WRITE_REPLY,
+        PermissionCode.MODERATE_CONTENT,
+        PermissionCode.MANAGE_BOARDS,
+        PermissionCode.MANAGE_SURVEY,
+        PermissionCode.MANAGE_CALENDAR,
+        PermissionCode.MANAGE_CONTACTS,
+        PermissionCode.SEND_BULK_EMAIL,
+        PermissionCode.MANAGE_USERS,
+        PermissionCode.VIEW_FINANCE,
+      ],
+    },
+    {
+      nameKo: "집행위원",
+      description: "집행위원회 구성원",
+      permissionCodes: [
+        PermissionCode.WRITE_OFFICIAL,
+        PermissionCode.MANAGE_SURVEY,
+        PermissionCode.VIEW_FINANCE,
+      ],
+    },
+  ];
+
+  await db.transaction(async (tx) => {
+    for (const preset of presets) {
+      const [created] = await tx.insert(roleGroups).values({
+        nameKo: preset.nameKo,
+        description: preset.description,
+        isSystem: false,
+      }).onConflictDoNothing({ target: roleGroups.nameKo })
+        .returning({ roleGroupId: roleGroups.roleGroupId });
+
+      // Defaults apply only on creation; keep later administrator changes.
+      if (!created) continue;
+
+      const permissionRows = await tx.select({ permissionId: permissions.permissionId })
+        .from(permissions)
+        .where(and(inArray(permissions.code, preset.permissionCodes), eq(permissions.isActive, true)));
+      if (permissionRows.length !== preset.permissionCodes.length) {
+        throw new Error(`Missing default permissions for role: ${preset.nameKo}`);
+      }
+      await tx.insert(roleGroupPermissions).values(permissionRows.map(permission => ({
+        roleGroupId: created.roleGroupId,
+        permissionId: permission.permissionId,
+      })));
+      console.log(`Created ${preset.nameKo} role with ${permissionRows.length} permission(s)`);
+    }
+  });
 }
 
 async function upsertDemoAccount() {
@@ -3164,6 +3221,7 @@ async function main() {
     }
     await seedPermissions();
     await seedInitialAdminRole();
+    await seedDefaultOperationalRoles();
     await seedBoards();
     await seedOperationalSurveys();
     if (seedMode === "demo") {

@@ -29,7 +29,7 @@ import type {
   UpdateBulkEmailTemplateRequest,
 } from "@soc/contracts";
 import { UsersService } from "../users/users.service";
-import { hasBulkEmailTemplateTokens, prepareEmailBody, renderBulkEmailTemplate, type EmailAttachment as DeliveryAttachment, type EmailRecipient } from "./email-rendering";
+import { collectEmailAttachmentIds, prepareEmailBody, renderBulkEmailTemplate, type EmailAttachment as DeliveryAttachment, type EmailRecipient } from "./email-rendering";
 import { isoToDate, msToDate, nowDate, nowMs } from "@soc/shared";
 import { AuditLogService } from "../audit/audit-log.service";
 import type { AuditMetadata } from "../audit/audit-context";
@@ -243,7 +243,9 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     dto: SendBulkEmailRequest,
     senderId?: string,
   ): Promise<BulkEmailPreviewResponse> {
-    if (senderId) for (const assetId of dto.attachmentAssetIds ?? []) {
+    const attachmentAssetIds = collectEmailAttachmentIds(dto.attachmentAssetIds ?? [], dto.content, dto.contentType);
+    if (attachmentAssetIds.length > 10) throw new BadRequestException("bulk_email_attachment_limit_exceeded");
+    if (senderId) for (const assetId of attachmentAssetIds) {
       if (!await this.assetService.hasOwnedAsset(assetId, senderId)) throw new BadRequestException(`bulk_email_attachment_unavailable:${assetId}`);
     }
     const recipients = await this.usersService.listEmailRecipients(dto.recipientType, dto.filters);
@@ -259,8 +261,9 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       throw new NotImplementedException(BULK_EMAIL_DELIVERY_NOT_CONFIGURED);
     }
 
-    await this.loadAttachments(senderId, dto.attachmentAssetIds ?? []);
-    const saved = await this.bulkEmailRepo.saveDraft(senderId, dto);
+    const attachmentAssetIds = collectEmailAttachmentIds(dto.attachmentAssetIds ?? [], dto.content, dto.contentType);
+    await this.loadAttachments(senderId, attachmentAssetIds);
+    const saved = await this.bulkEmailRepo.saveDraft(senderId, { ...dto, attachmentAssetIds });
     if (!saved) {
       throw new NotFoundException("bulk_email_draft_not_found");
     }
@@ -312,7 +315,7 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
 
     const recipientType = dto.recipientType;
     const filters = dto.filters;
-    const attachmentAssetIds = dto.attachmentAssetIds ?? [];
+    const attachmentAssetIds = collectEmailAttachmentIds(dto.attachmentAssetIds ?? [], dto.content, dto.contentType);
     const idempotencyKey = dto.idempotencyKey?.trim() || null;
     if (idempotencyKey) {
       const existing = await this.bulkEmailRepo.findByIdempotencyKey(
@@ -438,7 +441,8 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException("bulk_email_test_recipient_missing");
     }
 
-    const attachments = await this.loadAttachments(senderId, dto.attachmentAssetIds ?? []);
+    const attachmentAssetIds = collectEmailAttachmentIds(dto.attachmentAssetIds ?? [], dto.content, dto.contentType);
+    const attachments = await this.loadAttachments(senderId, attachmentAssetIds);
     const testRecipient: EmailRecipient = {
       email: recipientEmail,
       nameKo: sender?.nameKo ?? "학우",
@@ -711,19 +715,10 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       throw error;
     }
 
-    const hasTemplateTokens = hasBulkEmailTemplateTokens(input.compose.subject) ||
-      hasBulkEmailTemplateTokens(input.compose.content);
     let delivery: EmailDeliverySummary;
     try {
       await ensureActive();
-      delivery = hasTemplateTokens
-        ? await this.deliverPersonalized(input.recipients, input.compose, attachments, messageId, ensureActive)
-        : await this.emailDeliveryService.send({
-            recipients: input.recipients.map((recipient) => recipient.email),
-            subject: input.compose.subject,
-            ...prepareEmailBody(input.compose.content, input.compose.contentType, attachments),
-            messageId,
-          });
+      delivery = await this.deliverPersonalized(input.recipients, input.compose, attachments, messageId, ensureActive);
     } catch (error) {
       const ambiguous = !isDefinitelyPreSendFailure(error);
       await this.finishAttemptSafely(

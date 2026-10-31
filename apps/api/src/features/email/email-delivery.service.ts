@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   OnModuleDestroy,
@@ -42,6 +43,9 @@ export class EmailDeliveryService implements OnModuleDestroy {
       cid?: string;
     }>;
   }): Promise<EmailDeliveryResult> {
+    if (input.recipients.length !== 1) {
+      throw new BadRequestException("email_single_recipient_required");
+    }
     const dryRun = this.configService.get<boolean>(
       "EMAIL_DRY_RUN",
       this.configService.get<string>("NODE_ENV") !== "production",
@@ -84,7 +88,7 @@ export class EmailDeliveryService implements OnModuleDestroy {
     try {
       const result = await transporter.sendMail({
         from,
-        bcc: input.recipients,
+        to: input.recipients[0],
         subject: input.subject,
         text: input.content,
         ...(input.html ? { html: input.html } : {}),

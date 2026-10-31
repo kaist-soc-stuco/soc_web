@@ -183,6 +183,7 @@ function BulkEmailPageContent() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyDetail, setHistoryDetail] = useState<BulkEmailRecord | null>(null);
 
   const setOperationError = useCallback((message: string | null) => { if (message) toast({ type: "error", message }); }, [toast]);
   const [currentUser, setCurrentUser] = useState<CurrentUserResponse["user"]>();
@@ -456,8 +457,17 @@ function BulkEmailPageContent() {
       const response = await apiClient.sendBulkEmail(
         buildRequest({ idempotencyKey: idempotencyKeyRef.current }),
       );
+      if (!response.success || response.deliveryMode === "unknown") {
+        setOperationError("발송 완료를 확인하지 못했습니다. 발송 이력을 확인해 주세요.");
+        return;
+      }
       skipNextDraftSaveRef.current = true;
       clearStoredDraft();
+      setSubject("");
+      setContent("");
+      setContentType("html");
+      setEditorMode("editor");
+      setAttachments([]);
       setReviewOpen(false);
       setReviewPreview(null);
       setDeliveryMode("now");
@@ -466,7 +476,9 @@ function BulkEmailPageContent() {
       setStatusNotice(
         response.deliveryMode === "scheduled"
           ? "예약 발송을 등록했습니다."
-          : `${response.recipientCount}명에게 발송했습니다.`,
+          : response.deliveryMode === "dry_run"
+            ? "모의 발송을 완료했습니다. 실제 메일은 전송되지 않았습니다."
+            : `${response.recipientCount}명에게 발송했습니다.`,
       );
     } catch {
       setOperationError("메일 발송에 실패했습니다.");
@@ -495,6 +507,24 @@ function BulkEmailPageContent() {
   const openHistory = () => {
     setHistoryOpen(true);
     void loadHistory();
+  };
+
+  const loadHistoryMessage = () => {
+    if (!historyDetail || sending || uploading) return;
+    setSubject(historyDetail.subject);
+    setContent(historyDetail.content);
+    setContentType(historyDetail.contentType);
+    setEditorMode("editor");
+    setAttachments([]);
+    setDeliveryMode("now");
+    setScheduledAt("");
+    idempotencyKeyRef.current = null;
+    setHistoryDetail(null);
+    setHistoryOpen(false);
+    if (historyDetail.attachmentCount > 0) {
+      toast({ type: "info", message: "제목과 본문 이미지를 불러왔습니다. 일반 첨부파일은 다시 추가해 주세요." });
+    }
+    requestAnimationFrame(() => subjectInputRef.current?.focus());
   };
 
   const handleCancelScheduled = async (emailId: string) => {
@@ -792,19 +822,21 @@ function BulkEmailPageContent() {
         ) : (
           <ol className="divide-y divide-slate-100">
             {history.map((record) => (
-              <li key={record.id} className="flex gap-3 border-b border-slate-100 py-3 last:border-b-0">
-                <span className="mt-1.5 size-2 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="truncate text-sm font-medium text-slate-800">{record.subject || "제목 없음"}</p>
-                    <span className="text-xs font-normal text-slate-500">{formatBulkEmailStatus(record.status)}</span>
-                  </div>
-                  <p className="mt-1 flex items-center gap-1 text-xs font-normal text-slate-500">
-                    <Users className="size-3.5" aria-hidden="true" />
-                    {record.recipientCount}명 · {formatKoreanDateTime(record.scheduledAt ?? record.sentAt ?? record.updatedAt)}
-                  </p>
-                  {record.status === "SCHEDULED" && record.senderId === session?.userId ? <Button type="button" variant="ghost" size="sm" onClick={() => void handleCancelScheduled(record.id)} className="mt-2 px-0 text-xs font-normal text-slate-500 hover:bg-transparent hover:text-rose-600">예약 취소</Button> : null}
-                </div>
+              <li key={record.id} className="border-b border-slate-100 py-1 last:border-b-0">
+                <button type="button" className="flex w-full gap-3 rounded-lg px-2 py-3 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700" onClick={() => setHistoryDetail(record)} aria-label={`${record.subject || "제목 없음"} 상세 보기`}>
+                  <span className="mt-1.5 size-2 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="truncate text-sm font-medium text-slate-800">{record.subject || "제목 없음"}</span>
+                      <span className="text-xs font-normal text-slate-500">{formatBulkEmailStatus(record.status)}</span>
+                    </span>
+                    <span className="mt-1 flex items-center gap-1 text-xs font-normal text-slate-500">
+                      <Users className="size-3.5" aria-hidden="true" />
+                      {record.recipientCount}명 · {formatKoreanDateTime(record.scheduledAt ?? record.sentAt ?? record.updatedAt)}
+                    </span>
+                  </span>
+                </button>
+                {record.status === "SCHEDULED" && record.senderId === session?.userId ? <Button type="button" variant="ghost" size="sm" onClick={() => void handleCancelScheduled(record.id)} className="ml-7 px-0 text-xs font-normal text-slate-500 hover:bg-transparent hover:text-rose-600">예약 취소</Button> : null}
               </li>
             ))}
           </ol>
@@ -814,6 +846,21 @@ function BulkEmailPageContent() {
       </main>
 
 
+
+      <Modal open={Boolean(historyDetail)} onClose={() => setHistoryDetail(null)} title="발송 이력 상세" size="wide" mobileFullscreen
+        footer={<><Button type="button" variant="outline" onClick={() => setHistoryDetail(null)}>닫기</Button><Button type="button" disabled={sending || uploading} onClick={loadHistoryMessage}>불러오기</Button></>}>
+        {historyDetail && <div className="space-y-4">
+          <dl className="grid grid-cols-[5rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
+            <dt className="text-slate-500">제목</dt><dd className="break-words font-medium">{historyDetail.subject || "제목 없음"}</dd>
+            <dt className="text-slate-500">발송 상태</dt><dd>{formatBulkEmailStatus(historyDetail.status)}</dd>
+            <dt className="text-slate-500">받는 사람</dt><dd>{historyDetail.recipientCount}명</dd>
+            <dt className="text-slate-500">{historyDetail.status === "SCHEDULED" ? "예약 일시" : "발송 일시"}</dt><dd>{formatKoreanDateTime(historyDetail.scheduledAt ?? historyDetail.sentAt ?? historyDetail.updatedAt)}</dd>
+          </dl>
+          <section aria-label="메일 본문 미리보기" className="rounded-xl border border-slate-200 p-4 sm:p-5">
+            <RichTextContent content={historyDetail.contentType === "html" ? historyDetail.content : escapeEmailHtml(historyDetail.content).replace(/\r?\n/g, "<br>")} />
+          </section>
+        </div>}
+      </Modal>
 
       <Modal
         open={reviewOpen}
