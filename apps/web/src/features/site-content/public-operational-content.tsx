@@ -59,7 +59,7 @@ export function PublicOperationalContent() {
   return (
     <>
       {notices.length ? (
-        <div className="relative z-[55] grid gap-0">
+        <div className="public-site-notices relative z-[55] grid gap-0">
           {notices.map((notice) => {
             const noticeText = resolveContentBlockText(notice, lang);
             const isClosing = closing.includes(notice.contentBlockId);

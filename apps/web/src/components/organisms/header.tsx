@@ -101,7 +101,7 @@ export function Header({ variant = "default" }: HeaderProps) {
   });
 
   useLayoutEffect(() => {
-    if (!isCompactNavigation || !mobileMenuOpen) return;
+    if (!isCompactNavigation || !mobileMenuPresent) return;
     const position = { left: window.scrollX, top: window.scrollY };
     const pathname = location.pathname;
     return () => {
@@ -109,7 +109,7 @@ export function Header({ variant = "default" }: HeaderProps) {
         if (window.location.pathname === pathname) window.scrollTo({ ...position, behavior: "instant" });
       });
     };
-  }, [isCompactNavigation, mobileMenuOpen, location.pathname]);
+  }, [isCompactNavigation, mobileMenuPresent, location.pathname]);
 
   useEffect(() => {
     document.body.classList.toggle("site-mobile-search-open", isMobile && searchOpen);
@@ -131,9 +131,9 @@ export function Header({ variant = "default" }: HeaderProps) {
   useLayoutEffect(() => {
     if (typeof document === "undefined") return;
 
-    document.body.classList.toggle("site-mobile-menu-open", mobileMenuOpen);
+    document.body.classList.toggle("site-mobile-menu-open", mobileMenuPresent);
     return () => document.body.classList.remove("site-mobile-menu-open");
-  }, [mobileMenuOpen]);
+  }, [mobileMenuPresent]);
 
   useEffect(() => {
     if (variant !== "home" || typeof window === "undefined") {
@@ -161,7 +161,7 @@ export function Header({ variant = "default" }: HeaderProps) {
     };
   }, [variant]);
 
-  const homeHeaderDark = variant === "home" && !homeHeaderScrolled && !isMobile && !mobileMenuOpen;
+  const homeHeaderDark = variant === "home" && !homeHeaderScrolled && !isMobile && !mobileMenuPresent;
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -943,7 +943,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             inert={!mobileMenuOpen}
             tabIndex={-1}
             onKeyDown={handleMobileMenuKeyDown}
-            className="fixed inset-x-0 bottom-0 top-[var(--ui-header-height)] z-50 flex w-full flex-col overflow-hidden border-t border-slate-100 bg-white shadow-xl xl:hidden sm:inset-x-auto sm:left-auto sm:right-0 sm:max-w-[30rem] sm:border-l"
+            className="fixed inset-x-0 bottom-0 top-[var(--ui-header-height)] z-[49] flex w-full flex-col overflow-hidden border-slate-100 bg-white shadow-xl xl:hidden sm:inset-x-auto sm:left-auto sm:right-0 sm:max-w-[30rem] sm:border-l"
           >
             <h2 id="mobile-primary-navigation-title" className="sr-only">
               {lang === "ko" ? "모바일 주요 메뉴" : "Mobile primary navigation"}

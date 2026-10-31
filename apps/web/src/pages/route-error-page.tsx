@@ -25,5 +25,5 @@ export function RouteErrorPage({ withHeader = false }: { withHeader?: boolean })
       />
     </PageMain>
   );
-  return withHeader ? <div className="flex min-h-screen flex-col bg-[var(--ui-surface-canvas)]"><Header />{content}</div> : content;
+  return withHeader ? <div className="public-site-layout flex min-h-screen flex-col bg-[var(--ui-surface-canvas)]"><Header />{content}</div> : content;
 }

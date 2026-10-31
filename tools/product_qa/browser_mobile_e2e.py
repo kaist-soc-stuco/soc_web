@@ -53,6 +53,55 @@ class MobileSuite(AcceptanceSuite):
             page.set_viewport_size({"width": width, "height": 844})
             self.no_overflow(page)
 
+    def test_menu_header_seam_and_close_at_bottom(self):
+        page = self.page("guest")
+        # Long-page DOM snapshots dwarf this geometry check, particularly in WebKit.
+        page.context.tracing.stop()
+        page.context.tracing.start(screenshots=False, snapshots=False)
+        samples = []
+        for width in [320, 390, 430, 768, 1024]:
+            page.set_viewport_size({"width": width, "height": 844})
+            for path in ["/", "/about"]:
+                print(f"CHECK header {width}px {path}", flush=True)
+                page.goto(BASE + path)
+                page.locator("main").first.wait_for()
+                page.wait_for_load_state("networkidle")
+                header = page.locator("[data-site-header]")
+                for at_bottom in [False, True]:
+                    page.evaluate("bottom => window.scrollTo(0, bottom ? document.documentElement.scrollHeight : 0)", at_bottom)
+                    page.wait_for_timeout(60)
+                    before = page.evaluate("scrollY")
+                    assert abs(header.bounding_box()["y"]) < .5, (width, path, at_bottom, header.bounding_box())
+                    trigger = page.locator('button[aria-controls="mobile-primary-navigation"]')
+                    trigger.click()
+                    menu = page.locator("#mobile-primary-navigation")
+                    expect(menu).to_be_visible()
+                    menu.evaluate("async el => { await Promise.race([Promise.all(el.getAnimations().map(animation => animation.finished.catch(() => {}))), new Promise(done => setTimeout(done, 1000))]); }")
+                    expect(menu).to_have_css("opacity", "1")
+                    bounds = header.bounding_box()
+                    gap = menu.bounding_box()["y"] - bounds["y"] - bounds["height"]
+                    assert abs(gap) < .5, ("Menu seam", width, path, at_bottom, gap)
+                    frames = page.evaluate("""async () => {
+                      const frames = []; const start = performance.now();
+                      document.querySelector('button[aria-controls="mobile-primary-navigation"]').click();
+                      await new Promise(done => { const timeout = setTimeout(done, 1000); const tick = () => {
+                        const header = document.querySelector('[data-site-header]');
+                        const main = header.querySelector('.site-header-main');
+                        const rect = header.getBoundingClientRect(); const row = main.getBoundingClientRect();
+                        const menu = document.querySelector('#mobile-primary-navigation');
+                        frames.push({top:rect.top,bottom:rect.bottom,rowTop:row.top,rowBottom:row.bottom,
+                          gap:menu ? menu.getBoundingClientRect().top - rect.bottom : 0,
+                          opacity:getComputedStyle(header).opacity, visible:!!header.offsetHeight});
+                        if(performance.now()-start<350) requestAnimationFrame(tick); else {clearTimeout(timeout);done();}
+                      }; requestAnimationFrame(tick); }); return frames;
+                    }""")
+                    assert len(frames) >= 2 and all(frame["visible"] and abs(frame["top"]) < .5 and abs(frame["rowTop"]) < .5 and frame["opacity"] == "1" and frame["gap"] < .5 for frame in frames), (width, path, at_bottom, frames)
+                    expect(menu).to_have_count(0)
+                    assert abs(page.evaluate("scrollY") - before) <= 1, ("Scroll position changed", width, path, before, page.evaluate("scrollY"))
+                    samples.append({"width":width,"path":path,"bottom":at_bottom,"gap":gap,"frames":len(frames)})
+                if width == 390 and path == "/about": self.capture(page,"menu-header-bottom")
+        (OUT / "menu-header-geometry.json").write_text(json.dumps(samples,ensure_ascii=False,indent=2),encoding="utf-8")
+
     def test_menu_and_notification_sheet(self):
         page = self.page()
         page.goto(BASE + "/mypage")

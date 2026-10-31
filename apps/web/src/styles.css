@@ -5676,7 +5676,6 @@ input[type="search"]:focus-visible,
 
 .home-footer-legal, .home-footer-social-links { display: contents; }
 @media (width < 768px) {
-  body.site-mobile-menu-open [data-site-header] .site-header-main { position: fixed !important; inset: 0 0 auto; z-index: 60; background: #fff; }
   .site-header-language { display: inline-flex; order: -1; width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; align-self: center; }
   .mobile-nav-account { grid-template-columns: minmax(0,1fr); }
   .mobile-white-page { --ui-surface-canvas: #fff; background: #fff; }
@@ -5784,7 +5783,6 @@ input[type="search"]:focus-visible,
 
 /* The compact navigation shares one flat layout on phones and tablets. */
 @media (width < 1280px) {
-  body.site-mobile-menu-open [data-site-header] .site-header-main { position: fixed !important; inset: 0 0 auto; z-index: 60; background: #fff; }
   .mobile-navigation-sections { gap: .25rem; }
   .mobile-navigation-heading { min-height: 44px; padding: .5rem .75rem; border: 0; border-radius: 0; background: transparent; color: #64748b; font-size: .75rem; font-weight: 600; }
   .mobile-navigation-heading:hover { background: #f8fafc; }

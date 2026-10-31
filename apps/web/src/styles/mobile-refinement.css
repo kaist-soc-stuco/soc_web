@@ -1,4 +1,24 @@
+/* Keep compact navigation attached to the viewport, including at the end of
+   its page container. The whole header owns the divider, not a fixed inner row. */
+@media (width < 1280px) {
+  .public-site-layout { padding-top: var(--ui-header-height); }
+  .public-site-layout:has(> .site-header-home) { padding-top: 0; }
+  .public-site-notices { padding-top: var(--ui-header-height); z-index: 30; }
+  [data-site-header] {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 50;
+    width: 100%;
+    height: var(--ui-header-height);
+    box-sizing: border-box;
+    margin-bottom: 0;
+  }
+  [data-site-header] .site-header-main { height: calc(var(--ui-header-height) - 1px); }
+  .site-mobile-menu-open [data-site-header] { background: #fff; }
+}
+
 @media (max-width: 767px) {
+  .public-article-detail-layout { padding-top: 0; }
   [data-site-header] {
     height: var(--ui-header-height);
     box-sizing: border-box;
