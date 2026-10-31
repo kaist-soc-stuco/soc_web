@@ -1,4 +1,4 @@
--- Initial schema for fresh databases.
+-- Initial schema for fresh databases. Reset the database before adopting this squashed history.
 CREATE TYPE "public"."content_block_status" AS ENUM('DRAFT', 'PUBLISHED');--> statement-breakpoint
 CREATE TYPE "public"."content_block_type" AS ENUM('HERO', 'LOGO', 'TOP_BANNER', 'QUICK_LINK', 'ORGANIZATION_CHART', 'PLEDGE');--> statement-breakpoint
 CREATE TYPE "public"."site_content_key" AS ENUM('home.hero.title', 'home.hero.description', 'home.hero.cta', 'about.hero.title', 'about.hero.description', 'about.hero.cta.events', 'about.hero.cta.suggestions', 'about.nav.intro', 'about.nav.work', 'about.nav.organization', 'about.nav.partnership', 'about.intro.eyebrow', 'about.intro.title', 'about.intro.body', 'about.work.title', 'about.work.card.1.title', 'about.work.card.1.description', 'about.work.card.2.title', 'about.work.card.2.description', 'about.work.card.3.title', 'about.work.card.3.description', 'about.work.card.cta', 'about.pledges.title', 'about.organization.title', 'about.organization.description', 'about.organization.reference.eyebrow', 'about.organization.reference.title', 'about.partnership.title', 'about.partnership.description', 'about.partnership.cta', 'about.partnership.area.1', 'about.partnership.area.2', 'about.partnership.area.3', 'about.roadmap.title', 'about.roadmap.description', 'footer.description', 'footer.contact');--> statement-breakpoint
@@ -13,15 +13,15 @@ CREATE TABLE "permission" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "permission_code_unique" UNIQUE("code"),
 	CONSTRAINT "permission_bit_value_unique" UNIQUE("bit_value")
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "role_group_permission" (
 	"role_group_id" integer NOT NULL,
 	"permission_id" integer NOT NULL,
 	"granted_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "role_group_permission_role_group_id_permission_id_pk" PRIMARY KEY("role_group_id","permission_id")
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "role_group" (
 	"role_group_id" serial PRIMARY KEY NOT NULL,
 	"name_ko" varchar(100) NOT NULL,
@@ -30,8 +30,8 @@ CREATE TABLE "role_group" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "role_group_name_ko_unique" UNIQUE("name_ko")
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "user_role_group" (
 	"user_role_group_id" serial PRIMARY KEY NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -41,8 +41,8 @@ CREATE TABLE "user_role_group" (
 	"valid_from" timestamp with time zone,
 	"valid_to" timestamp with time zone,
 	"is_active" boolean DEFAULT true NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "user_sanction" (
 	"sanction_id" serial PRIMARY KEY NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -54,8 +54,8 @@ CREATE TABLE "user_sanction" (
 	"revoked_at" timestamp with time zone,
 	"revoked_by" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "users" (
 	"user_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"kaist_uid" varchar(20) NOT NULL,
@@ -77,18 +77,29 @@ CREATE TABLE "users" (
 	CONSTRAINT "users_kaist_uid_unique" UNIQUE("kaist_uid"),
 	CONSTRAINT "users_std_no_unique" UNIQUE("std_no"),
 	CONSTRAINT "users_email_unique" UNIQUE("email")
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "paid_student_records" (
 	"std_no" varchar(8) PRIMARY KEY NOT NULL,
 	"name_ko" varchar(100),
 	"admission_year" integer,
 	"paid_semesters" smallint NOT NULL,
 	"paid_amount" integer NOT NULL,
+	"completed_at" timestamp with time zone,
+	"note" text,
 	"imported_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
+CREATE TABLE "student_fee_consent" (
+	"user_id" uuid NOT NULL,
+	"semester" varchar(6) NOT NULL,
+	"notice_version" varchar(40) NOT NULL,
+	"consented_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"withdrawn_at" timestamp with time zone,
+	CONSTRAINT "student_fee_consent_user_id_semester_pk" PRIMARY KEY("user_id","semester")
+);--> statement-breakpoint
+
 CREATE TABLE "student_fee_payment_batch" (
 	"batch_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"actor_user_id" uuid NOT NULL,
@@ -97,23 +108,24 @@ CREATE TABLE "student_fee_payment_batch" (
 	"result" jsonb,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "student_fee_payment" (
 	"payment_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" uuid,
+	"std_no" varchar(8),
 	"amount" integer DEFAULT 0 NOT NULL,
 	"payment_type" varchar(40) NOT NULL,
-	"payment_method" varchar(30) NOT NULL,
 	"effective_start_semester" varchar(7) NOT NULL,
 	"coverage_semesters" smallint DEFAULT 6 NOT NULL,
 	"paid_at" timestamp with time zone NOT NULL,
 	"note" text,
 	"recorded_by" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "student_fee_payment_person_required" CHECK ("student_fee_payment"."user_id" IS NOT NULL OR "student_fee_payment"."std_no" IS NOT NULL)
+);--> statement-breakpoint
+
 CREATE TABLE "student_fee_policy" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"effective_semester" varchar(6) NOT NULL,
@@ -121,28 +133,29 @@ CREATE TABLE "student_fee_policy" (
 	"coverage_semesters" smallint DEFAULT 6 NOT NULL,
 	"created_by" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "student_fee_status" (
 	"user_id" uuid PRIMARY KEY NOT NULL,
 	"coverage_semesters" smallint DEFAULT 6 NOT NULL,
 	"paid_amount" integer DEFAULT 0 NOT NULL,
+	"initial_paid_amount" integer DEFAULT 0 NOT NULL,
 	"status" varchar(20) NOT NULL,
 	"paid_at" timestamp with time zone,
 	"verified_by" uuid,
 	"verified_at" timestamp with time zone,
 	"note" text,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "article_asset" (
 	"article_asset_id" serial PRIMARY KEY NOT NULL,
 	"article_id" integer NOT NULL,
 	"asset_id" integer NOT NULL,
 	"usage_type" varchar(20) NOT NULL,
 	"sort_order" integer DEFAULT 0 NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "article_draft" (
 	"draft_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"owner_user_id" uuid NOT NULL,
@@ -157,8 +170,8 @@ CREATE TABLE "article_draft" (
 	"payload" jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "article_engagement" (
 	"article_id" integer NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -166,15 +179,15 @@ CREATE TABLE "article_engagement" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "article_engagement_article_id_user_id_kind_pk" PRIMARY KEY("article_id","user_id","kind")
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "article_view" (
 	"article_id" integer NOT NULL,
 	"user_id" uuid NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "article_view_article_id_user_id_pk" PRIMARY KEY("article_id","user_id")
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "article" (
 	"article_id" serial PRIMARY KEY NOT NULL,
 	"board_id" integer NOT NULL,
@@ -206,29 +219,29 @@ CREATE TABLE "article" (
 	"event_location_en" varchar(255),
 	"event_description_ko" text,
 	"event_description_en" text,
-	CONSTRAINT "article_faq_category_check" CHECK ("article"."faq_category" IN ('account', 'fees', 'events-surveys', 'other'))
-);
---> statement-breakpoint
+	CONSTRAINT "article_faq_category_check" CHECK ("article"."faq_category" IN ('account', 'fees', 'events-surveys', 'communication', 'academics', 'council', 'other'))
+);--> statement-breakpoint
+
 CREATE TABLE "asset_cleanup_lease" (
 	"lease_name" varchar(64) PRIMARY KEY NOT NULL,
 	"owner_token" varchar(64) NOT NULL,
 	"lease_until" timestamp with time zone NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "asset_deletion_job" (
 	"storage_key" text PRIMARY KEY NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "asset_upload_reservation" (
 	"reservation_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"uploaded_by" uuid NOT NULL,
 	"size_bytes" integer NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "asset" (
 	"asset_id" serial PRIMARY KEY NOT NULL,
 	"storage_key" text NOT NULL,
@@ -241,8 +254,8 @@ CREATE TABLE "asset" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"uploaded_by" uuid NOT NULL,
 	CONSTRAINT "asset_storage_key_unique" UNIQUE("storage_key")
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "board" (
 	"board_id" serial PRIMARY KEY NOT NULL,
 	"code" varchar(20) NOT NULL,
@@ -259,8 +272,8 @@ CREATE TABLE "board" (
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
 	CONSTRAINT "board_code_unique" UNIQUE("code")
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "comment_engagement" (
 	"comment_id" integer NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -268,8 +281,8 @@ CREATE TABLE "comment_engagement" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "comment_engagement_comment_id_user_id_kind_pk" PRIMARY KEY("comment_id","user_id","kind")
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "comment" (
 	"comment_id" serial PRIMARY KEY NOT NULL,
 	"article_id" integer NOT NULL,
@@ -284,8 +297,8 @@ CREATE TABLE "comment" (
 	"hidden_at" timestamp with time zone,
 	"hidden_by_user_id" uuid,
 	"hidden_reason" text
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "survey_answers" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"response_id" uuid NOT NULL,
@@ -293,8 +306,8 @@ CREATE TABLE "survey_answers" (
 	"content" jsonb NOT NULL,
 	"submitted_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "survey_questions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"section_id" uuid NOT NULL,
@@ -311,13 +324,13 @@ CREATE TABLE "survey_questions" (
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "survey_response_subscription" (
 	"survey_id" uuid NOT NULL,
 	"user_id" uuid NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "survey_responses" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"survey_id" uuid NOT NULL,
@@ -327,8 +340,8 @@ CREATE TABLE "survey_responses" (
 	"submitted_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "survey_sections" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"survey_id" uuid NOT NULL,
@@ -340,8 +353,8 @@ CREATE TABLE "survey_sections" (
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "survey" (
 	"survey_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"creator_id" uuid,
@@ -385,8 +398,8 @@ CREATE TABLE "survey" (
 	CONSTRAINT "survey_academic_eligibility_check" CHECK ("survey"."academic_eligibility" in ('ANY', 'ENROLLED_ONLY', 'ENROLLED_OR_LEAVE')),
 	CONSTRAINT "survey_spreadsheet_sync_status_check" CHECK ("survey"."spreadsheet_sync_status" in ('NOT_CONNECTED', 'CONNECTED', 'ERROR')),
 	CONSTRAINT "survey_previous_version_check" CHECK ("survey"."previous_version_id" is null or "survey"."previous_version_id" <> "survey"."survey_id")
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "audit_log" (
 	"audit_log_id" serial PRIMARY KEY NOT NULL,
 	"actor_user_id" uuid,
@@ -396,8 +409,8 @@ CREATE TABLE "audit_log" (
 	"payload" text,
 	"ip_address" varchar(45),
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "executive_contact_department" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name_ko" varchar(100) NOT NULL,
@@ -409,8 +422,8 @@ CREATE TABLE "executive_contact_department" (
 	"is_active" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "executive_contact" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"portal_user_id" uuid,
@@ -432,8 +445,8 @@ CREATE TABLE "executive_contact" (
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "bulk_email_delivery_attempt" (
 	"attempt_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"email_id" uuid NOT NULL,
@@ -445,8 +458,8 @@ CREATE TABLE "bulk_email_delivery_attempt" (
 	"started_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"completed_at" timestamp with time zone,
 	"error_code" varchar(120)
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "bulk_email_template" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" varchar(100) NOT NULL,
@@ -459,8 +472,8 @@ CREATE TABLE "bulk_email_template" (
 	"created_by" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "bulk_email" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"subject" varchar(255) NOT NULL,
@@ -478,8 +491,8 @@ CREATE TABLE "bulk_email" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"error_message" text,
 	"idempotency_key" varchar(128)
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "content_block" (
 	"content_block_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"type" "content_block_type" NOT NULL,
@@ -499,8 +512,8 @@ CREATE TABLE "content_block" (
 	"published_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "site_content" (
 	"key" "site_content_key" PRIMARY KEY NOT NULL,
 	"value_ko" text NOT NULL,
@@ -508,8 +521,8 @@ CREATE TABLE "site_content" (
 	"updated_by" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "calendar_event" (
 	"calendar_event_id" serial PRIMARY KEY NOT NULL,
 	"title_ko" varchar(255) NOT NULL,
@@ -540,8 +553,8 @@ CREATE TABLE "calendar_event" (
 	"google_sync_error" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "calendar_sync_job" (
 	"calendar_sync_job_id" serial PRIMARY KEY NOT NULL,
 	"calendar_event_id" integer NOT NULL,
@@ -558,8 +571,8 @@ CREATE TABLE "calendar_sync_job" (
 	"last_error" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "notification" (
 	"notification_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -571,8 +584,8 @@ CREATE TABLE "notification" (
 	"is_read" boolean DEFAULT false NOT NULL,
 	"read_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "vote_ballot" (
 	"ballot_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"vote_id" uuid NOT NULL,
@@ -580,8 +593,8 @@ CREATE TABLE "vote_ballot" (
 	"iv" varchar(32) NOT NULL,
 	"auth_tag" varchar(32) NOT NULL,
 	"receipt_hash" varchar(64) NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "vote_item" (
 	"item_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"vote_id" uuid NOT NULL,
@@ -598,8 +611,8 @@ CREATE TABLE "vote_item" (
 	CONSTRAINT "vote_item_type_check" CHECK ("vote_item"."type" in ('YES_NO_ABSTAIN', 'SINGLE_CHOICE', 'MULTIPLE_CHOICE')),
 	CONSTRAINT "vote_item_selection_rule_check" CHECK ("vote_item"."selection_rule" in ('max', 'min', 'exact')),
 	CONSTRAINT "vote_item_max_selection_check" CHECK ("vote_item"."max_selections" >= 1)
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "vote_option" (
 	"option_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"item_id" uuid NOT NULL,
@@ -609,15 +622,15 @@ CREATE TABLE "vote_option" (
 	"description_en" text,
 	"image_url" text,
 	"sort_order" integer DEFAULT 0 NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "vote_tally" (
 	"vote_id" uuid PRIMARY KEY NOT NULL,
 	"result" jsonb NOT NULL,
 	"total_ballots" integer NOT NULL,
 	"tallied_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "vote_voter" (
 	"vote_id" uuid NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -635,8 +648,8 @@ CREATE TABLE "vote_voter" (
 	CONSTRAINT "vote_voter_vote_id_user_id_pk" PRIMARY KEY("vote_id","user_id"),
 	CONSTRAINT "vote_voter_status_check" CHECK ("vote_voter"."status" in ('ELIGIBLE', 'EXCLUDED')),
 	CONSTRAINT "vote_voter_source_check" CHECK ("vote_voter"."source" in ('FILTER', 'MANUAL', 'IMPORT'))
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "vote" (
 	"vote_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"creator_id" uuid,
@@ -662,14 +675,14 @@ CREATE TABLE "vote" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "vote_status_check" CHECK ("vote"."status" in ('DRAFT', 'PUBLISHED', 'CLOSED', 'TALLIED')),
 	CONSTRAINT "vote_schedule_check" CHECK ("vote"."ends_at" > "vote"."starts_at")
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "roadmap_course_relation" (
 	"relation_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"prerequisite_course_id" uuid NOT NULL,
 	"postrequisite_course_id" uuid NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "roadmap_course" (
 	"course_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"course_code" varchar(64) NOT NULL,
@@ -685,8 +698,8 @@ CREATE TABLE "roadmap_course" (
 	"source" varchar(20) DEFAULT 'MANUAL' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "roadmap_offering" (
 	"offering_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"term" varchar(32) NOT NULL,
@@ -706,8 +719,8 @@ CREATE TABLE "roadmap_offering" (
 	"source_file_name" varchar(255),
 	"imported_by" uuid,
 	"imported_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "roadmap_term" (
 	"term_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"term" varchar(32) NOT NULL,
@@ -716,8 +729,8 @@ CREATE TABLE "roadmap_term" (
 	"imported_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "google_spreadsheet_sync_job" (
 	"google_spreadsheet_sync_job_id" serial PRIMARY KEY NOT NULL,
 	"resource_type" varchar(32) NOT NULL,
@@ -735,8 +748,8 @@ CREATE TABLE "google_spreadsheet_sync_job" (
 	CONSTRAINT "google_spreadsheet_sync_job_status_check" CHECK ("google_spreadsheet_sync_job"."status" in ('PENDING', 'PROCESSING', 'SUCCEEDED', 'FAILED')),
 	CONSTRAINT "google_spreadsheet_sync_job_revision_check" CHECK ("google_spreadsheet_sync_job"."revision" >= 1),
 	CONSTRAINT "google_spreadsheet_sync_job_attempts_check" CHECK ("google_spreadsheet_sync_job"."attempts" >= 0)
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 CREATE TABLE "privacy_retention_case" (
 	"kind" varchar(20) NOT NULL,
 	"resource_id" uuid NOT NULL,
@@ -754,8 +767,8 @@ CREATE TABLE "privacy_retention_case" (
 	CONSTRAINT "privacy_retention_kind_check" CHECK ("privacy_retention_case"."kind" in ('SURVEY', 'APPLICATION', 'VOTE', 'FEE_PAYMENT', 'CONTACT')),
 	CONSTRAINT "privacy_retention_dates_check" CHECK ("privacy_retention_case"."expires_at" >= "privacy_retention_case"."finalized_at"),
 	CONSTRAINT "privacy_retention_hold_check" CHECK ("privacy_retention_case"."hold_until" is null or "privacy_retention_case"."hold_reason" is not null)
-);
---> statement-breakpoint
+);--> statement-breakpoint
+
 ALTER TABLE "role_group_permission" ADD CONSTRAINT "role_group_permission_role_group_id_role_group_role_group_id_fk" FOREIGN KEY ("role_group_id") REFERENCES "public"."role_group"("role_group_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_group_permission" ADD CONSTRAINT "role_group_permission_permission_id_permission_permission_id_fk" FOREIGN KEY ("permission_id") REFERENCES "public"."permission"("permission_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_role_group" ADD CONSTRAINT "user_role_group_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -764,8 +777,10 @@ ALTER TABLE "user_role_group" ADD CONSTRAINT "user_role_group_granted_by_users_u
 ALTER TABLE "user_sanction" ADD CONSTRAINT "user_sanction_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_sanction" ADD CONSTRAINT "user_sanction_issued_by_users_user_id_fk" FOREIGN KEY ("issued_by") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_sanction" ADD CONSTRAINT "user_sanction_revoked_by_users_user_id_fk" FOREIGN KEY ("revoked_by") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "student_fee_consent" ADD CONSTRAINT "student_fee_consent_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "student_fee_payment_batch" ADD CONSTRAINT "student_fee_payment_batch_actor_user_id_users_user_id_fk" FOREIGN KEY ("actor_user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "student_fee_payment" ADD CONSTRAINT "student_fee_payment_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "student_fee_payment" ADD CONSTRAINT "student_fee_payment_std_no_paid_student_records_std_no_fk" FOREIGN KEY ("std_no") REFERENCES "public"."paid_student_records"("std_no") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "student_fee_payment" ADD CONSTRAINT "student_fee_payment_recorded_by_users_user_id_fk" FOREIGN KEY ("recorded_by") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "student_fee_policy" ADD CONSTRAINT "student_fee_policy_created_by_users_user_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "student_fee_status" ADD CONSTRAINT "student_fee_status_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -834,6 +849,7 @@ CREATE INDEX "user_role_group_role_active_idx" ON "user_role_group" USING btree 
 CREATE INDEX "user_sanction_active_idx" ON "user_sanction" USING btree ("user_id","type","revoked_at");--> statement-breakpoint
 CREATE INDEX "users_active_name_idx" ON "users" USING btree ("is_active","name_ko");--> statement-breakpoint
 CREATE UNIQUE INDEX "student_fee_payment_batch_actor_key_idx" ON "student_fee_payment_batch" USING btree ("actor_user_id","idempotency_key");--> statement-breakpoint
+CREATE INDEX "student_fee_payment_std_no_idx" ON "student_fee_payment" USING btree ("std_no","paid_at");--> statement-breakpoint
 CREATE INDEX "student_fee_payment_user_paid_idx" ON "student_fee_payment" USING btree ("user_id","paid_at");--> statement-breakpoint
 CREATE INDEX "student_fee_payment_semester_idx" ON "student_fee_payment" USING btree ("effective_start_semester");--> statement-breakpoint
 CREATE INDEX "student_fee_status_status_updated_idx" ON "student_fee_status" USING btree ("status","updated_at");--> statement-breakpoint
@@ -914,4 +930,4 @@ CREATE UNIQUE INDEX "roadmap_term_term_uq" ON "roadmap_term" USING btree ("term"
 CREATE INDEX "roadmap_term_imported_idx" ON "roadmap_term" USING btree ("imported_at");--> statement-breakpoint
 CREATE INDEX "google_spreadsheet_sync_job_due_idx" ON "google_spreadsheet_sync_job" USING btree ("status","available_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "google_spreadsheet_sync_job_resource_idx" ON "google_spreadsheet_sync_job" USING btree ("resource_type","resource_key");--> statement-breakpoint
-CREATE INDEX "privacy_retention_due_idx" ON "privacy_retention_case" USING btree ("completed_at","expires_at");
+CREATE INDEX "privacy_retention_due_idx" ON "privacy_retention_case" USING btree ("completed_at","expires_at");--> statement-breakpoint

@@ -1,8 +1,6 @@
 const assert = require("node:assert/strict");
 const { test, before, beforeEach, after } = require("node:test");
 const { randomUUID } = require("node:crypto");
-const { readFileSync } = require("node:fs");
-const { join } = require("node:path");
 const { Pool } = require("pg");
 const { drizzle } = require("drizzle-orm/node-postgres");
 const { eq } = require("drizzle-orm");
@@ -137,34 +135,4 @@ test("paid-only submissions and edits require payment, not separate or historica
   assert.equal((await responses.insertSubmission({ surveyId: gated, userId: unpaid, answers: [] })).status, "fee_payer_only");
   const ordinary = await survey(id, false);
   assert.equal((await responses.insertSubmission({ surveyId: ordinary, userId: unpaid, answers: [] })).status, "created");
-});
-
-test("migration retains historical completions and baselines without counting the latest receipt twice or inferring consent", integration, async () => {
-  const connection = await pool.connect();
-  try {
-    await connection.query("BEGIN");
-    await connection.query("DROP TABLE student_fee_consent; ALTER TABLE paid_student_records DROP COLUMN completed_at; ALTER TABLE student_fee_status DROP COLUMN initial_paid_amount");
-    const complete = randomUUID(), partial = randomUUID();
-    await connection.query(`INSERT INTO users (user_id, kaist_uid, std_no, name_ko, email, privacy_consent_at)
-      VALUES ($1, 'migration-complete', '90990001', 'Synthetic', 'complete@example.invalid', now()),
-             ($2, 'migration-partial', '90990002', 'Synthetic', 'partial@example.invalid', now())`, [complete, partial]);
-    await connection.query(`INSERT INTO student_fee_status (user_id, status, paid_amount, coverage_semesters)
-      VALUES ($1, 'PAID', 30000, 1), ($2, 'PARTIAL', 5000, 1)`, [complete, partial]);
-    await connection.query(`INSERT INTO paid_student_records (std_no, admission_year, paid_semesters, paid_amount)
-      VALUES ('90990001', 2020, 6, 30000), ('90990002', 2020, 2, 10000)`);
-    await connection.query(`INSERT INTO student_fee_payment (user_id, amount, payment_type, payment_method, effective_start_semester, coverage_semesters, paid_at)
-      VALUES ($1, 5000, 'PRIOR_PAYMENT_BALANCE', 'BANK_TRANSFER', '2020-1', 1, now())`, [partial]);
-    const migration = readFileSync(join(__dirname, "../drizzle/0003_lifetime_fee_policy.sql"), "utf8");
-    await connection.query(migration);
-    const balances = (await connection.query("SELECT user_id, initial_paid_amount FROM student_fee_status")).rows;
-    assert.equal(balances.find(row => row.user_id === complete).initial_paid_amount, 30000);
-    assert.equal(balances.find(row => row.user_id === partial).initial_paid_amount, 0);
-    const roster = (await connection.query("SELECT std_no, completed_at FROM paid_student_records")).rows;
-    assert.ok(roster.find(row => row.std_no === "90990001").completed_at);
-    assert.equal(roster.find(row => row.std_no === "90990002").completed_at, null);
-    assert.equal((await connection.query("SELECT count(*)::int AS n FROM student_fee_consent")).rows[0].n, 0);
-  } finally {
-    await connection.query("ROLLBACK");
-    connection.release();
-  }
 });

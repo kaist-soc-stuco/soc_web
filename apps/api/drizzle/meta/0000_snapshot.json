@@ -1,5 +1,5 @@
 {
-  "id": "fadce0aa-6b60-445b-8ae1-bacfe3204569",
+  "id": "e418e6ca-5d7b-4929-a373-6b1dfa14d1c4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -696,6 +696,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "imported_at": {
           "name": "imported_at",
           "type": "timestamp with time zone",
@@ -714,6 +726,72 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.student_fee_consent": {
+      "name": "student_fee_consent",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "semester": {
+          "name": "semester",
+          "type": "varchar(6)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notice_version": {
+          "name": "notice_version",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consented_at": {
+          "name": "consented_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "withdrawn_at": {
+          "name": "withdrawn_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "student_fee_consent_user_id_users_user_id_fk": {
+          "name": "student_fee_consent_user_id_users_user_id_fk",
+          "tableFrom": "student_fee_consent",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "student_fee_consent_user_id_semester_pk": {
+          "name": "student_fee_consent_user_id_semester_pk",
+          "columns": [
+            "user_id",
+            "semester"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -828,7 +906,13 @@
           "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "std_no": {
+          "name": "std_no",
+          "type": "varchar(8)",
+          "primaryKey": false,
+          "notNull": false
         },
         "amount": {
           "name": "amount",
@@ -840,12 +924,6 @@
         "payment_type": {
           "name": "payment_type",
           "type": "varchar(40)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "payment_method": {
-          "name": "payment_method",
-          "type": "varchar(30)",
           "primaryKey": false,
           "notNull": true
         },
@@ -896,6 +974,27 @@
         }
       },
       "indexes": {
+        "student_fee_payment_std_no_idx": {
+          "name": "student_fee_payment_std_no_idx",
+          "columns": [
+            {
+              "expression": "std_no",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "paid_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "student_fee_payment_user_paid_idx": {
           "name": "student_fee_payment_user_paid_idx",
           "columns": [
@@ -947,6 +1046,19 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "student_fee_payment_std_no_paid_student_records_std_no_fk": {
+          "name": "student_fee_payment_std_no_paid_student_records_std_no_fk",
+          "tableFrom": "student_fee_payment",
+          "tableTo": "paid_student_records",
+          "columnsFrom": [
+            "std_no"
+          ],
+          "columnsTo": [
+            "std_no"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "student_fee_payment_recorded_by_users_user_id_fk": {
           "name": "student_fee_payment_recorded_by_users_user_id_fk",
           "tableFrom": "student_fee_payment",
@@ -964,7 +1076,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "student_fee_payment_person_required": {
+          "name": "student_fee_payment_person_required",
+          "value": "\"student_fee_payment\".\"user_id\" IS NOT NULL OR \"student_fee_payment\".\"std_no\" IS NOT NULL"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.student_fee_policy": {
@@ -1052,6 +1169,13 @@
         },
         "paid_amount": {
           "name": "paid_amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "initial_paid_amount": {
+          "name": "initial_paid_amount",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -2005,7 +2129,7 @@
       "checkConstraints": {
         "article_faq_category_check": {
           "name": "article_faq_category_check",
-          "value": "\"article\".\"faq_category\" IN ('account', 'fees', 'events-surveys', 'other')"
+          "value": "\"article\".\"faq_category\" IN ('account', 'fees', 'events-surveys', 'communication', 'academics', 'council', 'other')"
         }
       },
       "isRLSEnabled": false

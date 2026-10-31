@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1793212964217,
+      "when": 1793439668453,
       "tag": "0000_baseline",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1793259075867,
-      "tag": "0001_internal_fee_roster",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1793265027960,
-      "tag": "0002_unified_fee_payments",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1793283803968,
-      "tag": "0003_lifetime_fee_policy",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1793358031098,
-      "tag": "0004_faq_categories",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1793439668452,
-      "tag": "0005_simplify_fee_receipts",
       "breakpoints": true
     }
   ]
