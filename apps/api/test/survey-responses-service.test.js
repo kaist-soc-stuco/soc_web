@@ -112,7 +112,7 @@ function createService({
   const service = new SurveyResponsesService(
     responsesRepo,
     { findById: async () => surveyRecord },
-    { getStudentFeeStatus: async () => feeStatus, getStudentFeeConsent: async () => ({ consented: true }) },
+    { getStudentFeeStatus: async () => feeStatus },
     undefined,
     undefined,
     undefined,

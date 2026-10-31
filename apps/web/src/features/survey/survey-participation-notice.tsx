@@ -36,10 +36,6 @@ const reasonLabels: Record<
     ko: "과비 납부 내역이 확인되지 않습니다.",
     en: "Your student-fee payment could not be verified.",
   },
-  FEE_CONSENT_REQUIRED: {
-    ko: "이번 학기 과비 개인정보 동의가 필요합니다.",
-    en: "Your student-fee privacy consent is required for this semester.",
-  },
 };
 
 const getReasonLabel = (
@@ -79,9 +75,6 @@ export function SurveyParticipationNotice({
           className="ml-auto shrink-0 rounded-sm text-[length:var(--ui-text-body-sm-size)] font-medium text-amber-900 underline underline-offset-4 hover:text-amber-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-700">
           {lang === "ko" ? "이미 납부하셨나요?" : "Already paid?"}
         </button> : null}
-        {reason === "FEE_CONSENT_REQUIRED" ? <Link to="/mypage#fee-consent" className="ml-auto shrink-0 font-medium underline underline-offset-4">
-          {lang === "ko" ? "동의하러 가기" : "Review consent"}
-        </Link> : null}
       </li>)}
     </ul>
   ) : null;

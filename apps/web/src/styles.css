@@ -4444,7 +4444,7 @@ html { scrollbar-gutter: stable; }
 }
 
 /* A disclosure changes the content below its trigger, never the scroll anchor. */
-:is(.faq-page-container, .mobile-navigation-sections, .tree-pledge-list, .roadmap-mobile-fields, .mypage-fee-consent) {
+:is(.faq-page-container, .mobile-navigation-sections, .tree-pledge-list, .roadmap-mobile-fields) {
   overflow-anchor: none;
 }
 

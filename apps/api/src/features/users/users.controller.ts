@@ -1,4 +1,4 @@
-import { SaveStudentFeeRosterSchema, StudentFeePolicySchema, type SaveStudentFeeRosterRequest, type StudentFeePolicy } from "@soc/contracts";
+import { CancelStudentFeePaymentSchema, SaveStudentFeeRosterSchema, StudentFeePolicySchema, PreviewStudentFeePaymentsSchema, ImportStudentFeePaymentsSchema, type SaveStudentFeeRosterRequest, type StudentFeePolicy, type StudentFeePaymentImportRow, type ImportStudentFeePaymentsRequest } from "@soc/contracts";
 import { Body, Controller, Get, Header, Headers, Param, Post, Put, Query, Req, StreamableFile, UseGuards } from "@nestjs/common";
 import { Request } from "express";
 import * as XLSX from "xlsx";
@@ -8,7 +8,6 @@ import {
   UpdateStudentFeeStatusSchema,
   UpdateUserActiveStatusSchema,
   UpdateUserPostingSuspensionSchema,
-  StudentFeeConsentSchema,
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 
@@ -50,21 +49,6 @@ export class UsersController {
     private readonly usersService: UsersService,
     private readonly googleFeeSheetsService: GoogleFeeSheetsService,
   ) {}
-
-  @Get("me/fee-consent")
-  @UseGuards(AuthGuard)
-  @Header("Cache-Control", "private, no-store")
-  getMyFeeConsent(@Req() req: AuthenticatedRequest) {
-    return this.usersService.getStudentFeeConsent(req.user!.id);
-  }
-
-  @Put("me/fee-consent")
-  @UseGuards(AuthGuard)
-  @Header("Cache-Control", "private, no-store")
-  setMyFeeConsent(@Req() req: AuthenticatedRequest,
-    @Body(new ZodValidationPipe(StudentFeeConsentSchema)) input: { semester: string; noticeVersion: string; consented: boolean }) {
-    return this.usersService.setStudentFeeConsent(req.user!.id, input, auditMetadataFromRequest(req));
-  }
 
   @Get("me/articles")
   @UseGuards(AuthGuard)
@@ -269,10 +253,30 @@ export class UsersController {
   async exportStudentFeeRoster(@Req() req: AuthenticatedRequest, @Headers("x-download-reason") reason?: string, @Query("semester") semester?: string) {
     const decodedReason = requireDownloadReasonHeader(reason);
     const { records } = await this.usersService.exportStudentFeeRoster(auditMetadataFromRequest(req), decodedReason, semester);
-    const sheet = XLSX.utils.json_to_sheet(records.map(row => ({ "학번": row.stdNo, "이름": row.nameKo ?? "", "입학 연도": row.admissionYear ?? "",
-      "초기 납부 학기 수": row.paidSemesters, "초기 납부 금액": row.paidAmount, "비고": row.note ?? "", "가입 일시": row.joinedAt ?? "", "누적 수납액": row.totalPaidAmount ?? 0, "상태": row.status ?? "UNPAID" })));
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ["학번", "이름", "입학 연도", "초기 납부 학기 수", "초기 납부 금액", "비고", "가입 일시", "누적 수납액", "상태", "수정 일시"],
+      ...records.map(row => [row.stdNo, row.nameKo ?? "", row.admissionYear ?? "", row.paidSemesters, row.paidAmount,
+        row.note ?? "", row.joinedAt ?? "", row.totalPaidAmount ?? 0, row.status ?? "UNPAID", row.updatedAt ?? ""]),
+    ]);
+    sheet["!cols"] = [14, 18, 12, 20, 20, 40, 28, 20, 14, 28].map(wch => ({ wch }));
+    for (let row = 2; row <= records.length + 1; row++) {
+      for (const column of ["E", "H"]) if (sheet[column + row]) sheet[column + row].z = "#,##0";
+    }
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, "납부 관리");
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+      ["납부 현황", "이 파일은 전체 명부를 조회·보관하기 위한 파일입니다."],
+      ["신규 입금", "입금 양식에 이번 입금만 입력한 뒤 입금 엑셀 가져오기로 등록하세요."],
+      ["기초자료 정정", "학생의 납부 상세 화면에서 기초자료 정정을 사용하세요."],
+    ]), "이용 안내");
     return new StreamableFile(XLSX.write(book, { type: "buffer", bookType: "xlsx" }));
+  }
+
+  @Header("Cache-Control", "private, no-store")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  @Post("fee-status/payments/:paymentId/cancel")
+  cancelStudentFeePayment(@Param("paymentId") paymentId: string,
+    @Body(new ZodValidationPipe(CancelStudentFeePaymentSchema)) body: import("@soc/contracts").CancelStudentFeePaymentRequest, @Req() req: AuthenticatedRequest) {
+    return this.usersService.cancelStudentFeePayment(paymentId, body, auditMetadataFromRequest(req));
   }
 
   @Get("fee-status/policy")
@@ -513,6 +517,26 @@ export class UsersController {
       actorUserId: req.user?.id,
       ipAddress: req.ip,
     });
+  }
+
+  @Post("fee-status/payments/import/preview")
+  @Header("Cache-Control", "private, no-store")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  async previewStudentFeePayments(
+    @Body(new ZodValidationPipe(PreviewStudentFeePaymentsSchema)) body: { entries: StudentFeePaymentImportRow[] },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.usersService.previewStudentFeePayments(body.entries, auditMetadataFromRequest(req));
+  }
+
+  @Post("fee-status/payments/import")
+  @Header("Cache-Control", "private, no-store")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  async importStudentFeePayments(
+    @Body(new ZodValidationPipe(ImportStudentFeePaymentsSchema)) body: ImportStudentFeePaymentsRequest,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.usersService.importStudentFeePayments(body, auditMetadataFromRequest(req));
   }
 
   @Get("fee-status/detail/:userId")

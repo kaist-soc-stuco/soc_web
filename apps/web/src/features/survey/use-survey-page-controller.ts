@@ -369,10 +369,6 @@ export function useSurveyPageController(surveyId: string | undefined) {
             ko: "과비 납부가 확인된 사용자만 참여할 수 있습니다.",
             en: "This survey is limited to verified fee-paying members.",
           },
-          fee_consent_required: {
-            ko: "마이페이지에서 이번 학기 과비 개인정보 동의를 완료해 주세요.",
-            en: "Please complete this semester's student-fee privacy consent on your profile.",
-          },
           login_required_for_file_upload: {
             ko: "파일을 제출하려면 로그인해야 합니다.",
             en: "You must sign in to upload files.",

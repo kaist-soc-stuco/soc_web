@@ -52,34 +52,6 @@ def xlsx_rows(path):
         return rows
 
 
-def amend_fee_workbook(source, destination, student_number, note, added_row):
-    """Edit the exported note and append one unregistered synthetic applicant."""
-    rows = xlsx_rows(source)
-    ET.register_namespace("", SHEET_NS)
-    note_column = rows[0].index("비고")
-    with zipfile.ZipFile(source) as book:
-        sheet = ET.fromstring(book.read("xl/worksheets/sheet1.xml"))
-        data = sheet.find(f"{{{SHEET_NS}}}sheetData")
-        target_index = next(index for index, row in enumerate(rows) if row[0] == student_number)
-        target = data[target_index]
-        ref = f"{chr(65 + note_column)}{target.attrib['r']}"
-        cell = next((cell for cell in target if cell.get("r") == ref), None)
-        if cell is None:
-            cell = ET.SubElement(target, f"{{{SHEET_NS}}}c", {"r": ref})
-        cell.clear()
-        cell.attrib.update(r=ref, t="str")
-        ET.SubElement(cell, f"{{{SHEET_NS}}}v").text = note
-        row_number = len(rows) + 1
-        new_row = ET.SubElement(data, f"{{{SHEET_NS}}}row", {"r": str(row_number)})
-        for column, value in enumerate(added_row):
-            cell = ET.SubElement(new_row, f"{{{SHEET_NS}}}c", {"r": f"{chr(65 + column)}{row_number}", "t": "str"})
-            ET.SubElement(cell, f"{{{SHEET_NS}}}v").text = str(value)
-        sheet.find(f"{{{SHEET_NS}}}dimension").set("ref", f"A1:I{row_number}")
-        with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as output:
-            for entry in book.infolist():
-                output.writestr(entry, ET.tostring(sheet, encoding="utf-8", xml_declaration=True) if entry.filename == "xl/worksheets/sheet1.xml" else book.read(entry.filename))
-
-
 def write_xlsx(path, rows):
     """Create small Unicode workbook fixtures using only the standard library."""
     ET.register_namespace("", SHEET_NS)
@@ -442,25 +414,22 @@ class AcceptanceSuite:
         guest.goto(self.base + f"/survey/{survey_id}")
         expect(guest.get_by_text("로그인이 필요한 설문입니다", exact=True)).to_be_visible()
 
-    def test_fee_excel_payment_retry_and_registration(self):
+    def test_fee_export_payment_retry_and_registration(self):
         admin, student = self.page(), self.page("student")
         admin.goto(self.base + "/admin/finance")
         grid = admin.get_by_role("grid", name="과비 납부 관리표", exact=True)
         expect(grid).to_be_visible()
-        exported = self.download_with_reason(admin, admin.get_by_role("button", name="엑셀 내보내기", exact=True), "fee-export.xlsx")
+        exported = self.download_with_reason(admin, admin.get_by_role("button", name="전체 명부 내보내기", exact=True), "fee-export.xlsx")
         audit = self.api(admin, "/audit-logs?action=student_fee.roster.export&pageSize=1")
         assert json.loads(audit["items"][0]["payload"])["reason"] == "합성 데이터 검증", audit
         rows = xlsx_rows(exported)
         assert rows[0][:6] == ["학번", "이름", "입학 연도", "초기 납부 학기 수", "초기 납부 금액", "비고"], rows[0]
-        note = self.marker + " 엑셀 정정"
-        imported = ARTIFACTS / f"{self.marker}-fee-import.xlsx"
-        amend_fee_workbook(exported, imported, "90990002", note, ["90990003", "합성 미가입 신청자", 2026, 1, 10000, self.marker, "", 10000, "PARTIAL"])
-        admin.get_by_label("납부 엑셀 파일", exact=True).set_input_files(imported)
-        save = admin.get_by_role("button", name=re.compile(r"^저장 \("))
-        expect(save).to_be_enabled()
-        with admin.expect_response(lambda response: response.request.method == "PUT" and urlsplit(response.url).path == "/api/users/fee-status/roster") as saved:
-            save.click()
-        assert saved.value.status == 200, saved.value.text()
+        note = self.marker + " 기초자료 확인"
+        current = next(row for row in self.api(admin, "/users/fee-status/roster")["records"] if row["stdNo"] == "90990002")
+        self.api(admin, "/users/fee-status/roster", method="PUT", body={"records": [
+            {"stdNo": "90990002", "nameKo": current["nameKo"], "admissionYear": 2026, "paidSemesters": 0, "paidAmount": 0, "note": note, "expectedUpdatedAt": current["updatedAt"]},
+            {"stdNo": "90990003", "nameKo": "합성 미가입 신청자", "admissionYear": 2026, "paidSemesters": 1, "paidAmount": 10000, "note": self.marker, "expectedUpdatedAt": None},
+        ]})
         admin.reload()
         roster_path = "/users/fee-status/roster"
         roster = self.api(admin, roster_path)["records"]
@@ -678,8 +647,8 @@ class AcceptanceSuite:
             expect(viewer).to_have_url(self.base + "/admin/finance")
             expect(viewer.get_by_role("grid")).to_be_visible()
             expect(viewer.locator('aside a[href^="/admin/"]:visible')).to_have_count(1)
-            expect(viewer.get_by_role("button", name="엑셀 가져오기", exact=True)).to_have_count(0)
-            expect(viewer.get_by_role("button", name="엑셀 내보내기", exact=True)).to_have_count(0)
+            expect(viewer.get_by_role("button", name="입금 엑셀 가져오기", exact=True)).to_have_count(0)
+            expect(viewer.get_by_role("button", name="전체 명부 내보내기", exact=True)).to_have_count(0)
             self.api(viewer, "/users/fee-status/roster", method="PUT", body={"records": []}, status=403)
             self.api(viewer, "/users/fee-status/roster/export.xlsx", status=403)
         finally:
@@ -1347,6 +1316,192 @@ class AcceptanceSuite:
         page.get_by_role("button", name=auth.PROFILE_LABELS["admin"], exact=True).click()
         page.wait_for_url(self.base + "/admin/content")
         expect(page.get_by_role("heading", name="사이트 설정", exact=True)).to_be_visible()
+
+    def test_fee_payment_amounts_seoul_date_and_mixed_selection(self):
+        admin = self.page()
+        start = 90700000 + int(self.marker[3:7], 16) * 10
+        numbers = [str(start + i) for i in range(3)]
+        base = "/users/fee-status/roster"
+        initial = [(2, 10000), (0, 0), (6, 30000)]
+        self.api(admin, base, method="PUT", body={"records": [
+            {"stdNo": number, "nameKo": f"{self.marker} 납부자 {i + 1}", "admissionYear": 2026,
+             "paidSemesters": semesters, "paidAmount": amount, "note": self.marker, "expectedUpdatedAt": None}
+            for i, (number, (semesters, amount)) in enumerate(zip(numbers, initial))]})
+        required = self.api(admin, "/users/fee-status/policy")["amount"]
+        admin.goto(self.base + "/admin/finance")
+        grid = admin.get_by_role("grid", name="과비 납부 관리표", exact=True)
+        admin.get_by_role("searchbox", name="납부 검색", exact=True).fill(self.marker)
+        expect(grid.get_by_role("row")).to_have_count(4)
+        admin.clock.set_fixed_time(datetime(2026, 10, 30, 15, 30, tzinfo=timezone.utc))
+        grid.get_by_role("row").filter(has_text=numbers[0]).get_by_role("checkbox").check()
+        admin.get_by_role("button", name="선택 납부 처리 (1명)", exact=True).click()
+        payment = admin.get_by_role("dialog", name="납부 내역 추가", exact=True)
+        expect(payment.get_by_role("group", name="납부 일자", exact=True).locator("input")).to_have_value("2026-10-31")
+        amount = payment.get_by_role("group", name="납부 금액 (원)", exact=True).get_by_role("spinbutton")
+        for invalid in ("0", str(required - 10000 + 1)):
+            amount.fill(invalid)
+            payment.get_by_role("button", name="납부 처리", exact=True).click()
+            expect(payment.get_by_role("alert")).to_be_visible()
+            assert self.api(admin, base + "/detail/" + numbers[0])["history"] == []
+        amount.fill("5000")
+        with admin.expect_response(lambda r: r.request.method == "POST" and urlsplit(r.url).path == "/api/users/fee-status/payments") as partial:
+            payment.get_by_role("button", name="납부 처리", exact=True).click()
+        assert partial.value.status == 201, partial.value.text()
+        expect(payment).to_be_hidden()
+        detail = self.api(admin, base + "/detail/" + numbers[0])
+        assert detail["record"]["totalPaidAmount"] == 15000 and detail["record"]["remainingAmount"] == required - 15000
+        assert detail["history"][0]["paidAt"] == "2026-10-30T15:00:00.000Z"
+        for number in numbers:
+            grid.get_by_role("row").filter(has_text=number).get_by_role("checkbox").check()
+        admin.get_by_role("button", name="선택 납부 처리 (2명)", exact=True).click()
+        with admin.expect_response(lambda r: r.request.method == "POST" and urlsplit(r.url).path == "/api/users/fee-status/payments") as completed:
+            payment.get_by_role("button", name="납부 처리", exact=True).click()
+        assert completed.value.status == 201, completed.value.text()
+        sent = completed.value.request.post_data_json["payments"]
+        assert {item["stdNo"]: item["amount"] for item in sent} == {numbers[0]: required - 15000, numbers[1]: required}
+        expect(payment).to_be_hidden()
+        admin.reload()
+        admin.get_by_role("searchbox", name="납부 검색", exact=True).fill(self.marker)
+        for number, count in ((numbers[0], 2), (numbers[1], 1), (numbers[2], 0)):
+            result = self.api(admin, base + "/detail/" + number)
+            assert result["record"]["status"] == "PAID" and result["record"]["remainingAmount"] == 0
+            assert len(result["history"]) == count
+        admin.get_by_role("button", name="납부 상태", exact=True).click()
+        admin.get_by_role("option", name="완납", exact=True).click()
+        expect(grid.get_by_role("row")).to_have_count(4)
+        admin.get_by_role("button", name="납부 상태", exact=True).click()
+        admin.get_by_role("option", name="미납", exact=True).click()
+        expect(grid.get_by_role("row")).to_have_count(1)
+
+    def test_fee_confirmation_and_cancel_receipt(self):
+        admin, student = self.page(), self.page("student")
+        start = 90500000 + int(self.marker[3:7], 16)
+        numbers = [str(start), str(start + 1)]
+        base = "/users/fee-status/roster"
+        self.api(admin, base, method="PUT", body={"records": [
+            {"stdNo": number, "nameKo": f"{self.marker} 확인{i}", "admissionYear": 2026, "paidSemesters": 0,
+             "paidAmount": amount, "note": self.marker, "expectedUpdatedAt": None}
+            for i, (number, amount) in enumerate(zip(numbers, [10000, 0]))]})
+        admin.goto(self.base + "/admin/finance")
+        grid = admin.get_by_role("grid", name="과비 납부 관리표", exact=True)
+        admin.get_by_role("searchbox", name="납부 검색", exact=True).fill(self.marker)
+        expect(grid.get_by_role("row")).to_have_count(3)
+        for number in numbers: grid.get_by_role("row").filter(has_text=number).get_by_role("checkbox").check()
+        admin.get_by_role("button", name="선택 납부 처리 (2명)", exact=True).click()
+        dialog = admin.get_by_role("dialog", name="납부 내역 추가", exact=True)
+        expect(dialog.get_by_role("table", name="일괄 납부 확인표")).to_be_visible()
+        for number in numbers: expect(dialog.get_by_role("table")).to_contain_text(number)
+        expect(dialog.get_by_role("group", name="납부 유형", exact=True)).to_have_count(0)
+        expect(dialog.get_by_role("spinbutton")).to_have_count(0)
+        required = self.api(admin, "/users/fee-status/policy")["amount"]
+        expect(dialog).to_contain_text(f"합계 {required * 2 - 10000:,}원")
+        admin.screenshot(path=str(ARTIFACTS / "fee-bulk-confirmation.png"))
+        with admin.expect_response(lambda r: r.request.method == "POST" and urlsplit(r.url).path == "/api/users/fee-status/payments") as saved:
+            dialog.get_by_role("button", name="납부 처리", exact=True).click()
+        assert saved.value.status == 201, saved.value.text()
+        expect(dialog).to_be_hidden()
+        first = self.api(admin, base + "/detail/" + numbers[0])
+        payment = first["history"][0]
+        cancel_path = "/users/fee-status/payments/" + payment["paymentId"] + "/cancel"
+        self.api(student, cancel_path, method="POST", body={"reason":"권한 검증", "expectedUpdatedAt":payment["updatedAt"], "revokeRecognition":True}, status=403)
+        grid.get_by_role("row").filter(has_text=numbers[0]).get_by_role("button", name=f"{self.marker} 확인0", exact=True).click()
+        admin.get_by_role("button", name="입금 취소", exact=True).click()
+        cancel = admin.get_by_role("dialog", name="입금 기록 취소", exact=True)
+        cancel.get_by_role("button", name="입금 취소 확정", exact=True).click()
+        expect(cancel.get_by_role("alert")).to_contain_text("취소 사유")
+        assert self.api(admin, base + "/detail/" + numbers[0])["history"][0]["amount"] == required - 10000
+        self.field(cancel, "취소 사유 (필수)").fill("다른 학생을 선택한 입금 오류")
+        checkbox = cancel.get_by_role("checkbox", name="이 입금으로 잘못 처리된 완납 인정도 취소", exact=True)
+        expect(checkbox).not_to_be_checked()
+        checkbox.check()
+        with admin.expect_response(lambda r: r.request.method == "POST" and urlsplit(r.url).path == "/api" + cancel_path) as cancelled:
+            cancel.get_by_role("button", name="입금 취소 확정", exact=True).click()
+        assert cancelled.value.status == 201, cancelled.value.text()
+        expect(cancel).to_be_hidden()
+        after = self.api(admin, base + "/detail/" + numbers[0])
+        assert after["record"]["status"] == "PARTIAL" and after["record"]["totalPaidAmount"] == 10000, after
+        assert after["history"][0]["amount"] == 0 and "입금 취소" in after["history"][0]["note"]
+        logs = self.api(admin, "/audit-logs?action=student_fee_payment.cancel&pageSize=100")["items"]
+        log = next(item for item in logs if str(item["targetId"]) == payment["paymentId"])
+        payload = json.loads(log["payload"])
+        assert payload["before"]["amount"] == required - 10000 and payload["after"]["amount"] == 0
+        admin.screenshot(path=str(ARTIFACTS / "fee-cancelled-receipt.png"))
+
+    def test_fee_income_excel_preview_retry_and_duplicates(self):
+        admin, student = self.page(), self.page("student")
+        number = str(90400000 + int(self.marker[3:7], 16) * 2)
+        new_number = str(int(number) + 1)
+        existing_name, new_name = self.marker + " 기존", self.marker + " 신규"
+        base = "/users/fee-status/roster"
+        self.api(admin, base, method="PUT", body={"records": [{"stdNo": number, "nameKo": existing_name,
+            "admissionYear": 2026, "paidSemesters": 2, "paidAmount": 10000, "note": self.marker, "expectedUpdatedAt": None}]})
+        admin.goto(self.base + "/admin/finance")
+        grid = admin.get_by_role("grid", name="과비 납부 관리표", exact=True)
+        expect(grid).to_be_visible()
+        with admin.expect_download() as downloaded:
+            admin.get_by_role("button", name="입금 양식 다운로드", exact=True).click()
+        template = ARTIFACTS / (self.marker + "-income-template.xlsx")
+        downloaded.value.save_as(template)
+        headers = xlsx_rows(template)[0]
+        assert headers == ["학번", "이름", "입금액", "입금일", "납부 방법", "메모"]
+        assert len(xlsx_rows(template)) == 1
+        summary = self.download_with_reason(admin, admin.get_by_role("button", name="전체 명부 내보내기", exact=True), "fee-summary.xlsx")
+        admin.get_by_label("입금 엑셀 파일", exact=True).set_input_files(summary)
+        expect(admin.get_by_text("입금 등록 양식의 학번·이름·입금액·입금일 열이 필요합니다.", exact=False)).to_be_visible()
+        rows = [headers, [number, existing_name, 15000, "2026-10-30", "계좌이체", "추가 입금"],
+                [number, existing_name, 20000, "2026-10-31", "계좌이체", "나머지"],
+                [new_number, new_name, 12000, "2026-10-30", "현금", "첫 입금"],
+                [new_number, new_name, 5000, "2026-10-31", "계좌이체", "추가"]]
+        imported = ARTIFACTS / (self.marker + "-income.xlsx")
+        write_xlsx(imported, rows)
+        admin.get_by_label("입금 엑셀 파일", exact=True).set_input_files(imported)
+        dialog = admin.get_by_role("dialog", name="입금 등록 확인", exact=True)
+        expect(dialog).to_be_visible()
+        expect(dialog).to_contain_text("52,000원")
+        expect(dialog).to_contain_text("신규 명부 1명")
+        expect(dialog.get_by_role("table").get_by_role("row")).to_have_count(5)
+        assert len(self.api(admin, base + "/detail/" + number)["history"]) == 0
+        dialog.get_by_role("button", name="취소", exact=True).click()
+        expect(dialog).to_be_hidden()
+        assert not any(row["stdNo"] == new_number for row in self.api(admin, base)["records"])
+        admin.get_by_label("입금 엑셀 파일", exact=True).set_input_files(imported)
+        expect(dialog).to_be_visible()
+        intercepted = []
+        def lose_response(route):
+            response = route.fetch()
+            assert response.status == 201, response.text()
+            intercepted.append(route.request.post_data_json)
+            route.abort("failed")
+        admin.route("**/api/users/fee-status/payments/import", lose_response, times=1)
+        dialog.get_by_role("button", name="입금 등록", exact=True).click()
+        expect(dialog.get_by_role("alert")).to_contain_text("다시 시도")
+        with admin.expect_response(lambda r: r.request.method == "POST" and urlsplit(r.url).path == "/api/users/fee-status/payments/import") as retry:
+            dialog.get_by_role("button", name="입금 등록", exact=True).click()
+        assert retry.value.status == 201, retry.value.text()
+        assert retry.value.request.post_data_json == intercepted[0]
+        expect(dialog).to_be_hidden()
+        first = self.api(admin, base + "/detail/" + number)
+        second = self.api(admin, base + "/detail/" + new_number)
+        assert first["record"]["paidAmount"] == 10000 and first["record"]["totalPaidAmount"] == 45000
+        assert first["record"]["status"] == "PAID" and len(first["history"]) == 2
+        assert second["record"]["paidAmount"] == 0 and second["record"]["totalPaidAmount"] == 17000
+        assert second["record"]["userId"] is None and len(second["history"]) == 2
+        admin.get_by_role("searchbox", name="납부 검색", exact=True).fill(new_number)
+        expect(grid.get_by_role("row").filter(has_text=new_number)).to_contain_text("17,000")
+        duplicate = ARTIFACTS / (self.marker + "-duplicate-income.xlsx")
+        write_xlsx(duplicate, [headers, rows[3]])
+        admin.get_by_label("입금 엑셀 파일", exact=True).set_input_files(duplicate)
+        expect(dialog).to_contain_text("중복 의심")
+        expect(dialog.get_by_role("button", name="입금 등록", exact=True)).to_be_disabled()
+        dialog.get_by_role("button", name="취소", exact=True).click()
+        invalid = ARTIFACTS / (self.marker + "-wrong-name.xlsx")
+        write_xlsx(invalid, [headers, [new_number, "다른 사람", 1000, "2026-10-31", "", ""]])
+        admin.get_by_label("입금 엑셀 파일", exact=True).set_input_files(invalid)
+        expect(dialog).to_contain_text("등록된 이름")
+        expect(dialog.get_by_role("button", name="입금 등록", exact=True)).to_be_disabled()
+        dialog.get_by_role("button", name="취소", exact=True).click()
+        self.api(student, "/users/fee-status/payments/import/preview", method="POST", body={"entries": intercepted[0]["entries"]}, status=403)
+        self.api(student, "/users/fee-status/payments/import", method="POST", body=intercepted[0], status=403)
 
     def close(self):
         for context in self.contexts.values():

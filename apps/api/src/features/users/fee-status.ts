@@ -1,8 +1,8 @@
 import type { FeeStatus } from "@soc/contracts";
 import { sql, type SQL } from "drizzle-orm";
-import { paidStudentRecords, studentFeePayments, studentFeeStatus, studentFeePolicies, studentFeeConsents, users } from "../../infrastructure/postgres/postgres.schema";
+import { paidStudentRecords, studentFeePayments, studentFeeStatus, studentFeePolicies, users } from "../../infrastructure/postgres/postgres.schema";
 import { resolveFeeReferenceSemester } from "./fee-semester";
-import { DEFAULT_STUDENT_FEE_AMOUNT, STUDENT_FEE_PRIVACY_VERSION } from "./fee-policy";
+import { DEFAULT_STUDENT_FEE_AMOUNT } from "./fee-policy";
 
 export function currentFeeAmountSql() {
   return sql<number>`coalesce((SELECT ${studentFeePolicies.amount} FROM ${studentFeePolicies}
@@ -27,11 +27,4 @@ export function effectiveFeeStatusSql(): SQL<FeeStatus> {
     ) OR ${total} >= ${currentFeeAmountSql()} THEN 'PAID'
     WHEN ${total} > 0 THEN 'PARTIAL'
     ELSE 'UNPAID' END`;
-}
-
-/** Requires users in scope, independently of the financial status query. */
-export function currentFeeConsentSql(semester = resolveFeeReferenceSemester()): SQL<boolean> {
-  return sql<boolean>`EXISTS (SELECT 1 FROM ${studentFeeConsents} WHERE ${studentFeeConsents.userId} = ${users.userId}
-    AND ${studentFeeConsents.semester} = ${semester} AND ${studentFeeConsents.noticeVersion} = ${STUDENT_FEE_PRIVACY_VERSION}
-    AND ${studentFeeConsents.withdrawnAt} IS NULL)`;
 }

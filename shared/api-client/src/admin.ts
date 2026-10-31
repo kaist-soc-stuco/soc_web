@@ -1,5 +1,8 @@
 import type {
   StudentFeePolicy,
+  StudentFeePaymentImportRow,
+  StudentFeePaymentImportPreview,
+  ImportStudentFeePaymentsRequest,
   StudentFeeRosterResponse,
   SaveStudentFeeRosterRequest,
   AdminUserRecord,
@@ -79,9 +82,6 @@ export const createAdminApi = ({
   roleGroupsBaseUrl,
   usersBaseUrl,
 }: ApiClientContext) => ({
-  getStudentFeeConsent: () => requestJson<import("@soc/contracts").StudentFeeSemesterConsent>(`${usersBaseUrl}/me/fee-consent`, { method: "GET", cache: "no-store" }),
-  setStudentFeeConsent: (input: { semester: string; noticeVersion: string; consented: boolean }) =>
-    requestJson<import("@soc/contracts").StudentFeeSemesterConsent>(`${usersBaseUrl}/me/fee-consent`, { method: "PUT", body: JSON.stringify(input), headers: { "Content-Type": "application/json" } }),
   getMyArticles: async (
     options?: ListQueryOptions,
   ): Promise<MyArticleListResponse> => {
@@ -707,6 +707,21 @@ export const createAdminApi = ({
       { retryOnUnauthorized: true },
     );
   },
+
+  previewStudentFeePayments: (entries: StudentFeePaymentImportRow[]) =>
+    requestJson<StudentFeePaymentImportPreview>(`${usersBaseUrl}/fee-status/payments/import/preview`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ entries }),
+    }, { retryOnUnauthorized: true }),
+
+  importStudentFeePayments: (body: ImportStudentFeePaymentsRequest) =>
+    requestJson<BulkProcessStudentFeePaymentsResponse>(`${usersBaseUrl}/fee-status/payments/import`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }, { retryOnUnauthorized: true }),
+
+  cancelStudentFeePayment: (paymentId: string, body: import("@soc/contracts").CancelStudentFeePaymentRequest) =>
+    requestJson<import("@soc/contracts").StudentFeePaymentRecord>(`${usersBaseUrl}/fee-status/payments/${encodeURIComponent(paymentId)}/cancel`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }, { retryOnUnauthorized: true }),
 
   getStudentFeeDetail: async (userId: string, referenceSemester?: string): Promise<StudentFeeDetailResponse> => {
     return requestJson<StudentFeeDetailResponse>(

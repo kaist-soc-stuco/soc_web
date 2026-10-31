@@ -7,7 +7,7 @@ type BoardWritableUser = {
   permission: number;
 };
 
-type UserProfileLookup = Pick<UsersService, "findById" | "getStudentFeeStatus" | "getStudentFeeConsent">;
+type UserProfileLookup = Pick<UsersService, "findById" | "getStudentFeeStatus">;
 
 const isSchoolOfComputingPrimaryMajor = (value?: string | null): boolean => {
   const normalized = (value ?? "").trim().toLocaleLowerCase("ko-KR").replace(/\s+/g, " ");
@@ -50,7 +50,7 @@ export async function canWriteBoard(
     case "FEE_PAYER": {
       if (!usersService) return false;
       const feeStatus = await usersService.getStudentFeeStatus(user.id);
-      return feeStatus?.status === "PAID" && (await usersService.getStudentFeeConsent(user.id)).consented;
+      return feeStatus?.status === "PAID";
     }
     default:
       return false;

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { BulkProcessStudentFeePaymentsRequest } from "@soc/contracts";
+import type { BulkProcessStudentFeePaymentsRequest, StudentFeePaymentImportRow } from "@soc/contracts";
 
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -19,8 +19,9 @@ function stableJson(value: unknown): string {
 /** Canonical hash excludes the idempotency key and preserves payment order. */
 export function hashStudentFeePaymentPayload(
   input: BulkProcessStudentFeePaymentsRequest,
+  importedEntries?: StudentFeePaymentImportRow[],
 ): string {
   return createHash("sha256")
-    .update(stableJson({ payments: input.payments }), "utf8")
+    .update(stableJson({ payments: input.payments, importedEntries }), "utf8")
     .digest("hex");
 }

@@ -541,7 +541,6 @@ test(
     };
     const usersService = {
       getStudentFeeStatus: async () => ({ status: "PAID" }),
-      getStudentFeeConsent: async () => ({ consented: true }),
     };
     const service = new SurveyResponsesService(
       responsesRepository,

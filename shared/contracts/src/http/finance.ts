@@ -14,14 +14,6 @@ export type FeeMajorCategory = "PRIMARY";
 export type FeePaymentType = "SIX_SEMESTER_LUMP_SUM" | "PRIOR_PAYMENT_BALANCE";
 export type FeePaymentMethod = "BANK_TRANSFER" | "CASH" | "OTHER";
 
-export interface StudentFeeSemesterConsent {
-  semester: string;
-  noticeVersion: string;
-  consented: boolean;
-  consentedAt: string | null;
-  withdrawnAt: string | null;
-}
-
 export interface StudentFeeRosterRecord {
   stdNo: string;
   nameKo: string | null;
@@ -101,6 +93,17 @@ export interface StudentFeePaymentRecord {
   note: string | null;
   recordedBy: string | null;
   createdAt: string;
+  updatedAt: string;
+}
+
+export type CancelStudentFeePaymentRequest = z.infer<typeof import("../schemas.js").CancelStudentFeePaymentSchema>;
+
+export type StudentFeePaymentImportRow = z.infer<typeof import("../schemas.js").StudentFeePaymentImportRowSchema>;
+export type ImportStudentFeePaymentsRequest = z.infer<typeof import("../schemas.js").ImportStudentFeePaymentsSchema>;
+export interface StudentFeePaymentImportPreview {
+  rows: Array<StudentFeePaymentImportRow & { userId: string | null; isNewPerson: boolean; duplicate: boolean; error: string | null }>;
+  totalAmount: number;
+  newPeopleCount: number;
 }
 
 export interface StudentFeeDetailResponse {

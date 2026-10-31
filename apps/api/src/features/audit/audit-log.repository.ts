@@ -56,6 +56,7 @@ const DOMAIN_DEFINITIONS: Record<string, { domain: string; label: string }> = {
 };
 
 const ACTION_DEFINITIONS: Record<string, { label: string; kind: AuditLogEventKind }> = {
+  "student_fee_payment.cancel": { label: "입금 기록 취소", kind: "UPDATE" },
   "article_draft.create": { label: "게시글 초안 저장", kind: "CREATE" },
   "article_draft.delete": { label: "게시글 초안 삭제", kind: "DELETE" },
   "article_draft.update": { label: "게시글 초안 수정", kind: "UPDATE" },

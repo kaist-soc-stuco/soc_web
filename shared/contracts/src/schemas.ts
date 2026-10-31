@@ -733,12 +733,6 @@ const StudentFeePaymentInputSchema = z.object({
   note: z.string().trim().max(500).nullable().optional(),
 }).refine(value => Boolean(value.userId) !== Boolean(value.stdNo), { message: "one_fee_person_identifier_required" });
 
-export const StudentFeeConsentSchema = z.object({
-  semester: z.string().regex(/^\d{4}-[12]$/),
-  noticeVersion: z.string().min(1).max(40),
-  consented: z.boolean(),
-});
-
 export const BulkProcessStudentFeePaymentsSchema = z.object({
   idempotencyKey: z
     .string()
@@ -747,6 +741,33 @@ export const BulkProcessStudentFeePaymentsSchema = z.object({
     .max(128)
     .regex(/^[A-Za-z0-9._:-]+$/, "invalid_idempotency_key"),
   payments: z.array(StudentFeePaymentInputSchema).min(1).max(1_000),
+});
+
+export const CancelStudentFeePaymentSchema = z.object({
+  reason: z.string().trim().min(2).max(500),
+  expectedUpdatedAt: z.string().datetime({ offset: true }),
+  revokeRecognition: z.boolean().default(false),
+}).strict();
+
+export const StudentFeePaymentImportRowSchema = z.object({
+  stdNo: z.string().regex(/^\d{8}$/),
+  nameKo: z.string().trim().min(1).max(100),
+  amount: z.number().int().min(1).max(100_000_000),
+  paidDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
+    const date = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
+  }),
+  paymentMethod: z.enum(["BANK_TRANSFER", "CASH", "OTHER"]).default("BANK_TRANSFER"),
+  note: z.string().trim().max(500).nullable().optional(),
+}).strict();
+
+export const PreviewStudentFeePaymentsSchema = z.object({
+  entries: z.array(StudentFeePaymentImportRowSchema).min(1).max(1000),
+}).strict();
+
+export const ImportStudentFeePaymentsSchema = PreviewStudentFeePaymentsSchema.extend({
+  idempotencyKey: z.string().min(16).max(128).regex(/^[A-Za-z0-9._:-]+$/),
+  confirmDuplicates: z.boolean().default(false),
 });
 
 export const BulkUpdateStudentFeeStatusSchema = z.object({

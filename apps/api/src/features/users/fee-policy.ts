@@ -1,7 +1,6 @@
 import type { FeeStatus } from "@soc/contracts";
 
 export const DEFAULT_STUDENT_FEE_AMOUNT = 45_000;
-export const STUDENT_FEE_PRIVACY_VERSION = "2026-10-29";
 
 /** Six semesters describe the one-time price, not an entitlement expiry. */
 export function resolveStudentFee(input: {

@@ -42,18 +42,13 @@ class MobileSuite(AcceptanceSuite):
         page.wait_for_url(BASE + "/mypage")
         expect(page.get_by_role("heading", name="마이페이지", exact=True)).to_be_visible()
         expect(page.locator(".mobile-mypage-identity")).to_contain_text("90990001")
-        disclosure = page.locator(".mobile-fee-disclosure")
-        expect(disclosure).to_have_attribute("aria-expanded", "false")
+        expect(page.locator("#fee-consent")).to_have_count(0)
         self.capture(page, "01-mypage")
-        disclosure.click()
-        expect(page.locator("#fee-consent-content")).to_be_visible()
-        disclosure.click()
-        expect(page.locator("#fee-consent-content")).to_be_hidden()
         page.get_by_role("button", name="스크랩", exact=True).click()
         expect(page.get_by_role("tab", name="활동 내역")).to_have_attribute("aria-selected", "true")
         self.capture(page, "02-mypage-activity")
         page.goto(BASE + "/mypage#fee-consent")
-        expect(page.locator("#fee-consent-content")).to_be_visible()
+        expect(page.locator("#fee-consent")).to_have_count(0)
         for width in [320, 390]:
             page.set_viewport_size({"width": width, "height": 844})
             self.no_overflow(page)
@@ -505,48 +500,19 @@ class MobileSuite(AcceptanceSuite):
         expect(question).to_be_visible()
         self.api(admin, f"/boards/faq/articles/{faq['articleId']}", method="DELETE")
 
-    def test_usage_fee_consent_save_failure_and_withdrawal(self):
-        admin = self.page()
-        # Separate identities keep parallel browser runs from changing each other's consent.
-        page = self.page("admin" if self.browser.browser_type.name == "webkit" else "student")
+    def test_fee_status_has_no_separate_consent(self):
+        admin, page = self.page(), self.page("student")
         user_id = self.api(page, "/auth/session")["userId"]
         fee_before = self.api(admin, f"/users/{user_id}/fee-status")
-        consent = self.api(page, "/users/me/fee-consent")
-        if consent["consented"]:
-            self.api(page, "/users/me/fee-consent", method="PUT", body={
-                "semester": consent["semester"], "noticeVersion": consent["noticeVersion"], "consented": False})
-        page.goto(BASE + "/mypage#fee-consent")
-        panel = page.locator("#fee-consent-content")
-        expect(panel).to_be_visible()
-        checkbox = panel.get_by_role("checkbox")
-        submit = panel.get_by_role("button", name="동의 완료", exact=True)
-        expect(submit).to_be_disabled()
-        checkbox.check()
-        def disconnect(route):
-            if route.request.method == "PUT": route.abort("failed")
-            else: route.continue_()
-        page.route("**/api/users/me/fee-consent", disconnect)
-        submit.click()
-        expect(panel.get_by_role("alert")).to_be_visible()
-        expect(checkbox).not_to_be_checked()
-        expect(submit).to_be_disabled()
-        assert self.api(page, "/users/me/fee-consent")["consented"] is False
-        page.unroute("**/api/users/me/fee-consent", disconnect)
-        checkbox.check()
-        with page.expect_response(lambda r: r.request.method == "PUT" and urlsplit(r.url).path == "/api/users/me/fee-consent") as accepted:
-            submit.click()
-        assert accepted.value.status == 200
-        page.reload()
-        withdraw = panel.get_by_role("button", name="이번 학기 동의 철회", exact=True)
-        expect(withdraw).to_be_visible()
-        assert self.api(page, "/users/me/fee-consent")["consented"] is True
-        with page.expect_response(lambda r: r.request.method == "PUT" and urlsplit(r.url).path == "/api/users/me/fee-consent") as revoked:
-            withdraw.click()
-        assert revoked.value.status == 200
-        page.reload()
-        expect(checkbox).not_to_be_checked()
-        assert self.api(page, "/users/me/fee-consent")["consented"] is False
+        fee_requests = []
+        page.on("request", lambda request: fee_requests.append(request.url)
+                if "/users/me/fee-consent" in request.url else None)
+        page.goto(BASE + "/mypage")
+        expect(page.get_by_role("heading", name="마이페이지", exact=True)).to_be_visible()
+        expect(page.locator("#fee-consent")).to_have_count(0)
+        expect(page.get_by_text("과비 개인정보 동의", exact=True)).to_have_count(0)
         assert self.api(admin, f"/users/{user_id}/fee-status")["status"] == fee_before["status"]
+        assert not fee_requests, fee_requests
         page.set_viewport_size({"width": 320, "height": 568})
         self.no_overflow(page)
 
@@ -555,7 +521,7 @@ class MobileSuite(AcceptanceSuite):
         page.set_viewport_size({"width": 1440, "height": 1000})
         page.goto(BASE + "/mypage")
         expect(page.locator(".mobile-mypage-heading")).to_be_hidden()
-        expect(page.locator("#fee-consent-content")).to_be_visible()
+        expect(page.locator("#fee-consent")).to_have_count(0)
         page.locator('.home-header-utilities button[aria-label$="프로필"]').click()
         expect(page.get_by_role("button", name="로그아웃", exact=True)).to_be_visible()
         page.goto(BASE + "/calendar")

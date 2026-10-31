@@ -63,7 +63,7 @@ async function feeUser(name, { status = "UNPAID", paidAt = null, paidAmount = 0,
   return userId;
 }
 
-test("financial status agrees across filters and mail while semester consent independently gates surveys", opts, async () => {
+test("financial status agrees across filters, mail and surveys without a separate semester consent", opts, async () => {
   const ref = users.currentReferenceSemester();
   const year = Number(ref.slice(0, 4)), half = Number(ref.at(-1));
   const currentDate = new Date(Date.UTC(year, half === 1 ? 1 : 7, 10));
@@ -83,16 +83,14 @@ test("financial status agrees across filters and mail while semester consent ind
   for (const [name, input, expected] of cases) rows.push({ userId: await feeUser(name, input), expected });
   const ids = rows.map(row => row.userId);
   const feeList = await users.listStudentsByFeeStatus(undefined, 1, 100, "name", "asc", undefined, undefined, undefined, ref, ids);
-  const surveys = new SurveysService({}, {}, {}, {}, {}, { findById: id => users.findById(id), getStudentFeeStatus: id => users.getStudentFeeStatus(id), getStudentFeeConsent: id => users.getStudentFeeConsent(id) });
+  const surveys = new SurveysService({}, {}, {}, {}, {}, { findById: id => users.findById(id), getStudentFeeStatus: id => users.getStudentFeeStatus(id) });
   const paidMail = await users.listEmailRecipients("PAID_STUDENTS", { query: prefix });
   const unpaidMail = await users.listEmailRecipients("UNPAID_STUDENTS", { query: prefix });
   for (const { userId, expected } of rows) {
     assert.equal((await users.getStudentFeeStatus(userId)).status, expected);
     assert.equal(feeList.students.find(row => row.userId === userId).status, expected);
     const caller = { id: userId, permission: 0 };
-    const consent = await users.getStudentFeeConsent(userId);
-    await users.setStudentFeeConsent(userId, { ...consent, consented: true });
-    const eligibility = surveys.getParticipationEligibility({ feePayersOnly: true }, caller, await surveys.loadEligibilityContext(caller, true));
+    const eligibility = surveys.getParticipationEligibility({ feePayersOnly: true }, caller, await surveys.loadEligibilityContext(caller));
     assert.equal(eligibility.status, expected === "PAID" ? "ELIGIBLE" : "NOT_ELIGIBLE");
     assert.equal(await db.transaction(tx => new SurveyResponsesRepository(db).feeRequirementFailure(tx, userId, "PAID_ONLY")), expected === "PAID" ? null : "fee_payer_only");
     assert.equal(paidMail.some(row => row.email === `${userId}@example.test`), expected === "PAID");

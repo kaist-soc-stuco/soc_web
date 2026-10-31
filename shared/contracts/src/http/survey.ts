@@ -34,8 +34,7 @@ export type SurveyParticipationEligibilityReason =
   | "LOGIN_REQUIRED"
   | "PRIMARY_MAJOR_REQUIRED"
   | "ACADEMIC_STATUS_REQUIRED"
-  | "FEE_PAYER_REQUIRED"
-  | "FEE_CONSENT_REQUIRED";
+  | "FEE_PAYER_REQUIRED";
 
 export type SurveyParticipationEligibilityStatus =
   | "ANONYMOUS"

@@ -18,7 +18,6 @@ import type {
   MyPageMenu,
 } from "./use-my-page-controller";
 import { Button } from "@/components/ui/button";
-import { FeeConsentPanel } from "./fee-consent-panel";
 
 const formatRelative = (value: string | null | undefined, lang: string) => {
   if (!value) return "-";
@@ -294,7 +293,6 @@ export function MyPageProfilePanel({
           </div>
         ))}
       </div>
-      <FeeConsentPanel lang={lang} />
       {onActivitySelect && <nav className="mobile-mypage-shortcuts md:hidden" aria-label={lang === "ko" ? "내 활동 바로가기" : "My activity"}>
         {([{ id: "post", ko: "작성한 글", en: "My posts", icon: FileText }, { id: "comment", ko: "댓글 단 글", en: "Commented posts", icon: MessageCircle },
           { id: "scraps", ko: "스크랩", en: "Saved content", icon: Bookmark }, { id: "survey", ko: "설문 응답", en: "Survey responses", icon: Clock3 }] as const).map(item => <button key={item.id} type="button" onClick={() => onActivitySelect(item.id)}><item.icon aria-hidden="true" /><span>{lang === "ko" ? item.ko : item.en}</span><ChevronRight aria-hidden="true" /></button>)}

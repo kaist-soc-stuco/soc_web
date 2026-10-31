@@ -11,6 +11,8 @@ import type {
 } from "./repositories/users.repository";
 import type {
   StudentFeePolicy,
+  StudentFeePaymentImportRow,
+  ImportStudentFeePaymentsRequest,
   StudentFeeRosterUpdate,
   AdminUserListResponse,
   AdminUserRecord,
@@ -308,16 +310,6 @@ export class UsersService {
     return this.usersRepository.getStudentFeeStatus(userId);
   }
 
-  getStudentFeeConsent(userId: string) { return this.usersRepository.getStudentFeeConsent(userId); }
-
-  async setStudentFeeConsent(userId: string, input: { semester: string; noticeVersion: string; consented: boolean }, audit: AuditMetadata) {
-    const result = await this.usersRepository.setStudentFeeConsent(userId, input);
-    await this.auditLogService.record({ action: input.consented ? "student_fee.consent.accept" : "student_fee.consent.withdraw",
-      actorUserId: userId, ipAddress: audit.ipAddress, targetType: "student_fee_consent", targetId: userId,
-      payload: { semester: input.semester, noticeVersion: input.noticeVersion } });
-    return result;
-  }
-
   async getStudentFeeStatusForAdmin(
     userId: string,
     audit?: AuditMetadata,
@@ -485,13 +477,21 @@ export class UsersService {
     return detail;
   }
 
+  async cancelStudentFeePayment(paymentId: string, input: import("@soc/contracts").CancelStudentFeePaymentRequest, audit: AuditMetadata) {
+    const result = await this.usersRepository.cancelStudentFeePayment(paymentId, input, audit.actorUserId!, audit.ipAddress);
+    await this.googleSheetsQueue?.enqueue(GOOGLE_SHEET_RESOURCE.STUDENT_FEES);
+    return result;
+  }
+
   async processStudentFeePayments(
     input: BulkProcessStudentFeePaymentsRequest,
     audit?: AuditMetadata,
+    imported?: { entries: StudentFeePaymentImportRow[]; confirmDuplicates: boolean },
   ): Promise<BulkProcessStudentFeePaymentsResponse> {
     const result = await this.usersRepository.processStudentFeePayments(
       input,
       audit?.actorUserId ?? undefined,
+      imported,
     );
 
     await this.auditLogService.record({
@@ -505,6 +505,24 @@ export class UsersService {
     await this.googleSheetsQueue?.enqueue(GOOGLE_SHEET_RESOURCE.STUDENT_FEES);
 
     return result;
+  }
+
+  async previewStudentFeePayments(entries: StudentFeePaymentImportRow[], audit: AuditMetadata) {
+    const result = await this.usersRepository.previewStudentFeePayments(entries);
+    await this.recordStudentFeeAccess("student_fee_payment.import_preview", result.rows.flatMap(row => row.userId ? [row.userId] : []), { count: entries.length, studentNumbers: entries.map(row => row.stdNo) }, audit);
+    return result;
+  }
+
+  async importStudentFeePayments(input: ImportStudentFeePaymentsRequest, audit: AuditMetadata) {
+    const payments = input.entries.map(row => ({
+      stdNo: row.stdNo, amount: row.amount, paymentType: "SIX_SEMESTER_LUMP_SUM" as const,
+      paymentMethod: row.paymentMethod, coverageSemesters: 6,
+      effectiveStartSemester: `${row.paidDate.slice(0, 4)}-${Number(row.paidDate.slice(5, 7)) <= 6 ? 1 : 2}`,
+      paidAt: isoToDate(`${row.paidDate}T00:00:00+09:00`).toISOString(), note: row.note ?? null,
+    }));
+    return this.processStudentFeePayments({ idempotencyKey: input.idempotencyKey, payments }, audit, {
+      entries: input.entries, confirmDuplicates: input.confirmDuplicates,
+    });
   }
 
   async listStudentsByFeeStatus(

@@ -2,7 +2,6 @@ import { nowDate } from "@soc/shared";
 import { useMemo, useState, useRef, useLayoutEffect } from "react";
 import type { StudentFeeStatsResponse } from "@soc/contracts";
 import { AdminCard, AdminEmptyState } from "@/components/ui/admin-page";
-import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -15,7 +14,7 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
   return <div className="min-w-0 px-5 py-4"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-2xl font-medium tabular-nums text-slate-900">{value}</p><p className="mt-1 min-h-4 text-xs text-slate-500">{detail}</p></div>;
 }
 
-export function FeeStatisticsPanel({ semester, semesterOptions, loading, onSemesterChange, stats, range, displayedRange = range, onRangeChange, error, onRetry }: {
+export function FeeStatisticsPanel({ loading, stats, range, displayedRange = range, onRangeChange, error, onRetry }: {
   error?: string | null; onRetry?: () => void;
   semester: string; semesterOptions: readonly FeeSemesterOption[]; loading: boolean;
   onSemesterChange: (value: string) => void; stats: StudentFeeStatsResponse | null;
@@ -46,8 +45,7 @@ export function FeeStatisticsPanel({ semester, semesterOptions, loading, onSemes
     {error ? <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600"><span>{error}</span><Button type="button" variant="ghost" size="sm" onClick={onRetry}>다시 시도</Button></div> : null}
     <AdminCard className="overflow-visible">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-        <div><h2 className="text-base font-medium text-slate-900">학기별 납부 현황</h2><p className="mt-1 text-xs text-slate-500">미가입자를 포함한 전체 납부 대상자의 선택 학기 기준입니다.</p></div>
-        <AdminSelectDropdown ariaLabel="납부 현황 기준 학기" value={semester} onChange={onSemesterChange} options={[...semesterOptions]} className="w-44" />
+        <div><h2 className="text-base font-medium text-slate-900">누적 납부 인정 현황</h2><p className="mt-1 text-xs text-slate-500">미가입자를 포함한 전체 명부의 현재 납부 인정 상태입니다.</p></div>
       </div>
       <div className={`grid divide-y divide-slate-100 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-y-0 ${loading ? "opacity-60" : ""}`}>
         <Metric label="대상 인원" value={totals ? `${totals.totalStudents.toLocaleString()}명` : "—"} />

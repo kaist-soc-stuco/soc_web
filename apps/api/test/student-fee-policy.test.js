@@ -38,10 +38,6 @@ function payment(target, amount, key = randomUUID()) {
   return { idempotencyKey: key, payments: [{ ...target, amount, paymentType: "PRIOR_PAYMENT_BALANCE", paymentMethod: "BANK_TRANSFER",
     effectiveStartSemester: "2020-1", coverageSemesters: 1, paidAt: "2020-01-01T00:00:00.000Z" }] };
 }
-async function accept(userId) {
-  const state = await repository.getStudentFeeConsent(userId);
-  return repository.setStudentFeeConsent(userId, { semester: state.semester, noticeVersion: state.noticeVersion, consented: true });
-}
 async function survey(userId, paidOnly = true) {
   const id = randomUUID();
   await db.insert(schema.surveys).values({ surveyId: id, creatorId: userId, kind: "SURVEY", titleKo: "합성 정책 설문",
@@ -120,42 +116,27 @@ test("concurrent distinct receipts cannot exceed the balance and mixed batches r
   assert.equal((await db.select().from(schema.studentFeePayments)).length, 2);
 });
 
-test("semester consent is explicit, idempotent and independent of login consent and payment history", integration, async () => {
-  const id = await member();
-  await baseline("90990001", 30000, 6);
-  await db.update(schema.users).set({ privacyConsentAt: new Date() }).where(eq(schema.users.userId, id));
-  const financial = await repository.getStudentFeeStatus(id);
-  const initial = await repository.getStudentFeeConsent(id);
-  assert.equal(initial.consented, false);
-  const agreed = await accept(id);
-  assert.equal(agreed.consented, true);
-  assert.deepEqual(await accept(id), agreed);
-  await assert.rejects(repository.setStudentFeeConsent(id, { ...initial, semester: "2099-1", consented: true }), /fee_consent_notice_changed/);
-  await assert.rejects(repository.setStudentFeeConsent(id, { ...initial, noticeVersion: "obsolete", consented: true }), /fee_consent_notice_changed/);
-  const withdrawn = await repository.setStudentFeeConsent(id, { ...initial, consented: false });
-  assert.equal(withdrawn.consented, false);
-  assert.ok(withdrawn.withdrawnAt);
-  assert.deepEqual(await repository.getStudentFeeStatus(id), financial);
-  await accept(id);
-  await db.update(schema.studentFeeConsents).set({ semester: "1900-1" }).where(eq(schema.studentFeeConsents.userId, id));
-  assert.equal((await repository.getStudentFeeConsent(id)).consented, false);
-  assert.deepEqual(await repository.getStudentFeeStatus(id), financial);
-});
-
-test("paid-only submissions and edits independently require current consent; ordinary surveys do not", integration, async () => {
+test("paid-only submissions and edits require payment, not separate or historical consent", integration, async () => {
   const id = await member();
   await baseline("90990001", 30000, 6);
   const gated = await survey(id);
-  assert.equal((await responses.insertSubmission({ surveyId: gated, userId: id, answers: [] })).status, "fee_consent_required");
-  const ordinary = await survey(id, false);
-  assert.equal((await responses.insertSubmission({ surveyId: ordinary, userId: id, answers: [] })).status, "created");
-  await accept(id);
+  // No semester-consent row exists, yet a verified payer can submit.
   const submitted = await responses.insertSubmission({ surveyId: gated, userId: id, answers: [] });
   assert.equal(submitted.status, "created");
-  const consent = await repository.getStudentFeeConsent(id);
-  await repository.setStudentFeeConsent(id, { ...consent, consented: false });
-  assert.equal((await responses.updateSubmission({ responseId: submitted.response.id, surveyId: gated, userId: id, answers: [] })).status, "fee_consent_required");
-  assert.equal((await repository.getStudentFeeStatus(id)).status, "PAID");
+  const financial = await repository.getStudentFeeStatus(id);
+  // Historical withdrawal/version/semester records no longer gate participation.
+  await db.insert(schema.studentFeeConsents).values({ userId: id, semester: "1900-1",
+    noticeVersion: "obsolete", withdrawnAt: new Date() });
+  assert.equal((await responses.updateSubmission({ responseId: submitted.response.id,
+    surveyId: gated, userId: id, answers: [] })).status, "updated");
+  assert.deepEqual(await repository.getStudentFeeStatus(id), financial);
+
+  const unpaid = await member("90990002");
+  assert.equal((await responses.insertSubmission({ surveyId: gated, userId: unpaid, answers: [] })).status, "fee_payer_only");
+  await baseline("90990002", 10000, 1);
+  assert.equal((await responses.insertSubmission({ surveyId: gated, userId: unpaid, answers: [] })).status, "fee_payer_only");
+  const ordinary = await survey(id, false);
+  assert.equal((await responses.insertSubmission({ surveyId: ordinary, userId: unpaid, answers: [] })).status, "created");
 });
 
 test("migration retains historical completions and baselines without counting the latest receipt twice or inferring consent", integration, async () => {

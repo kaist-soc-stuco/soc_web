@@ -224,43 +224,6 @@
   .mobile-mypage .mypage-profile-fields > div > span:last-child {
     font-size: 0.875rem;
   }
-  .mobile-mypage .mypage-fee-consent {
-    margin-top: 0.25rem;
-    border: 0;
-    border-radius: 0;
-    padding: 0;
-  }
-  .mobile-fee-disclosure {
-    display: flex;
-    width: 100%;
-    min-height: 4.25rem;
-    align-items: center;
-    justify-content: space-between;
-    text-align: left;
-    gap: 1rem;
-  }
-  .mobile-fee-disclosure > span {
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-  }
-  .mobile-fee-disclosure strong {
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
-  .mobile-fee-disclosure small {
-    font-size: 0.75rem;
-    color: #7d8892;
-  }
-  .mobile-fee-disclosure svg {
-    width: 1.125rem;
-    height: 1.125rem;
-    color: #7d8892;
-    flex: none;
-  }
-  .mobile-mypage #fee-consent-content:not([hidden]) {
-    padding-bottom: 1.25rem;
-  }
   .mobile-mypage-shortcuts {
     display: block;
     border-top: 1px solid #e9edf0;

@@ -5,14 +5,14 @@ const { Permissions } = require("@soc/contracts");
 
 const { canWriteBoard } = require("../dist/apps/api/src/features/board/board-write-access.js");
 
-test("paid-member board access requires current consent without changing financial completion", async () => {
-  let consented = false;
-  const profile = { getStudentFeeStatus: async () => ({ status: "PAID" }), getStudentFeeConsent: async () => ({ consented }) };
+test("paid-member board access depends on verified payment without separate semester consent", async () => {
+  let status = "PAID";
+  const profile = { getStudentFeeStatus: async () => ({ status }) };
   const board = { writeAccessScope: "FEE_PAYER", writePermissionBit: 0 };
-  assert.equal(await canWriteBoard(board, { id: "synthetic", permission: 0 }, profile), false);
-  consented = true;
   assert.equal(await canWriteBoard(board, { id: "synthetic", permission: 0 }, profile), true);
-  assert.equal((await profile.getStudentFeeStatus()).status, "PAID");
+  for (status of ["PARTIAL", "UNPAID"]) {
+    assert.equal(await canWriteBoard(board, { id: "synthetic", permission: 0 }, profile), false);
+  }
 });
 const { CommentService } = require("../dist/apps/api/src/features/board/comment.service.js");
 

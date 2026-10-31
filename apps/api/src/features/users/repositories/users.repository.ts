@@ -11,7 +11,7 @@ import { resolveFeeReferenceSemester } from "../fee-semester";
 import { DEFAULT_AUTHENTICATED_PERMISSION_BITS } from "@soc/contracts";
 import Redis from "ioredis";
 
-import { isoToDate, isoToMs, msToDate, msToIso, nowDate } from "@soc/shared";
+import { isoToDate, isoToMs, isoToHtmlDatetimeLocal, msToDate, msToIso, nowDate } from "@soc/shared";
 import { and, asc, desc, eq, getTableColumns, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 
 import {
@@ -21,13 +21,13 @@ import {
 import { REDIS_CLIENT } from "../../../infrastructure/redis/redis.provider";
 import {
   permissions,
+  auditLogs,
   roleGroupPermissions,
   studentFeePaymentBatches,
   studentFeePayments,
   studentFeeStatus,
   paidStudentRecords,
   studentFeePolicies,
-  studentFeeConsents,
   userRoleGroups,
   users,
   articles,
@@ -45,10 +45,12 @@ import type { StudentFeeBootstrapRecord } from "../student-fee-bootstrap-loader"
 import { INITIAL_FEE_ROSTER_NOTE, initialFeeRosterLinkAllowed, initialFeeRosterStatus } from "../student-fee-roster";
 import type { PostgresTransaction } from "../../../infrastructure/postgres/postgres.provider";
 import { currentFeeAmountSql, effectiveFeeStatusSql, feeTotalPaidSql } from "../fee-status";
-import { resolveStudentFee, STUDENT_FEE_PRIVACY_VERSION } from "../fee-policy";
+import { resolveStudentFee } from "../fee-policy";
 import { readableArticleFilter } from "../../board/article-query-access";
 import type {
   StudentFeePolicy,
+  StudentFeePaymentImportRow,
+  StudentFeePaymentImportPreview,
   StudentFeeRosterRecord,
   StudentFeeRosterUpdate,
   AdminUserListResponse,
@@ -182,6 +184,7 @@ export class UsersRepository {
   private mapRowToUserRecord(row: typeof users.$inferSelect): UserRecord {
     return {
       createdAt: msToIso(row.createdAt.valueOf()),
+      updatedAt: msToIso(row.updatedAt.valueOf()),
       userId: String(row.userId),
       kaistUid: row.kaistUid,
       nameEn: row.nameEn,
@@ -196,7 +199,6 @@ export class UsersRepository {
       privacyConsentAt: row.privacyConsentAt ? msToIso(row.privacyConsentAt.valueOf()) : null,
       isActive: row.isActive,
       lastLoginAt: row.lastLoginAt ? msToIso(row.lastLoginAt.valueOf()) : null,
-      updatedAt: msToIso(row.updatedAt.valueOf()),
     };
   }
 
@@ -848,7 +850,7 @@ export class UsersRepository {
         admissionYear: source?.admissionYear ?? null, paidSemesters: source?.paidSemesters ?? 0, paidAmount: source?.paidAmount ?? 0,
         note: source?.note ?? legacy?.note ?? null, userId: member?.userId ?? null, joinedAt: member ? msToIso(member.createdAt.valueOf()) : null,
         updatedAt: source ? msToIso(source.updatedAt.valueOf()) : null, email: member?.email ?? "", ...balance,
-        paidAt: entries[0] ? msToIso(entries[0].paidAt.valueOf()) : legacy?.paidAt ? msToIso(legacy.paidAt.valueOf()) : null });
+        paidAt: entries.find(entry=>entry.amount>0) ? msToIso(entries.find(entry=>entry.amount>0)!.paidAt.valueOf()) : legacy?.paidAt ? msToIso(legacy.paidAt.valueOf()) : null });
     };
     for (const source of sources) append(source, memberByNumber.get(source.stdNo));
     for (const member of members) if (!represented.has(member.userId)) append(undefined, member);
@@ -937,39 +939,11 @@ export class UsersRepository {
       status: row.status, paidAmount: total, requiredAmount: required, remainingAmount: row.status === "PAID" ? 0 : Math.max(0, required - total) };
   }
 
-  async getStudentFeeConsent(userId: string) {
-    const semester = this.currentReferenceSemester();
-    const [row] = await this.db.select().from(studentFeeConsents)
-      .where(and(eq(studentFeeConsents.userId, userId), eq(studentFeeConsents.semester, semester))).limit(1);
-    return { semester, noticeVersion: STUDENT_FEE_PRIVACY_VERSION,
-      consented: Boolean(row && !row.withdrawnAt && row.noticeVersion === STUDENT_FEE_PRIVACY_VERSION),
-      consentedAt: row ? msToIso(row.consentedAt.valueOf()) : null,
-      withdrawnAt: row?.withdrawnAt ? msToIso(row.withdrawnAt.valueOf()) : null };
-  }
-
-  async setStudentFeeConsent(userId: string, input: { semester: string; noticeVersion: string; consented: boolean }) {
-    if (input.semester !== this.currentReferenceSemester() || input.noticeVersion !== STUDENT_FEE_PRIVACY_VERSION)
-      throw new ConflictException("fee_consent_notice_changed");
-    await this.db.transaction(async tx => {
-      const [member] = await tx.select({ id: users.userId }).from(users).where(eq(users.userId, userId)).for("update");
-      if (!member) throw new BadRequestException("fee_user_not_found");
-      if (input.consented) {
-        await tx.insert(studentFeeConsents).values({ userId, semester: input.semester, noticeVersion: input.noticeVersion })
-          .onConflictDoUpdate({ target: [studentFeeConsents.userId, studentFeeConsents.semester],
-            set: { noticeVersion: input.noticeVersion, consentedAt: nowDate(), withdrawnAt: null },
-            setWhere: or(isNotNull(studentFeeConsents.withdrawnAt), sql`${studentFeeConsents.noticeVersion} <> ${input.noticeVersion}`) });
-      } else {
-        await tx.update(studentFeeConsents).set({ withdrawnAt: nowDate() })
-          .where(and(eq(studentFeeConsents.userId, userId), eq(studentFeeConsents.semester, input.semester), isNull(studentFeeConsents.withdrawnAt)));
-      }
-    });
-    return this.getStudentFeeConsent(userId);
-  }
-
   private mapFeePaymentRow(row: typeof studentFeePayments.$inferSelect): StudentFeePaymentRecord {
     return {
       paymentId: row.paymentId,
       userId: row.userId,
+      stdNo: row.stdNo,
       amount: row.amount,
       paymentType: row.paymentType as FeePaymentType,
       paymentMethod: row.paymentMethod as FeePaymentMethod,
@@ -979,6 +953,7 @@ export class UsersRepository {
       note: row.note,
       recordedBy: row.recordedBy,
       createdAt: msToIso(row.createdAt.valueOf()),
+      updatedAt: msToIso(row.updatedAt.valueOf()),
     };
   }
 
@@ -1110,15 +1085,87 @@ export class UsersRepository {
     });
   }
 
+  async cancelStudentFeePayment(paymentId: string, input: import("@soc/contracts").CancelStudentFeePaymentRequest, actorId: string, ipAddress?: string | null) {
+    const policy = await this.getStudentFeePolicy(this.currentReferenceSemester());
+    return this.db.transaction(async tx => {
+      const [found] = await tx.select().from(studentFeePayments).where(eq(studentFeePayments.paymentId, paymentId));
+      if (!found) throw new BadRequestException("fee_payment_not_found");
+      const [member] = await tx.select().from(users).where(found.userId ? eq(users.userId, found.userId) : eq(users.stdNo, found.stdNo!)).for("update");
+      const number = found.stdNo ?? member?.stdNo;
+      const [source] = number ? await tx.select().from(paidStudentRecords).where(eq(paidStudentRecords.stdNo, number)).for("update") : [];
+      const [payment] = await tx.select().from(studentFeePayments).where(eq(studentFeePayments.paymentId, paymentId)).for("update");
+      if (payment.amount === 0) return this.mapFeePaymentRow(payment);
+      if (msToIso(payment.updatedAt.valueOf()) !== input.expectedUpdatedAt) throw new ConflictException("fee_payment_changed");
+      const history = await tx.select().from(studentFeePayments).where(or(number ? eq(studentFeePayments.stdNo, number) : undefined, member ? eq(studentFeePayments.userId, member.userId) : undefined));
+      const [legacy] = member ? await tx.select().from(studentFeeStatus).where(eq(studentFeeStatus.userId, member.userId)).for("update") : [];
+      const before = this.feeBalance(legacy, history, policy.amount, source);
+      const now = nowDate();
+      const [updated] = await tx.update(studentFeePayments).set({ amount: 0,
+        note: `${payment.note ? payment.note + " · " : ""}입금 취소: ${input.reason}`, updatedAt: msToDate(Math.max(now.valueOf(), payment.updatedAt.valueOf() + 1)) })
+        .where(eq(studentFeePayments.paymentId, paymentId)).returning();
+      const initial = source?.paidAmount ?? legacy?.initialPaidAmount ?? 0;
+      const balance = resolveStudentFee({ recognizedComplete: !input.revokeRecognition && before.status === "PAID", initialAmount: initial,
+        payments: history.filter(row => row.paymentId !== paymentId), requiredAmount: policy.amount });
+      if (source) await tx.update(paidStudentRecords).set({ ...(input.revokeRecognition ? { completedAt: null, paidSemesters: 0 } : {}),
+        updatedAt: msToDate(Math.max(now.valueOf(), source.updatedAt.valueOf() + 1)) }).where(eq(paidStudentRecords.stdNo, source.stdNo));
+      if (member) {
+        const latest = history.filter(row=>row.paymentId!==paymentId && row.amount>0).sort((a,b)=>b.paidAt.valueOf()-a.paidAt.valueOf())[0];
+        const values = { status: balance.status, initialPaidAmount: initial, paidAmount: balance.totalPaidAmount, paidAt: latest?.paidAt ?? null,
+          verifiedBy: actorId, verifiedAt: now, updatedAt: now };
+        await tx.insert(studentFeeStatus).values({ userId: member.userId, ...values }).onConflictDoUpdate({ target: studentFeeStatus.userId, set: values });
+      }
+      await tx.insert(auditLogs).values({ action: "student_fee_payment.cancel", actorUserId: actorId, ipAddress, targetType: "student_fee_payment", targetId: paymentId,
+        payload: JSON.stringify({ reason: input.reason, revokeRecognition: input.revokeRecognition, before: this.mapFeePaymentRow(payment), after: this.mapFeePaymentRow(updated) }) });
+      return this.mapFeePaymentRow(updated);
+    });
+  }
+
+  async previewStudentFeePayments(entries: StudentFeePaymentImportRow[]): Promise<StudentFeePaymentImportPreview> {
+    const records = await this.listStudentFeeRoster();
+    const byNumber = new Map(records.filter(row => row.stdNo).map(row => [row.stdNo, row]));
+    const numbers = [...new Set(entries.map(row => row.stdNo))];
+    const members = await this.db.select({ stdNo: users.stdNo, nameKo: users.nameKo, userId: users.userId }).from(users).where(inArray(users.stdNo, numbers));
+    const memberByNumber = new Map(members.map(row => [row.stdNo, row]));
+    const numberByUser = new Map(members.map(row => [row.userId, row.stdNo]));
+    const conditions = [inArray(studentFeePayments.stdNo, numbers)];
+    if (members.length) conditions.push(inArray(studentFeePayments.userId, members.map(row => row.userId)));
+    const history = await this.db.select().from(studentFeePayments).where(or(...conditions));
+    const key = (number: string, amount: number, date: string, method: string) => `${number}|${amount}|${date}|${method}`;
+    const seen = new Set(history.map(row => key(row.stdNo ?? numberByUser.get(row.userId!) ?? "", row.amount, isoToHtmlDatetimeLocal(msToIso(row.paidAt.valueOf())).slice(0, 10), row.paymentMethod)));
+    const balances = new Map(records.map(row => [row.stdNo, row.totalPaidAmount ?? 0]));
+    const names = new Map<string, string>();
+    const newPeople = new Set<string>();
+    const policy = await this.getStudentFeePolicy(this.currentReferenceSemester());
+    const normalize = (name: string) => name.replace(/\s+/g, "").toLowerCase();
+    const rows = entries.map(entry => {
+      const existing = byNumber.get(entry.stdNo);
+      const expectedName = memberByNumber.get(entry.stdNo)?.nameKo ?? existing?.nameKo ?? names.get(entry.stdNo);
+      const before = balances.get(entry.stdNo) ?? 0;
+      const duplicateKey = key(entry.stdNo, entry.amount, entry.paidDate, entry.paymentMethod);
+      let error: string | null = null;
+      if (expectedName && normalize(expectedName) !== normalize(entry.nameKo)) error = `등록된 이름(${expectedName})과 다릅니다.`;
+      else if (existing?.status === "PAID" || before >= policy.amount) error = "이미 완납한 학생입니다.";
+      else if (entry.amount > policy.amount - before) error = `미납 차액 ${(policy.amount - before).toLocaleString("ko-KR")}원을 초과합니다.`;
+      const duplicate = seen.has(duplicateKey);
+      seen.add(duplicateKey);
+      names.set(entry.stdNo, expectedName ?? entry.nameKo);
+      balances.set(entry.stdNo, before + entry.amount);
+      if (!existing) newPeople.add(entry.stdNo);
+      return { ...entry, userId: existing?.userId ?? null, isNewPerson: !existing, duplicate, error };
+    });
+    return { rows, totalAmount: entries.reduce((sum, row) => sum + row.amount, 0), newPeopleCount: newPeople.size };
+  }
+
   async processStudentFeePayments(
     input: BulkProcessStudentFeePaymentsRequest,
     recordedBy?: string,
+    imported?: { entries: StudentFeePaymentImportRow[]; confirmDuplicates: boolean },
   ): Promise<BulkProcessStudentFeePaymentsResponse> {
     const actorUserId = recordedBy?.trim();
     if (!actorUserId) throw new BadRequestException("actor_required");
     const idempotencyKey = input.idempotencyKey.trim();
     if (!idempotencyKey) throw new BadRequestException("idempotency_key_required");
-    const payloadHash = hashStudentFeePaymentPayload(input);
+    const payloadHash = hashStudentFeePaymentPayload(input, imported?.entries);
     const policy = await this.getStudentFeePolicy(this.currentReferenceSemester());
 
     const result = await this.db.transaction(async (tx) => {
@@ -1170,6 +1217,17 @@ export class UsersRepository {
       const accountNumbers = accountIds.length ? await tx.select({ stdNo: users.stdNo }).from(users).where(inArray(users.userId, accountIds)) : [];
       const rosterNumbers = [...new Set([...input.payments.flatMap(payment => payment.stdNo ? [payment.stdNo] : []),
         ...accountNumbers.flatMap(member => member.stdNo ? [member.stdNo] : [])])].sort();
+      if (imported) {
+        const names = new Map<string, string>();
+        for (const row of imported.entries) {
+          const previous = names.get(row.stdNo);
+          if (previous && previous.replace(/\s+/g, "").toLowerCase() !== row.nameKo.replace(/\s+/g, "").toLowerCase()) throw new BadRequestException("fee_import_name_mismatch");
+          names.set(row.stdNo, row.nameKo);
+        }
+        for (const stdNo of rosterNumbers) await tx.insert(paidStudentRecords).values({
+          stdNo, nameKo: names.get(stdNo)!, paidSemesters: 0, paidAmount: 0,
+        }).onConflictDoNothing({ target: paidStudentRecords.stdNo });
+      }
       if (rosterNumbers.length) await tx.select().from(paidStudentRecords).where(inArray(paidStudentRecords.stdNo, rosterNumbers)).orderBy(asc(paidStudentRecords.stdNo)).for("update");
       const identifiers: SQL[] = [];
       if (accountIds.length) identifiers.push(inArray(users.userId, accountIds));
@@ -1179,7 +1237,7 @@ export class UsersRepository {
       const ordered = [...input.payments].sort((a, b) => (a.userId ?? a.stdNo ?? "").localeCompare(b.userId ?? b.stdNo ?? ""));
       for (const target of ordered) {
         if (!Number.isInteger(target.amount) || target.amount <= 0) throw new BadRequestException("fee_payment_amount_invalid");
-        const [member] = await tx.select({ userId: users.userId, stdNo: users.stdNo }).from(users)
+        const [member] = await tx.select({ userId: users.userId, stdNo: users.stdNo, nameKo: users.nameKo }).from(users)
           .where(target.userId ? eq(users.userId, target.userId) : eq(users.stdNo, target.stdNo!));
         if (target.userId && !member) throw new BadRequestException("fee_user_not_found");
         const stdNo = target.stdNo ?? member?.stdNo;
@@ -1190,6 +1248,12 @@ export class UsersRepository {
         if (member) person.push(eq(studentFeePayments.userId, member.userId));
         if (source) person.push(eq(studentFeePayments.stdNo, source.stdNo));
         const history = await tx.select().from(studentFeePayments).where(or(...person));
+        if (imported) {
+          const suppliedName = imported.entries.find(row => row.stdNo === stdNo)!.nameKo;
+          const expectedName = member?.nameKo ?? source?.nameKo;
+          if (expectedName && expectedName.replace(/\s+/g, "").toLowerCase() !== suppliedName.replace(/\s+/g, "").toLowerCase()) throw new BadRequestException("fee_import_name_mismatch");
+          if (!imported.confirmDuplicates && history.some(row => row.amount === target.amount && row.paymentMethod === target.paymentMethod && isoToHtmlDatetimeLocal(msToIso(row.paidAt.valueOf())).slice(0, 10) === isoToHtmlDatetimeLocal(target.paidAt).slice(0, 10))) throw new ConflictException("fee_import_duplicates_changed");
+        }
         const before = this.feeBalance(current, history, policy.amount, source);
         if (before.status === "PAID") throw new ConflictException("fee_already_paid");
         if (target.amount > before.remainingAmount) throw new BadRequestException("fee_payment_exceeds_balance");
@@ -1202,7 +1266,7 @@ export class UsersRepository {
             userId: member?.userId ?? null,
             stdNo: source?.stdNo ?? null,
             amount: target.amount,
-            paymentType: target.paymentType,
+            paymentType: imported ? before.totalPaidAmount > 0 ? "PRIOR_PAYMENT_BALANCE" : "SIX_SEMESTER_LUMP_SUM" : target.paymentType,
             paymentMethod: target.paymentMethod,
             effectiveStartSemester: target.effectiveStartSemester,
             coverageSemesters: target.coverageSemesters,
@@ -1604,7 +1668,7 @@ export class UsersRepository {
     const [people, policy, receipts, members] = await Promise.all([
       this.listStudentFeeRoster(reference), this.getStudentFeePolicy(reference),
       this.db.select(getTableColumns(studentFeePayments)).from(studentFeePayments).leftJoin(users, eq(users.userId, studentFeePayments.userId))
-        .where(or(isNull(studentFeePayments.userId), notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]))).orderBy(asc(studentFeePayments.paidAt)),
+        .where(and(gt(studentFeePayments.amount, 0), or(isNull(studentFeePayments.userId), notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS])))).orderBy(asc(studentFeePayments.paidAt)),
       this.db.select({ userId: users.userId, primaryMajor: users.primaryMajor }).from(users).where(notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS])),
     ]);
     const start = options.dateFrom ? isoToDate(`${options.dateFrom}T00:00:00.000+09:00`).valueOf() : -Infinity;

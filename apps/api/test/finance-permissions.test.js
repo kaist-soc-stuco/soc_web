@@ -17,8 +17,10 @@ test("finance reads, edits and downloads have separate server-side permissions",
     assert.equal(allowed(method, Permissions.MANAGE_FINANCE), true);
     assert.throws(() => allowed(method, 0), /insufficient_permission/);
   }
-  assert.equal(allowed("saveStudentFeeRoster", Permissions.MANAGE_FINANCE), true);
-  assert.throws(() => allowed("saveStudentFeeRoster", Permissions.VIEW_FINANCE), /insufficient_permission/);
+  for (const method of ["saveStudentFeeRoster", "cancelStudentFeePayment"]) {
+    assert.equal(allowed(method, Permissions.MANAGE_FINANCE), true);
+    assert.throws(() => allowed(method, Permissions.VIEW_FINANCE), /insufficient_permission/);
+  }
   for (const method of ["exportStudentFeeRoster", "exportStudentFeeStatus"]) {
     assert.throws(() => allowed(method, Permissions.MANAGE_FINANCE), /insufficient_permission/);
     assert.throws(() => allowed(method, Permissions.EXPORT_FINANCE), /insufficient_permission/);

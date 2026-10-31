@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { DataGrid, SelectColumn, renderTextEditor, type Column, type SortColumn, type RenderSortStatusProps } from "react-data-grid";
-import { Download, Upload, Plus, ChevronUp, ChevronDown } from "lucide-react";
+import { Download, Plus, ChevronUp, ChevronDown } from "lucide-react";
 import "react-data-grid/lib/styles.css";
 import "@/components/ui/admin-sheet.css";
 import { createApiClient } from "@soc/api-client";
@@ -15,7 +15,8 @@ import { useToast } from "@/components/ui/toast";
 import { useUnsavedNavigation } from "@/hooks/use-unsaved-navigation";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { downloadBlob } from "@/lib/download-blob";
-import { feeRosterRow, feeRosterUpdate, importFeeRoster, type FeeRosterRow } from "@/lib/fee-roster";
+import { feeRosterRow, feeRosterUpdate, type FeeRosterRow } from "@/lib/fee-roster";
+import { FeePaymentImport } from "./fee-payment-import";
 import { randomId } from "@/lib/random-id";
 
 function renderSortStatus({ sortDirection, priority }: RenderSortStatusProps) {
@@ -42,18 +43,16 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [membership, setMembership] = useState("all");
   const [status, setStatus] = useState("all");
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const fileInput = useRef<HTMLInputElement>(null);
   const base = useMemo(() => new Map(original.map(row => [row.key, JSON.stringify(feeRosterUpdate(row))])), [original]);
   const changed = useMemo(() => rows.filter(row => base.get(row.key) !== JSON.stringify(feeRosterUpdate(row))), [base, rows]);
   const dirty = changed.length > 0;
-  const busy = saving || importing || loading;
+  const busy = saving || loading;
   useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
   useEffect(() => { onSelectionChange(rows.filter(row => selected.has(row.key))); }, [rows, selected, onSelectionChange]);
   useUnsavedNavigation(dirty, () => confirm({ title: "저장하지 않은 변경 사항을 버릴까요?", confirmLabel: "변경 사항 버리기", tone: "danger" }));
@@ -120,9 +119,9 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
         </div>
         <div className="flex flex-wrap gap-2">
           {selectionAction}
-          {canExport && <Button variant="outline" loading={exporting} disabled={busy || dirty} onClick={() => void exportRows()}><Download />엑셀 내보내기</Button>}
+          {canExport && <Button variant="outline" loading={exporting} disabled={busy || dirty} onClick={() => void exportRows()}><Download />전체 명부 내보내기</Button>}
           {canEdit && <><Button variant="outline" disabled={busy} onClick={() => { setQuery(""); setMembership("all"); setStatus("all"); setRows(current => [{ key: randomId(), stdNo: "", nameKo: "", admissionYear: "", paidSemesters: "0", paidAmount: "0", note: "", userId: null, joinedAt: null, updatedAt: null, totalPaidAmount: 0, status: "UNPAID" }, ...current]); }}><Plus />행 추가</Button>
-            <Button variant="outline" loading={importing} disabled={busy} onClick={() => fileInput.current?.click()}><Upload />엑셀 가져오기</Button>
+            <FeePaymentImport disabled={busy || dirty} onImported={async () => { await load(); onSaved(); }} />
             {dirty && <Button variant="ghost" disabled={busy} onClick={async () => { if (await confirm({ title: "저장하지 않은 변경 사항을 버릴까요?", tone: "danger" })) void load(); }}>변경 취소</Button>}
             <Button disabled={!dirty || busy} loading={saving} onClick={() => void save()}>저장{dirty ? ` (${changed.length})` : ""}</Button></>}
         </div>
@@ -134,14 +133,5 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
         onRowsChange={canEdit && !busy ? next => { const updates = new Map(next.map(row => [row.key, row])); setRows(current => current.map(row => updates.get(row.key) ?? row)); } : undefined} />}
       <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">{visible.length.toLocaleString()}명 / 전체 {rows.length.toLocaleString()}명{canEdit ? " · 이름·학번을 눌러 상세 보기" : " · 조회 전용"}</p>
     </AdminTableCard>
-    <input ref={fileInput} type="file" accept=".xlsx" className="hidden" aria-label="납부 엑셀 파일" onChange={async event => {
-      const file = event.target.files?.[0]; event.target.value = ""; if (!file || !canEdit || busy) return;
-      if (file.size > 5 * 1024 * 1024) { setError("5MB 이하의 엑셀 파일을 선택해 주세요."); return; }
-      setImporting(true);
-      try { setRows(importFeeRoster(await file.arrayBuffer(), rows)); setQuery(""); setMembership("all"); setStatus("all"); setError(null);
-        toast({ type: "success", message: "기초자료를 표에 반영했습니다. 확인 후 저장해 주세요. 신규 입금은 납부 처리로 기록합니다." }); }
-      catch (cause) { setError(cause instanceof Error ? cause.message : "엑셀 내용을 확인해 주세요."); }
-      finally { setImporting(false); }
-    }} />
   </section>;
 }
