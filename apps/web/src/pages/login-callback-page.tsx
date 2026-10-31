@@ -308,7 +308,7 @@ export function LoginCallbackPage() {
                 onClick={() => void submitConsentDecision(true)}
                 className="text-sm font-semibold shadow-sm"
               >
-                {lang === "ko" ? "개인정보 동의 후 가입" : "Consent to data use and join"}
+                {lang === "ko" ? "동의하고 시작하기" : "Agree and get started"}
               </Button>
             </div>
           }
@@ -358,7 +358,7 @@ export function LoginCallbackPage() {
           <dl className="space-y-3 break-keep text-sm leading-6 text-slate-600">
             <div className="sm:grid sm:grid-cols-[8rem_1fr] sm:gap-3">
               <dt className="font-semibold text-slate-800">{lang === "ko" ? "수집·이용 목적" : "Purpose"}</dt>
-              <dd>{lang === "ko" ? "KAIST 구성원 확인, 계정 관리, 서비스 운영·보안" : "KAIST membership verification, account management, service operation and security"}</dd>
+              <dd>{lang === "ko" ? "KAIST 구성원 확인, 계정 관리, 학생회비 납부 확인·관리, 서비스 운영·보안" : "KAIST membership verification, account management, student-fee payment verification and management, and service operation and security"}</dd>
             </div>
             <div className="sm:grid sm:grid-cols-[8rem_1fr] sm:gap-3">
               <dt className="font-semibold text-slate-800">{lang === "ko" ? "수집 항목" : "Information collected"}</dt>
@@ -367,15 +367,14 @@ export function LoginCallbackPage() {
             <div className="sm:grid sm:grid-cols-[8rem_1fr] sm:gap-3">
               <dt className="font-semibold text-slate-800">{lang === "ko" ? "보유·이용 기간" : "Retention period"}</dt>
               <dd className="space-y-1">
-                <p>{lang === "ko" ? "회원·SSO·동의 정보: 탈퇴·동의 철회·서비스 종료 시까지" : "Account, SSO and consent data: until account closure, withdrawal of consent or service termination"}</p>
-                <p>{lang === "ko" ? "운영·보안 기록: 2년 / 개인정보 접근 권한 변경 기록: 3년" : "Operational and security records: 2 years / personal-data access-permission changes: 3 years"}</p>
+                <p>{lang === "ko" ? "회원 탈퇴, 동의 철회 또는 서비스 종료 시까지 보유합니다." : "Retained until account closure, withdrawal of consent or service termination."}</p>
+                <p>{lang === "ko" ? "운영·보안 기록은 2년, 개인정보 접근 권한 변경 기록은 3년간 보관합니다." : "Operational and security records are retained for 2 years, and changes to personal-data access permissions for 3 years."}</p>
               </dd>
             </div>
             <div className="sm:grid sm:grid-cols-[8rem_1fr] sm:gap-3">
               <dt className="font-semibold text-slate-800">{lang === "ko" ? "동의 거부권 및 불이익" : "Right to refuse and consequences"}</dt>
               <dd className="space-y-1">
-                <p>{lang === "ko" ? "동의 거부 가능 · 계정 저장 없이 최대 10분간 임시 이용" : "You may refuse consent and use a temporary session for up to 10 minutes without saving an account"}</p>
-                <p>{lang === "ko" ? "미동의 시 마이페이지 등 회원 계정이 필요한 기능 이용 불가" : "Without consent, features requiring a member account, including My Page, are unavailable"}</p>
+                <p>{lang === "ko" ? "동의를 거부할 수 있습니다. 이 경우 임시 이용만 가능하며, 마이페이지 등 회원 전용 기능은 이용할 수 없습니다." : "You may refuse consent. In that case, temporary access is available, but member-only features such as My Page are unavailable."}</p>
               </dd>
             </div>
           </dl>

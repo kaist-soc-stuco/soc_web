@@ -86,14 +86,14 @@ test("initial ledger rejects duplicate student numbers before importing and acce
   assert.deepEqual(BootstrapRecordsSchema.parse([{ ...record, nameKo: "합성 사용자" }]), [{ ...record, nameKo: "합성 사용자" }]);
 });
 
-test("historical balance snapshots credit the 30,000-won basis and recognize prior completion", () => {
+test("deployment balance snapshots credit the confirmed 45,000-won basis and recognize completion", () => {
   assert.deepEqual(parseStudentFeeBootstrapRecords([
     { stdNo: "20250001", nameKo: " 합성 완납자 ", remainingAmount: 0 },
     { stdNo: "20250002", nameKo: null, remainingAmount: 20000 },
-    { stdNo: "20250003", remainingAmount: 30000 },
+    { stdNo: "20250003", remainingAmount: 45000 },
   ]), [
-    { stdNo: "20250001", nameKo: "합성 완납자", admissionYear: 2025, paidSemesters: 6, paidAmount: 30000 },
-    { stdNo: "20250002", admissionYear: 2025, paidSemesters: 0, paidAmount: 10000 },
+    { stdNo: "20250001", nameKo: "합성 완납자", admissionYear: 2025, paidSemesters: 6, paidAmount: 45000 },
+    { stdNo: "20250002", admissionYear: 2025, paidSemesters: 0, paidAmount: 25000 },
     { stdNo: "20250003", admissionYear: 2025, paidSemesters: 0, paidAmount: 0 },
   ]);
 });
@@ -105,7 +105,7 @@ test("balance snapshots reject the whole file for duplicate, mixed or invalid re
     [row, { ...row }],
     [row, record],
     [{ ...row, remainingAmount: -1 }],
-    [{ ...row, remainingAmount: 30001 }],
+    [{ ...row, remainingAmount: 45001 }],
     [{ ...row, remainingAmount: "20000" }],
   ]) assert.throws(() => parseStudentFeeBootstrapRecords(input));
 });
@@ -115,7 +115,7 @@ test("private balance files support UTF-8 BOM and duplicate diagnostics disclose
   const warnings = t.mock.method(Logger.prototype, "warn", () => {});
   const row = { stdNo: "20250001", nameKo: "비공개 합성 이름", remainingAmount: 20000 };
   fs.writeFileSync(process.env.STUDENT_FEE_BOOTSTRAP_PATH, "\uFEFF" + JSON.stringify([row]));
-  assert.equal(getStudentFeeBootstrapRecords()[0].paidAmount, 10000);
+  assert.equal(getStudentFeeBootstrapRecords()[0].paidAmount, 25000);
   process.env.STUDENT_FEE_BOOTSTRAP_PATH += ".duplicate";
   fs.writeFileSync(process.env.STUDENT_FEE_BOOTSTRAP_PATH, JSON.stringify([row, { ...row, remainingAmount: 0 }]));
   assert.equal(getStudentFeeBootstrapRecords(), null);

@@ -19,9 +19,9 @@ export const BootstrapRecordsSchema = z.array(BootstrapRecordSchema).superRefine
   });
 });
 
-// This private source is a 2024/2025 balance snapshot. Its original total must
-// stay fixed even when the current fee policy changes.
-export const BOOTSTRAP_BALANCE_REFERENCE_AMOUNT = 30_000;
+// The deployment balance snapshot uses a confirmed 45,000-won total. Keep this
+// source basis fixed even when the current fee policy changes.
+export const BOOTSTRAP_BALANCE_REFERENCE_AMOUNT = 45_000;
 export const DepartmentFeePaymentsSchema = z.array(z.object({
   stdNo: z.string().trim().regex(/^\d{8}$/),
   nameKo: z.string().trim().min(1).max(100).nullish(),
@@ -98,7 +98,9 @@ export function getStudentFeeBootstrapRecords(): StudentFeeBootstrapRecord[] | n
         : 0;
       logger.warn(duplicateRows
         ? `student_fee_bootstrap_invalid: duplicate_student_number; duplicateRows=${duplicateRows}; no fee records imported. Correct the source file and restart the API.`
-        : "student_fee_bootstrap_unavailable: file missing or invalid; fee import skipped; login can continue.");
+        : error instanceof z.ZodError
+          ? `student_fee_bootstrap_invalid: validation=${[...new Set(error.issues.map(issue => `${issue.path.filter(part => typeof part === "string").join(".") || "file"}:${issue.code}`))].join(",")}; fee import skipped.`
+          : "student_fee_bootstrap_unavailable: file missing or invalid JSON; fee import skipped; login can continue.");
     }
   }
   return cachedAvailable ? [...cachedRecords.values()] : null;
