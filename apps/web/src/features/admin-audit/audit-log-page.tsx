@@ -40,7 +40,9 @@ const domainOptions = [
   { value: "calendar_event", label: "일정" },
   { value: "roadmap_course", label: "로드맵 과목" },
   { value: "roadmap_offering", label: "로드맵 개설 정보" },
-  { value: "student_fee_status", label: "과비" },
+  { value: "paid_student_records", label: "과비 명부" },
+  { value: "student_fee_policy", label: "과비 설정" },
+  { value: "student_fee_status", label: "과비 상태" },
   { value: "student_fee_payment", label: "과비 수납" },
   { value: "user", label: "유저" },
   { value: "role_group", label: "권한" },
@@ -316,7 +318,7 @@ function AuditLogDetailDrawer({ log, onClose }: { log: AuditLogRecord | null; on
   const snapshots = log ? snapshotEntries(log) : [];
 
   return (
-    <AdminDrawer open={Boolean(log)} onClose={onClose} title="접속기록 상세" width="max-w-2xl">
+    <AdminDrawer open={Boolean(log)} onClose={onClose} title="작업 상세" width="max-w-2xl">
       {log ? (
         <div className="space-y-6">
           <header className="space-y-3">

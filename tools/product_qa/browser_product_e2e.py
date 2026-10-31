@@ -444,7 +444,7 @@ class AcceptanceSuite:
         payment = admin.get_by_role("dialog", name="납부 내역 추가", exact=True)
         amount = payment.get_by_role("group", name="납부 금액 (원)", exact=True).get_by_role("spinbutton")
         expect(amount).to_have_value(str(member["remainingAmount"]))
-        expect(amount).to_have_attribute("readonly", "")
+        expect(amount).to_be_disabled()
         payment.get_by_role("button", name="취소", exact=True).click()
         self.api(admin, "/users/fee-status/payments", method="POST", body={"idempotencyKey": self.marker + "-partial-setup", "payments": [
             {"userId": member["userId"], "amount": 5000, "paymentType": "SIX_SEMESTER_LUMP_SUM", 
@@ -1342,7 +1342,7 @@ class AcceptanceSuite:
         expect(payment.get_by_role("group", name="납부 일자", exact=True).locator("input")).to_have_value("2026-10-31")
         amount = payment.get_by_role("group", name="납부 금액 (원)", exact=True).get_by_role("spinbutton")
         expect(amount).to_have_value(str(required - 10000))
-        expect(amount).to_have_attribute("readonly", "")
+        expect(amount).to_be_disabled()
         payment.get_by_role("button", name="취소", exact=True).click()
         self.api(admin, "/users/fee-status/payments", method="POST", body={"idempotencyKey": self.marker + "-partial-date-setup", "payments": [
             {"stdNo": numbers[0], "amount": 5000, "paymentType": "PRIOR_PAYMENT_BALANCE", 

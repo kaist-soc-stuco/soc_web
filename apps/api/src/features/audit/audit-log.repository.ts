@@ -9,6 +9,7 @@ import {
 } from "../../infrastructure/postgres/postgres.provider";
 import {
   auditLogs,
+  paidStudentRecords,
   users,
 } from "../../infrastructure/postgres/postgres.schema";
 
@@ -20,6 +21,8 @@ export interface AuditLogCreateInput {
   targetId?: string | number | null;
   targetType: string;
 }
+
+import { normalizeAuditIp } from "./audit-context";
 
 type AuditPayload = Record<string, unknown>;
 
@@ -44,6 +47,8 @@ const DOMAIN_DEFINITIONS: Record<string, { domain: string; label: string }> = {
   site_content: { domain: "content", label: "사이트" },
   student_fee_payment: { domain: "fee", label: "과비" },
   student_fee_status: { domain: "fee", label: "과비" },
+  paid_student_records: { domain: "fee", label: "과비" },
+  student_fee_policy: { domain: "fee", label: "과비" },
   survey_answer_file: { domain: "survey", label: "설문 응답 파일" },
   user: { domain: "user", label: "유저" },
   article: { domain: "board", label: "게시판" },
@@ -136,6 +141,11 @@ const ACTION_DEFINITIONS: Record<string, { label: string; kind: AuditLogEventKin
   "student_fee_status.preview": { label: "과비 변경 미리보기 조회", kind: "READ" },
   "student_fee_status.status": { label: "과비 상태 조회", kind: "READ" },
   "student_fee_status.bulk_update": { label: "과비 상태 일괄 변경", kind: "BATCH" },
+  "student_fee_policy.create": { label: "표준 과비 설정", kind: "CREATE" },
+  "bulk_email.recover": { label: "중단된 이메일 발송 정리", kind: "EXECUTE" },
+  "survey.structure.restore": { label: "설문 이전 내용 복원", kind: "UPDATE" },
+  "survey_response.delete_all": { label: "설문 응답 전체 삭제", kind: "BATCH" },
+  "vote.results.unpublish": { label: "투표 결과 공개 취소", kind: "EXECUTE" },
   "student_fee.roster.list": { label: "과비 납부 명부 조회", kind: "READ" },
   "student_fee.roster.update": { label: "과비 납부 명부 수정", kind: "UPDATE" },
   "student_fee.roster.export": { label: "과비 납부 명부 내보내기", kind: "EXECUTE" },
@@ -219,6 +229,8 @@ const TARGET_TYPE_LABELS: Record<string, string> = {
   site_content: "공개 문구",
   student_fee_payment: "학생회비 납부",
   student_fee_status: "학생회비 상태",
+  paid_student_records: "과비 납부 명부",
+  student_fee_policy: "과비 설정",
   survey: "설문",
   survey_section: "설문 섹션",
   survey_question: "설문 문항",
@@ -296,7 +308,7 @@ export class AuditLogRepository {
       payload: input.payload === undefined ? null : JSON.stringify(input.payload),
       targetId: input.targetId === undefined || input.targetId === null ? null : String(input.targetId),
       targetType: input.targetType,
-      ipAddress: input.ipAddress ?? null,
+      ipAddress: normalizeAuditIp(input.ipAddress),
     });
   }
 
@@ -373,7 +385,7 @@ export class AuditLogRepository {
 
     const targetUserIds = [...new Set(rows.flatMap((row) => {
       const ids: string[] = [];
-      if ((row.targetType === "user" || row.targetType === "student_fee_status") && row.targetId && UUID_PATTERN.test(row.targetId)) {
+      if ((row.targetType === "user" || row.targetType === "student_fee_status" || row.targetType === "paid_student_records") && row.targetId && UUID_PATTERN.test(row.targetId)) {
         ids.push(row.targetId);
       }
       if (row.targetType === "role_group_member" && row.targetId) {
@@ -382,13 +394,21 @@ export class AuditLogRepository {
       }
       return ids;
     }))];
-    const targetUsers = targetUserIds.length === 0
+    const targetStudentNumbers = [...new Set(rows.flatMap(row => row.targetType === "paid_student_records" && row.targetId && /^\d{8}$/.test(row.targetId) ? [row.targetId] : []))];
+    const targetUsers = targetUserIds.length === 0 && targetStudentNumbers.length === 0
       ? []
-      : await this.db
-        .select({ userId: users.userId, nameKo: users.nameKo, stdNo: users.stdNo })
-        .from(users)
-        .where(inArray(users.userId, targetUserIds));
-    const targetUserMap = new Map(targetUsers.map((user) => [user.userId, user]));
+      : await this.db.select({ userId: users.userId, nameKo: users.nameKo, stdNo: users.stdNo }).from(users)
+        .where(or(targetUserIds.length ? inArray(users.userId, targetUserIds) : undefined, targetStudentNumbers.length ? inArray(users.stdNo, targetStudentNumbers) : undefined));
+    const targetUserMap = new Map<string, { nameKo: string; stdNo: string | null }>();
+    for (const user of targetUsers) {
+      targetUserMap.set(user.userId, user);
+      if (user.stdNo) targetUserMap.set(user.stdNo, user);
+    }
+    if (targetStudentNumbers.length) {
+      const records = await this.db.select({ stdNo: paidStudentRecords.stdNo, nameKo: paidStudentRecords.nameKo }).from(paidStudentRecords)
+        .where(inArray(paidStudentRecords.stdNo, targetStudentNumbers));
+      for (const record of records) if (!targetUserMap.has(record.stdNo) && record.nameKo) targetUserMap.set(record.stdNo, { nameKo: record.nameKo, stdNo: record.stdNo });
+    }
 
     const items = rows.map((row) => {
       const definition = actionDefinition(row.action, row.targetType);
@@ -404,6 +424,8 @@ export class AuditLogRepository {
 
       if (row.targetType === "user" || row.targetType === "student_fee_status") {
         targetLabel = userLabel(row.targetId ? targetUserMap.get(row.targetId) : undefined) ?? `${domain.label} 대상`;
+      } else if (row.targetType === "paid_student_records") {
+        targetLabel = row.targetId ? userLabel(targetUserMap.get(row.targetId)) ?? "과비 명부 대상" : typeof payload.count === "number" ? `과비 납부 명부 ${payload.count}명` : "과비 납부 명부";
       } else if (row.targetType === "student_fee_payment") {
         const count = typeof payload.count === "number" ? payload.count : Array.isArray(payload.paymentIds) ? payload.paymentIds.length : 0;
         targetLabel = count > 0 ? `${count}명 학생회비 수납 대상` : "학생회비 수납 대상";
@@ -468,7 +490,7 @@ export class AuditLogRepository {
         domain: domain.domain,
         domainLabel: domain.label,
         eventKind: definition.kind,
-        ipAddress: row.ipAddress ?? null,
+        ipAddress: normalizeAuditIp(row.ipAddress),
         payload: row.payload ?? null,
         targetId: row.targetId ?? null,
         targetLabel,

@@ -10,6 +10,8 @@ services:
       - .env
     environment:
       NODE_ENV: development
+      TRUST_PROXY_IPS: ${TRUST_PROXY_IPS:-172.16.0.0/12}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
       SEED_MODE: demo
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -18,7 +20,7 @@ services:
       ASSET_ORPHAN_CLEANUP_ENABLED: ${ASSET_ORPHAN_CLEANUP_ENABLED:-false}
       STUDENT_FEE_BOOTSTRAP_PATH: /run/secrets/student-fee-bootstrap.json
     ports:
-      - '${API_PORT:-3000}:3000'
+      - '127.0.0.1:${API_PORT:-3000}:3000'
     volumes:
       - ./apps/api/uploads:/app/apps/api/uploads
       - ./secrets/student-fee-bootstrap.json:/run/secrets/student-fee-bootstrap.json:ro

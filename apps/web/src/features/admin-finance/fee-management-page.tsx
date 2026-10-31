@@ -51,8 +51,7 @@ export function FeeManagementPage() {
   const [targets, setTargets] = useState<FeeRosterRow[] | null>(null);
   const [date, setDate] = useState(today);
   const [paymentNote, setPaymentNote] = useState("");
-  const [paymentType, setPaymentType] = useState<"SIX_SEMESTER_LUMP_SUM" | "PRIOR_PAYMENT_BALANCE">("SIX_SEMESTER_LUMP_SUM");
-  const amount = targets?.length === 1 ? paymentType === "SIX_SEMESTER_LUMP_SUM" ? policy?.amount ?? 0 : remainingFee(targets[0]) : 0;
+  const amount = targets?.length === 1 ? remainingFee(targets[0]) : 0;
   const [error, setError] = useState<string | null>(null);
   const [cancelPayment, setCancelPayment] = useState<StudentFeePaymentRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -90,8 +89,6 @@ export function FeeManagementPage() {
     if (rows.some(row => remainingFee(row) <= 0)) return;
     if (rows.length > 1000) {toast({type:"error",message:"한 번에 최대 1,000명까지 납부 처리할 수 있습니다."});return;}
     setTargets(rows); setError(null); setDate(today()); setPaymentNote("");
-    const previous = rows.length === 1 ? rows[0].totalPaidAmount ?? 0 : 0;
-    setPaymentType(previous > 0 ? "PRIOR_PAYMENT_BALANCE" : "SIX_SEMESTER_LUMP_SUM");
   };
   const submitPayment = async () => {
     if (!targets || busy) return;
@@ -102,7 +99,7 @@ export function FeeManagementPage() {
     }
     const recordingSemester = `${date.slice(0, 4)}-${Number(date.slice(5, 7)) <= 6 ? 1 : 2}`;
     const payments: BulkProcessStudentFeePaymentsRequest["payments"] = targets.map(row => ({ ...(row.userId ? { userId: row.userId } : { stdNo: row.stdNo }), amount: targets.length > 1 ? remainingFee(row) : amount,
-      paymentType: targets.length > 1 ? (row.totalPaidAmount ?? 0) > 0 ? "PRIOR_PAYMENT_BALANCE" : "SIX_SEMESTER_LUMP_SUM" : paymentType,
+      paymentType: (row.totalPaidAmount ?? 0) > 0 ? "PRIOR_PAYMENT_BALANCE" : "SIX_SEMESTER_LUMP_SUM",
       coverageSemesters: 6, effectiveStartSemester: recordingSemester, paidAt: paidAt.toISOString(), note: paymentNote.trim() || null }));
     const fingerprint = JSON.stringify(payments);
     if (idempotency.current?.fingerprint !== fingerprint) idempotency.current = {fingerprint, key:randomId()};
@@ -145,9 +142,8 @@ export function FeeManagementPage() {
     <Modal size="wide" open={Boolean(targets)} onClose={()=>{if(!busy)setTargets(null);}} title="납부 내역 추가" footer={<><span className="mr-auto text-sm font-medium">{targets?.length ?? 0}명 · 합계 {money(targets?.reduce((sum,row)=>sum+(targets.length===1 ? amount : remainingFee(row)),0) ?? 0)}</span><Button variant="outline" disabled={busy} onClick={()=>setTargets(null)}>취소</Button><Button loading={busy} disabled={busy} onClick={()=>void submitPayment()}>납부 처리</Button></>}>
       <p className="mb-4 text-sm">{targets?.length === 1 ? targets[0].nameKo : `${targets?.length ?? 0}명`} · {targets && targets.length > 1 ? "각 대상자의 미납 차액만 기록합니다." : `미납 차액 ${money(targets ? remainingFee(targets[0]) : 0)}`}</p>
       {targets && targets.length > 1 && <><div className="mb-3 max-h-80 overflow-auto"><table className="w-full text-left text-sm"><caption className="sr-only">일괄 납부 확인표</caption><thead><tr className="border-b border-slate-200"><th className="p-2">이름</th><th className="p-2">학번</th><th className="p-2 text-right">기존 수납액</th><th className="p-2 text-right">이번 납부액</th></tr></thead><tbody>{targets.map(row=><tr key={row.key} className="border-b border-slate-100"><td className="p-2">{row.nameKo}</td><td className="p-2">{row.stdNo}</td><td className="p-2 text-right tabular-nums">{money(row.totalPaidAmount ?? 0)}</td><td className="p-2 text-right tabular-nums">{money(remainingFee(row))}</td></tr>)}</tbody></table></div><p className="mb-4 text-xs text-slate-500">입금 내역과 이름·학번·금액을 대조해 주세요.</p></>}
-      <div className="grid gap-4 sm:grid-cols-2">{targets?.length === 1 && <AdminFormField label="납부 금액 (원)"><UiInput type="number" min={1} max={remainingFee(targets[0])} value={amount} readOnly /></AdminFormField>}<AdminFormField label="납부 일자"><UiInput type="date" value={date} onChange={event=>setDate(event.target.value)} /></AdminFormField>
-        {targets?.length === 1 && <AdminFormField label="납부 유형"><AdminSelectDropdown disabled={busy || (targets[0].totalPaidAmount ?? 0) > 0} value={paymentType} onChange={value=>setPaymentType(value as typeof paymentType)} options={[{value:"SIX_SEMESTER_LUMP_SUM",label:"6학기 일시납"},{value:"PRIOR_PAYMENT_BALANCE",label:"기납부 차액"}]} /></AdminFormField>}
-        <AdminFormField label="메모"><UiInput value={paymentNote} maxLength={500} onChange={event=>setPaymentNote(event.target.value)} /></AdminFormField></div>{error && <p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
+      <div className="grid gap-4 sm:grid-cols-2">{targets?.length === 1 && <AdminFormField label="납부 금액 (원)"><UiInput type="number" min={1} max={remainingFee(targets[0])} value={amount} disabled /></AdminFormField>}<AdminFormField label="납부 일자"><UiInput type="date" value={date} onChange={event=>setDate(event.target.value)} /></AdminFormField>
+        <AdminFormField label="메모" className="sm:col-span-2"><UiInput value={paymentNote} maxLength={500} onChange={event=>setPaymentNote(event.target.value)} /></AdminFormField></div>{error && <p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
     </Modal>
     <Modal open={Boolean(cancelPayment)} onClose={()=>{if(!busy)setCancelPayment(null);}} title="입금 기록 취소" footer={<><Button variant="outline" disabled={busy} onClick={()=>setCancelPayment(null)}>닫기</Button><Button variant="destructive" loading={busy} onClick={()=>void cancelReceipt()}>입금 취소 확정</Button></>}>
       <p className="mb-4">{detail?.record.nameKo} · {detail?.record.stdNo} · {money(cancelPayment?.amount ?? 0)} · {stamp(cancelPayment?.paidAt)}</p>

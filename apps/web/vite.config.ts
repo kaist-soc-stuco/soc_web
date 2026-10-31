@@ -92,6 +92,7 @@ export default defineConfig(({ mode }) => {
         "/api": {
           target: apiTarget,
           changeOrigin: true,
+          xfwd: true,
           rewrite: (requestPath) => requestPath.replace(/^\/api/, "/v1"),
         },
         "/health": {
