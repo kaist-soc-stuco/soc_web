@@ -24,7 +24,7 @@ import type { SurveyResponseRecord } from "./entities/survey-response.entity";
 import type { SubmitResponseDto } from "./dto/submit-response.dto";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import { isoToMs, nowMs } from "@soc/shared";
-import { getSurveyEligibilityFailure } from "./survey-eligibility";
+import { getSurveyEligibilityFailure, requiresSurveyMemberAccount } from "./survey-eligibility";
 import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
 import type { TemporaryAccessTokenClaims } from "../auth/auth.types";
 import { AuditLogService } from "../audit/audit-log.service";
@@ -155,6 +155,14 @@ export class SurveyResponsesService {
       throw new ForbiddenException("login_required");
     }
 
+    const questions = this.sectionsRepo && this.questionsRepo
+      ? await this.loadQuestions(surveyId)
+      : [];
+    if (!caller?.id && requiresSurveyMemberAccount(survey,
+      questions.some(question => question.questionType === "file_upload" && question.isRequired))) {
+      throw new ForbiddenException("member_account_required");
+    }
+
     if (caller?.temporaryClaims) {
       const eligibilityFailure = getSurveyEligibilityFailure({
         user: {
@@ -190,9 +198,6 @@ export class SurveyResponsesService {
       }
     }
 
-    const questions = this.sectionsRepo && this.questionsRepo
-      ? await this.loadQuestions(surveyId)
-      : [];
     if (caller?.id) {
       await this.validateUploadedAssets(dto.answers, caller.id, questions);
     } else if (dto.answers.some((answer) => getCanonicalSurveyAssetIds(answer.content).length > 0)) {

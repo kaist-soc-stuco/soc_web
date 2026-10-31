@@ -1,11 +1,12 @@
-import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { BadRequestException, ConflictException, Inject, Injectable } from "@nestjs/common";
+import { and, asc, eq, ilike, inArray, ne, or, sql, type SQL } from "drizzle-orm";
 import { DRIZZLE_DB, PostgresDatabase } from "../../infrastructure/postgres/postgres.provider";
 import { executiveContactDepartments, executiveContacts } from "../../infrastructure/postgres/postgres.schema";
 import type {
   BulkImportContactsRequest,
   BulkImportContactsResponse,
   ContactRecord,
+  ContactActivity,
   ContactDepartmentRecord,
   ContactDepartmentListResponse,
   PublicContactDepartmentListResponse,
@@ -18,7 +19,7 @@ import type {
   UpdateContactRequest,
   UpdateContactDepartmentRequest,
 } from "@soc/contracts";
-import { msToIso, nowDate } from "@soc/shared";
+import { msToIso, msToTimeObj, nowDate, nowMs } from "@soc/shared";
 import { enqueueSpreadsheetSync } from "../../infrastructure/google/enqueue-spreadsheet-sync";
 
 @Injectable()
@@ -252,11 +253,18 @@ export class ContactsRepository {
   }
 
   async insert(dto: CreateContactRequest): Promise<ContactRecord> {
-    const [sortOrderRow] = await this.db
+    return this.db.transaction(async tx => {
+    await tx.execute(sql`LOCK TABLE ${executiveContacts} IN SHARE ROW EXCLUSIVE MODE`);
+    if (dto.studentNumber?.trim()) {
+      const [duplicate] = await tx.select({id: executiveContacts.id}).from(executiveContacts)
+        .where(sql`btrim(${executiveContacts.studentNumber}) = ${dto.studentNumber.trim()}`).limit(1);
+      if (duplicate) throw new ConflictException("contact_student_number_exists");
+    }
+    const [sortOrderRow] = await tx
       .select({ maxSortOrder: sql<number | null>`max(${executiveContacts.sortOrder})` })
       .from(executiveContacts);
     const nextSortOrder = Number(sortOrderRow?.maxSortOrder ?? -1) + 1;
-    const [row] = await this.db
+    const [row] = await tx
       .insert(executiveContacts)
       .values({
         portalUserId: dto.portalUserId ?? null,
@@ -267,7 +275,7 @@ export class ContactsRepository {
         departmentEn: dto.departmentEn ?? null,
         roleKo: dto.roleKo,
         roleEn: dto.roleEn,
-        studentNumber: dto.studentNumber ?? null,
+        studentNumber: dto.studentNumber?.trim() || null,
         cohort: dto.cohort ?? null,
         email: dto.email ?? null,
         phoneNumber: dto.phoneNumber ?? null,
@@ -278,48 +286,121 @@ export class ContactsRepository {
       })
       .returning();
     return this.map(row);
+    });
   }
 
   async bulkImport(
     dto: BulkImportContactsRequest,
   ): Promise<BulkImportContactsResponse> {
+    const numbers = dto.items.map(item => item.studentNumber?.trim());
+    if (numbers.some(number => !number || !/^\d{8}$/.test(number)) || new Set(numbers).size !== numbers.length) {
+      throw new BadRequestException("contact_import_student_numbers_invalid");
+    }
     return this.db.transaction(async (tx) => {
-      let removedCount = 0;
+      // The legacy directory has no unique student-number constraint. Serialize
+      // imports against every contact writer, including inserts for new people.
+      // Reads stay available; no migration deletes or rewrites the directory.
+      await tx.execute(sql`LOCK TABLE ${executiveContacts} IN SHARE ROW EXCLUSIVE MODE`);
+      const [order] = await tx.select({ max: sql<number | null>`max(${executiveContacts.sortOrder})` }).from(executiveContacts);
+      let nextOrder = Number(order?.max ?? -10) + 10;
+      let createdCount = 0;
+      const rows: Array<typeof executiveContacts.$inferSelect> = [];
+      const year = (value: number) => value < 100 ? 2000 + value : value;
+      const currentYear = msToTimeObj(nowMs()).year;
+      const history = (row: typeof executiveContacts.$inferSelect): ContactActivity[] => row.activities.length
+        ? row.activities.map(activity => ({ ...activity, year: year(activity.year) }))
+        : row.cohort ? [{ year: year(row.cohort), departmentKo: row.departmentKo ?? "", departmentEn: row.departmentEn ?? "", roleKo: row.roleKo, roleEn: row.roleEn }] : [];
 
-      if (dto.replaceExisting) {
-        const removed = await tx.delete(executiveContacts).returning({
-          id: executiveContacts.id,
+      for (const item of dto.items) {
+        const matches = await tx.select().from(executiveContacts)
+          .where(sql`btrim(${executiveContacts.studentNumber}) = ${item.studentNumber}`)
+          .orderBy(asc(executiveContacts.createdAt), asc(executiveContacts.id));
+        if (new Set(matches.flatMap(row => row.portalUserId ? [row.portalUserId] : [])).size > 1) {
+          throw new ConflictException("contact_portal_account_conflict");
+        }
+        const existing = matches.find(row => row.portalUserId) ?? matches[0];
+        const previous = existing ? [existing, ...matches.filter(row => row.id !== existing.id)] : [];
+        const text = (field: "nameEn" | "departmentKo" | "departmentEn" | "roleEn" | "email" | "phoneNumber" | "avatarStorageKey") =>
+          previous.find(row => row[field]?.trim())?.[field] ?? "";
+        const departmentKo = item.departmentKo?.trim() || text("departmentKo");
+        const departmentEn = item.departmentEn?.trim() || (departmentKo === existing?.departmentKo ? text("departmentEn") : "");
+        const roleEn = item.roleEn?.trim() || (item.roleKo === existing?.roleKo ? text("roleEn") : "");
+        const oldActivities = previous.flatMap(history);
+        const explicitActivities = Boolean(item.activities?.length);
+        let sourceActivities: ContactActivity[] = item.activities?.length ? item.activities : [{
+          year: currentYear, departmentKo: item.departmentKo ?? "", departmentEn: item.departmentEn ?? "", roleKo: item.roleKo, roleEn: item.roleEn,
+        }];
+        const currentActivities = oldActivities.filter(activity => activity.year === currentYear);
+        if (!explicitActivities && currentActivities.length > 1) {
+          if (!currentActivities.some(activity => activity.roleKo === item.roleKo && activity.departmentKo === departmentKo)) {
+            throw new ConflictException("contact_import_activities_ambiguous");
+          }
+          // A legacy six-column sheet cannot describe all concurrent positions.
+          sourceActivities = currentActivities;
+        }
+        const incoming = sourceActivities.map(activity => {
+          const normalizedYear = year(activity.year);
+          const old = oldActivities.find(entry => entry.year === normalizedYear && entry.departmentKo === activity.departmentKo && entry.roleKo === activity.roleKo)
+            ?? oldActivities.find(entry => entry.year === normalizedYear && entry.departmentKo === activity.departmentKo)
+            ?? oldActivities.find(entry => entry.year === normalizedYear);
+          const department = explicitActivities ? activity.departmentKo : activity.departmentKo || old?.departmentKo || departmentKo;
+          return {
+            ...activity, year: normalizedYear, departmentKo: department,
+            departmentId: activity.departmentId ?? (department === old?.departmentKo ? old?.departmentId : undefined),
+            departmentEn: activity.departmentEn || (department === old?.departmentKo ? old?.departmentEn ?? "" : department === departmentKo ? departmentEn : ""),
+            roleEn: activity.roleEn || (activity.roleKo === old?.roleKo ? old?.roleEn ?? "" : ""),
+          };
         });
-        removedCount = removed.length;
+        const replacedYears = new Set(incoming.map(activity => activity.year));
+        for (const importedYear of replacedYears) {
+          const previousCount = new Set(oldActivities.filter(activity => activity.year === importedYear).map(activity => JSON.stringify([activity.departmentKo, activity.roleKo]))).size;
+          const incomingCount = new Set(incoming.filter(activity => activity.year === importedYear).map(activity => JSON.stringify([activity.departmentKo, activity.roleKo]))).size;
+          if (previousCount > 1 && incomingCount < previousCount) throw new ConflictException("contact_import_activities_ambiguous");
+        }
+        const activities = new Map<string, ContactActivity>();
+        for (const activity of [...oldActivities.filter(entry => !replacedYears.has(entry.year)), ...incoming]) {
+          const key = JSON.stringify([activity.year, activity.departmentKo, activity.roleKo]);
+          if (!activities.has(key)) activities.set(key, activity);
+        }
+        const mergedActivities = [...activities.values()];
+        let latest = mergedActivities.reduce<ContactActivity | undefined>((best, activity) =>
+          !best || activity.year >= best.year ? activity : best, undefined);
+        if (latest) {
+          const latestYear = latest.year;
+          latest = mergedActivities.find(activity => activity.year === latestYear && activity.departmentKo === existing?.departmentKo && activity.roleKo === existing?.roleKo) ?? latest;
+        }
+        const values = {
+          activities: mergedActivities, nameKo: item.nameKo, nameEn: item.nameEn || text("nameEn"),
+          departmentKo: (latest?.departmentKo ?? departmentKo) || null, departmentEn: (latest?.departmentEn ?? departmentEn) || null,
+          roleKo: latest?.roleKo ?? item.roleKo, roleEn: latest?.roleEn ?? roleEn, studentNumber: item.studentNumber,
+          cohort: latest?.year ?? existing?.cohort ?? null,
+          email: item.email?.trim() || text("email") || null,
+          phoneNumber: item.phoneNumber?.trim() || text("phoneNumber") || null,
+          updatedAt: nowDate(),
+        };
+        if (existing) {
+          const [updated] = await tx.update(executiveContacts).set({
+            ...values, avatarStorageKey: text("avatarStorageKey") || null,
+            privacyConsented: previous.every(row => row.privacyConsented),
+          }).where(eq(executiveContacts.id, existing.id)).returning();
+          const duplicates = matches.filter(row => row.id !== existing.id).map(row => row.id);
+          if (duplicates.length) await tx.delete(executiveContacts).where(inArray(executiveContacts.id, duplicates));
+          rows.push(updated);
+        } else {
+          const [created] = await tx.insert(executiveContacts).values({
+            ...values, portalUserId: item.portalUserId ?? null,
+            privacyConsented: item.privacyConsented, publiclyListed: false,
+            sortOrder: item.sortOrder ?? nextOrder,
+          }).returning();
+          nextOrder += 10;
+          createdCount++;
+          rows.push(created);
+        }
       }
-
-      const rows = await tx
-        .insert(executiveContacts)
-        .values(
-          dto.items.map((item, index) => ({
-            portalUserId: item.portalUserId ?? null,
-            activities: item.activities ?? [],
-            nameKo: item.nameKo,
-            nameEn: item.nameEn,
-            departmentKo: item.departmentKo ?? null,
-            departmentEn: item.departmentEn ?? null,
-            roleKo: item.roleKo,
-            roleEn: item.roleEn,
-            studentNumber: item.studentNumber ?? null,
-            cohort: item.cohort ?? null,
-            email: item.email ?? null,
-            phoneNumber: item.phoneNumber ?? null,
-            privacyConsented: item.privacyConsented ?? true,
-            publiclyListed: false,
-            sortOrder: item.sortOrder ?? index * 10,
-            updatedAt: nowDate(),
-          })),
-        )
-        .returning();
-
       return {
         importedCount: rows.length,
-        removedCount,
+        createdCount,
+        updatedCount: rows.length - createdCount,
         items: rows
           .map((row) => this.map(row))
           .sort(
@@ -352,19 +433,30 @@ export class ContactsRepository {
     if (dto.departmentEn !== undefined) set.departmentEn = dto.departmentEn;
     if (dto.roleKo !== undefined) set.roleKo = dto.roleKo;
     if (dto.roleEn !== undefined) set.roleEn = dto.roleEn;
-    if (dto.studentNumber !== undefined) set.studentNumber = dto.studentNumber;
+    if (dto.studentNumber !== undefined) set.studentNumber = dto.studentNumber?.trim() || null;
     if (dto.cohort !== undefined) set.cohort = dto.cohort;
     if (dto.email !== undefined) set.email = dto.email;
     if (dto.phoneNumber !== undefined) set.phoneNumber = dto.phoneNumber;
     if (dto.privacyConsented !== undefined) set.privacyConsented = dto.privacyConsented;
     if (dto.sortOrder !== undefined) set.sortOrder = dto.sortOrder;
 
-    const [row] = await this.db
-      .update(executiveContacts)
+    const persist = async (executor: Pick<PostgresDatabase, "update">) => {
+    const [row] = await executor.update(executiveContacts)
       .set(set)
       .where(eq(executiveContacts.id, id))
       .returning();
     return row ? this.map(row) : null;
+    };
+    if (dto.studentNumber === undefined) return persist(this.db);
+    return this.db.transaction(async tx => {
+      await tx.execute(sql`LOCK TABLE ${executiveContacts} IN SHARE ROW EXCLUSIVE MODE`);
+      if (dto.studentNumber?.trim()) {
+        const [duplicate] = await tx.select({id: executiveContacts.id}).from(executiveContacts)
+          .where(and(sql`btrim(${executiveContacts.studentNumber}) = ${dto.studentNumber.trim()}`, ne(executiveContacts.id, id))).limit(1);
+        if (duplicate) throw new ConflictException("contact_student_number_exists");
+      }
+      return persist(tx);
+    });
   }
 
   async reorder(items: ReorderContactsRequest["items"]): Promise<ContactRecord[]> {

@@ -1,5 +1,4 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import { msToTimeObj, nowMs } from "@soc/shared";
 import type {
   ContactListOptions,
   ContactListResponse,
@@ -189,23 +188,15 @@ export class ContactsService {
     dto: BulkImportContactsRequest,
     audit?: AuditMetadata,
   ): Promise<BulkImportContactsResponse> {
-    const year = msToTimeObj(nowMs()).year;
-    const result = await this.contactsRepo.bulkImport({
-      ...dto,
-      items: dto.items.map((item) => item.activities?.length ? item : {
-        ...item,
-        cohort: year,
-        activities: [{ year, departmentKo: item.departmentKo ?? "", departmentEn: item.departmentEn ?? "", roleKo: item.roleKo, roleEn: item.roleEn ?? "" }],
-      }),
-    });
+    const result = await this.contactsRepo.bulkImport(dto);
     await this.auditLogService.record({
       action: "executive_contact.import",
       actorUserId: audit?.actorUserId ?? null,
       ipAddress: audit?.ipAddress ?? null,
       payload: {
         importedCount: result.importedCount,
-        removedCount: result.removedCount,
-        replaceExisting: dto.replaceExisting,
+        createdCount: result.createdCount,
+        updatedCount: result.updatedCount,
       },
       targetType: "executive_contact",
     });

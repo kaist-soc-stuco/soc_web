@@ -245,5 +245,6 @@ test("self-deactivation has no side effects while other-user and automated deact
     { userId: "other", isActive: false }, { userId: "expired", isActive: false }, { userId: "manager", isActive: true },
   ]);
   assert.equal(audits.length, 3);
-  assert.equal(emails.length, 2);
+  assert.equal(emails.length, 3);
+  assert.match(emails[2].subject, /복구 완료/);
 });

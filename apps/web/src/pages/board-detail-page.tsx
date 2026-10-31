@@ -181,6 +181,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
             canComment={canViewCommentSection}
             commentTotal={commentTotal}
             onCommentClick={() => {
+              setReplyTargetId(null);
               if (canCreateComment) commentInputRef.current?.focus({ preventScroll: true });
               else if (!session?.canUsePersistentFeatures) commentLoginRef.current?.focus({ preventScroll: true });
               else document.getElementById("article-comments")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -215,7 +216,11 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
             onUpdateComment={handleUpdateComment}
             onSetCommentEngagement={handleSetCommentEngagement}
             onReplyTextChange={setReplyText}
-            onReplyTargetChange={setReplyTargetId}
+            onReplyTargetChange={(commentId) => {
+              if (commentSubmitting || replySubmitting) return;
+              setReplyTargetId(commentId);
+              if (isMobile) window.requestAnimationFrame(() => commentInputRef.current?.focus({ preventScroll: true }));
+            }}
             replySubmitting={replySubmitting}
             replyTargetId={replyTargetId}
             replyText={replyText}
@@ -223,7 +228,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
 
         </div>
       </main>
-      {isMobile && canViewCommentSection && <MobileCommentComposer inputRef={commentInputRef} loginRef={commentLoginRef} authenticated={Boolean(session?.canUsePersistentFeatures)} canCreate={canCreateComment} submitting={commentSubmitting} value={commentText} error={commentError} lang={lang} onChange={setCommentText} onSubmit={handleCreateComment} />}
+      {isMobile && canViewCommentSection && <MobileCommentComposer inputRef={commentInputRef} loginRef={commentLoginRef} authenticated={Boolean(session?.canUsePersistentFeatures)} canCreate={canCreateComment} replying={Boolean(replyTargetId)} submitting={commentSubmitting || replySubmitting} value={commentText} error={commentError} lang={lang} onChange={setCommentText} onSubmit={() => replyTargetId ? handleCreateReply(replyTargetId, commentText) : handleCreateComment()} />}
 
     </PageShell>
   );

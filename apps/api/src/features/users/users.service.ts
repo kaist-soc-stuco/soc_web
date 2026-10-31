@@ -157,35 +157,37 @@ export class UsersService {
       throw new ForbiddenException("cannot_deactivate_self");
     }
     const updated = await this.usersRepository.setActiveStatus(userId, isActive);
+    if (!updated) return this.usersRepository.findById(userId);
 
-    if (updated) {
-      await this.auditLogService.record({
-        action: isActive ? "user.account.activate" : "user.account.expire",
-        actorUserId: audit?.actorUserId ?? null,
-        ipAddress: audit?.ipAddress ?? null,
-        payload: { reason },
-        targetId: userId,
-        targetType: "user",
+    await this.auditLogService.record({
+      action: isActive ? "user.account.activate" : "user.account.expire",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { reason },
+      targetId: userId,
+      targetType: "user",
+    });
+    try {
+      await this.emailDeliveryService?.send({
+        recipients: [updated.email],
+        subject: isActive ? "[KAIST SOC] 계정 복구 완료 안내" : "[KAIST SOC] 계정 비활성화 안내",
+        content: (isActive ? [
+          `${updated.nameKo}님의 KAIST SOC 계정이 복구되었습니다.`,
+          "",
+          "웹사이트에 다시 로그인하여 서비스를 이용하실 수 있습니다.",
+          "문의할 내용이 있다면 웹사이트 우측 하단 채널톡으로 연락해 주세요.",
+        ] : [
+          `${updated.nameKo}님의 KAIST SOC 계정이 비활성화되었습니다.`,
+          "",
+          `사유: ${reason}`,
+          "",
+          "계정 복구가 필요하거나 문의할 내용이 있다면 웹사이트 우측 하단 채널톡으로 연락해 주세요.",
+        ]).join("\n"),
       });
-      if (!isActive) {
-        try {
-          await this.emailDeliveryService?.send({
-            recipients: [updated.email],
-            subject: "[KAIST SOC] 계정 비활성화 안내",
-            content: [
-              `${updated.nameKo}님의 KAIST SOC 계정이 비활성화되었습니다.`,
-              "",
-              `사유: ${reason}`,
-              "",
-              "계정 복구가 필요하거나 문의할 내용이 있다면 웹사이트 우측 하단 채널톡으로 연락해 주세요.",
-            ].join("\n"),
-          });
-        } catch (error) {
-          this.logger.warn(
-            `Failed to send account deactivation email to ${updated.userId}: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to send account status email to ${updated.userId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     return updated;

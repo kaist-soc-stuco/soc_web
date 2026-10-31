@@ -72,10 +72,10 @@ def login(page: Page, profile: str, *, consent: bool) -> dict[str, Any]:
         consent_button = page.get_by_role("button", name=consent_label, exact=True)
         consent_button.wait_for(state="visible")
         expect(not consent_button.is_enabled(), "consent was actionable without the required agreement")
-        page.get_by_role("checkbox", name="[필수] 서비스 이용약관에 동의합니다.", exact=True).check()
+        page.get_by_role("checkbox", name="[필수] 서비스 이용약관 동의", exact=True).check()
         if consent:
             expect(not consent_button.is_enabled(), "persisted sign-in was actionable without privacy consent")
-            page.get_by_role("checkbox", name="[필수] 개인정보 수집 및 이용에 동의합니다.", exact=True).check()
+            page.get_by_role("checkbox", name="[필수] 개인정보 수집·이용 동의", exact=True).check()
         consent_button.click()
     mark(f"login:{profile}:home")
     wait_for_home(page)

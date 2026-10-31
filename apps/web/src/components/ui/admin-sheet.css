@@ -23,7 +23,8 @@
 .admin-fee-page--payments .admin-fee-management > * { flex-shrink: 0; }
 .admin-fee-page--payments .fee-roster-panel { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 .admin-fee-page--payments .fee-roster-card { display: flex; flex: 1; flex-direction: column; min-height: 0; }
-.admin-fee-page--payments .fee-roster-card > :not(.admin-sheet-grid) { flex-shrink: 0; }
+.admin-fee-page--payments .fee-roster-card > :not(.fee-roster-grid-region) { flex-shrink: 0; }
+.admin-fee-page--payments .fee-roster-grid-region { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .admin-fee-page--payments .admin-sheet-grid { flex: 1; height: auto; min-height: 0; }
 @media (max-width: 47.999rem) { .admin-fee-page { height: calc(100dvh - 4rem); } }
 

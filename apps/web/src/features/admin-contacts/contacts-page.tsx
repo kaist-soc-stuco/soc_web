@@ -8,8 +8,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import * as XLSX from "xlsx";
-import { createApiClient } from "@soc/api-client";
+import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type {
   AdminUserRecord,
   ContactDepartmentRecord,
@@ -50,7 +49,7 @@ import { UiInput } from "@/components/ui/form-control";
 import { Modal } from "@/components/ui/modal";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { CONTACT_XLSX_TEMPLATE_ROWS, parseContactSpreadsheet, type ParsedContactSpreadsheetRow } from "@/lib/contact-spreadsheet";
+import { createContactTemplate, parseContactSpreadsheet, type ParsedContactSpreadsheetRow } from "@/lib/contact-spreadsheet";
 import { downloadBlob } from "@/lib/download-blob";
 import { Permissions } from "@/lib/permissions";
 import { ExecutiveMemberModal, type ExecutiveMemberFormValues } from "./ExecutiveMemberModal";
@@ -104,8 +103,10 @@ function ContactsPageContent() {
   const [bulkRows, setBulkRows] = useState<ParsedContactSpreadsheetRow[]>([]);
   const [bulkErrors, setBulkErrors] = useState<string[]>([]);
   const [bulkFileName, setBulkFileName] = useState<string | null>(null);
-  const [bulkReplaceExisting, setBulkReplaceExisting] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkReading, setBulkReading] = useState(false);
+  const bulkReadRequest = useRef(0);
+  const bulkImportInFlight = useRef(false);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
   const [memberModalOpen, setMemberModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<ContactRecord | null>(null);
@@ -115,14 +116,15 @@ function ContactsPageContent() {
   const [departmentForm, setDepartmentForm] = useState({ nameKo: "" });
   const [departmentSaving, setDepartmentSaving] = useState(false);
 
-  const loadContacts = async () => { await contactsQuery.refetch(); };
+  const loadContacts = async () => { await contactsQuery.refetch({ throwOnError: true }); setError(null); };
 
-  const loadDepartments = useCallback(async () => {
+  const loadDepartments = useCallback(async (throwOnError = false) => {
     try {
       const response = await apiClient.getManagedContactDepartments();
       setDepartments(response.items);
-    } catch {
+    } catch (cause) {
       setError("부서 정보를 불러오는 데 실패했습니다.");
+      if (throwOnError) throw cause;
     }
   }, [apiClient]);
 
@@ -202,54 +204,61 @@ function ContactsPageContent() {
   };
 
   const readBulkFile = async (file: File) => {
+    if (bulkImportInFlight.current) return;
+    if (!/\.xlsx$/i.test(file.name) || file.size > 5 * 1024 * 1024) {
+      toast({ type: "error", message: "5MB 이하의 XLSX 파일을 선택해 주세요." });
+      return;
+    }
+    const request = ++bulkReadRequest.current;
     setImportDragging(false);
     setImportGuideOpen(false);
+    setBulkFileName(file.name); setBulkRows([]); setBulkErrors([]); setBulkReading(true);
     try {
       const parsed = parseContactSpreadsheet(await file.arrayBuffer());
-      setBulkFileName(file.name);
+      if (request !== bulkReadRequest.current) return;
       setBulkRows(parsed.rows);
       setBulkErrors(parsed.errors);
     } catch {
-      setBulkFileName(file.name);
-      setBulkRows([]);
-      setBulkErrors(["XLSX 파일을 읽지 못했습니다."]);
-    }
+      if (request === bulkReadRequest.current) setBulkErrors(["XLSX 파일을 읽지 못했습니다."]);
+    } finally { if (request === bulkReadRequest.current) setBulkReading(false); }
   };
 
   const clearBulkImport = (force = false) => {
-    if (bulkImporting && !force) return;
+    if (bulkImportInFlight.current && !force) return;
+    bulkReadRequest.current++;
+    setBulkReading(false);
     setBulkRows([]);
     setBulkErrors([]);
     setBulkFileName(null);
-    setBulkReplaceExisting(false);
   };
 
   const downloadContactTemplate = () => {
-    const worksheet = XLSX.utils.aoa_to_sheet(CONTACT_XLSX_TEMPLATE_ROWS.map((row) => [...row]));
-    worksheet["!cols"] = [
-      { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 16 }, { wch: 30 }, { wch: 18 },
-    ];
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "연락망");
-    const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    downloadBlob(blob, "부원 명단 양식.xlsx");
+    try { downloadBlob(createContactTemplate(), "부원 명단 양식.xlsx"); }
+    catch { toast({ type: "error", message: "양식을 내려받지 못했습니다. 다시 시도해 주세요." }); }
   };
 
   const handleBulkImport = async () => {
-    if (bulkRows.length === 0 || bulkErrors.length > 0) return;
+    if (bulkRows.length === 0 || bulkErrors.length > 0 || bulkReading || bulkImportInFlight.current) return;
+    bulkImportInFlight.current = true;
     try {
       setBulkImporting(true);
-      const result = await apiClient.bulkImportContacts({ items: bulkRows, replaceExisting: bulkReplaceExisting });
+      const result = await apiClient.bulkImportContacts({ items: bulkRows });
       clearBulkImport(true);
-      await loadContacts();
       toast({
         type: "success",
-        message: `${result.importedCount}명을 가져왔습니다.${result.removedCount > 0 ? ` 기존 ${result.removedCount}명은 교체되었습니다.` : ""}`,
+        message: `${result.createdCount}명 추가 · ${result.updatedCount}명 갱신했습니다.`,
       });
-    } catch {
-      setBulkErrors(["일괄 업로드에 실패했습니다. 입력값과 권한을 확인해 주세요."]);
+      try { await loadContacts(); }
+      catch { toast({ type: "error", message: "가져오기는 완료됐지만 목록을 갱신하지 못했습니다. 새로고침해 주세요." }); }
+    } catch (cause) {
+      const code = cause instanceof ApiClientHttpError ? cause.code : undefined;
+      setBulkErrors([code === "contact_import_activities_ambiguous"
+        ? "겸직 이력이 누락되거나 구분되지 않습니다. 해당 연도의 활동을 모두 입력해 주세요. 이력 삭제는 부원 편집에서 처리할 수 있습니다. 이번 파일은 반영되지 않았습니다."
+        : code === "contact_portal_account_conflict"
+        ? "같은 학번에 서로 다른 회원 계정이 연결되어 있습니다. 기존 부원 정보를 확인해 주세요. 이번 파일은 반영되지 않았습니다."
+        : "일괄 업로드에 실패했습니다. 입력값과 권한을 확인해 주세요."]);
     } finally {
+      bulkImportInFlight.current = false;
       setBulkImporting(false);
     }
   };
@@ -286,9 +295,12 @@ function ContactsPageContent() {
       else await apiClient.createContact(payload);
       setMemberModalOpen(false);
       setEditingContact(null);
-      await loadContacts();
-    } catch {
-      toast({ type: "error", message: "저장에 실패했습니다. 입력을 다시 확인해 주세요." });
+      try { await loadContacts(); }
+      catch { toast({ type: "error", message: "저장은 완료됐지만 목록을 갱신하지 못했습니다. 새로고침해 주세요." }); }
+    } catch (cause) {
+      toast({ type: "error", message: cause instanceof ApiClientHttpError && cause.code === "contact_student_number_exists"
+        ? "이미 등록된 학번입니다. 기존 부원을 찾아 편집해 주세요."
+        : "저장에 실패했습니다. 입력을 다시 확인해 주세요." });
     } finally {
       setMemberSaving(false);
     }
@@ -335,8 +347,9 @@ function ContactsPageContent() {
       }
       setEditingDepartment(null);
       setDepartmentForm({ nameKo: "" });
-      await Promise.all([loadDepartments(), loadContacts()]);
       toast({ type: "success", message: editingDepartment ? "부서 정보를 수정했습니다." : "부서를 추가했습니다." });
+      try { await Promise.all([loadDepartments(true), loadContacts()]); }
+      catch { toast({ type: "error", message: "부서는 저장됐지만 목록을 갱신하지 못했습니다. 새로고침해 주세요." }); }
     } catch {
       toast({ type: "error", message: "부서 저장에 실패했습니다. 중복 여부와 입력값을 확인해 주세요." });
     } finally {
@@ -354,8 +367,9 @@ function ContactsPageContent() {
     if (!confirmed) return;
     try {
       await apiClient.deleteContactDepartment(department.id);
-      await loadDepartments();
       toast({ type: "success", message: "부서를 삭제했습니다." });
+      try { await loadDepartments(true); }
+      catch { toast({ type: "error", message: "부서는 삭제됐지만 목록을 갱신하지 못했습니다. 새로고침해 주세요." }); }
     } catch {
       toast({ type: "error", message: "부서를 삭제하지 못했습니다. 다시 시도해 주세요." });
     }
@@ -375,7 +389,7 @@ function ContactsPageContent() {
         <AdminPageHeader title="집행위 연락망" actions={headerActions} />
         <Modal open={importGuideOpen} onClose={() => { setImportGuideOpen(false); setImportDragging(false); }} title="부원 명단 가져오기" size="standard" footer={<Button variant="outline" onClick={() => setImportGuideOpen(false)}>닫기</Button>}>
           <div className="space-y-5 text-sm leading-6">
-            <p>이름·학번·부서·직책·이메일·전화번호를 작성한 뒤 엑셀 파일을 올려 주세요. 부서와 직책은 올해 활동 이력으로 자동 등록됩니다. 이름과 직책은 필수이며, 나머지는 비워 둘 수 있습니다.</p>
+            <p>이름·학번(8자리)·직책은 필수입니다. 같은 학번은 기존 부원을 갱신하고, 없는 학번은 추가합니다. 활동 1건당 한 행에 연도·부서·직책을 입력하세요. 겸직은 해당 연도의 활동을 모두 입력하며, 다른 연도와 빈 연락처는 유지됩니다. 연도가 비어 있으면 올해로 등록됩니다.</p>
             <Button variant="outline" onClick={downloadContactTemplate}><Download aria-hidden="true" />양식 다운로드</Button>
             <button type="button" onClick={() => bulkFileInputRef.current?.click()}
               onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setImportDragging(true); }}
@@ -413,14 +427,13 @@ function ContactsPageContent() {
               footer={<>
                 <Button type="button" variant="ghost" onClick={downloadContactTemplate} disabled={bulkImporting}>양식 다운로드</Button>
                 <Button type="button" variant="outline" onClick={() => clearBulkImport()} disabled={bulkImporting}>취소</Button>
-                <Button type="button" onClick={() => void handleBulkImport()} disabled={bulkRows.length === 0 || bulkErrors.length > 0 || bulkImporting}>불러오기</Button>
+                <Button type="button" onClick={() => void handleBulkImport()} disabled={bulkRows.length === 0 || bulkErrors.length > 0 || bulkReading || bulkImporting}>불러오기</Button>
               </>}
             >
               <div className="space-y-4">
-                <div><p className="text-sm font-semibold text-slate-800">{bulkFileName}</p><p className="mt-1 text-xs text-slate-500">정상 행 {bulkRows.length}개 · 오류 {bulkErrors.length}개</p></div>
-                <label className="inline-flex items-center gap-2 text-sm text-slate-700"><UiInput type="checkbox" checked={bulkReplaceExisting} onChange={(event) => setBulkReplaceExisting(event.currentTarget.checked)} className="size-4 accent-brand-primary" />기존 연락망 전체 교체</label>
+                <div><p className="text-sm font-semibold text-slate-800">{bulkFileName}</p><p className="mt-1 text-xs text-slate-500" role={bulkReading ? "status" : undefined}>{bulkReading ? "파일을 읽는 중…" : `정상 행 ${bulkRows.length}개 · 오류 ${bulkErrors.length}개`}</p></div>
                 {bulkErrors.length > 0 ? <ul className="space-y-1 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">{bulkErrors.slice(0, 8).map((message) => <li key={message}>{message}</li>)}{bulkErrors.length > 8 ? <li>외 {bulkErrors.length - 8}건</li> : null}</ul> : null}
-                {bulkRows.length > 0 && bulkErrors.length === 0 ? <div className="overflow-hidden rounded-lg border border-slate-100"><AdminDataTable minWidth={640}><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>부서</AdminTableHead><AdminTableHead>직책</AdminTableHead><AdminTableHead>이메일</AdminTableHead></tr></AdminTableHeader><AdminTableBody>{bulkRows.slice(0, 5).map((row, index) => <tr key={`${row.email}-${index}`}><AdminTableCell><span className="admin-table-text-emphasis">{row.nameKo}</span></AdminTableCell><AdminTableCell>{row.departmentKo || ""}</AdminTableCell><AdminTableCell>{row.roleKo}</AdminTableCell><AdminTableCell>{row.email || ""}</AdminTableCell></tr>)}</AdminTableBody></AdminDataTable></div> : null}
+                {bulkRows.length > 0 && bulkErrors.length === 0 ? <div className="overflow-hidden rounded-lg border border-slate-100"><AdminDataTable minWidth={640}><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>활동 이력</AdminTableHead><AdminTableHead>이메일</AdminTableHead></tr></AdminTableHeader><AdminTableBody>{bulkRows.slice(0, 5).map((row) => <tr key={row.studentNumber}><AdminTableCell><span className="admin-table-text-emphasis">{row.nameKo}</span></AdminTableCell><AdminTableCell>{row.activities?.length ? row.activities.map((activity, index) => <div key={index}>{activity.year} · {activity.departmentKo || "부서 없음"} · {activity.roleKo}</div>) : `${row.departmentKo} · ${row.roleKo}`}</AdminTableCell><AdminTableCell>{row.email || ""}</AdminTableCell></tr>)}</AdminTableBody></AdminDataTable></div> : null}
               </div>
             </Modal>
 
@@ -470,7 +483,8 @@ function ContactsPageContent() {
     if (!confirmed) return false;
     try {
       await apiClient.deleteContact(id);
-      await loadContacts();
+      try { await loadContacts(); }
+      catch { toast({ type: "error", message: "삭제는 완료됐지만 목록을 갱신하지 못했습니다. 새로고침해 주세요." }); }
       return true;
     } catch {
       toast({ type: "error", message: "삭제에 실패했습니다." });

@@ -411,19 +411,21 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     }
   };
 
-  const handleCreateReply = async (parentCommentId: string) => {
-    if (!articleId || !replyText.trim() || !canCreateComment || replyRequestPending.current) return;
+  const handleCreateReply = async (parentCommentId: string, mobileText?: string) => {
+    const content = mobileText ?? replyText;
+    if (!articleId || !content.trim() || !canCreateComment || replyRequestPending.current) return;
     replyRequestPending.current = true;
 
     setReplySubmitting(true);
     setCommentError(null);
     try {
       await apiClient.createComment(category, articleId, {
-        content: replyText.trim(),
+        content: content.trim(),
         parentCommentId,
       });
       await refreshComments();
       setReplyText("");
+      if (mobileText !== undefined) setCommentText("");
       setReplyTargetId(null);
     } catch {
       setCommentError(

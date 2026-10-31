@@ -413,8 +413,8 @@ export function SurveyQuestionInput({
     case "file_upload": {
       if (!session?.userId) {
         return <p className="text-sm text-slate-500">{lang === "ko"
-          ? "파일 첨부는 로그인 후 이용할 수 있습니다. 자료 링크 입력란이 있다면 공유 링크를 입력해 주세요."
-          : "Sign in to attach files. If a material-link field is available, you can provide a shared link there."}</p>;
+          ? "파일 첨부는 로그인 및 개인정보 수집·이용 동의 후 이용할 수 있습니다. 자료 링크 입력란이 있다면 공유 링크를 입력해 주세요."
+          : "Sign in and agree to the collection and use of personal information to attach files. If a material-link field is available, you can provide a shared link there."}</p>;
       }
       const maxSizeBytes = question.config?.maxSizeBytes ?? 20_000_000;
       const maxFiles = question.config?.maxFiles ?? 1;

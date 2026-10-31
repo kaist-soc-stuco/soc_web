@@ -30,8 +30,9 @@ export function FeePaymentImport({ disabled, onImported }: { disabled: boolean; 
       const result = await client.importStudentFeePayments({ entries: candidate.entries, idempotencyKey: candidate.key, confirmDuplicates: confirmed });
       setCandidate(null);
       setOpen(false);
-      await onImported();
       toast({ type: "success", message: `${result.count}건의 입금을 등록했습니다.` });
+      try { await onImported(); }
+      catch { toast({ type: "error", message: "입금 등록은 완료됐지만 목록을 갱신하지 못했습니다. 새로고침해 주세요." }); }
     } catch (cause) {
       const code = cause instanceof ApiClientHttpError ? cause.code : undefined;
       const messages: Record<string, string> = {

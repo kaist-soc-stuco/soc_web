@@ -444,7 +444,7 @@ export class UsersRepository {
     const [updated] = await this.db
       .update(users)
       .set({ isActive, updatedAt: nowDate() })
-      .where(eq(users.userId, userId))
+      .where(and(eq(users.userId, userId), sql`${users.isActive} IS DISTINCT FROM ${isActive}`))
       .returning();
 
     if (!updated) return null;

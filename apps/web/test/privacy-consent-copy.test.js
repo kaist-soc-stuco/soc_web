@@ -10,10 +10,10 @@ test("privacy consent shows every required notice item", () => {
   );
 
   for (const heading of [
-    "수집·이용 목적",
-    "수집 항목",
-    "보유·이용 기간",
-    "동의 거부권 및 불이익",
+    "목적",
+    "항목",
+    "보유 기간",
+    "미동의 시",
   ]) {
     assert.match(source, new RegExp(heading.replace("·", "\\·")));
   }

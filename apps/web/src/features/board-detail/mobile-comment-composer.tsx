@@ -1,9 +1,9 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { CommentComposer, CommentLoginInput } from "@/components/ui/comment-section";
 
-export function MobileCommentComposer({ inputRef, loginRef, authenticated, canCreate, submitting, value, error, lang, onChange, onSubmit }: {
+export function MobileCommentComposer({ inputRef, loginRef, authenticated, canCreate, replying, submitting, value, error, lang, onChange, onSubmit }: {
   inputRef: RefObject<HTMLTextAreaElement | null>; loginRef: RefObject<HTMLAnchorElement | null>;
-  authenticated: boolean; canCreate: boolean; submitting: boolean; value: string; error: string | null; lang: string;
+  authenticated: boolean; canCreate: boolean; replying: boolean; submitting: boolean; value: string; error: string | null; lang: string;
   onChange: (value: string) => void; onSubmit: () => Promise<void>;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -41,7 +41,7 @@ export function MobileCommentComposer({ inputRef, loginRef, authenticated, canCr
   return <div ref={surfaceRef} className="mobile-sticky-comment-composer" role="region" aria-label={lang === "ko" ? "댓글 작성" : "Write a comment"}>
     {authenticated ? canCreate ? <>
       {error && <p role="alert" className="mb-2 text-xs text-rose-600">{error}</p>}
-      <CommentComposer inputRef={inputRef} mobile ariaLabel={lang === "ko" ? "댓글 입력" : "Comment input"} submitLabel={lang === "ko" ? "댓글 등록" : "Post comment"} disabled={submitting} isSubmitting={submitting} value={value} onChange={onChange} onSubmit={onSubmit} placeholder={lang === "ko" ? "댓글을 입력하세요" : "Write a comment"} />
+      <CommentComposer inputRef={inputRef} mobile ariaLabel={replying ? lang === "ko" ? "대댓글 입력" : "Reply input" : lang === "ko" ? "댓글 입력" : "Comment input"} submitLabel={replying ? lang === "ko" ? "대댓글 등록" : "Post reply" : lang === "ko" ? "댓글 등록" : "Post comment"} disabled={submitting} isSubmitting={submitting} value={value} onChange={onChange} onSubmit={onSubmit} placeholder={replying ? lang === "ko" ? "대댓글을 입력하세요." : "Write a reply..." : lang === "ko" ? "댓글을 입력하세요" : "Write a comment"} />
     </> : <p className="py-3 text-center text-sm text-slate-500">{lang === "ko" ? "댓글을 작성할 권한이 없습니다." : "You cannot comment on this post."}</p> : <CommentLoginInput lang={lang} mobile loginRef={loginRef} />}
   </div>;
 }

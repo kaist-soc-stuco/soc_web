@@ -1081,7 +1081,7 @@ class AcceptanceSuite:
             admin.get_by_role("dialog", name="부원 명단 가져오기", exact=True).get_by_role("button", name="엑셀 파일을 여기에 놓거나 클릭해 선택하세요", exact=False).click()
         chooser.value.set_files(str(amended))
         modal = admin.get_by_role("dialog", name="가져올 부원 확인", exact=True)
-        modal.get_by_role("checkbox", name="기존 연락망 전체 교체", exact=True).check()
+        expect(modal.get_by_role("checkbox")).to_have_count(0)
         modal.get_by_role("button", name="불러오기", exact=True).click()
         expect(modal).to_be_hidden()
         admin.reload()
@@ -1091,10 +1091,18 @@ class AcceptanceSuite:
         expect(self.field(drawer, "전화번호")).to_have_value("01000990088")
         contacts = self.api(admin, "/contacts/manage?pageSize=100")["items"]
         assert len(contacts) == 1, contacts
-        year = datetime.now(timezone(timedelta(hours=9))).year
-        expected_history = {(year, department + " 수정", "부원")}
+        assert contacts[0]["id"] == contact["id"], contacts
         assert {(item["year"], item["departmentKo"], item["roleKo"]) for item in contacts[0]["activities"]} == expected_history, contacts
         drawer.get_by_role("button", name="취소", exact=True).click()
+        admin.get_by_role("button", name="엑셀 가져오기", exact=True).click()
+        with admin.expect_file_chooser() as chooser:
+            admin.get_by_role("dialog", name="부원 명단 가져오기", exact=True).get_by_role("button", name="엑셀 파일을 여기에 놓거나 클릭해 선택하세요", exact=False).click()
+        chooser.value.set_files(str(amended))
+        admin.get_by_role("dialog", name="가져올 부원 확인", exact=True).get_by_role("button", name="불러오기", exact=True).click()
+        expect(admin.get_by_role("dialog", name="가져올 부원 확인", exact=True)).to_be_hidden()
+        repeated = self.api(admin, "/contacts/manage?pageSize=100")["items"]
+        assert len(repeated) == 1 and repeated[0]["id"] == contact["id"], repeated
+        assert repeated[0]["activities"] == contacts[0]["activities"], repeated
         admin.get_by_role("button", name="부서 관리", exact=True).click()
         modal = admin.get_by_role("dialog", name="부서 관리", exact=True)
         modal.get_by_role("button", name=department + " 수정 삭제", exact=True).click()

@@ -24,6 +24,10 @@ const reasonLabels: Record<
   Exclude<SurveyParticipationEligibilityReason, "LOGIN_REQUIRED">,
   { ko: string; en: string }
 > = {
+  MEMBER_ACCOUNT_REQUIRED: {
+    ko: "개인정보 수집·이용에 동의한 회원만 참여할 수 있습니다.",
+    en: "Participation requires a member account with privacy consent.",
+  },
   PRIMARY_MAJOR_REQUIRED: {
     ko: "주전공이 전산학부가 아닙니다.",
     en: "Your primary major is not the School of Computing.",
@@ -59,12 +63,27 @@ export function SurveyParticipationNotice({
   }
 
   const isLoginRequired = eligibility.status === "LOGIN_REQUIRED";
+  const isMemberRequired = eligibility.reasons.includes("MEMBER_ACCOUNT_REQUIRED");
+  const needsSignIn = isLoginRequired || isMemberRequired;
+  const title = isMemberRequired
+    ? lang === "ko" ? "회원 계정이 필요한 설문입니다" : "A member account is required"
+    : isLoginRequired
+      ? lang === "ko" ? `로그인이 필요한 ${subject === "vote" ? "투표" : "설문"}입니다` : "Login required"
+      : lang === "ko" ? "참여 조건을 충족하지 않습니다" : "You are not eligible to participate";
+  const explanation = description ?? (isMemberRequired
+    ? reasonLabels.MEMBER_ACCOUNT_REQUIRED[lang === "ko" ? "ko" : "en"]
+    : isLoginRequired
+      ? lang === "ko" ? "참여하려면 KAIST 계정으로 로그인해 주세요." : "Sign in with your KAIST account to participate."
+      : lang === "ko" ? "아래 사유로 참여할 수 없습니다." : "You cannot participate for the following reasons.");
+  const actionLabel = isMemberRequired
+    ? lang === "ko" ? "동의하러 가기" : "Continue to consent"
+    : lang === "ko" ? "로그인" : "Sign in";
   const reasons = eligibility.reasons.filter(
     (reason): reason is Exclude<SurveyParticipationEligibilityReason, "LOGIN_REQUIRED"> =>
       reason !== "LOGIN_REQUIRED",
   );
 
-  const reasonList = !isLoginRequired && reasons.length > 0 ? (
+  const reasonList = !needsSignIn && reasons.length > 0 ? (
     <ul className={cn("survey-eligibility-reasons max-w-full space-y-1.5 rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-3 text-left text-sm font-normal leading-5 text-amber-900", compact ? "w-full" : "w-fit")}>
       {reasons.map(reason => <li key={reason} className="flex flex-wrap items-center gap-x-4 gap-y-1">
         <span className="flex min-w-0 flex-1 items-start gap-2">
@@ -80,11 +99,11 @@ export function SurveyParticipationNotice({
   ) : null;
 
   if (!compact) return <ResponseStateCard className="survey-participation-notice"
-    icon={isLoginRequired ? LockKeyhole : ShieldAlert} tone={isLoginRequired ? "neutral" : "warning"}
-    title={lang === "ko" ? isLoginRequired ? `로그인이 필요한 ${subject === "vote" ? "투표" : "설문"}입니다` : "참여 조건을 충족하지 않습니다" : isLoginRequired ? "Login required" : "You are not eligible to participate"}
-    description={description ?? (lang === "ko" ? isLoginRequired ? "참여하려면 KAIST 계정으로 로그인해 주세요." : "아래 사유로 참여할 수 없습니다." : isLoginRequired ? "Sign in with your KAIST account to participate." : "You cannot participate for the following reasons.")}
-    actions={isLoginRequired ? <Button asChild className={responseStateActionClassName}><Link to="/login" onClick={() => rememberAuthReturnPath()}>{lang === "ko" ? "로그인" : "Sign in"}</Link></Button> : undefined}
-    mobileAction={!isLoginRequired ? subject === "vote" ? <VoteListAction lang={lang} /> : <SurveyListAction lang={lang} /> : undefined}
+    icon={needsSignIn ? LockKeyhole : ShieldAlert} tone={needsSignIn ? "neutral" : "warning"}
+    title={title}
+    description={explanation}
+    actions={needsSignIn ? <Button asChild className={responseStateActionClassName}><Link to="/login" onClick={() => rememberAuthReturnPath()}>{actionLabel}</Link></Button> : undefined}
+    mobileAction={!needsSignIn ? subject === "vote" ? <VoteListAction lang={lang} /> : <SurveyListAction lang={lang} /> : undefined}
   >
     {reasonList}
   </ResponseStateCard>;
@@ -102,12 +121,12 @@ export function SurveyParticipationNotice({
         <div
           className={cn(
             "flex size-10 shrink-0 items-center justify-center rounded-xl",
-            isLoginRequired
+            needsSignIn
               ? "bg-emerald-50 text-emerald-700"
               : "bg-amber-50 text-amber-700",
           )}
         >
-          {isLoginRequired ? (
+          {needsSignIn ? (
             <LockKeyhole aria-hidden="true" className="size-5" />
           ) : (
             <ShieldAlert aria-hidden="true" className="size-5" />
@@ -116,31 +135,19 @@ export function SurveyParticipationNotice({
 
         <div className={cn("min-w-0", !compact && "text-center")}>
           <h2 className="text-base font-semibold text-slate-900">
-            {isLoginRequired
-              ? lang === "ko"
-                ? `로그인이 필요한 ${subject === "vote" ? "투표" : "설문"}입니다`
-                : "Login required"
-              : lang === "ko"
-                ? "참여 자격을 충족하지 않습니다"
-                : "You are not eligible to participate"}
+            {title}
           </h2>
           <p className="mt-1.5 text-sm font-normal leading-6 text-slate-600">
-            {description ?? (isLoginRequired
-              ? lang === "ko"
-                ? `${subject === "vote" ? "투표" : "설문"} 참여 및 본인 확인을 위해 KAIST 계정으로 로그인해 주세요.`
-                : `Sign in to check the participation requirements for this ${subject}.`
-              : lang === "ko"
-                ? "다음 조건을 충족하지 못해 응답할 수 없습니다."
-                : "You cannot submit a response because these requirements are not met.")}
+            {explanation}
           </p>
         </div>
       </div>
 
       {reasonList}
 
-      {isLoginRequired ? (
+      {needsSignIn ? (
         <Button asChild size={compact ? "sm" : "default"} className={cn(!compact && "w-full")}>
-          <Link to="/login" onClick={() => rememberAuthReturnPath()}>{lang === "ko" ? "로그인" : "Sign in"}</Link>
+          <Link to="/login" onClick={() => rememberAuthReturnPath()}>{actionLabel}</Link>
         </Button>
       ) : null}
     </div>

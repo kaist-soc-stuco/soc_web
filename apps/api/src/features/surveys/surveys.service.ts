@@ -31,7 +31,7 @@ import type { CreateSurveyDto } from "./dto/create-survey.dto";
 import type { UpdateSurveyDto } from "./dto/update-survey.dto";
 import type { ComputedSurveyState, SurveyDetailResponse } from "@soc/contracts";
 import { UsersService } from "../users/users.service";
-import { getSurveyEligibilityFailures } from "./survey-eligibility";
+import { getSurveyEligibilityFailures, requiresSurveyMemberAccount } from "./survey-eligibility";
 import type { TemporaryAccessTokenClaims } from "../auth/auth.types";
 import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
 import { AuditLogService } from "../audit/audit-log.service";
@@ -189,7 +189,14 @@ export class SurveysService {
     survey: SurveyRecordWithState,
     caller: SurveyCaller | undefined,
     context: EligibilityContext | null,
+    hasRequiredFile = false,
   ): SurveyParticipationEligibility {
+    if (!caller?.id && requiresSurveyMemberAccount(survey, hasRequiredFile)) {
+      if (caller?.temporaryClaims || hasRequiredFile) {
+        return { status: "NOT_ELIGIBLE", reasons: ["MEMBER_ACCOUNT_REQUIRED"] };
+      }
+      return { status: "LOGIN_REQUIRED", reasons: ["LOGIN_REQUIRED"] };
+    }
     const eligibleSocAffiliations = survey.eligibleSocAffiliations ?? [];
     const academicEligibility = "ANY";
     const hasMemberRequirements =
@@ -338,6 +345,7 @@ export class SurveysService {
         survey,
         caller,
         eligibilityContext,
+        sectionsWithQuestions.some(section => section.questions.some(question => question.questionType === "file_upload" && question.isRequired)),
       ),
       sections: sectionsWithQuestions,
       currentResponse,

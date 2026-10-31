@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -11,6 +12,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
+import { Permissions } from "@soc/contracts";
 import { ConfigService } from "@nestjs/config";
 import { BulkEmailRepository, type BulkEmailStoredRecord } from "./bulk-email.repository";
 import { BulkEmailTemplateRepository } from "./bulk-email-template.repository";
@@ -645,6 +647,13 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
 
   private async deliverStored(record: BulkEmailStoredRecord): Promise<void> {
     if (!record.senderId) throw new BadRequestException("bulk_email_sender_missing");
+    const sender = await this.usersService.findById(record.senderId);
+    if (!sender?.isActive || !Permissions.has(
+      await this.usersService.resolvePermissionBitmaskByUserId(record.senderId),
+      Permissions.SEND_BULK_EMAIL,
+    )) {
+      throw new ForbiddenException("bulk_email_sender_not_authorized");
+    }
     const recipients = await this.usersService.listEmailRecipients(
       record.recipientType,
       record.recipientFilters,
@@ -980,7 +989,7 @@ function parseScheduledAt(value: string | undefined): Date | null {
 }
 
 function auditErrorCode(error: unknown): string {
-  if (error instanceof BadRequestException || error instanceof ConflictException) {
+  if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof ForbiddenException) {
     const response = error.getResponse();
     if (typeof response === "string") return response.slice(0, 120);
     if (response && typeof response === "object" && "message" in response) {

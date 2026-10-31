@@ -2,7 +2,7 @@ import { createApiClient } from "@soc/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, CircleAlert } from "lucide-react";
+import { ArrowLeft, ChevronRight, CircleAlert } from "lucide-react";
 
 import {
   clearStoredAuthState,
@@ -17,6 +17,8 @@ import { UiInput } from "@/components/ui/form-control";
 import { IconButton } from "@/components/ui/icon-button";
 import { useToast } from "@/components/ui/toast";
 import { ResponseStateCard, responseStateActionClassName } from "@/features/survey/response-state-card";
+
+const consentFullTextLinkClassName = "inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-sm py-0.5 text-xs font-normal text-slate-500 no-underline hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-400 sm:text-sm";
 
 type LoginStatus = "idle" | "starting" | "processing" | "failed";
 let historyRestoreHandled = false;
@@ -313,7 +315,7 @@ export function LoginCallbackPage() {
           showClose={false}
           initialFocus="surface"
           size="standard"
-          bodyClassName="service-consent space-y-3"
+          bodyClassName="service-consent space-y-5 break-keep"
           footer={
             <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-end">
               <Button loading={consentSubmitting === "temporary"}
@@ -355,70 +357,71 @@ export function LoginCallbackPage() {
               <span>{lang === "ko" ? "전체 동의하기" : "Agree to all"}</span>
             </label>
           </div>
-          <div className="space-y-2 border-b border-slate-200 pb-3">
-            <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-brand-primary underline underline-offset-4">
-              {lang === "ko" ? "서비스 이용약관 전문 보기" : "Read the Terms of Service"}
-              <span className="sr-only">{lang === "ko" ? " (새 탭에서 열림)" : " (opens in a new tab)"}</span>
-            </a>
-            <ul className="list-disc space-y-1 break-keep pl-4 text-sm leading-6 text-slate-600">
+          <section className="space-y-2.5" aria-label={lang === "ko" ? "서비스 이용약관" : "Terms of Service"}>
+            <div className="flex items-start justify-between gap-3">
+              <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 text-sm font-medium leading-6 text-slate-800">
+                <UiInput
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(event) => setTermsAccepted(event.target.checked)}
+                  disabled={consentSubmitting !== null}
+                  required
+                  className="mt-1 shrink-0"
+                />
+                <span>{lang === "ko" ? "[필수] 서비스 이용약관 동의" : "[Required] Terms of Service"}</span>
+              </label>
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className={consentFullTextLinkClassName}>
+                <span className="sr-only">{lang === "ko" ? "서비스 이용약관 " : "Terms of Service: "}</span>
+                {lang === "ko" ? "전문 보기" : "Read in full"}<ChevronRight aria-hidden="true" className="size-3.5" />
+                <span className="sr-only">{lang === "ko" ? " (새 탭에서 열림)" : " (opens in a new tab)"}</span>
+              </a>
+            </div>
+            <ul className="list-disc space-y-1 rounded-xl bg-gray-50 py-3 pl-7 pr-4 text-[0.8125rem] leading-[1.375rem] text-slate-600">
               <li>{lang === "ko" ? "게시물 이용·관리, 이용 제한·이의 제기, 회원 탈퇴에 관한 규정" : "Rules for using and moderating posts, service restrictions, appeals, and account closure"}</li>
               <li>{lang === "ko" ? "임시 이용에도 약관 동의 필요" : "Agreement required for temporary access too"}</li>
             </ul>
-            <label className="flex cursor-pointer items-start gap-2 text-sm leading-6 text-slate-800">
-              <UiInput
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(event) => setTermsAccepted(event.target.checked)}
-                disabled={consentSubmitting !== null}
-                required
-                className="mt-1 shrink-0"
-              />
-              <span>{lang === "ko" ? "[필수] 서비스 이용약관에 동의합니다." : "[Required] I agree to the Terms of Service."}</span>
-            </label>
-          </div>
-          <h3 className="text-sm font-semibold text-slate-800">
-            {lang === "ko" ? "개인정보 수집 및 이용 동의" : "Consent to collection and use of personal information"}
-          </h3>
-          <dl className="space-y-3 break-keep text-sm leading-6 text-slate-600">
-            <div className="sm:grid sm:grid-cols-[8rem_1fr] sm:gap-3">
-              <dt className="font-semibold text-slate-800">{lang === "ko" ? "수집·이용 목적" : "Purpose"}</dt>
-              <dd>{lang === "ko" ? "KAIST 구성원 확인, 계정 관리, 학생회비 납부 확인·관리, 서비스 운영·보안" : "KAIST membership verification, account management, student-fee payment verification and management, and service operation and security"}</dd>
+          </section>
+          <section className="space-y-2.5" aria-label={lang === "ko" ? "개인정보 수집·이용" : "Collection and use of personal information"}>
+            <div className="flex items-start justify-between gap-3">
+              <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 text-sm font-medium leading-6 text-slate-800">
+                <UiInput
+                  type="checkbox"
+                  checked={privacyAccepted}
+                  onChange={(event) => setPrivacyAccepted(event.target.checked)}
+                  disabled={consentSubmitting !== null}
+                  required
+                  className="mt-1 shrink-0"
+                />
+                <span>{lang === "ko" ? "[필수] 개인정보 수집·이용 동의" : "[Required] Collection and use of personal information"}</span>
+              </label>
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" className={consentFullTextLinkClassName}>
+                <span className="sr-only">{lang === "ko" ? "개인정보처리방침 " : "Privacy Policy: "}</span>
+                {lang === "ko" ? "전문 보기" : "Read in full"}<ChevronRight aria-hidden="true" className="size-3.5" />
+                <span className="sr-only">{lang === "ko" ? " (새 탭에서 열림)" : " (opens in a new tab)"}</span>
+              </a>
             </div>
-            <div className="sm:grid sm:grid-cols-[8rem_1fr] sm:gap-3">
-              <dt className="font-semibold text-slate-800">{lang === "ko" ? "수집 항목" : "Information collected"}</dt>
-              <dd>{lang === "ko" ? "KAIST UID, 성명(한글·영문), 학번, 이메일, 소속 학과, 주전공, 신분코드, 동의·로그인·접속 기록" : "KAIST UID, Korean and English names, student number, email, department, primary major, member code, and consent, sign-in and access records"}</dd>
-            </div>
-            <div className="sm:grid sm:grid-cols-[8rem_1fr] sm:gap-3">
-              <dt className="font-semibold text-slate-800">{lang === "ko" ? "보유·이용 기간" : "Retention period"}</dt>
-              <dd className="space-y-1">
-                <p>{lang === "ko" ? "회원 탈퇴, 동의 철회 또는 서비스 종료 시까지 보유합니다." : "Retained until account closure, withdrawal of consent or service termination."}</p>
-                <p>{lang === "ko" ? "운영·보안 기록은 2년, 개인정보 접근 권한 변경 기록은 3년간 보관합니다." : "Operational and security records are retained for 2 years, and changes to personal-data access permissions for 3 years."}</p>
-              </dd>
-            </div>
-            <div className="sm:grid sm:grid-cols-[8rem_1fr] sm:gap-3">
-              <dt className="font-semibold text-slate-800">{lang === "ko" ? "동의 거부권 및 불이익" : "Right to refuse and consequences"}</dt>
-              <dd className="space-y-1">
-                <p>{lang === "ko" ? "동의를 거부할 수 있습니다. 이 경우 임시 이용만 가능하며, 마이페이지 등 회원 전용 기능은 이용할 수 없습니다." : "You may refuse consent. In that case, temporary access is available, but member-only features such as My Page are unavailable."}</p>
-              </dd>
-            </div>
-          </dl>
-          <p className="text-sm leading-6 text-slate-600">
-            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-primary underline underline-offset-4">
-              {lang === "ko" ? "개인정보처리방침 전문 보기" : "Read the Privacy Policy"}
-              <span className="sr-only">{lang === "ko" ? " (새 탭에서 열림)" : " (opens in a new tab)"}</span>
-            </a>
-          </p>
-          <label className="flex cursor-pointer items-start gap-2 text-sm leading-6 text-slate-800">
-            <UiInput
-              type="checkbox"
-              checked={privacyAccepted}
-              onChange={(event) => setPrivacyAccepted(event.target.checked)}
-              disabled={consentSubmitting !== null}
-              required
-              className="mt-1 shrink-0"
-            />
-            <span>{lang === "ko" ? "[필수] 개인정보 수집 및 이용에 동의합니다." : "[Required] I agree to the collection and use of personal information."}</span>
-          </label>
+            <dl className="space-y-3 rounded-xl bg-gray-50 p-4 text-[0.8125rem] leading-[1.375rem] text-slate-600">
+              <div className="grid grid-cols-[4rem_minmax(0,1fr)] gap-x-3">
+                <dt className="font-semibold text-slate-800">{lang === "ko" ? "목적" : "Purpose"}</dt>
+                <dd>{lang === "ko" ? "KAIST 구성원 확인, 계정 관리, 학생회비 납부 확인·관리, 서비스 운영·보안" : "KAIST membership verification, account management, student-fee payment verification and management, and service operation and security"}</dd>
+              </div>
+              <div className="grid grid-cols-[4rem_minmax(0,1fr)] gap-x-3">
+                <dt className="font-semibold text-slate-800">{lang === "ko" ? "항목" : "Data"}</dt>
+                <dd>{lang === "ko" ? "KAIST UID, 성명(한글·영문), 학번, 이메일, 소속 학과, 주전공, 신분코드, 동의·로그인·접속 기록" : "KAIST UID, Korean and English names, student number, email, department, primary major, member code, and consent, sign-in and access records"}</dd>
+              </div>
+              <div className="grid grid-cols-[4rem_minmax(0,1fr)] gap-x-3">
+                <dt className="font-semibold text-slate-800">{lang === "ko" ? "보유 기간" : "Retention"}</dt>
+                <dd className="space-y-1">
+                  <p>{lang === "ko" ? "회원 탈퇴, 동의 철회 또는 서비스 종료 시까지 보유합니다." : "Retained until account closure, withdrawal of consent or service termination."}</p>
+                  <p>{lang === "ko" ? "운영·보안 기록은 2년, 개인정보 접근 권한 변경 기록은 3년간 보관합니다." : "Operational and security records are retained for 2 years, and changes to personal-data access permissions for 3 years."}</p>
+                </dd>
+              </div>
+              <div className="grid grid-cols-[4rem_minmax(0,1fr)] gap-x-3">
+                <dt className="font-semibold text-slate-800">{lang === "ko" ? "미동의 시" : "If declined"}</dt>
+                <dd>{lang === "ko" ? "동의를 거부할 수 있습니다. 이 경우 임시 이용만 가능하며, 마이페이지 등 회원 전용 기능은 이용할 수 없습니다." : "You may refuse consent. In that case, temporary access is available, but member-only features such as My Page are unavailable."}</dd>
+              </div>
+            </dl>
+          </section>
         </Modal>
       ) : null}
     </main>

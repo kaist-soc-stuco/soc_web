@@ -61,10 +61,11 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
     setLoading(true); setError(null);
     try {
       const result = await client.listStudentFeeRoster(semester);
-      if (request !== loadRequest.current) return;
+      if (request !== loadRequest.current) return false;
       const next = result.records.map(feeRosterRow); setOriginal(next); setRows(next); setSelected(new Set());
       setHasLoaded(true);
-    } catch { if (request === loadRequest.current) setError("납부 정보를 불러오지 못했습니다."); }
+      return true;
+    } catch { if (request === loadRequest.current) setError("납부 정보를 불러오지 못했습니다."); return false; }
     finally { if (request === loadRequest.current) setLoading(false); }
   }, [client, semester]);
   useEffect(() => { void load(); return () => { loadRequest.current++; }; }, [load, revision]);
@@ -99,7 +100,13 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
     const parsed = SaveStudentFeeRosterSchema.safeParse({ records: changed.map(feeRosterUpdate) });
     if (!parsed.success) { setError("학번과 입력값을 확인해 주세요. 한 번에 최대 2,000행을 저장할 수 있습니다."); return; }
     setSaving(true); setError(null);
-    try { await client.saveStudentFeeRoster(parsed.data); await load(); onSaved(); toast({ type: "success", message: "변경 사항을 저장했습니다." }); }
+    try {
+      await client.saveStudentFeeRoster(parsed.data);
+      setOriginal(rows); setSelected(new Set());
+      toast({ type: "success", message: "변경 사항을 저장했습니다." });
+      const refreshed = await load(); onSaved();
+      if (!refreshed) toast({ type: "error", message: "저장은 완료됐지만 명부를 갱신하지 못했습니다. 새로고침해 주세요." });
+    }
     catch (cause) { setError(cause instanceof Error && /fee_roster_changed|409/.test(cause.message) ? "다른 관리자가 수정했습니다. 변경 내용을 보관한 뒤 변경 취소로 최신 데이터를 불러오세요." : "저장하지 못했습니다. 입력한 내용은 유지됩니다."); }
     finally { setSaving(false); }
   };
@@ -123,13 +130,13 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
           {selectionAction ? <div inert={busy} aria-disabled={busy || undefined} className={busy ? "opacity-60" : undefined}>{selectionAction}</div> : null}
           {canExport && <Button variant="outline" loading={exporting} disabled={busy || dirty || exporting} onClick={() => void exportRows()}><Download />전체 명부 내보내기</Button>}
           {canEdit && <><Button variant="outline" disabled={busy} onClick={() => { setQuery(""); setMembership("all"); setStatus("all"); setRows(current => [{ key: randomId(), stdNo: "", nameKo: "", admissionYear: "", paidSemesters: "0", paidAmount: "0", note: "", userId: null, joinedAt: null, updatedAt: null, totalPaidAmount: 0, status: "UNPAID" }, ...current]); }}><Plus />행 추가</Button>
-            <FeePaymentImport disabled={busy || dirty} onImported={async () => { await load(); onSaved(); }} />
+            <FeePaymentImport disabled={busy || dirty} onImported={async () => { const refreshed = await load(); onSaved(); if (!refreshed) throw new Error("fee_roster_refresh_failed"); }} />
             {dirty && <Button variant="ghost" disabled={busy} onClick={async () => { if (await confirm({ title: "저장하지 않은 변경 사항을 버릴까요?", tone: "danger" })) void load(); }}>변경 취소</Button>}
             <Button disabled={!dirty || busy} loading={saving} onClick={() => void save()}>저장{dirty ? ` (${changed.length})` : ""}</Button></>}
         </div>
       </div>
       {error && <p role="alert" className="px-4 py-3 text-sm text-rose-700">{error}{!dirty && <Button variant="ghost" onClick={() => void load()}>다시 시도</Button>}</p>}
-      <div aria-busy={loading} inert={busy} className={`transition-opacity duration-150 ${loading && hasLoaded ? "opacity-60" : "opacity-100"}`}>
+      <div aria-busy={loading} inert={busy} className={`fee-roster-grid-region transition-opacity duration-150 ${loading && hasLoaded ? "opacity-60" : "opacity-100"}`}>
       {loading && !hasLoaded ? <AdminLoadingState /> : <DataGrid aria-label="과비 납부 관리표" className="admin-sheet-grid rdg-light" columns={columns} rows={visible} rowKeyGetter={row => row.key}
         renderers={{ renderSortStatus }} defaultColumnOptions={{ sortable: true, resizable: true }} sortColumns={sortColumns} onSortColumnsChange={setSortColumns}
         selectedRows={selected} onSelectedRowsChange={canEdit ? setSelected : undefined} isRowSelectionDisabled={row => !canEdit || busy || (!row.userId && row.updatedAt === null)}

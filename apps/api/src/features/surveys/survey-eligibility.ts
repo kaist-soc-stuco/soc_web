@@ -3,6 +3,15 @@ import type {
   SurveySocAffiliation,
 } from "@soc/contracts";
 
+export const requiresSurveyMemberAccount = (survey: {
+  allowAnonymous: boolean;
+  allowMultipleResponses: boolean;
+  allowResponseEdit: boolean;
+  feePayersOnly: boolean;
+}, hasRequiredFile = false): boolean =>
+  survey.feePayersOnly || survey.allowResponseEdit || hasRequiredFile ||
+  (!survey.allowAnonymous && !survey.allowMultipleResponses);
+
 interface SurveyEligibilityUser {
   primaryMajor?: string | null;
   departmentKo?: string | null;

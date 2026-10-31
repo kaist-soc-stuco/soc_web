@@ -183,6 +183,65 @@ class MobileSuite(AcceptanceSuite):
         expect(dialog).to_be_hidden()
         assert page.evaluate("getComputedStyle(document.body).overflow") != "hidden"
 
+    def test_shared_comment_composer_and_compact_actions(self):
+        page = self.page()
+        article = self.api(page, "/boards/notice/articles", method="POST", status=201, body={"titleKo": self.marker + " 댓글 입력", "contentKo": "<p>댓글 작성과 답글 전환을 확인합니다.</p>", "visibilityScope": "PUBLIC"})
+        path = f"/boards/notice/articles/{article['articleId']}"
+        original = self.marker + " 원문 댓글"
+        parent = self.api(page, path + "/comments", method="POST", status=201, body={"content": original})
+        page.goto(BASE + f"/board/notice/{article['articleId']}")
+        row = page.locator(".comment-list > div > article").filter(has_text=original)
+        actions = row.locator(".comment-row-actions")
+        for width in [390, 320]:
+            page.set_viewport_size({"width": width, "height": 844})
+            expect(row).to_be_visible()
+            buttons = actions.get_by_role("button")
+            positions = [(button.get_attribute("aria-label"), button.bounding_box()) for button in buttons.all()]
+            assert [label for label, box in sorted(positions, key=lambda item: item[1]["x"])] == ["답글", "댓글 좋아요", "댓글 더보기"], positions
+            assert max(box["width"] for _, box in positions) - min(box["width"] for _, box in positions) < 1, positions
+            expect(actions.locator(".tabular-nums")).to_be_hidden()
+            expect(row.locator(".comment-mobile-meta time")).to_be_visible()
+            assert actions.locator("svg").first.evaluate("el => getComputedStyle(el).fill") != "none"
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
+            self.capture(page, f"comment-actions-{width}")
+        page.set_viewport_size({"width": 390, "height": 844})
+        normal = page.get_by_role("textbox", name="댓글 입력", exact=True)
+        normal.fill("작성 중인 글")
+        reply_button = row.get_by_role("button", name="답글", exact=True)
+        reply_button.click()
+        reply = page.get_by_role("textbox", name="대댓글 입력", exact=True)
+        expect(reply).to_be_focused()
+        expect(reply).to_have_attribute("placeholder", "대댓글을 입력하세요.")
+        expect(reply).to_have_value("작성 중인 글")
+        expect(page.locator("textarea:visible")).to_have_count(1)
+        reply_button.click()
+        expect(normal).to_have_value("작성 중인 글")
+        reply_button.click()
+        row.get_by_role("button", name="댓글 좋아요", exact=True).click()
+        expect(row.locator(".comment-mobile-meta .tabular-nums")).to_have_text("1")
+        reply_text = self.marker + " 하단 입력창 대댓글"
+        reply.fill(reply_text)
+        page.route("**/api" + path + "/comments", lambda route: route.abort("failed"), times=1)
+        page.get_by_role("button", name="대댓글 등록", exact=True).click()
+        expect(page.get_by_role("alert")).to_contain_text("대댓글 작성에 실패")
+        expect(reply).to_have_value(reply_text)
+        with page.expect_response(lambda response: response.request.method == "POST" and urlsplit(response.url).path == "/api" + path + "/comments") as saved:
+            page.get_by_role("button", name="대댓글 등록", exact=True).click()
+        assert saved.value.status == 201, saved.value.text()
+        assert saved.value.request.post_data_json["parentCommentId"] == parent["commentId"]
+        expect(page.locator("#article-comments").get_by_text(reply_text, exact=True)).to_be_visible()
+        expect(normal).to_have_value("")
+        normal.fill(self.marker + " 일반 댓글")
+        with page.expect_response(lambda response: response.request.method == "POST" and urlsplit(response.url).path == "/api" + path + "/comments") as saved:
+            page.get_by_role("button", name="댓글 등록", exact=True).click()
+        assert saved.value.status == 201 and not saved.value.request.post_data_json.get("parentCommentId")
+        expect(normal).to_have_value("")
+        self.capture(page, "comment-reply-posted")
+        page.set_viewport_size({"width": 1440, "height": 1000})
+        expect(row.locator(".comment-mobile-meta")).to_be_hidden()
+        row.get_by_role("button", name="답글", exact=True).click()
+        expect(page.locator("#article-comments").get_by_role("textbox", name="대댓글 입력", exact=True)).to_be_visible()
+
     def test_post_detail_header_actions_and_menu(self):
         page = self.page()
         created = self.api(page, "/boards/notice/articles", method="POST", status=201, body={"titleKo": self.marker + " 모바일 게시글", "contentKo": "<p>모바일 상세 화면을 확인합니다.</p>", "visibilityScope": "PUBLIC"})

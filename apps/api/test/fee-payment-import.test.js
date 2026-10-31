@@ -41,7 +41,12 @@ test("Excel receipts preserve baselines, create unregistered people, and link th
   assert.equal(result.payments[0].paidAt, "2026-10-29T15:00:00.000Z");
   const roster = await repo.listStudentFeeRoster();
   const existing = roster.find(row => row.stdNo === "90990001"), added = roster.find(row => row.stdNo === "90990002");
-  assert.equal(existing.paidAmount, 10000); assert.equal(existing.totalPaidAmount, 45000); assert.equal(existing.status, "PAID");
+  assert.equal(existing.paidAmount, 0); assert.equal(existing.totalPaidAmount, 45000); assert.equal(existing.status, "PAID");
+  const existingDetail = await repo.getStudentFeeRosterDetail("90990001");
+  const baseline = existingDetail.history.filter(row => row.paymentType === "INITIAL_RECORD");
+  assert.equal(baseline.length, 1);
+  assert.equal(baseline[0].amount, 10000);
+  assert.equal(existingDetail.history.reduce((total, row) => total + row.amount, 0), 45000);
   assert.equal(added.paidAmount, 0); assert.equal(added.totalPaidAmount, 17000); assert.equal(added.userId, null);
   const before = await repo.getStudentFeeRosterDetail("90990002");
   const newId = randomUUID();

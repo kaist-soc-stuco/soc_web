@@ -370,8 +370,12 @@ export function useSurveyPageController(surveyId: string | undefined) {
             en: "This survey is limited to verified fee-paying members.",
           },
           login_required_for_file_upload: {
-            ko: "파일을 제출하려면 로그인해야 합니다.",
-            en: "You must sign in to upload files.",
+            ko: "파일을 제출하려면 로그인 및 개인정보 수집·이용 동의가 필요합니다.",
+            en: "Sign in and complete privacy consent to upload files.",
+          },
+          member_account_required: {
+            ko: "이 설문은 개인정보 수집·이용에 동의한 회원만 참여할 수 있습니다. 다시 로그인해 동의를 완료해 주세요.",
+            en: "This survey requires a member account with privacy consent. Sign in again and complete consent.",
           },
         };
         const message = error.code ? requirementMessages[error.code] : undefined;

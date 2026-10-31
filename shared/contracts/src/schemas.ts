@@ -850,10 +850,19 @@ export const ReorderContactsSchema = z
 // only applies them to fields the caller actually supplies.
 export const UpdateContactSchema = ContactFieldsSchema.partial();
 
-export const BulkImportContactsSchema = z.object({
-  items: z.array(CreateContactSchema).min(1).max(500),
-  replaceExisting: z.boolean().default(false),
+export const ContactImportItemSchema = CreateContactSchema.extend({
+  studentNumber: z.string().trim().regex(/^\d{8}$/),
 });
+
+export const BulkImportContactsSchema = z.object({
+  items: z.array(ContactImportItemSchema).min(1).max(500).superRefine((items, context) => {
+    const seen = new Set<string>();
+    items.forEach((item, index) => {
+      if (seen.has(item.studentNumber)) context.addIssue({ code: "custom", message: "duplicate_student_number", path: [index, "studentNumber"] });
+      seen.add(item.studentNumber);
+    });
+  }),
+}).strict();
 
 export const CreateContactDepartmentSchema = z.object({
   nameKo: RequiredContactTextSchema,

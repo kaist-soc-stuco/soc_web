@@ -114,14 +114,14 @@ export function CommentSection({
         )}
       </div>
 
-      <div className="mt-3">
+      <div className="mt-0 md:mt-3">
         {comments.length === 0 && !commentsLoading ? (
           <div className="py-2 text-[length:var(--ui-text-body-size)] font-normal text-slate-500">
             <span className="hidden md:inline">{lang === "ko" ? "아직 등록된 댓글이 없습니다." : "No comments yet."}</span>
             <span className="mobile-comment-empty-message md:hidden">{lang === "ko" ? "첫 댓글을 남겨주세요." : "Leave the first comment."}</span>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="comment-list divide-y divide-slate-100">
             {topLevelComments.map((comment) => {
               const replies = repliesByParent.get(comment.commentId) ?? [];
               const showReplyComposer = replyTargetId === comment.commentId;
@@ -147,10 +147,11 @@ export function CommentSection({
                       )
                     }
                     showReplyButton={canCreateComment && isAuthenticated}
+                    replySelected={showReplyComposer}
                   />
 
                   {showReplyComposer && canCreateComment && isAuthenticated && comment.status === "PUBLISHED" ? (
-                    <div className="ml-5 min-w-0 border-l border-slate-200 pb-3 pl-4 pt-1 sm:ml-9 sm:pl-5">
+                    <div className={cn("ml-5 min-w-0 border-l border-slate-200 pb-3 pl-4 pt-1 sm:ml-9 sm:pl-5", hideComposerOnMobile && "hidden md:block")}>
                       <CommentComposer
                         ariaLabel={lang === "ko" ? "대댓글 입력" : "Reply input"}
                         disabled={!canCreateComment}
@@ -257,6 +258,7 @@ function CommentRow({
   onSetCommentEngagement,
   onReplyToggle,
   showReplyButton,
+  replySelected = false,
 }: {
   allowEngagement: boolean;
   canDelete: boolean;
@@ -277,6 +279,7 @@ function CommentRow({
   ) => Promise<void>;
   onReplyToggle: () => void;
   showReplyButton: boolean;
+  replySelected?: boolean;
 }) {
   const likeActionKey = `${comment.commentId}:LIKE`;
   const likeActive = isAuthenticated && comment.viewerHasLiked;
@@ -326,12 +329,12 @@ function CommentRow({
   return (
     <article
       className={cn(
-        "group flex items-start gap-2.5",
+        "comment-row group flex items-start gap-2.5",
         isNested ? "py-2.5" : "py-4",
         comment.status === "HIDDEN" && "rounded-lg bg-amber-50/70 px-3 py-3",
       )}
     >
-      <div className={cn("shrink-0 overflow-hidden rounded-full", isNested ? "size-6" : "size-7")}>
+      <div className={cn("comment-avatar shrink-0 overflow-hidden rounded-full", isNested ? "size-6" : "size-7")}>
         <img
           src="/default-avatar.svg"
           alt=""
@@ -340,9 +343,9 @@ function CommentRow({
           draggable="false"
         />
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+      <div className="comment-main min-w-0 flex-1">
+        <div className="comment-header flex min-w-0 items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="min-w-0 break-words text-[length:var(--ui-text-body-size)] font-semibold text-slate-800 [overflow-wrap:anywhere]">
               {(lang === "en" ? comment.author.nameEn || comment.author.name : comment.author.name)}
             </span>
@@ -357,14 +360,14 @@ function CommentRow({
               </span>
             ) : null}
             <time
-              className="shrink-0 text-xs font-normal text-slate-400"
+              className="hidden shrink-0 text-xs font-normal text-slate-400 md:inline"
               dateTime={comment.createdAt}
               title={formatDateTime(comment.createdAt)}
             >
               {formatRelativeTime(comment.createdAt, lang)}
             </time>
           </div>
-          {!editing ? <div className="flex shrink-0 items-center gap-0.5 self-start sm:self-auto">
+          {!editing ? <div className="comment-row-actions ml-auto flex shrink-0 items-center gap-0.5">
             {allowEngagement ? <EngagementActionButton
               active={likeActive}
               className="comment-engagement-action h-7 gap-1 rounded-md border-0 px-2 text-xs font-medium"
@@ -395,9 +398,10 @@ function CommentRow({
                 variant="ghost"
                 size="icon"
                 aria-label={lang === "ko" ? "답글" : "Reply"}
+                aria-pressed={replySelected}
                 data-tooltip={lang === "ko" ? "답글" : "Reply"}
                 onClick={onReplyToggle}
-                className="comment-reply-action !size-7 !min-h-0 rounded-md border-0 bg-transparent !p-0 text-slate-400 hover:border-0 hover:bg-slate-100 hover:text-slate-500"
+                className="comment-reply-action md:!size-7 md:!min-h-0 rounded-md border-0 bg-transparent !p-0 text-slate-400 hover:border-0 hover:bg-slate-100 hover:text-slate-500"
               >
                 <MessageCircle className="size-3.5" aria-hidden="true" />
               </Button>
@@ -405,7 +409,7 @@ function CommentRow({
             {(canDelete || canHide || canRestore) && (
               <DropdownMenu.Root modal={false}>
                 <DropdownMenu.Trigger asChild>
-                  <Button type="button" variant="ghost" size="icon" aria-label={lang === "ko" ? "댓글 더보기" : "Comment actions"} className="mobile-more-trigger !size-7 min-h-0 rounded-md border-0 text-slate-500">
+                  <Button type="button" variant="ghost" size="icon" aria-label={lang === "ko" ? "댓글 더보기" : "Comment actions"} className="comment-more-action mobile-more-trigger md:!size-7 min-h-0 rounded-md border-0 text-slate-500">
                     <MoreVertical className="size-4" />
                   </Button>
                 </DropdownMenu.Trigger>
@@ -518,7 +522,7 @@ function CommentRow({
           </Modal>
         ) : null}
         {editing ? (
-          <div className="mt-2">
+          <div className="comment-editor mt-2">
               <UiTextarea
                 autoFocus
                 autoResize
@@ -547,10 +551,17 @@ function CommentRow({
             </div>
           </div>
         ) : (
-            <p className="mt-0 whitespace-pre-line text-[length:var(--ui-text-body-size)] font-normal leading-relaxed text-slate-700">
+            <p className="comment-content mt-0 whitespace-pre-line text-[length:var(--ui-text-body-size)] font-normal leading-relaxed text-slate-700">
             {comment.content}
           </p>
         )}
+        {!editing && <div className="comment-mobile-meta mt-1.5 flex items-center gap-2.5 text-xs text-slate-400 md:hidden">
+          <time dateTime={comment.createdAt} title={formatDateTime(comment.createdAt)}>{formatRelativeTime(comment.createdAt, lang)}</time>
+          {allowEngagement && <span className={cn("inline-flex items-center gap-1", likeActive ? "text-rose-600" : "text-slate-500")}>
+            <Heart aria-hidden="true" className="size-3" fill="currentColor" />
+            <span className="sr-only">{lang === "ko" ? "좋아요" : "Likes"}</span><span className="tabular-nums">{comment.likeCount}</span>
+          </span>}
+        </div>}
       </div>
     </article>
   );
@@ -637,7 +648,7 @@ export function CommentComposer({
           {isSubmitting ? (
             <Loader2 className={cn(mobile ? "size-5" : "size-4", "animate-spin")} />
           ) : mobile ? (
-            <Send className="size-5" aria-hidden="true" />
+            <Send className="size-5" fill="currentColor" aria-hidden="true" />
           ) : (
             <ArrowUp className="size-4" aria-hidden="true" />
           )}

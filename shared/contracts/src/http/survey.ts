@@ -32,6 +32,7 @@ export type SurveyAcademicEligibility = z.infer<typeof SurveyAcademicEligibility
 
 export type SurveyParticipationEligibilityReason =
   | "LOGIN_REQUIRED"
+  | "MEMBER_ACCOUNT_REQUIRED"
   | "PRIMARY_MAJOR_REQUIRED"
   | "ACADEMIC_STATUS_REQUIRED"
   | "FEE_PAYER_REQUIRED";

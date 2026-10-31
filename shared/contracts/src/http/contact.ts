@@ -115,6 +115,7 @@ export interface ContactSpreadsheetSyncResponse {
 
 export interface BulkImportContactsResponse {
   importedCount: number;
-  removedCount: number;
+  createdCount: number;
+  updatedCount: number;
   items: ContactRecord[];
 }

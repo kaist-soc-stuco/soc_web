@@ -76,17 +76,18 @@ export class ContactsController {
       reason,
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["이름", "학번", "부서", "직책", "이메일", "전화번호"],
-      ...items.map((item) => [
-        item.nameKo,
-        item.studentNumber,
-        item.departmentKo,
-        item.roleKo,
-        item.email,
-        item.phoneNumber,
-      ]),
+      ["이름", "학번", "부서", "직책", "이메일", "전화번호", "연도"],
+      ...items.flatMap((item) => {
+        const normalizeYear = (value: number) => value < 100 ? 2000 + value : value;
+        const selectedYear = cohort ? normalizeYear(Number(cohort)) : undefined;
+        const activities = item.activities?.length ? item.activities : [{ year: item.cohort ? normalizeYear(item.cohort) : null, departmentKo: item.departmentKo, roleKo: item.roleKo }];
+        // Filters select people. Keep their other positions in the selected year
+        // so re-importing a department export cannot remove concurrent positions.
+        return activities.filter(activity => !selectedYear || normalizeYear(activity.year ?? 0) === selectedYear)
+          .map(activity => [item.nameKo, item.studentNumber, activity.departmentKo, activity.roleKo, item.email, item.phoneNumber, activity.year ? normalizeYear(activity.year) : ""]);
+      }),
     ]);
-    worksheet["!cols"] = [16, 16, 20, 16, 30, 18].map(wch => ({ wch }));
+    worksheet["!cols"] = [16, 16, 20, 16, 30, 18, 10].map(wch => ({ wch }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "연락망");
     const buffer = Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
