@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type ChangeEvent,
 } from "react";
 import * as XLSX from "xlsx";
 import { createApiClient } from "@soc/api-client";
@@ -101,6 +100,7 @@ function ContactsPageContent() {
   const [activeContactId, setActiveContactId] = useState<string | null>(null);
   const [activeDragWidth, setActiveDragWidth] = useState<number | null>(null);
   const [importGuideOpen, setImportGuideOpen] = useState(false);
+  const [importDragging, setImportDragging] = useState(false);
   const [bulkRows, setBulkRows] = useState<ParsedContactSpreadsheetRow[]>([]);
   const [bulkErrors, setBulkErrors] = useState<string[]>([]);
   const [bulkFileName, setBulkFileName] = useState<string | null>(null);
@@ -201,10 +201,9 @@ function ContactsPageContent() {
     }
   };
 
-  const handleBulkFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = "";
-    if (!file) return;
+  const readBulkFile = async (file: File) => {
+    setImportDragging(false);
+    setImportGuideOpen(false);
     try {
       const parsed = parseContactSpreadsheet(await file.arrayBuffer());
       setBulkFileName(file.name);
@@ -375,14 +374,22 @@ function ContactsPageContent() {
       <main className="admin-page__main mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6 md:px-6 xl:px-6">
         {ConfirmDialog}
         <AdminPageHeader title="집행위 연락망" actions={headerActions} />
-        <Modal open={importGuideOpen} onClose={() => setImportGuideOpen(false)} title="부원 명단 가져오기" size="standard" footer={<><Button variant="outline" onClick={() => setImportGuideOpen(false)}>취소</Button><Button onClick={() => {setImportGuideOpen(false);bulkFileInputRef.current?.click();}}>파일 선택</Button></>}>
+        <Modal open={importGuideOpen} onClose={() => { setImportGuideOpen(false); setImportDragging(false); }} title="부원 명단 가져오기" size="standard" footer={<Button variant="outline" onClick={() => setImportGuideOpen(false)}>닫기</Button>}>
           <div className="space-y-5 text-sm leading-6">
             <p>전용 양식에 명단을 작성한 뒤 XLSX 파일을 업로드해 주세요.</p>
-            <section className="space-y-2"><h3 className="font-semibold">1. 양식 준비</h3><Button variant="outline" onClick={downloadContactTemplate}>양식 다운로드</Button><p className="text-slate-500">열 이름과 순서를 유지해 주세요.</p></section>
-            <section className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5"><h3 className="font-semibold">2. 파일 업로드</h3><p className="mt-1 text-slate-500">파일을 선택하면 등록 전에 내용을 검토할 수 있습니다.</p></section>
+            <Button variant="outline" onClick={downloadContactTemplate}><Download aria-hidden="true" />양식 다운로드</Button>
+            <button type="button" onClick={() => bulkFileInputRef.current?.click()}
+              onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setImportDragging(true); }}
+              onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setImportDragging(false); }}
+              onDrop={(event) => { event.preventDefault(); setImportDragging(false); const file = event.dataTransfer.files[0]; if (file) void readBulkFile(file); }}
+              className={`flex min-h-48 w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-6 transition-colors focus-visible:outline-2 focus-visible:outline-brand-primary ${importDragging ? "border-brand-primary bg-emerald-50" : "border-slate-300 bg-slate-50 hover:border-brand-primary hover:bg-emerald-50/50"}`}>
+              <Upload aria-hidden="true" className="size-8 text-brand-primary" />
+              <span className="font-semibold text-slate-800">엑셀 파일을 여기에 놓거나 클릭해 선택하세요</span>
+              <span className="text-slate-500">XLSX 파일 · 등록 전에 내용을 확인할 수 있습니다.</span>
+            </button>
           </div>
         </Modal>
-        <UiInput ref={bulkFileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void handleBulkFileChange(event)} />
+        <UiInput ref={bulkFileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void readBulkFile(file); }} />
         {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div> : null}
 
         <>

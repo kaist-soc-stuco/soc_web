@@ -18,7 +18,7 @@ import {
   msToIso,
   nowMs,
 } from "@soc/shared";
-import { CalendarDays, ChevronDown, Upload, RefreshCw } from "lucide-react";
+import { CalendarDays, ChevronDown, Download, Upload, RefreshCw } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import {
@@ -50,6 +50,7 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { formatNumericDateRange } from "@/lib/date-display";
 import { Permissions } from "@/lib/permissions";
+import { downloadBlob } from "@/lib/download-blob";
 
 type SourceFilter = "all" | "ARTICLE" | "MANUAL" | "KAIST_ACADEMIC";
 type VisibilityFilter = "all" | "visible" | "hidden";
@@ -179,6 +180,7 @@ function CalendarManagementContent() {
   const [draft, setDraft] = useState<EventDraft>(emptyDraft);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState<"kaist" | "google" | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const eventsQuery = useAdminListQuery({
     resource: "calendar-events",
@@ -370,6 +372,14 @@ function CalendarManagementContent() {
               <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
                 <Upload className="size-4" aria-hidden="true" />
                 ICS 가져오기
+              </Button>
+              <Button variant="outline" loading={exporting} onClick={async () => {
+                setExporting(true);
+                try { downloadBlob(await apiClient.exportCalendarIcs(), "일정.ics"); }
+                catch { toast({ type: "error", message: "일정을 내보내지 못했습니다." }); }
+                finally { setExporting(false); }
+              }}>
+                <Download className="size-4" aria-hidden="true" />ICS 내보내기
               </Button>
               <DropdownMenu.Root modal={false}>
                 <DropdownMenu.Trigger asChild><Button variant="outline" disabled={syncing !== null}><RefreshCw className={`size-4 ${syncing ? "animate-spin" : ""}`} aria-hidden="true" />동기화<ChevronDown className="size-4" aria-hidden="true" /></Button></DropdownMenu.Trigger>

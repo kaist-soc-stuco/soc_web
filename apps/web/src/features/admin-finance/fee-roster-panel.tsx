@@ -16,6 +16,8 @@ import { resolveApiBaseUrl } from "@/lib/api";
 import { downloadBlob } from "@/lib/download-blob";
 import { feeRosterRow, feeRosterUpdate, type FeeRosterRow } from "@/lib/fee-roster";
 import { FeePaymentImport } from "./fee-payment-import";
+import { Modal } from "@/components/ui/modal";
+import { createFeePaymentTemplate } from "@/lib/fee-payment-spreadsheet";
 import { randomId } from "@/lib/random-id";
 
 function renderSortStatus({ sortDirection, priority }: RenderSortStatusProps) {
@@ -41,6 +43,7 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [membership, setMembership] = useState("all");
@@ -82,7 +85,6 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
       renderCell: ({ row }) => <span className="flex h-full items-center justify-between gap-1">{row.updatedAt || row.userId ? <button className="admin-sheet-link" onClick={() => onOpenDetail(row)}>{row.stdNo || "학번 없음"}</button> : <><span>{row.stdNo}</span><Button size="icon" variant="ghost" className="h-6 w-6" aria-label="추가 행 삭제" onClick={() => setRows(current => current.filter(item => item.key !== row.key))}>×</Button></>}</span> },
     { key: "nameKo", name: "이름", width: 130, editable: row => canEdit && !busy && !row.userId && row.updatedAt === null, renderEditCell: renderTextEditor,
       renderCell: ({ row }) => row.updatedAt || row.userId ? <button className="admin-sheet-link" onClick={() => onOpenDetail(row)}>{row.nameKo || "이름 없음"}</button> : row.nameKo },
-    { key: "admissionYear", name: "입학 연도", width: 105, editable: row => canEdit && !busy && Boolean(row.stdNo), renderEditCell: renderTextEditor },
     { key: "totalPaidAmount", name: "누적 수납액", width: 145, cellClass: "admin-sheet-money", headerCellClass: "admin-sheet-money", renderCell: ({ row }) => (row.totalPaidAmount ?? 0).toLocaleString("ko-KR") },
     { key: "status", name: "납부 상태", width: 115, renderCell: ({ row }) => row.status === "PAID" ? "완납" : row.status === "PARTIAL" ? "부분 납부" : "미납" },
     { key: "joinedAt", name: "가입 여부", width: 110, renderCell: ({ row }) => row.userId ? "가입" : "미가입" },
@@ -102,12 +104,19 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
   const exportRows = async () => {
     const reason = "";
     setExporting(true);
-    try { downloadBlob(await client.exportStudentFeeRoster(reason, semester), "과비 납부 관리.xlsx"); }
+    try { downloadBlob(await client.exportStudentFeeRoster(reason, semester), "과비 납부 관리.xlsx"); setExportOpen(false); }
     catch { toast({ type: "error", message: "내려받지 못했습니다." }); }
     finally { setExporting(false); }
   };
   return <section className="fee-roster-panel min-w-0" aria-label="과비 납부 관리">
     {ConfirmDialog}
+    <Modal open={exportOpen} onClose={() => { if (!exporting) setExportOpen(false); }} title="내보내기" size="compact"
+      footer={<Button variant="outline" disabled={exporting} onClick={() => setExportOpen(false)}>닫기</Button>}>
+      <div className="flex flex-col gap-3">
+        {canExport && <Button variant="outline" loading={exporting} disabled={exporting} onClick={() => void exportRows()}><Download />전체 명부 내보내기</Button>}
+        {canEdit && <Button variant="outline" disabled={exporting} onClick={() => { downloadBlob(createFeePaymentTemplate(), "입금 등록 양식.xlsx"); setExportOpen(false); }}><Download />입금 양식 다운로드</Button>}
+      </div>
+    </Modal>
     <AdminTableCard className="fee-roster-card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
         <div className="flex flex-wrap gap-2">
@@ -117,7 +126,7 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
         </div>
         <div className="flex flex-wrap gap-2">
           {selectionAction}
-          {canExport && <Button variant="outline" loading={exporting} disabled={busy || dirty} onClick={() => void exportRows()}><Download />전체 명부 내보내기</Button>}
+          {(canExport || canEdit) && <Button variant="outline" disabled={busy || dirty} onClick={() => setExportOpen(true)}><Download />내보내기</Button>}
           {canEdit && <><Button variant="outline" disabled={busy} onClick={() => { setQuery(""); setMembership("all"); setStatus("all"); setRows(current => [{ key: randomId(), stdNo: "", nameKo: "", admissionYear: "", paidSemesters: "0", paidAmount: "0", note: "", userId: null, joinedAt: null, updatedAt: null, totalPaidAmount: 0, status: "UNPAID" }, ...current]); }}><Plus />행 추가</Button>
             <FeePaymentImport disabled={busy || dirty} onImported={async () => { await load(); onSaved(); }} />
             {dirty && <Button variant="ghost" disabled={busy} onClick={async () => { if (await confirm({ title: "저장하지 않은 변경 사항을 버릴까요?", tone: "danger" })) void load(); }}>변경 취소</Button>}

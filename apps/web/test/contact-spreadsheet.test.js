@@ -46,3 +46,18 @@ test("exported activity history preserves department punctuation and compact leg
   assert.equal(result.rows[2].activities[0].departmentKo, "");
   assert.equal(result.rows[2].activities[0].roleKo, "회장");
 });
+
+test("contact export imports display order and skips empty spreadsheet rows", () => {
+  const result = parse([
+    ["이름", "학번", "부서", "직책", "이메일", "전화번호", "활동 이력", "개인정보동의", "표시순서"],
+    ["테스트", "20260001", "기획부", "부원", "test@example.com", "010-1234-5678", "2026년 · 기획부 · 부원", "동의", 20],
+    ["", "", "", "", "", "", "", "", ""],
+  ]);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.rows.length, 1);
+  assert.equal(result.rows[0].sortOrder, 20);
+  assert.equal(result.rows[0].phoneNumber, "01012345678");
+  assert.equal(result.rows[0].activities[0].year, 2026);
+  const { BulkImportContactsSchema } = require("@soc/contracts");
+  assert.ok(BulkImportContactsSchema.safeParse({ items: result.rows, replaceExisting: false }).success);
+});

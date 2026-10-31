@@ -1,12 +1,11 @@
 import { useMemo, useRef, useState } from "react";
-import { Download, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type { StudentFeePaymentImportPreview, StudentFeePaymentImportRow } from "@soc/contracts";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
-import { createFeePaymentTemplate, parseFeePaymentSpreadsheet } from "@/lib/fee-payment-spreadsheet";
-import { downloadBlob } from "@/lib/download-blob";
+import { parseFeePaymentSpreadsheet } from "@/lib/fee-payment-spreadsheet";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { randomId } from "@/lib/random-id";
 
@@ -42,7 +41,6 @@ export function FeePaymentImport({ disabled, onImported }: { disabled: boolean; 
     } finally { inFlight.current = false; setSaving(false); }
   };
   return <>
-    <Button variant="outline" disabled={disabled || loading || saving} onClick={() => downloadBlob(createFeePaymentTemplate(), "입금 등록 양식.xlsx")}><Download />입금 양식 다운로드</Button>
     <Button variant="outline" disabled={disabled || saving} loading={loading} onClick={() => input.current?.click()}><Upload />입금 엑셀 가져오기</Button>
     <input ref={input} type="file" accept=".xlsx" className="hidden" aria-label="입금 엑셀 파일" onChange={async event => {
       const file = event.target.files?.[0]; event.target.value = "";

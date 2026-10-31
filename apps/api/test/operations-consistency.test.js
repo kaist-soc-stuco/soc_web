@@ -158,6 +158,30 @@ test("contact export traverses all pages with filters and audits the full export
   assert.equal(entries.find(row => row.action === "executive_contact.export").payload.count, 1001);
 });
 
+test("contact export matches displayed activity years for legacy and current records", opts, async () => {
+  const XLSX = require("xlsx");
+  const { ContactsController } = require(base + "features/contacts/contacts.controller.js");
+  const common = { nameEn: "", roleKo: "부원", roleEn: "", departmentKo: "기획부", privacyConsented: true };
+  const created = await db.insert(schema.executiveContacts).values([
+    { ...common, nameKo: `${prefix}-year-legacy`, cohort: 26 },
+    { ...common, nameKo: `${prefix}-year-current`, cohort: 2026, activities: [{ year: 2026, departmentKo: "기획부", roleKo: "부원" }] },
+    { ...common, nameKo: `${prefix}-year-history`, cohort: 25, activities: [{ year: 26, departmentKo: "기획부", roleKo: "부원" }, { year: 25, departmentKo: "다른부서", roleKo: "부원" }] },
+    { ...common, nameKo: `${prefix}-year-other`, cohort: 25 },
+  ]).returning();
+  const service = new ContactsService(contacts, audit, {}, { enqueueSync: async () => {} });
+  const controller = new ContactsController(service, {});
+  const file = await controller.exportManagedContacts({ ip: "127.0.0.1" }, `${prefix}-year-`, "2026", "기획부");
+  const chunks = [];
+  for await (const chunk of file.getStream()) chunks.push(chunk);
+  const book = XLSX.read(Buffer.concat(chunks), { type: "buffer" });
+  const rows = XLSX.utils.sheet_to_json(book.Sheets["연락망"], { header: 1 });
+  assert.equal(rows.length, 4);
+  assert.deepEqual(new Set(rows.slice(1).map(row => row[0])), new Set(created.slice(0, 3).map(row => row.nameKo)));
+  assert.ok(rows.slice(1).every(row => row[6].includes("2026년")));
+  const shortYear = await contacts.findManaged({ q: `${prefix}-year-`, cohort: 26, department: "기획부" });
+  assert.equal(shortYear.total, 3);
+});
+
 const calendar = () => new CalendarService(db, config, { enqueueEvent: async () => {} }, audit);
 const ics = events => ["BEGIN:VCALENDAR", "VERSION:2.0", ...events.flatMap(event => ["BEGIN:VEVENT", `UID:${randomUUID()}`, "SUMMARY:Synthetic calendar", ...event, "END:VEVENT"]), "END:VCALENDAR"].join("\r\n");
 

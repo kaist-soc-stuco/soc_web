@@ -35,7 +35,7 @@ const HEADER_ALIASES: Record<keyof ParsedContactSpreadsheetRow, string[]> = {
   email: ["email", "이메일", "메일"],
   phoneNumber: ["phonenumber", "phone", "전화번호", "연락처", "휴대전화"],
   privacyConsented: ["privacyconsented", "개인정보동의", "동의여부"],
-  sortOrder: ["sortorder", "순서", "정렬순서"],
+  sortOrder: ["sortorder", "순서", "정렬순서", "표시순서"],
 };
 
 const requiredFields: Array<keyof ParsedContactSpreadsheetRow> = ["nameKo", "roleKo"];
@@ -92,6 +92,7 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
   const errors: string[] = [];
 
   rows.slice(1).forEach((cells, rowOffset) => {
+    if (cells.every(cell => !normalizeCell(cell))) return;
     const lineNumber = rowOffset + 2;
     const value = (field: keyof ParsedContactSpreadsheetRow) =>
       (columnIndexes.has(field) ? normalizeCell(cells[columnIndexes.get(field)!]) : "");

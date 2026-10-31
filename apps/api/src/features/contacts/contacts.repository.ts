@@ -180,6 +180,8 @@ export class ContactsRepository {
     const pageSize = Math.min(Math.max(input.pageSize ?? 50, 1), 500);
     const offset = (page - 1) * pageSize;
     const normalizedQuery = input.q?.trim() ?? "";
+    const year = input.cohort !== undefined && input.cohort < 100 ? 2000 + input.cohort : input.cohort;
+    const yearValues = year !== undefined ? (year > 2000 && year < 2100 ? [year, year - 2000] : [year]) : [];
     const conditions: Array<SQL | undefined> = [
       normalizedQuery
         ? or(
@@ -199,11 +201,11 @@ export class ContactsRepository {
         ? or(
             and(
               sql`jsonb_array_length(${executiveContacts.activities}) = 0`,
-              input.cohort !== undefined ? eq(executiveContacts.cohort, input.cohort) : undefined,
+              year !== undefined ? sql`${executiveContacts.cohort} IN (${sql.join(yearValues.map(value => sql`${value}`), sql`, `)})` : undefined,
               input.department ? or(eq(executiveContacts.departmentKo, input.department), eq(executiveContacts.departmentEn, input.department)) : undefined,
             ),
             sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${executiveContacts.activities}) a
-              WHERE ${input.cohort !== undefined ? sql`a->>'year' = ${String(input.cohort)}` : sql`TRUE`}
+              WHERE ${year !== undefined ? sql`a->>'year' IN (${sql.join(yearValues.map(value => sql`${String(value)}`), sql`, `)})` : sql`TRUE`}
               AND ${input.department ? sql`(a->>'departmentKo' = ${input.department} OR a->>'departmentEn' = ${input.department})` : sql`TRUE`})`,
           )
         : undefined,

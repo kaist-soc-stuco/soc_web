@@ -254,13 +254,12 @@ export class UsersController {
     const decodedReason = requireDownloadReasonHeader(reason);
     const { records } = await this.usersService.exportStudentFeeRoster(auditMetadataFromRequest(req), decodedReason, semester);
     const sheet = XLSX.utils.aoa_to_sheet([
-      ["학번", "이름", "입학 연도", "비고", "가입 일시", "누적 수납액", "상태", "수정 일시"],
-      ...records.map(row => [row.stdNo, row.nameKo ?? "", row.admissionYear ?? "",
-        row.note ?? "", row.joinedAt ?? "", row.totalPaidAmount ?? 0, row.status ?? "UNPAID", row.updatedAt ?? ""]),
+      ["학번", "이름", "비고", "누적 수납액", "상태"],
+      ...records.map(row => [row.stdNo, row.nameKo ?? "", row.note ?? "", row.totalPaidAmount ?? 0, row.status ?? "UNPAID"]),
     ]);
-    sheet["!cols"] = [14, 18, 12, 40, 28, 20, 14, 28].map(wch => ({ wch }));
+    sheet["!cols"] = [14, 18, 40, 20, 14].map(wch => ({ wch }));
     for (let row = 2; row <= records.length + 1; row++) {
-      for (const column of ["F"]) if (sheet[column + row]) sheet[column + row].z = "#,##0";
+      if (sheet["D" + row]) sheet["D" + row].z = "#,##0";
     }
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, "납부 관리");
     XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
