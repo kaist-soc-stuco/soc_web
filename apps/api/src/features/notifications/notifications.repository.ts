@@ -74,6 +74,7 @@ export class NotificationsRepository {
     userId: string,
     page: number,
     pageSize: number,
+    unreadOnly = false,
   ): Promise<NotificationListResponse> {
     const rows = await this.db
       .select()
@@ -113,14 +114,16 @@ export class NotificationsRepository {
       return existingArticleKeys.has(`${target.boardCode}:${target.articleId}`);
     });
     const offset = (page - 1) * pageSize;
-    const pageRows = visibleRows.slice(offset, offset + pageSize);
+    const unreadRows = visibleRows.filter((row) => !row.isRead);
+    const requestedRows = unreadOnly ? unreadRows : visibleRows;
+    const pageRows = requestedRows.slice(offset, offset + pageSize);
 
     return {
       items: pageRows.map((row) => this.mapRow(row)),
       page,
       pageSize,
-      total: visibleRows.length,
-      unreadCount: visibleRows.filter((row) => !row.isRead).length,
+      total: requestedRows.length,
+      unreadCount: unreadRows.length,
     };
   }
 

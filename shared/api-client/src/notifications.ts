@@ -13,12 +13,14 @@ export const createNotificationsApi = ({
   getNotifications: async (options?: {
     page?: number;
     pageSize?: number;
+    unreadOnly?: boolean;
   }): Promise<NotificationListResponse> => {
     const params = new URLSearchParams();
     if (options?.page !== undefined) params.set("page", String(options.page));
     if (options?.pageSize !== undefined) {
       params.set("pageSize", String(options.pageSize));
     }
+    if (options?.unreadOnly !== undefined) params.set("unreadOnly", String(options.unreadOnly));
 
     return requestJson<NotificationListResponse>(
       `${notificationsBaseUrl}${params.toString() ? `?${params.toString()}` : ""}`,

@@ -1,0 +1,36 @@
+@media (width < 768px) {
+  .legal-document-page {
+    --ui-surface-canvas: #fff;
+  }
+
+  .legal-document-content {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .legal-document-content :is(.legal-document-header, .legal-document-toc, .legal-document-section, .legal-document-footer) {
+    padding-inline: 0;
+    background: transparent;
+  }
+
+  .legal-document-header {
+    padding-top: 0;
+  }
+
+  .legal-document-groups {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .legal-document-groups > div {
+    padding-inline: 0;
+  }
+
+  .legal-document-prose {
+    font-size: 0.8125rem;
+  }
+}

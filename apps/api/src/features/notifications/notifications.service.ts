@@ -17,7 +17,7 @@ export class NotificationsService {
 
   async listForUser(
     userId: string,
-    input: { page?: number; pageSize?: number },
+    input: { page?: number; pageSize?: number; unreadOnly?: boolean },
   ): Promise<NotificationListResponse> {
     const page = Number.isFinite(input.page)
       ? Math.max(1, Math.floor(input.page!))
@@ -26,7 +26,7 @@ export class NotificationsService {
       ? Math.min(50, Math.max(1, Math.floor(input.pageSize!)))
       : 20;
 
-    return this.notificationsRepository.listForUser(userId, page, pageSize);
+    return this.notificationsRepository.listForUser(userId, page, pageSize, input.unreadOnly ?? false);
   }
 
   async markRead(userId: string, notificationId: string): Promise<NotificationReadResponse> {

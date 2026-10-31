@@ -19,6 +19,7 @@ import {
 } from "../../../infrastructure/postgres/postgres.provider";
 import {
   articles,
+  boards,
   commentEngagements,
   comments,
   users,
@@ -340,11 +341,10 @@ export class CommentRepository {
         articleAuthorUserId: articles.authorUserId,
         articleId: articles.articleId,
         articleTitleKo: articles.titleKo,
-        boardCode: sql<string>`(
-          select code from board where board_id = ${articles.boardId} limit 1
-        )`,
+        boardCode: boards.code,
       })
       .from(articles)
+      .innerJoin(boards, eq(boards.boardId, articles.boardId))
       .where(eq(articles.articleId, comment.articleId))
       .limit(1);
 
@@ -437,7 +437,7 @@ export class CommentRepository {
         commentId: comments.commentId,
         articleId: comments.articleId,
         articleTitleKo: articles.titleKo,
-        boardCode: sql<string>`(select code from board where board_id = ${articles.boardId} limit 1)`,
+        boardCode: boards.code,
         content: comments.content,
         authorName: users.nameKo,
         authorNameEn: users.nameEn,
@@ -446,6 +446,7 @@ export class CommentRepository {
       })
       .from(comments)
       .innerJoin(articles, eq(comments.articleId, articles.articleId))
+      .innerJoin(boards, eq(boards.boardId, articles.boardId))
       .leftJoin(users, eq(comments.authorUserId, users.userId))
       .where(eq(comments.status, COMMENT_STATUS.HIDDEN))
       .orderBy(sql`${comments.hiddenAt} desc`);

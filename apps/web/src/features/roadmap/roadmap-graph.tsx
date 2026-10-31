@@ -14,7 +14,7 @@ import {
   type OnMove,
   type ReactFlowInstance,
 } from "@xyflow/react";
-import { ChevronDown, Clock3, MapPin, Maximize2, Minimize2, Minus, Plus, RotateCcw, Search, X } from "lucide-react";
+import { ChevronDown, Clock3, ExternalLink, MapPin, Maximize2, Minimize2, Minus, Plus, RotateCcw, Search, X } from "lucide-react";
 import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -29,6 +29,7 @@ import { useLocation } from "react-router-dom";
 
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { IconButton } from "@/components/ui/icon-button";
+import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/text-input";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { Switch } from "@/components/ui/switch";
@@ -60,6 +61,7 @@ import "@xyflow/react/dist/style.css";
 import { createRoadmapRouter, roundedPath, uniqueRoutePaths, type Point } from "./roadmap-routing";
 import { easeRoadmapCamera, getCourseFocusViewport, isCourseComfortablyVisible, type RoadmapViewport } from "./roadmap-camera";
 import { readRoadmapViewState, restoreRoadmapViewport, saveRoadmapViewState } from "./roadmap-view-state";
+import { getRoadmapOtlUrl } from "./roadmap-otl";
 
 const RoutedEdge = memo(function RoutedEdge(props: EdgeProps) {
   const paths = useMemo(() => {
@@ -400,6 +402,12 @@ export function RoadmapGraph({
   const [selectedTerm, setSelectedTerm] = useState<RoadmapOfferingTerm>(savedView?.selectedTerm ?? "2026-fall");
   const [offeredOnly, setOfferedOnly] = useState(savedView?.offeredOnly ?? false);
   const isMobile = useMediaQuery("(max-width: 767px)");
+  const [lastSelectedCourseCode, setLastSelectedCourseCode] = useState(selectedCourseCode);
+  if (selectedCourseCode && selectedCourseCode !== lastSelectedCourseCode) {
+    setLastSelectedCourseCode(selectedCourseCode);
+  }
+  // Keep the exiting sheet's content when a URL update clears the selection.
+  const sheetCourseCode = selectedCourseCode ?? lastSelectedCourseCode;
   const showGraph = useMediaQuery("(min-width: 1024px)");
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftFilters, setDraftFilters] = useState({ term: selectedTerm, offeredOnly, tracks: new Set<string>() });
@@ -880,8 +888,8 @@ export function RoadmapGraph({
         </details>
         </>}
 
-        {isMobile ? <FilterSheet className="mobile-filter-sheet mobile-course-sheet" bodyClassName="mobile-course-sheet-body" open={Boolean(selectedCourseCode)} onClose={() => onSelectedCourseChange(null)} title={<span className="flex min-w-0 items-center gap-2"><span className="min-w-0">{selectedCourseCode ? roadmapCourseByCode.get(selectedCourseCode)?.name[lang] ?? (lang === "ko" ? "과목 상세" : "Course details") : ""}</span>{selectedCourseCode && <span className="roadmap-course-code">{displayCodeByCourse.get(selectedCourseCode) ?? selectedCourseCode}</span>}</span>} closeLabel={lang === "ko" ? "과목 상세 닫기" : "Close course details"}>
-          <CourseDetails courseCode={selectedCourseCode} courseByCode={roadmapCourseByCode} displayCodeByCourse={displayCodeByCourse} lang={lang} relations={roadmapRelations} offeringsByCourse={offeringsByCourse} selectedTerm={selectedTerm} onClose={() => onSelectedCourseChange(null)} onCourseClick={onSelectedCourseChange} sheet />
+        {isMobile ? <FilterSheet className="mobile-filter-sheet mobile-course-sheet" bodyClassName="mobile-course-sheet-body" open={Boolean(selectedCourseCode)} onClose={() => onSelectedCourseChange(null)} title={<span className="flex min-w-0 items-center gap-2"><span className="min-w-0">{sheetCourseCode ? roadmapCourseByCode.get(sheetCourseCode)?.name[lang] ?? (lang === "ko" ? "과목 상세" : "Course details") : ""}</span>{sheetCourseCode && <span className="roadmap-course-code">{displayCodeByCourse.get(sheetCourseCode) ?? sheetCourseCode}</span>}</span>} closeLabel={lang === "ko" ? "과목 상세 닫기" : "Close course details"}>
+          <CourseDetails courseCode={sheetCourseCode} courseByCode={roadmapCourseByCode} displayCodeByCourse={displayCodeByCourse} lang={lang} relations={roadmapRelations} offeringsByCourse={offeringsByCourse} selectedTerm={selectedTerm} onClose={() => onSelectedCourseChange(null)} onCourseClick={onSelectedCourseChange} sheet />
         </FilterSheet> : selectedCourseCode ? (
           <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 pb-5">
             <CourseDetails
@@ -1185,6 +1193,7 @@ function CourseDetails({
 }: CourseDetailsProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "offerings">("overview");
   const item = courseCode ? courseByCode.get(courseCode) : undefined;
+  const otlUrl = item ? getRoadmapOtlUrl(item.code) : null;
   const allOfferings = item ? offeringsByCourse.get(item.code) ?? [] : [];
   const offerings = allOfferings.filter((offering) => offering.term === selectedTerm);
   const previous = item
@@ -1219,10 +1228,10 @@ function CourseDetails({
 
   return (
     <section className="roadmap-course-details pt-5" aria-live="polite">
-      {!sheet && <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <h2 className="min-w-0 text-lg font-semibold leading-tight tracking-tight text-slate-950">{item.name[lang]}</h2>
-          <span className="roadmap-course-code">{displayCodeByCourse.get(item.code) ?? item.code}</span>
+      {!sheet && <div className="flex items-center justify-between gap-3">
+        <div className="roadmap-course-heading flex min-w-0 items-center gap-2">
+          <h2 className="min-w-0 text-lg font-semibold leading-6 tracking-tight text-slate-950">{item.name[lang]}</h2>
+          <span className="roadmap-course-code self-center">{displayCodeByCourse.get(item.code) ?? item.code}</span>
         </div>
         {!sheet && <IconButton aria-label={lang === "ko" ? "과목 상세 닫기" : "Close details"} onClick={onClose}>
           <X aria-hidden="true" className="size-4" />
@@ -1316,6 +1325,14 @@ function CourseDetails({
         </>
       )}
       </div>
+      {otlUrl && <div className="roadmap-course-footer shrink-0 pt-4">
+        <Button asChild variant="outline" className="min-h-11 w-full !border-slate-200 !bg-white hover:!border-slate-300 hover:!bg-slate-50">
+          <a href={otlUrl} target="_blank" rel="noopener noreferrer">
+            {lang === "ko" ? "OTL 강의평 확인하기" : "View course reviews on OTL"}
+            <ExternalLink aria-hidden="true" className="size-4" />
+          </a>
+        </Button>
+      </div>}
     </section>
   );
 }

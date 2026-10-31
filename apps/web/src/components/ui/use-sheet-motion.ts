@@ -6,6 +6,7 @@ export function useSheetMotion(open: boolean, surfaceRef: RefObject<HTMLElement 
   const animations = useRef<Animation[]>([]);
   const closing = useRef(false);
   const notifyOnClose = useRef(false);
+  const dismissed = useRef(false);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const cancel = useCallback(() => {
@@ -15,6 +16,7 @@ export function useSheetMotion(open: boolean, surfaceRef: RefObject<HTMLElement 
 
   const close = useCallback((notify: boolean) => {
     notifyOnClose.current ||= notify;
+    dismissed.current ||= notify;
     if (closing.current) return;
     const surface = surfaceRef.current;
     const finish = () => {
@@ -45,9 +47,12 @@ export function useSheetMotion(open: boolean, surfaceRef: RefObject<HTMLElement 
   }, [cancel, enabled, surfaceRef]);
 
   useLayoutEffect(() => {
+    if (!open) dismissed.current = false;
     if (!present) {
       cancel();
-      if (open) setPresent(true);
+      // Router-driven owners can acknowledge onClose in a later render. Do not
+      // reopen the finished sheet while its previous open prop is still true.
+      if (open && !dismissed.current) setPresent(true);
       return;
     }
     if (!open) { close(false); return; }

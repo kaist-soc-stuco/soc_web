@@ -84,6 +84,7 @@ export function Header({ variant = "default" }: HeaderProps) {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const notificationsUserIdRef = useRef<string | null>(null);
   const [loginStarting, setLoginStarting] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const previousNotificationOpen = useRef(false);
@@ -205,17 +206,20 @@ export function Header({ variant = "default" }: HeaderProps) {
 
   useEffect(() => {
     if (!user) {
+      notificationsUserIdRef.current = null;
       setNotifications([]);
       setUnreadNotificationCount(0);
       setNotificationOpen(false);
       return;
     }
+    if (!notificationOpen && notificationsUserIdRef.current === user.id) return;
 
     let cancelled = false;
     void apiClient
-      .getNotifications({ page: 1, pageSize: 5 })
+      .getNotifications({ page: 1, pageSize: 5, unreadOnly: true })
       .then((response) => {
         if (cancelled) return;
+        notificationsUserIdRef.current = user.id;
         setNotifications(response.items.filter((item) => !item.isRead));
         setUnreadNotificationCount(response.unreadCount);
       })
@@ -226,7 +230,7 @@ export function Header({ variant = "default" }: HeaderProps) {
     return () => {
       cancelled = true;
     };
-  }, [apiClient, user?.id]);
+  }, [apiClient, user?.id, notificationOpen]);
 
   useLayoutEffect(() => {
     setSearchOpen(false);

@@ -1,0 +1,7 @@
+# Documentation-only network values (RFC 5737 TEST-NET).
+# Replace gateway/source/interface with the real host values before installation.
+# This is a host-only config, not the API .env. Do not put secrets here.
+SSO_EGRESS_HOST=ssodev.kaist.ac.kr
+SSO_EGRESS_INTERFACE=eth0
+SSO_EGRESS_GATEWAY=192.0.2.1
+SSO_EGRESS_SOURCE_IP=192.0.2.10

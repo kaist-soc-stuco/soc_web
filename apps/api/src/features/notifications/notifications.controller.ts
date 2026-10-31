@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, Patch, Query, Req, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, ParseBoolPipe, ParseIntPipe, Patch, Query, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
 import type {
   NotificationListResponse,
@@ -23,10 +23,12 @@ export class NotificationsController {
     @Req() request: AuthenticatedRequest,
     @Query("page", new ParseIntPipe({ optional: true })) page?: number,
     @Query("pageSize", new ParseIntPipe({ optional: true })) pageSize?: number,
+    @Query("unreadOnly", new ParseBoolPipe({ optional: true })) unreadOnly?: boolean,
   ): Promise<NotificationListResponse> {
     return this.notificationsService.listForUser(request.user!.id, {
       page,
       pageSize,
+      unreadOnly,
     });
   }
 

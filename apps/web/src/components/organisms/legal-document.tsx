@@ -3,6 +3,7 @@ import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { useLanguage, type Language } from "@/hooks/use-language";
 import { PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import { useLayoutEffect, useState } from "react";
+import "./legal-document.css";
 
 type LegalText = Readonly<{
   ko: string;
@@ -834,7 +835,7 @@ function LegalSectionView({ lang, section, kind }: { lang: Language; section: Le
   const BulletList = kind === "terms" ? "ol" : "ul";
 
   return (
-    <section id={section.id} className="scroll-mt-24 break-words select-text px-5 py-7 md:px-8">
+    <section id={section.id} className="legal-document-section scroll-mt-24 break-words select-text px-5 py-7 md:px-8">
       <div className="min-w-0">
         <h2 className="text-lg font-semibold tracking-tight text-app-text-strong">
           {isSupplementary ? localized(section.title, lang) : lang === "ko"
@@ -843,7 +844,7 @@ function LegalSectionView({ lang, section, kind }: { lang: Language; section: Le
         </h2>
 
         {section.paragraphs?.length ? (
-          <div className="mt-3 space-y-3 text-sm leading-6 text-app-text-body">
+          <div className="legal-document-prose mt-3 space-y-3 text-sm leading-6 text-app-text-body">
             {section.paragraphs.map((paragraph, index) => (
               <p key={`${section.id}-paragraph-${index}`}>
                 {kind === "terms" && (section.paragraphs?.length ?? 0) > 1 ? (
@@ -856,7 +857,7 @@ function LegalSectionView({ lang, section, kind }: { lang: Language; section: Le
         ) : null}
 
         {section.bullets?.length ? (
-          <BulletList className={`mt-3 ${kind === "terms" ? "list-decimal" : "list-disc"} space-y-2 pl-5 text-sm leading-6 text-app-text-body marker:text-brand-primary`}>
+          <BulletList className={`legal-document-prose mt-3 ${kind === "terms" ? "list-decimal" : "list-disc"} space-y-2 pl-5 text-sm leading-6 text-app-text-body marker:text-brand-primary`}>
             {section.bullets.map((bullet, index) => (
               <li key={`${section.id}-bullet-${index}`}>{localized(bullet, lang)}</li>
             ))}
@@ -864,10 +865,10 @@ function LegalSectionView({ lang, section, kind }: { lang: Language; section: Le
         ) : null}
 
         {section.groups?.length ? (
-          <dl className="mt-4 divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-slate-50/60">
+          <dl className="legal-document-groups mt-4 divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-slate-50/60">
             {section.groups.map((group, index) => (
               <div className="grid gap-1 px-4 py-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-5" key={`${section.id}-group-${index}`}>
-                <dt className="flex flex-wrap items-center gap-2 text-sm font-semibold text-app-text-strong">
+                <dt className="legal-document-prose flex flex-wrap items-center gap-2 text-sm font-semibold text-app-text-strong">
                   {group.kind ? (
                     <span className={group.kind === "required"
                       ? "rounded-md bg-brand-primary-light px-2 py-0.5 text-xs font-semibold text-brand-primary"
@@ -879,7 +880,7 @@ function LegalSectionView({ lang, section, kind }: { lang: Language; section: Le
                   ) : null}
                   {localized(group.label, lang)}
                 </dt>
-                <dd className="min-w-0 whitespace-pre-line break-words text-sm leading-5 text-app-text-body">
+                <dd className="legal-document-prose min-w-0 whitespace-pre-line break-words text-sm leading-5 text-app-text-body">
                   {localized(group.value, lang)}
                 </dd>
               </div>
@@ -903,7 +904,7 @@ export function LegalDocumentPage({ kind }: { kind: "terms" | "privacy" }) {
   }, [kind, selectedVersion.version]);
 
   return (
-    <PageShell>
+    <PageShell className="legal-document-page">
 
       <PageMain>
         <PageHeader
@@ -912,10 +913,10 @@ export function LegalDocumentPage({ kind }: { kind: "terms" | "privacy" }) {
         />
 
         <PageContainer className="max-w-[var(--ui-legal-max-width)] pb-12">
-          <article className="break-words overflow-hidden rounded-[var(--ui-card-radius)] border border-slate-200 bg-white shadow-card">
-            <header className="border-b border-slate-200 bg-slate-50/70 px-5 py-6 md:px-8">
+          <article className="legal-document-content break-words overflow-hidden rounded-[var(--ui-card-radius)] border border-slate-200 bg-white shadow-card">
+            <header className="legal-document-header border-b border-slate-200 bg-slate-50/70 px-5 py-6 md:px-8">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="min-w-0 text-sm leading-6 text-app-text-strong">
+                <p className="legal-document-prose min-w-0 text-sm leading-6 text-app-text-strong">
                   <span className="text-app-text-muted">{lang === "ko" ? "운영 주체:" : "Operator:"}</span>
                   <span className="ml-1 font-medium">{lang === "ko" ? OPERATOR_NAME : OPERATOR_NAME_EN}</span>
                 </p>
@@ -933,16 +934,16 @@ export function LegalDocumentPage({ kind }: { kind: "terms" | "privacy" }) {
                   optionClassName="!px-2 text-sm font-normal"
                 />
               </div>
-              <p className="mt-2 text-sm leading-6 text-app-text-body">
+              <p className="legal-document-prose mt-2 text-sm leading-6 text-app-text-body">
                 {localized(document.summary, lang)}
               </p>
             </header>
 
-            <nav aria-label={localized(document.sectionsLabel, lang)} className="border-b border-slate-200 bg-slate-50/70 px-5 py-4 md:px-8">
+            <nav aria-label={localized(document.sectionsLabel, lang)} className="legal-document-toc border-b border-slate-200 bg-slate-50/70 px-5 py-4 md:px-8">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-app-text-muted">
                 {localized(document.sectionsLabel, lang)}
               </p>
-              <ol className="grid gap-x-8 gap-y-1 text-sm leading-6 text-app-text-body sm:grid-cols-2">
+              <ol className="legal-document-prose grid gap-x-8 gap-y-1 text-sm leading-6 text-app-text-body sm:grid-cols-2">
                 {selectedVersion.sections.map((section) => (
                   <li className={kind === "terms" && section.id === "effective-date" ? "list-none" : "list-inside list-decimal marker:text-app-text-muted"} key={section.id}>
                     <a
@@ -962,7 +963,7 @@ export function LegalDocumentPage({ kind }: { kind: "terms" | "privacy" }) {
               ))}
             </div>
 
-            <footer className="border-t border-slate-200 bg-slate-50/70 px-5 py-5 text-sm leading-6 text-app-text-body md:px-8">
+            <footer className="legal-document-footer legal-document-prose border-t border-slate-200 bg-slate-50/70 px-5 py-5 text-sm leading-6 text-app-text-body md:px-8">
               <p className="font-semibold text-app-text-strong">
                 {lang === "ko" ? "문의" : "Contact"}
               </p>

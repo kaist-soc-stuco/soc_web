@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh KAIST SSO host routes after boot and DNS changes
+
+[Timer]
+OnBootSec=20s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Unit=soc-web-sso-egress.service
+
+[Install]
+WantedBy=timers.target

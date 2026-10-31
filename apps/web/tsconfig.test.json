@@ -22,6 +22,7 @@
     "src/lib/korean-holidays.ts",
     "src/lib/my-page-localization.ts",
     "src/features/roadmap/roadmap-data.ts",
+    "src/features/roadmap/roadmap-otl.ts",
     "src/features/roadmap/roadmap-routing.ts",
     "src/features/roadmap/roadmap-camera.ts",
     "src/features/roadmap/roadmap-view-state.ts",

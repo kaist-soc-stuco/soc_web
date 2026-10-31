@@ -105,6 +105,8 @@ def write_xlsx(path, rows):
 
 
 class AcceptanceSuite:
+    context_options = {"viewport": {"width": 1440, "height": 1000}, "locale": "ko-KR", "timezone_id": "Asia/Seoul"}
+
     def __init__(self, browser, app_url: str):
         self.browser = browser
         self.base = app_url
@@ -117,7 +119,7 @@ class AcceptanceSuite:
     def page(self, actor="admin"):
         first_visit = actor not in self.contexts
         if first_visit:
-            context = self.browser.new_context(viewport={"width": 1440, "height": 1000}, locale="ko-KR", timezone_id="Asia/Seoul")
+            context = self.browser.new_context(**self.context_options)
             context.set_default_timeout(20000)
             context.set_default_navigation_timeout(45000)
             context.tracing.start(screenshots=True, snapshots=True)

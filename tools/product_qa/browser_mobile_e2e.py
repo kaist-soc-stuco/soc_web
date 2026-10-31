@@ -1,21 +1,30 @@
 """Mobile interaction regressions on the disposable synthetic product QA stack."""
 from pathlib import Path
 import argparse
+import base64
 import json
 import re
 import time
+import traceback
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit
 from urllib.request import urlopen
 
 from playwright.sync_api import expect, sync_playwright
-from browser_product_e2e import AcceptanceSuite
+from browser_product_e2e import AcceptanceSuite, auth
 
 BASE = "http://127.0.0.1:38765"
 OUT = Path(__file__).resolve().parents[2] / "output/product-e2e/mobile"
 
 
 class MobileSuite(AcceptanceSuite):
+    context_options = {**AcceptanceSuite.context_options, "viewport": {"width": 390, "height": 844}, "is_mobile": True, "has_touch": True}
+
     def page(self, actor="admin"):
         page = super().page(actor)
+        # Finish the initial fixture page before immediately navigating elsewhere.
+        # WebKit reports in-flight fetches cancelled by a hard navigation as page errors.
+        page.wait_for_load_state("networkidle")
         page.set_viewport_size({"width": 390, "height": 844})
         return page
 
@@ -214,6 +223,333 @@ class MobileSuite(AcceptanceSuite):
         expect(sheet).to_be_hidden()
         self.no_overflow(page)
 
+    def test_usage_event_registration_survey_and_network_retry(self):
+        admin, student = self.page(), self.page("student")
+        title = self.marker + " 모바일 참가 신청"
+        event = self.api(admin, "/boards/_EVENT/articles", method="POST", status=201, body={
+            "titleKo": title, "contentKo": "<p>모바일에서 참가 신청합니다.</p>", "visibilityScope": "PUBLIC",
+            "eventStartDate": (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
+            "eventEndDate": (datetime.now(timezone.utc) + timedelta(days=2, hours=2)).isoformat(),
+        })
+        survey = self.api(admin, "/surveys", method="POST", status=201, body={
+            "titleKo": title, "isKoreanOnly": True, "isAlwaysOpen": True, "allowResponseEdit": True,
+            "connectedArticleId": str(event["articleId"]),
+        })
+        path = f"/surveys/{survey['id']}"
+        sections = [self.api(admin, path + "/sections", method="POST", status=201,
+                            body={"titleKo": name, "sortOrder": i}) for i, name in enumerate(("신청 정보", "추가 정보"))]
+        def question(section, title, kind, order, **extra):
+            return self.api(admin, path + f"/sections/{section['id']}/questions", method="POST", status=201,
+                            body={"titleKo": title, "questionType": kind, "sortOrder": order, "isRequired": True, **extra})
+        name = question(sections[0], "참가자 이름", "short_text", 0)
+        choice = question(sections[0], "참가 유형", "dropdown", 1,
+                          options=[{"value": "student", "labelKo": "학부생"}, {"value": "other", "labelKo": "기타"}])
+        day = question(sections[1], "희망 날짜", "date", 0)
+        clock = question(sections[1], "희망 시간", "time", 1)
+        upload = question(sections[1], "참고 파일", "file_upload", 2,
+                          config={"maxFiles": 1, "allowedMimeTypes": ["image/png"], "maxSizeBytes": 100000})
+        self.api(admin, path, method="PATCH", body={"isPublished": True})
+        student.goto(BASE + f"/events/{event['articleId']}")
+        cta = student.locator("[data-survey-cta] a")
+        expect(cta).to_be_visible()
+        assert abs(cta.bounding_box()["width"] - student.locator("[data-survey-cta]").bounding_box()["width"]) <= 2
+        with student.expect_popup() as opened:
+            cta.tap()
+        form = opened.value
+        self.pages.append(form)
+        form.on("pageerror", lambda error: self.page_errors.append(str(error)))
+        form.wait_for_url(BASE + f"/survey/{survey['id']}")
+        form.get_by_role("button", name="다음", exact=True).click()
+        expect(form.get_by_text("필수 질문입니다", exact=False).first).to_be_visible()
+        form.locator('main input[type="text"]').fill("모바일 참가자")
+        native = form.get_by_role("combobox", name=re.compile("참가 유형"))
+        assert native.evaluate("el=>el.tagName") == "SELECT"
+        native.select_option("student")
+        form.get_by_role("button", name="다음", exact=True).click()
+        form.locator('input[type="date"]').fill("2026-11-02")
+        form.locator('input[type="time"]').fill("18:30")
+        for width in (320, 390):
+            form.set_viewport_size({"width": width, "height": 844})
+            self.no_overflow(form)
+        png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j5uUAAAAASUVORK5CYII=")
+        form.locator('input[type="file"]').set_input_files({"name": "mobile-response.png", "mimeType": "image/png", "buffer": png})
+        expect(form.get_by_text("mobile-response.png", exact=True)).to_be_visible()
+        form.reload()
+        expect(form.locator('main input[type="text"]')).to_have_value("모바일 참가자")
+        expect(native).to_have_value("student")
+        form.get_by_role("button", name="다음", exact=True).click()
+        expect(form.locator('input[type="date"]')).to_have_value("2026-11-02")
+        expect(form.locator('input[type="time"]')).to_have_value("18:30")
+        expect(form.get_by_text("mobile-response.png", exact=True)).to_be_visible()
+        def disconnect(route):
+            if route.request.method == "POST": route.abort("failed")
+            else: route.continue_()
+        form.route("**/api" + path + "/responses", disconnect)
+        form.get_by_role("button", name="제출", exact=True).click()
+        expect(form.get_by_role("button", name="제출", exact=True)).to_be_enabled()
+        assert self.api(admin, path + "/responses")["total"] == 0
+        form.unroute("**/api" + path + "/responses", disconnect)
+        with form.expect_response(lambda r: r.request.method == "POST" and urlsplit(r.url).path == "/api" + path + "/responses") as saved:
+            form.get_by_role("button", name="제출", exact=True).click()
+        assert saved.value.status == 201, saved.value.text()
+        response = self.api(form, path + "/responses/mine")
+        answers = {item["questionId"]: item["content"] for item in response["answers"]}
+        assert answers[name["id"]]["text"] == "모바일 참가자" and answers[choice["id"]]["value"] == "student"
+        assert answers[day["id"]]["date"] == "2026-11-02" and answers[clock["id"]]["time"] == "18:30"
+        assert len(answers[upload["id"]]["assetIds"]) == 1
+        form.reload()
+        expect(form.get_by_text("이전에 제출한 응답을 수정하는 중입니다.", exact=False)).to_be_visible()
+        form.locator('main input[type="text"]').fill("수정한 모바일 참가자")
+        form.get_by_role("button", name="다음", exact=True).click()
+        with form.expect_response(lambda r: r.request.method == "PATCH" and urlsplit(r.url).path == "/api" + path + "/responses/mine") as updated:
+            form.get_by_role("button", name="저장", exact=True).click()
+        assert updated.value.status == 200, updated.value.text()
+        assert self.api(admin, path + "/responses")["total"] == 1
+        self.no_overflow(form)
+        self.capture(form, "13-mobile-survey")
+        guest = self.page("guest")
+        guest.goto(BASE + f"/survey/{survey['id']}")
+        guest.get_by_role("link", name="로그인", exact=True).click()
+        guest.wait_for_url(re.compile(r"/__local-sso/authorize(?:\?|$)"))
+        guest.get_by_role("button", name=auth.PROFILE_LABELS["student"], exact=True).click()
+        guest.wait_for_url(BASE + f"/survey/{survey['id']}")
+        expect(guest.get_by_role("heading", name=title, exact=True)).to_be_visible()
+
+    def test_usage_roadmap_course_sheet_and_filters(self):
+        page = self.page("student")
+        page.goto(BASE + "/life/roadmap")
+        field = page.get_by_role("searchbox", name="과목 검색", exact=True)
+        field.fill("CS10001")
+        row = page.locator(".mobile-roadmap-course-row").first
+        expect(row).to_be_visible()
+        for width in (320, 390):
+            page.set_viewport_size({"width": width, "height": 844})
+            self.no_overflow(page)
+        row.click()
+        sheet = page.locator(".mobile-course-sheet")
+        expect(sheet).to_be_visible()
+        page.wait_for_timeout(400)
+        initial = sheet.bounding_box()
+        tabs = sheet.get_by_role("tablist", name="과목 상세 탭", exact=True)
+        sheet.get_by_role("tab", name=re.compile("개설 분반")).click()
+        page.wait_for_timeout(200)
+        assert abs(sheet.bounding_box()["height"] - initial["height"]) <= 2
+        assert sheet.locator(".roadmap-course-code").evaluate("el=>getComputedStyle(el).whiteSpace") == "nowrap"
+        top = tabs.bounding_box()["y"]
+        scroll = sheet.locator(".roadmap-details-scroll")
+        assert scroll.evaluate("el=>{el.scrollTop=240;return el.scrollTop;}") > 0
+        assert abs(tabs.bounding_box()["y"] - top) <= 1
+        sheet.get_by_role("tab", name="기본 정보", exact=True).click()
+        assert abs(sheet.bounding_box()["height"] - initial["height"]) <= 2
+        self.capture(page, "14-mobile-course")
+        sheet.get_by_role("button", name="과목 상세 닫기", exact=True).click()
+        expect(sheet).to_be_hidden()
+        assert page.evaluate("getComputedStyle(document.body).overflow") != "hidden"
+        trigger = page.get_by_role("button", name="필터", exact=True)
+        trigger.tap()
+        filters = page.get_by_role("dialog", name="과목 필터", exact=True)
+        filters.get_by_role("combobox", name="학기", exact=True).select_option("2026-spring")
+        filters.get_by_role("switch").check()
+        filters.get_by_role("button", name="적용", exact=True).click()
+        expect(trigger.locator(".mobile-filter-active-dot")).to_be_visible()
+        page.reload()
+        expect(field).to_have_value("CS10001")
+        trigger.click()
+        expect(filters.get_by_role("combobox", name="학기", exact=True)).to_have_value("2026-spring")
+        expect(filters.get_by_role("switch")).to_be_checked()
+        filters.get_by_role("button", name="초기화", exact=True).click()
+        filters.get_by_role("button", name="적용", exact=True).click()
+        expect(trigger.locator(".mobile-filter-active-dot")).to_have_count(0)
+        field.fill("")
+        self.no_overflow(page)
+
+    def test_usage_discovery_filter_apply_cancel_and_reload(self):
+        page = self.page("student")
+        for path in ("/events", "/surveys"):
+            page.goto(BASE + path)
+            trigger = page.get_by_role("button", name="필터", exact=True)
+            expect(trigger.locator(".mobile-filter-active-dot")).to_have_count(0)
+            trigger.click()
+            sheet = page.get_by_role("dialog", name="필터", exact=True)
+            expect(sheet.get_by_role("radio").first).to_have_attribute("value", "all")
+            sheet.get_by_role("radio", name=re.compile("지난 행사|종료된 설문")).check()
+            sheet.get_by_label("시작일", exact=True).fill("2026-01-01")
+            sheet.get_by_label("종료일", exact=True).fill("2026-12-31")
+            sheet.get_by_role("button", name="적용", exact=True).click()
+            expect(trigger.locator(".mobile-filter-active-dot")).to_be_visible()
+            assert "state=closed" in page.url and "from=2026-01-01" in page.url and "to=2026-12-31" in page.url
+            page.reload()
+            trigger.click()
+            expect(sheet.get_by_role("radio", name=re.compile("지난 행사|종료된 설문"))).to_be_checked()
+            expect(sheet.locator('input[type="date"]').first).to_have_value("2026-01-01")
+            sheet.locator('input[type="date"]').first.fill("2026-02-01")
+            page.keyboard.press("Escape")
+            expect(sheet).to_be_hidden()
+            assert "from=2026-01-01" in page.url
+            trigger.click()
+            expect(sheet.locator('input[type="date"]').first).to_have_value("2026-01-01")
+            sheet.get_by_role("button", name="초기화", exact=True).click()
+            sheet.get_by_role("button", name="적용", exact=True).click()
+            expect(trigger.locator(".mobile-filter-active-dot")).to_have_count(0)
+            assert "from=" not in page.url and "to=" not in page.url
+            expect(page.get_by_role("radiogroup")).to_have_count(0)
+            self.no_overflow(page)
+
+    def test_usage_mobile_write_scrap_and_notification_navigation(self):
+        admin, student = self.page(), self.page("student")
+        title, body = self.marker + " 모바일 작성", self.marker + " 모바일 본문"
+        student.set_viewport_size({"width": 320, "height": 568})
+        self.editor(student, "/board/suggestions/write", title).fill(body)
+        self.no_overflow(student)
+        article_id = self.publish_article(student, "suggestions")
+        student.set_viewport_size({"width": 390, "height": 844})
+        expect(student.get_by_role("heading", name=title, exact=True)).to_be_visible()
+        scrap = student.get_by_role("button", name="스크랩", exact=True)
+        scrap.click()
+        expect(scrap).to_have_attribute("aria-pressed", "true")
+        reply = self.marker + " 모바일 알림 댓글"
+        self.api(admin, f"/boards/suggestions/articles/{article_id}/comments", method="POST", status=201, body={"content": reply})
+        student.goto(BASE + "/mypage")
+        student.get_by_role("button", name="스크랩", exact=True).click()
+        expect(student.get_by_role("link").filter(has_text=title).first).to_be_visible()
+        student.get_by_role("button", name="알림", exact=True).click()
+        sheet = student.get_by_role("dialog", name="알림", exact=True)
+        notice = sheet.get_by_role("button").filter(has_text=title)
+        expect(notice).to_be_visible()
+        notice.click()
+        student.wait_for_url(re.compile(f"/board/suggestions/{article_id}#comment-"))
+        expect(sheet).to_be_hidden()
+        expect(student.locator("#article-comments").get_by_text(reply, exact=True)).to_be_visible()
+        notifications = self.api(student, "/notifications")
+        assert any(item["isRead"] and title in (item.get("bodyKo") or "") for item in notifications["items"]), notifications
+        assert student.evaluate("getComputedStyle(document.body).overflow") != "hidden"
+        self.no_overflow(student)
+        self.capture(student, "15-mobile-notification")
+        for code in ("notice", "_EVENT"):
+            event_fields = {"eventStartDate": (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()} if code == "_EVENT" else {}
+            article = self.api(admin, f"/boards/{code}/articles", method="POST", status=201,
+                               body={"titleKo": title + " " + code, "contentKo": "<p>게시판별 알림 이동을 확인합니다.</p>", "visibilityScope": "PUBLIC", **event_fields})
+            self.api(student, f"/boards/{code}/articles/{article['articleId']}/comments", method="POST", status=201, body={"content": reply})
+            admin.goto(BASE + "/mypage")
+            admin.get_by_role("button", name="알림", exact=True).click()
+            admin.get_by_role("dialog", name="알림", exact=True).get_by_role("button").filter(has_text=title + " " + code).click()
+            route = "events" if code == "_EVENT" else "board/notice"
+            admin.wait_for_url(re.compile(f"/{route}/{article['articleId']}#comment-"))
+
+    def test_usage_notifications_refresh_and_unread_queue(self):
+        admin, student = self.page(), self.page("student")
+        title = self.marker + " 알림 대기열"
+        article = self.api(student, "/boards/suggestions/articles", method="POST", status=201,
+                           body={"titleKo": title, "contentKo": "<p>읽지 않은 알림을 확인합니다.</p>", "visibilityScope": "PUBLIC"})
+        article_id = article["articleId"]
+        with student.expect_response(lambda r: r.request.method == "GET" and urlsplit(r.url).path == "/api/notifications"):
+            student.goto(BASE + "/mypage")
+        for index in range(6):
+            self.api(admin, f"/boards/suggestions/articles/{article_id}/comments", method="POST", status=201,
+                     body={"content": f"{self.marker} 답변 {index + 1}"})
+        for index in range(6):
+            if index:
+                student.goto(BASE + "/mypage")
+            student.get_by_role("button", name="알림", exact=True).click()
+            sheet = student.get_by_role("dialog", name="알림", exact=True)
+            notice = sheet.get_by_role("button").filter(has_text=title).first
+            expect(notice, f"Unread notification {index + 1}/6 must remain reachable").to_be_visible()
+            notice.click()
+            student.wait_for_url(re.compile(f"/board/suggestions/{article_id}#comment-"))
+            expect(sheet).to_be_hidden()
+        records = self.api(student, "/notifications?pageSize=50")["items"]
+        own = [item for item in records if title in (item.get("bodyKo") or "")]
+        assert len(own) == 6 and all(item["isRead"] for item in own), own
+
+    def test_usage_faq_search_categories_and_language(self):
+        admin, student = self.page(), self.page("student")
+        title, translated, keyword = self.marker + " 과비 안내", self.marker + " Fee FAQ", self.marker + " 본문검색어"
+        long_url = "https://example.invalid/" + "long-unbroken-link" * 24
+        faq = self.api(admin, "/boards/faq/articles", method="POST", status=201, body={
+            "titleKo": title, "titleEn": translated, "visibilityScope": "PUBLIC", "faqCategory": "fees",
+            "contentKo": f"<p>{'안내 본문입니다. ' * 40}</p><p>{keyword}</p><p><a href='{long_url}'>{long_url}</a></p>",
+            "contentEn": "<p>Please contact the council for payment inquiries.</p>",
+        })
+        student.set_viewport_size({"width": 320, "height": 844})
+        student.goto(BASE + "/board/faq")
+        search = student.get_by_role("searchbox", name="FAQ 검색", exact=True)
+        search.fill(title)
+        question = student.get_by_role("button", name=title, exact=True)
+        question.click()
+        answer = student.get_by_role("region", name=title, exact=True)
+        expect(answer).to_contain_text(keyword)
+        self.no_overflow(student)
+        search.fill(keyword)
+        expect(question).to_be_visible()
+        trigger = student.get_by_role("button", name="필터", exact=True)
+        trigger.click()
+        sheet = student.get_by_role("dialog", name="FAQ 필터", exact=True)
+        sheet.get_by_role("radio", name="계정·이용", exact=True).check()
+        sheet.get_by_role("button", name="적용", exact=True).click()
+        expect(question).to_have_count(0)
+        trigger.click()
+        sheet.get_by_role("radio", name="과비 납부", exact=True).check()
+        sheet.get_by_role("button", name="적용", exact=True).click()
+        expect(question).to_be_visible()
+        expect(trigger.locator(".mobile-filter-active-dot")).to_be_visible()
+        student.get_by_role("button", name="메뉴 열기", exact=True).click()
+        student.get_by_role("button", name="영어로 전환", exact=True).click()
+        student.keyboard.press("Escape")
+        expect(student.locator("#mobile-primary-navigation")).to_be_hidden()
+        expect(student.get_by_role("button", name=translated, exact=True)).to_be_visible()
+        expect(student.get_by_role("region", name=translated, exact=True)).to_contain_text("Please contact the council")
+        self.no_overflow(student)
+        student.get_by_role("button", name="Open menu", exact=True).click()
+        student.get_by_role("button", name="Switch to Korean", exact=True).click()
+        student.keyboard.press("Escape")
+        expect(question).to_be_visible()
+        self.api(admin, f"/boards/faq/articles/{faq['articleId']}", method="DELETE")
+
+    def test_usage_fee_consent_save_failure_and_withdrawal(self):
+        admin = self.page()
+        # Separate identities keep parallel browser runs from changing each other's consent.
+        page = self.page("admin" if self.browser.browser_type.name == "webkit" else "student")
+        user_id = self.api(page, "/auth/session")["userId"]
+        fee_before = self.api(admin, f"/users/{user_id}/fee-status")
+        consent = self.api(page, "/users/me/fee-consent")
+        if consent["consented"]:
+            self.api(page, "/users/me/fee-consent", method="PUT", body={
+                "semester": consent["semester"], "noticeVersion": consent["noticeVersion"], "consented": False})
+        page.goto(BASE + "/mypage#fee-consent")
+        panel = page.locator("#fee-consent-content")
+        expect(panel).to_be_visible()
+        checkbox = panel.get_by_role("checkbox")
+        submit = panel.get_by_role("button", name="동의 완료", exact=True)
+        expect(submit).to_be_disabled()
+        checkbox.check()
+        def disconnect(route):
+            if route.request.method == "PUT": route.abort("failed")
+            else: route.continue_()
+        page.route("**/api/users/me/fee-consent", disconnect)
+        submit.click()
+        expect(panel.get_by_role("alert")).to_be_visible()
+        expect(checkbox).not_to_be_checked()
+        expect(submit).to_be_disabled()
+        assert self.api(page, "/users/me/fee-consent")["consented"] is False
+        page.unroute("**/api/users/me/fee-consent", disconnect)
+        checkbox.check()
+        with page.expect_response(lambda r: r.request.method == "PUT" and urlsplit(r.url).path == "/api/users/me/fee-consent") as accepted:
+            submit.click()
+        assert accepted.value.status == 200
+        page.reload()
+        withdraw = panel.get_by_role("button", name="이번 학기 동의 철회", exact=True)
+        expect(withdraw).to_be_visible()
+        assert self.api(page, "/users/me/fee-consent")["consented"] is True
+        with page.expect_response(lambda r: r.request.method == "PUT" and urlsplit(r.url).path == "/api/users/me/fee-consent") as revoked:
+            withdraw.click()
+        assert revoked.value.status == 200
+        page.reload()
+        expect(checkbox).not_to_be_checked()
+        assert self.api(page, "/users/me/fee-consent")["consented"] is False
+        assert self.api(admin, f"/users/{user_id}/fee-status")["status"] == fee_before["status"]
+        page.set_viewport_size({"width": 320, "height": 568})
+        self.no_overflow(page)
+
     def test_desktop_views_and_admin_access_remain(self):
         page = self.page()
         page.set_viewport_size({"width": 1440, "height": 1000})
@@ -234,6 +570,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--only", action="append", help="Run matching scenario names")
     parser.add_argument("--headed", action="store_true")
+    parser.add_argument("--browser", choices=["chromium", "webkit"], default="chromium")
     args = parser.parse_args()
     health = json.load(urlopen(BASE + "/__local-sso/health", timeout=5))
     assert health.get("kind") == "synthetic-local-sso", "Refusing to test a live site"
@@ -241,8 +578,11 @@ def main():
     expect.set_options(timeout=15000)
     results = []
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=not args.headed)
+        browser = getattr(playwright, args.browser).launch(headless=not args.headed)
         suite = MobileSuite(browser, BASE)
+        device = dict(playwright.devices["iPhone 13" if args.browser == "webkit" else "Pixel 7"])
+        device.pop("default_browser_type", None)
+        suite.context_options = {**suite.context_options, **device, "viewport": {"width": 390, "height": 844}}
         names = [name for name in MobileSuite.__dict__ if name.startswith("test_") and (not args.only or any(term in name for term in args.only))]
         if not names:
             raise SystemExit("No matching scenario")
@@ -256,10 +596,17 @@ def main():
                 print("PASS", name, flush=True)
                 results.append({"test": name, "passed": True, "seconds": round(time.monotonic() - started, 1)})
             except Exception as error:
-                print("FAIL", name, str(error), flush=True)
+                print("FAIL", name, traceback.format_exc(), flush=True)
                 suite.pages[-1].screenshot(path=str(OUT / (name + "-failure.png")), full_page=True)
                 results.append({"test": name, "passed": False, "error": str(error)})
-        (OUT / ("results-selected.json" if args.only else "results.json")).write_text(json.dumps({"results": results, "pageErrors": suite.page_errors}, ensure_ascii=False, indent=2), encoding="utf-8")
+            for actor, context in suite.contexts.items():
+                context.tracing.stop(**({"path": str(OUT / f"{name}-{args.browser}-{actor}.zip")} if not results[-1]["passed"] else {}))
+                context.tracing.start(screenshots=True, snapshots=True)
+            for page in suite.pages:
+                page.close()
+            suite.pages.clear()
+        suffix = "" if args.browser == "chromium" else "-" + args.browser
+        (OUT / (f"results{suffix}-selected.json" if args.only else f"results{suffix}.json")).write_text(json.dumps({"browser": args.browser, "results": results, "pageErrors": suite.page_errors}, ensure_ascii=False, indent=2), encoding="utf-8")
         suite.close()
         browser.close()
     raise SystemExit(1 if any(not result["passed"] for result in results) else 0)
