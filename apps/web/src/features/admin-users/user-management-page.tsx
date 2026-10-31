@@ -326,7 +326,7 @@ export function UserManagementPage() {
                       ascending={sortBy === "lastLoginAt" && sortDirection === "asc"}
                       onClick={() => handleSortChange("lastLoginAt")}
                     >
-                      최근 접속
+                      최근 로그인
                     </AdminSortableHead>
                     <AdminTableHead className="text-center"><span className="sr-only">작업</span></AdminTableHead>
                   </tr>
@@ -364,7 +364,7 @@ export function UserManagementPage() {
                         <AdminTableCell data-mobile-label="전공" className="py-3">
                           {major ? <div className="mt-0.5 truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]">{major}</div> : null}
                         </AdminTableCell>
-                        <AdminTableCell truncate data-mobile-label="최근 접속" className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
+                        <AdminTableCell truncate data-mobile-label="최근 로그인" className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
                           <time dateTime={user.lastLoginAt ?? undefined} title={formatShortDateTime(user.lastLoginAt)}>
                             {formatRelativeTime(user.lastLoginAt)}
                           </time>
@@ -543,7 +543,7 @@ function UserDetailDrawer({
             <h3 className="text-sm font-semibold text-slate-900">계정 상세 메타데이터</h3>
             <dl className="divide-y divide-slate-100 rounded-xl border border-slate-200">
               <UserDetailRow label="가입 일시" value={formatShortDateTime(user.createdAt)} />
-              <UserDetailRow label="최근 접속" value={formatShortDateTime(user.lastLoginAt)} />
+              <UserDetailRow label="최근 로그인" value={formatShortDateTime(user.lastLoginAt)} />
               <UserDetailRow label="개인정보 동의 시각" value={user.privacyConsentAt ? formatShortDateTime(user.privacyConsentAt) : ""} />
               <UserDetailRow label="계정 식별 코드" value={user.identityCode ?? "—"} />
             </dl>
