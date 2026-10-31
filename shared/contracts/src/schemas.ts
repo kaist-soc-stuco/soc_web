@@ -821,7 +821,7 @@ const ContactFieldsSchema = z.object({
   studentNumber: z.string().trim().max(30).nullable().optional(),
   cohort: z.number().int().positive().max(3000).nullable().optional(),
   email: z.string().email().or(z.literal("")).nullable().optional(),
-  phoneNumber: z.string().max(50).nullable().optional(),
+  phoneNumber: z.string().max(50).nullable().optional().transform(value => value?.replace(/-/g, "") ?? value),
   privacyConsented: z.boolean(),
   sortOrder: z.number().int().optional(),
 });

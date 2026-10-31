@@ -31,6 +31,7 @@ import type {
   UpdateRoleGroupRequest,
 } from "@soc/contracts";
 import { msToIso, nowDate } from "@soc/shared";
+import { EXCLUDED_SYSTEM_TARGET_KAIST_UIDS } from "../users/system-users";
 import { effectiveFeeStatusSql } from "../users/fee-status";
 
 @Injectable()
@@ -129,7 +130,8 @@ export class RoleGroupsRepository {
         userCount: sql<number>`COUNT(*)`,
       })
       .from(userRoleGroups)
-      .where(eq(userRoleGroups.isActive, true))
+      .innerJoin(users, eq(userRoleGroups.userId, users.userId))
+      .where(and(eq(userRoleGroups.isActive, true), notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS])))
       .groupBy(userRoleGroups.roleGroupId);
 
     const userCountByRoleGroupId = new Map<number, number>(
@@ -299,7 +301,7 @@ export class RoleGroupsRepository {
       })
       .from(userRoleGroups)
       .innerJoin(users, eq(userRoleGroups.userId, users.userId))
-      .where(and(eq(userRoleGroups.roleGroupId, roleGroupId), eq(userRoleGroups.isActive, true)))
+      .where(and(eq(userRoleGroups.roleGroupId, roleGroupId), eq(userRoleGroups.isActive, true), notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS])))
       .orderBy(asc(users.nameKo), asc(users.kaistUid));
 
     return rows.map((row) => ({
@@ -336,6 +338,7 @@ export class RoleGroupsRepository {
     const offset = (page - 1) * pageSize;
     const query = input.q?.trim();
     const conditions = [
+      notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]),
       query
         ? or(
             ilike(users.nameKo, `%${query}%`),

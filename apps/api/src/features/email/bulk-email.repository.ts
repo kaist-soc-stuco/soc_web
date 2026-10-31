@@ -9,6 +9,7 @@ import {
 } from "../../infrastructure/postgres/postgres.schema";
 import type {
   BulkEmailRecord,
+  BulkEmailRecipient,
   BulkEmailStatus,
   SaveBulkEmailDraftRequest,
   SendBulkEmailRequest,
@@ -53,6 +54,7 @@ type EmailRow = {
   senderId: string | null;
   senderNameKo: string | null;
   recipientCount: number;
+  recipientSnapshot: BulkEmailRecipient[] | null;
   status: string;
   scheduledAt: Date | null;
   sentAt: Date;
@@ -110,6 +112,7 @@ export class BulkEmailRepository {
       senderId: bulkEmails.senderId,
       senderNameKo: users.nameKo,
       recipientCount: bulkEmails.recipientCount,
+      recipientSnapshot: bulkEmails.recipientSnapshot,
       status: bulkEmails.status,
       scheduledAt: bulkEmails.scheduledAt,
       sentAt: bulkEmails.sentAt,
@@ -132,6 +135,7 @@ export class BulkEmailRepository {
       senderId: row.senderId,
       senderName: row.senderNameKo ?? "Unknown",
       recipientCount: row.recipientCount,
+      recipients: row.recipientSnapshot ?? null,
       status: isBulkEmailStatus(row.status) ? row.status : "FAILED",
       scheduledAt: row.scheduledAt ? msToIso(row.scheduledAt.valueOf()) : null,
       updatedAt: msToIso(row.updatedAt.valueOf()),
@@ -195,6 +199,7 @@ export class BulkEmailRepository {
     attachmentAssetIds?: string[];
     senderId: string;
     recipientCount: number;
+    recipients?: BulkEmailRecipient[];
     status: BulkEmailStatus;
     scheduledAt?: Date | null;
     idempotencyKey?: string | null;
@@ -213,6 +218,7 @@ export class BulkEmailRepository {
           attachmentAssetIds: input.attachmentAssetIds ?? [],
           senderId: input.senderId,
           recipientCount: input.recipientCount,
+          recipientSnapshot: input.recipients ?? null,
           status: input.status,
           scheduledAt: input.scheduledAt ?? null,
           sentAt: now,
@@ -368,7 +374,15 @@ export class BulkEmailRepository {
   async createDeliveryAttempt(
     emailId: string,
     messageId: string,
+    recipients?: BulkEmailRecipient[],
   ): Promise<BulkEmailDeliveryAttemptRecord> {
+    if (recipients) {
+      await this.db.update(bulkEmails).set({
+        recipientSnapshot: recipients,
+        recipientCount: recipients.length,
+        updatedAt: nowDate(),
+      }).where(eq(bulkEmails.id, emailId));
+    }
     const [next] = await this.db
       .select({
         attemptNumber: sql<number>`coalesce(max(${bulkEmailDeliveryAttempts.attemptNumber}), 0) + 1`,

@@ -39,7 +39,7 @@ export class ContactsRepository {
       studentNumber: row.studentNumber ?? null,
       cohort: row.cohort ? (row.cohort < 100 ? 2000 + row.cohort : row.cohort) : null,
       email: row.email,
-      phoneNumber: row.phoneNumber,
+      phoneNumber: row.phoneNumber?.replace(/-/g, "") ?? null,
       privacyConsented: row.privacyConsented,
       sortOrder: row.sortOrder,
       createdAt: msToIso(row.createdAt.valueOf()),
@@ -190,7 +190,7 @@ export class ContactsRepository {
             ilike(executiveContacts.roleKo, `%${normalizedQuery}%`),
             ilike(executiveContacts.roleEn, `%${normalizedQuery}%`),
             ilike(executiveContacts.email, `%${normalizedQuery}%`),
-            ilike(executiveContacts.phoneNumber, `%${normalizedQuery}%`),
+            ilike(sql`replace(${executiveContacts.phoneNumber}, '-', '')`, `%${normalizedQuery.replace(/-/g, "")}%`),
             ilike(executiveContacts.studentNumber, `%${normalizedQuery}%`),
             sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${executiveContacts.activities}) a WHERE a->>'roleKo' ILIKE ${`%${normalizedQuery}%`} OR a->>'roleEn' ILIKE ${`%${normalizedQuery}%`})`,
           )

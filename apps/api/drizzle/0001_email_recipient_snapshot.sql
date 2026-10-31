@@ -1,0 +1,1 @@
+ALTER TABLE "bulk_email" ADD COLUMN "recipient_snapshot" jsonb;

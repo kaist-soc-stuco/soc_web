@@ -372,7 +372,7 @@ function ContactsPageContent() {
 
   return (
     <AdminPageShell>
-      <main className="admin-page__main mx-auto flex w-full max-w-none flex-col gap-4 px-4 py-6 md:px-6 xl:px-6">
+      <main className="admin-page__main mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6 md:px-6 xl:px-6">
         {ConfirmDialog}
         <AdminPageHeader title="집행위 연락망" actions={headerActions} />
         <Modal open={importGuideOpen} onClose={() => setImportGuideOpen(false)} title="부원 명단 가져오기" size="standard" footer={<><Button variant="outline" onClick={() => setImportGuideOpen(false)}>취소</Button><Button onClick={() => {setImportGuideOpen(false);bulkFileInputRef.current?.click();}}>파일 선택</Button></>}>

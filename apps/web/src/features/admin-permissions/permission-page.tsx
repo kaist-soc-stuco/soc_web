@@ -394,7 +394,7 @@ export function PermissionPage() {
 
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {canEditRole ? <Button type="button" size="sm" variant="outline" className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void deleteRole()}> 역할 삭제</Button> : null}
+                  {canEditRole ? <Button type="button" size="icon" variant="ghost" aria-label="역할 삭제" data-tooltip="역할 삭제" className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => void deleteRole()}><Trash2 aria-hidden="true" className="size-4" /></Button> : null}
                 </div>
               </AdminCardHeader>
               <div className="px-5"><SegmentedControl variant="underline" ariaLabel="역할 상세 탭" role="tablist" value={selectedTab} onChange={(tab) => setSelection(selectedRole.roleGroupId, tab)} className="clean-segmented-control w-full" options={[{ value: "members", label: `구성원 (${selectedRole.userCount})` }, { value: "permissions", label: `권한 설정 (${draft.permissionIds.length})` }]} /></div>

@@ -50,7 +50,7 @@ function getInitialValues(contact: ContactRecord | null): ExecutiveMemberFormVal
     nameEn: contact?.nameEn ?? "",
     studentNumber: contact?.studentNumber ?? "",
     email: contact?.email ?? "",
-    phoneNumber: contact?.phoneNumber ?? "",
+    phoneNumber: contact?.phoneNumber?.replace(/-/g, "") ?? "",
   };
 }
 
@@ -277,7 +277,7 @@ export function ExecutiveMemberModal({
             <UiInput type="email" value={formData.email} onChange={(event) => updateField("email", event.currentTarget.value)} placeholder="name@kaist.ac.kr" className="box-border w-full" />
           </AdminFormField>
           <AdminFormField label="전화번호">
-            <UiInput value={formData.phoneNumber} onChange={(event) => updateField("phoneNumber", event.currentTarget.value)} placeholder="010-0000-0000" className="box-border w-full" />
+            <UiInput type="tel" value={formData.phoneNumber} onChange={(event) => updateField("phoneNumber", event.currentTarget.value.replace(/-/g, ""))} placeholder="01000000000" className="box-border w-full" />
           </AdminFormField>
 
           </div>

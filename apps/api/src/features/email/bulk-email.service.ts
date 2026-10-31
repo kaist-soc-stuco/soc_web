@@ -340,6 +340,7 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       recipientFilters: filters,
       attachmentAssetIds,
       recipientCount: recipients.length,
+      recipients,
       senderId,
       status: scheduledAt ? "SCHEDULED" : "PENDING",
       scheduledAt,
@@ -701,6 +702,7 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     const attempt = await this.bulkEmailRepo.createDeliveryAttempt(
       input.emailId,
       messageId,
+      input.recipients,
     );
     if (!(await this.bulkEmailRepo.markDeliveryAttemptSending(attempt.attemptId))) {
       throw new ConflictException("bulk_email_attempt_claim_failed");

@@ -853,7 +853,17 @@ function BulkEmailPageContent() {
           <dl className="grid grid-cols-[5rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
             <dt className="text-slate-500">제목</dt><dd className="break-words font-medium">{historyDetail.subject || "제목 없음"}</dd>
             <dt className="text-slate-500">발송 상태</dt><dd>{formatBulkEmailStatus(historyDetail.status)}</dd>
-            <dt className="text-slate-500">받는 사람</dt><dd>{historyDetail.recipientCount}명</dd>
+            <dt className="text-slate-500">{historyDetail.status === "SCHEDULED" ? "예약 수신자" : "받는 사람"}</dt>
+            <dd>{historyDetail.recipients ? <details key={historyDetail.id} open>
+              <summary className="cursor-pointer text-slate-600">수신자 목록 ({historyDetail.recipients.length}명)</summary>
+              <div className="mt-2 flex max-h-52 flex-wrap gap-2 overflow-y-auto">
+                {historyDetail.recipients.map(recipient => <span key={recipient.email} className="inline-flex max-w-full flex-wrap items-center gap-x-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs">
+                  <span className="font-medium">{recipient.nameKo}</span>
+                  {recipient.studentNumber && <span className="text-slate-500">{recipient.studentNumber}</span>}
+                  <span className="break-all text-slate-600">{recipient.email}</span>
+                </span>)}
+              </div>
+            </details> : <span className="text-slate-500">이전 이력에는 수신자 목록이 저장되어 있지 않습니다.</span>}</dd>
             <dt className="text-slate-500">{historyDetail.status === "SCHEDULED" ? "예약 일시" : "발송 일시"}</dt><dd>{formatKoreanDateTime(historyDetail.scheduledAt ?? historyDetail.sentAt ?? historyDetail.updatedAt)}</dd>
           </dl>
           <section aria-label="메일 본문 미리보기" className="rounded-xl border border-slate-200 p-4 sm:p-5">

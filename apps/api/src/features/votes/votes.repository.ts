@@ -1,8 +1,9 @@
 import { meetsVoteQuorum } from "@soc/shared";
 import { BadRequestException, ConflictException, Inject, Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import type { CreateVoteRequest, UpdateVoteRequest, VoteVoterRecord } from "@soc/contracts";
 import { isoToDate, msToDate, nowDate, nowMs } from "@soc/shared";
+import { EXCLUDED_SYSTEM_TARGET_KAIST_UIDS } from "../users/system-users";
 import { effectiveFeeStatusSql } from "../users/fee-status";
 
 import { DRIZZLE_DB, type PostgresDatabase, type PostgresTransaction } from "../../infrastructure/postgres/postgres.provider";
@@ -195,7 +196,7 @@ export class VotesRepository {
     const term = query.trim().slice(0, 100);
     if (!term) return [];
     return this.db.select({userId: users.userId, nameKo: users.nameKo, stdNo: users.stdNo})
-      .from(users).where(and(eq(users.isActive, true), schoolOfComputingPrimaryMajor,
+      .from(users).where(and(eq(users.isActive, true), notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]), schoolOfComputingPrimaryMajor,
         or(ilike(users.nameKo, `%${term}%`), ilike(users.stdNo, `%${term}%`), ilike(users.email, `%${term}%`))))
       .orderBy(asc(users.nameKo)).limit(30);
   }
@@ -212,7 +213,7 @@ export class VotesRepository {
           userIds.length > 0 && studentNumbers.length > 0
             ? or(inArray(users.userId, userIds), inArray(users.stdNo, studentNumbers))!
             : userIds.length > 0 ? inArray(users.userId, userIds) : inArray(users.stdNo, studentNumbers),
-          eq(users.isActive, true), schoolOfComputingPrimaryMajor,
+          eq(users.isActive, true), notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]), schoolOfComputingPrimaryMajor,
         ));
       if (userIds.some(id => !selected.some(({user}) => user.userId === id)) || studentNumbers.some(number => !selected.some(({user}) => user.stdNo === number))) throw new BadRequestException("vote_voter_not_found_or_ineligible");
       for (const { user, feeStatus } of selected) {
@@ -232,7 +233,7 @@ export class VotesRepository {
       if (!vote || vote.status !== "DRAFT") {
         throw new ConflictException("vote_voter_roll_locked");
       }
-      const selected = await tx.select().from(users).where(and(inArray(users.userId, userIds), eq(users.isActive, true), schoolOfComputingPrimaryMajor));
+      const selected = await tx.select().from(users).where(and(inArray(users.userId, userIds), eq(users.isActive, true), notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]), schoolOfComputingPrimaryMajor));
       for (const user of selected) await tx.insert(voteVoters).values({ voteId, userId: user.userId, nameKo: user.nameKo, studentNumber: user.stdNo, email: user.email, primaryMajor: user.primaryMajor, academicStatus: user.academicStatus, source: "MANUAL", status: "EXCLUDED" }).onConflictDoNothing();
       const changed = await tx.update(voteVoters).set({ status: "EXCLUDED", source: "MANUAL" })
         .where(and(eq(voteVoters.voteId, voteId), inArray(voteVoters.userId, userIds), eq(voteVoters.hasVoted, false)))

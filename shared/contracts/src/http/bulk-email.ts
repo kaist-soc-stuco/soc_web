@@ -17,6 +17,12 @@ export type BulkEmailStatus =
   | "FAILED"
   | "CANCELLED";
 
+export interface BulkEmailRecipient {
+  nameKo: string;
+  email: string;
+  studentNumber: string | null;
+}
+
 export interface BulkEmailRecord {
   id: string;
   subject: string;
@@ -28,6 +34,7 @@ export interface BulkEmailRecord {
   senderId: string | null;
   senderName?: string;
   recipientCount: number;
+  recipients?: BulkEmailRecipient[] | null;
   status: BulkEmailStatus;
   scheduledAt: string | null;
   updatedAt: string;

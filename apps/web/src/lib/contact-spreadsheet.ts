@@ -107,7 +107,7 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
       studentNumber: value("studentNumber"),
       cohort: cohortText ? (Number(cohortText) < 100 ? 2000 + Number(cohortText) : Number(cohortText)) : undefined,
       email: value("email"),
-      phoneNumber: value("phoneNumber"),
+      phoneNumber: value("phoneNumber").replace(/-/g, ""),
       privacyConsented: value("privacyConsented")
         ? !["false", "0", "no", "아니오", "미동의"].includes(value("privacyConsented").toLowerCase())
         : true,
@@ -161,5 +161,5 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
 
 export const CONTACT_XLSX_TEMPLATE_ROWS = [
   ["이름", "학번", "부서", "직책", "이메일", "전화번호", "활동 이력", "개인정보동의", "표시순서"],
-  ["홍길동", "20261234", "회장단", "회장", "hong@example.com", "010-0000-0000", "2026년 · 회장단 · 회장", "동의", 10],
+  ["홍길동", "20261234", "회장단", "회장", "hong@example.com", "01000000000", "2026년 · 회장단 · 회장", "동의", 10],
 ] as const;

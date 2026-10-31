@@ -113,19 +113,8 @@ export type StudentFeeSortBy = "name" | "studentId" | "status" | "paidAt";
 export type SortDirection = "asc" | "desc";
 export type FeeReferenceSemester = string;
 
-/**
- * Synthetic/system identities are useful for seeded content and QA, but they
- * must never appear in student fee or bulk-email audiences.
- *
- * Keep the legacy values here as well: a production database can contain an
- * older seed before the next seed run consolidates those users.
- */
-export const EXCLUDED_SYSTEM_TARGET_KAIST_UIDS = [
-  "demo-author",
-  "reference-faq",
-  "DEV0001",
-  "seed-council-author",
-] as const;
+import { EXCLUDED_SYSTEM_TARGET_KAIST_UIDS } from "../system-users";
+export { EXCLUDED_SYSTEM_TARGET_KAIST_UIDS } from "../system-users";
 export type EmailRecipientFilters = {
   query?: string;
   studentNumber?: string;
@@ -557,7 +546,7 @@ export class UsersRepository {
     const rows = await this.db
       .select()
       .from(users)
-      .where(whereClause)
+      .where(and(notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]), whereClause))
       .orderBy(desc(users.updatedAt))
       .limit(Math.min(Math.max(limit, 1), 50));
 
@@ -630,6 +619,7 @@ export class UsersRepository {
     const offset = (page - 1) * pageSize;
     const normalizedQuery = input.query?.trim() ?? "";
     const baseConditions = [
+      notInArray(users.kaistUid, [...EXCLUDED_SYSTEM_TARGET_KAIST_UIDS]),
       normalizedQuery
         ? or(
             ilike(users.nameKo, `%${normalizedQuery}%`),

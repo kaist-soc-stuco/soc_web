@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { users } from "./auth.schema";
+import type { BulkEmailRecipient } from "@soc/contracts";
 
 export const bulkEmails = pgTable("bulk_email", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -23,6 +24,7 @@ export const bulkEmails = pgTable("bulk_email", {
   senderId: uuid("sender_id")
     .references(() => users.userId, { onDelete: "set null" }),
   recipientCount: integer("recipient_count").notNull(),
+  recipientSnapshot: jsonb("recipient_snapshot").$type<BulkEmailRecipient[] | null>(),
   status: varchar("status", { length: 20 }).notNull(),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
   sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
