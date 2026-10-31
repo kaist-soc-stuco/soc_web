@@ -18,10 +18,10 @@
   background: #dbe2df;
   margin-inline: 0.125rem;
 }
-.admin-brand > strong {
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+.admin-brand > .admin-brand-leaf {
+  height: 2rem;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 .admin-brand-scope {
   color: #7a8780;

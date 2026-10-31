@@ -20,7 +20,6 @@ import { UiInput } from "@/components/ui/form-control";
 import { Modal } from "@/components/ui/modal";
 import { Pagination } from "@/components/ui/pagination";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { Skeleton } from "@/components/ui/skeleton";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Permissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -113,7 +112,6 @@ export function PermissionPage() {
   const selectedRoleIdRef = useRef(selectedRoleId);
   selectedRoleIdRef.current = selectedRoleId;
   const canEditRole = selectedRole?.canEdit === true;
-  const canManageMembers = selectedRole?.canManageMembers === true;
   const selectedTab: DetailTab = searchParams.get("tab") === "permissions" ? "permissions" : "members";
   const isDirty = Boolean(selectedRole && (draft.nameKo !== selectedRole.nameKo || !sameIds(draft.permissionIds, selectedRole.permissionIds)));
 
@@ -135,15 +133,18 @@ export function PermissionPage() {
   }, [selectedTab, setSearchParams]);
 
   const membersQuery = useAdminListQuery({
-    resource: `role-members:${selectedRoleId}`,
+    resource: "role-members",
+    params: { roleGroupId: selectedRoleId },
     enabled: !!selectedRoleId,
     queryFn: () => client.listRoleGroupMembers(selectedRoleId!),
   });
   const members = membersQuery.data ?? [];
   const setMembers = membersQuery.setData;
   const membersLoading = membersQuery.isFetching;
-  const isOwnRole = members.some((member) => member.userId === session?.userId);
-  const canChangePermissions = canEditRole && membersQuery.isSuccess;
+  const membersReady = membersQuery.isSuccess && !membersQuery.isPlaceholderData && !membersLoading;
+  const isOwnRole = !membersQuery.isPlaceholderData && members.some((member) => member.userId === session?.userId);
+  const canManageMembers = selectedRole?.canManageMembers === true && membersReady;
+  const canChangePermissions = canEditRole && membersReady;
   const isOwnPermission = (permissionId: number) => isOwnRole && Boolean(selectedRole?.permissionIds.includes(permissionId));
   useEffect(() => {
     if (rolesQuery.isError || permissionsQuery.isError || membersQuery.isError) setError("권한 정보를 불러오지 못했습니다.");
@@ -213,7 +214,7 @@ export function PermissionPage() {
   };
 
   const deleteRole = async () => {
-    if (!selectedRole || !canEditRole || !membersQuery.isSuccess || isOwnRole) return;
+    if (!selectedRole || !canEditRole || !membersReady || isOwnRole) return;
     const approved = await confirm({
       title: "역할 삭제",
       description: <>정말 <strong className="font-semibold text-slate-900">“{selectedRole.nameKo}”</strong> 역할을 삭제할까요?</>,
@@ -415,7 +416,7 @@ export function PermissionPage() {
 
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {canEditRole ? <Button type="button" size="icon" variant="ghost" aria-label="역할 삭제" data-tooltip={isOwnRole ? "본인이 속한 역할은 삭제할 수 없습니다." : "역할 삭제"} disabled={!membersQuery.isSuccess || isOwnRole} className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => void deleteRole()}><Trash2 aria-hidden="true" className="size-4" /></Button> : null}
+                  {canEditRole ? <Button type="button" size="icon" variant="ghost" aria-label="역할 삭제" data-tooltip={isOwnRole ? "본인이 속한 역할은 삭제할 수 없습니다." : "역할 삭제"} disabled={!membersReady || isOwnRole} className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => void deleteRole()}><Trash2 aria-hidden="true" className="size-4" /></Button> : null}
                 </div>
               </AdminCardHeader>
               <div className="px-5"><SegmentedControl variant="underline" ariaLabel="역할 상세 탭" role="tablist" value={selectedTab} onChange={(tab) => setSelection(selectedRole.roleGroupId, tab)} className="clean-segmented-control w-full" options={[{ value: "members", label: `구성원 (${selectedRole.userCount})` }, { value: "permissions", label: `권한 설정 (${draft.permissionIds.length})` }]} /></div>
@@ -439,9 +440,9 @@ export function PermissionPage() {
                 })}</div>
               </div> : <div className="min-w-0">
                 <div className="flex items-center justify-between gap-3 px-5 py-2"><span className="text-sm font-normal text-[#344054]">총 {membersQuery.data ? members.length : selectedRole.userCount}명</span><Button type="button" variant="outline" size="sm" disabled={!canManageMembers} onClick={() => void openMemberEditor()}>구성원 추가</Button></div>
-                <div aria-busy={membersLoading}>
+                <div aria-busy={membersLoading} inert={membersQuery.isPlaceholderData} className={cn("transition-opacity duration-150", membersLoading ? "opacity-60" : "opacity-100")}>
                 <AdminDataTable minWidth={0} mobileMode="cards" viewportClassName="!overflow-visible"><colgroup><col style={{ width: "28%" }} /><col style={{ width: "16%" }} /><col style={{ width: "30%" }} /><col style={{ width: "18%" }} /><col style={{ width: "8%" }} /></colgroup><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>학번</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>부여일</AdminTableHead><AdminTableHead className="text-right"><span className="sr-only">작업</span></AdminTableHead></tr></AdminTableHeader><AdminTableBody>
-                  {membersQuery.isPending ? <tr>{Array.from({ length: 5 }).map((_, index) => <AdminTableCell key={index}><Skeleton className="h-4 w-16" /></AdminTableCell>)}</tr> : members.length === 0 ? <AdminTableEmpty colSpan={5}>이 역할에 지정된 구성원이 없습니다.</AdminTableEmpty>
+                  {membersQuery.isPending ? <AdminTableEmpty colSpan={5}><span role="status">구성원을 불러오는 중…</span></AdminTableEmpty> : members.length === 0 ? <AdminTableEmpty colSpan={5}>이 역할에 지정된 구성원이 없습니다.</AdminTableEmpty>
                     : members.map((member) => <tr key={member.userId}><AdminTableCell truncate className="admin-table-text-emphasis">{member.nameKo}</AdminTableCell><AdminTableCell data-mobile-label="학번" truncate>{member.stdNo ?? member.kaistUid}</AdminTableCell><AdminTableCell data-mobile-label="이메일" truncate>{member.email}</AdminTableCell><AdminTableCell data-mobile-label="부여일" truncate>{formatDate(member.grantedAt)}</AdminTableCell><AdminTableCell className="text-right"><Button type="button" variant="ghost" size="icon" aria-label={`${member.nameKo} 제외`} data-tooltip="구성원 제외" className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => void removeMember(member.userId)} disabled={candidateSaving || !canManageMembers || member.userId === session?.userId}><Trash2 aria-hidden="true" className="size-4" /></Button></AdminTableCell></tr>)}
                 </AdminTableBody></AdminDataTable>
                 </div>
@@ -462,7 +463,7 @@ export function PermissionPage() {
             <div className={cn("scrollbar-hidden min-h-0 flex-1 overflow-x-hidden overflow-y-auto rounded-xl border border-slate-200 transition-opacity duration-150", candidateLoading && candidateData ? "opacity-60" : "opacity-100")} aria-busy={candidateLoading}>
               <label className="flex items-center gap-2 px-4 pt-3 text-sm lg:hidden"><UiInput type="checkbox" aria-label="현재 페이지 전체 선택" checked={Boolean(candidateData?.items.length && candidateData.items.every((item) => selectedMemberIds.includes(item.userId)))} onChange={(event) => toggleCandidatePage(event.currentTarget.checked)} />현재 페이지 전체 선택</label>
               <AdminDataTable minWidth={0} mobileMode="cards" viewportClassName="!overflow-visible"><colgroup><col style={{ width: "8%" }} /><col style={{ width: "38%" }} /><col style={{ width: "22%" }} /><col style={{ width: "32%" }} /></colgroup><AdminTableHeader><tr><AdminTableHead className="text-center"><UiInput type="checkbox" aria-label="현재 페이지 전체 선택" checked={Boolean(candidateData?.items.length && candidateData.items.every((item) => selectedMemberIds.includes(item.userId)))} onChange={(event) => toggleCandidatePage(event.currentTarget.checked)} /></AdminTableHead><AdminTableHead>이름</AdminTableHead><AdminTableHead>학번</AdminTableHead><AdminTableHead>이메일</AdminTableHead></tr></AdminTableHeader><AdminTableBody>
-              {!candidateData && candidateLoading ? Array.from({ length: 5 }).map((_, index) => <tr key={index}>{Array.from({ length: 4 }).map((__, cell) => <AdminTableCell key={cell}><Skeleton className="h-4 w-20" /></AdminTableCell>)}</tr>)
+              {!candidateData && candidateLoading ? <AdminTableEmpty colSpan={4}><span role="status">사용자를 불러오는 중…</span></AdminTableEmpty>
                 : (candidateData?.items.length ?? 0) === 0 ? <AdminTableEmpty colSpan={4}>조건에 맞는 사용자가 없습니다.</AdminTableEmpty>
                 : candidateData?.items.map((candidate) => { const checked = selectedMemberIds.includes(candidate.userId); return <tr key={candidate.userId} className="cursor-pointer hover:bg-slate-50" tabIndex={0} aria-selected={checked} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === " " || event.key === "Enter")) { event.preventDefault(); toggleCandidateMember(candidate.userId); } }} onClick={() => toggleCandidateMember(candidate.userId)}><AdminTableCell><div className="flex items-center gap-3 lg:justify-center"><UiInput type="checkbox" checked={checked} onClick={(event) => event.stopPropagation()} disabled={isOwnRole && candidate.userId === session?.userId} onChange={() => toggleCandidateMember(candidate.userId)} aria-label={`${candidate.nameKo} 선택`} /><span className="admin-table-text-emphasis lg:hidden">{candidate.nameKo}</span></div></AdminTableCell><AdminTableCell truncate className="admin-table-text-emphasis max-lg:!hidden">{candidate.nameKo}</AdminTableCell><AdminTableCell data-mobile-label="학번" truncate>{candidate.stdNo ?? candidate.kaistUid}</AdminTableCell><AdminTableCell data-mobile-label="이메일" truncate>{candidate.email}</AdminTableCell></tr>; })}
             </AdminTableBody></AdminDataTable></div>

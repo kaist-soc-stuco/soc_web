@@ -9,7 +9,12 @@ function workbook(rows) {
   return XLSX.write(book, { type: "array", bookType: "xlsx" });
 }
 test("the payment template includes an identifiable example and formats input cells", async () => {
-  const book = XLSX.read(await createFeePaymentTemplate().arrayBuffer(), { type: "array" });
+  const bytes = await createFeePaymentTemplate().arrayBuffer();
+  const zip = XLSX.CFB.read(new Uint8Array(bytes), { type: "array" });
+  const xml = new TextDecoder().decode(XLSX.CFB.find(zip, "/xl/worksheets/sheet1.xml").content);
+  assert.match(xml, /<pane xSplit="2" ySplit="1"/);
+  assert.equal(zip.FullPaths.filter(path => path.endsWith("/xl/worksheets/sheet1.xml")).length, 1);
+  const book = XLSX.read(bytes, { type: "array" });
   const sheet = book.Sheets["입금 등록"];
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
   assert.deepEqual(rows[0], headers);

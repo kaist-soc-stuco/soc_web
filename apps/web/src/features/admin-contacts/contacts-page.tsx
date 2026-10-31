@@ -227,14 +227,13 @@ function ContactsPageContent() {
   const downloadContactTemplate = () => {
     const worksheet = XLSX.utils.aoa_to_sheet(CONTACT_XLSX_TEMPLATE_ROWS.map((row) => [...row]));
     worksheet["!cols"] = [
-      { wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 18 }, { wch: 22 }, { wch: 16 },
-      { wch: 22 }, { wch: 12 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 12 },
+      { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 16 }, { wch: 30 }, { wch: 18 },
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "연락망");
     const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    downloadBlob(blob, "executive_contacts_template.xlsx");
+    downloadBlob(blob, "부원 명단 양식.xlsx");
   };
 
   const handleBulkImport = async () => {
@@ -376,7 +375,7 @@ function ContactsPageContent() {
         <AdminPageHeader title="집행위 연락망" actions={headerActions} />
         <Modal open={importGuideOpen} onClose={() => { setImportGuideOpen(false); setImportDragging(false); }} title="부원 명단 가져오기" size="standard" footer={<Button variant="outline" onClick={() => setImportGuideOpen(false)}>닫기</Button>}>
           <div className="space-y-5 text-sm leading-6">
-            <p>전용 양식에 명단을 작성한 뒤 XLSX 파일을 업로드해 주세요.</p>
+            <p>이름·학번·부서·직책·이메일·전화번호를 작성한 뒤 엑셀 파일을 올려 주세요. 부서와 직책은 올해 활동 이력으로 자동 등록됩니다. 이름과 직책은 필수이며, 나머지는 비워 둘 수 있습니다.</p>
             <Button variant="outline" onClick={downloadContactTemplate}><Download aria-hidden="true" />양식 다운로드</Button>
             <button type="button" onClick={() => bulkFileInputRef.current?.click()}
               onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setImportDragging(true); }}
@@ -412,7 +411,7 @@ function ContactsPageContent() {
               title="가져올 부원 확인"
               size="wide"
               footer={<>
-                <Button type="button" variant="ghost" onClick={downloadContactTemplate} disabled={bulkImporting}>양식 내보내기</Button>
+                <Button type="button" variant="ghost" onClick={downloadContactTemplate} disabled={bulkImporting}>양식 다운로드</Button>
                 <Button type="button" variant="outline" onClick={() => clearBulkImport()} disabled={bulkImporting}>취소</Button>
                 <Button type="button" onClick={() => void handleBulkImport()} disabled={bulkRows.length === 0 || bulkErrors.length > 0 || bulkImporting}>불러오기</Button>
               </>}
@@ -421,7 +420,7 @@ function ContactsPageContent() {
                 <div><p className="text-sm font-semibold text-slate-800">{bulkFileName}</p><p className="mt-1 text-xs text-slate-500">정상 행 {bulkRows.length}개 · 오류 {bulkErrors.length}개</p></div>
                 <label className="inline-flex items-center gap-2 text-sm text-slate-700"><UiInput type="checkbox" checked={bulkReplaceExisting} onChange={(event) => setBulkReplaceExisting(event.currentTarget.checked)} className="size-4 accent-brand-primary" />기존 연락망 전체 교체</label>
                 {bulkErrors.length > 0 ? <ul className="space-y-1 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">{bulkErrors.slice(0, 8).map((message) => <li key={message}>{message}</li>)}{bulkErrors.length > 8 ? <li>외 {bulkErrors.length - 8}건</li> : null}</ul> : null}
-                {bulkRows.length > 0 && bulkErrors.length === 0 ? <div className="overflow-hidden rounded-lg border border-slate-100"><AdminDataTable minWidth={640}><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>직책</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>순서</AdminTableHead></tr></AdminTableHeader><AdminTableBody>{bulkRows.slice(0, 5).map((row, index) => <tr key={`${row.email}-${index}`}><AdminTableCell><span className="admin-table-text-emphasis">{row.nameKo}</span></AdminTableCell><AdminTableCell>{row.roleKo}</AdminTableCell><AdminTableCell>{row.email || ""}</AdminTableCell><AdminTableCell>{row.sortOrder ?? "자동"}</AdminTableCell></tr>)}</AdminTableBody></AdminDataTable></div> : null}
+                {bulkRows.length > 0 && bulkErrors.length === 0 ? <div className="overflow-hidden rounded-lg border border-slate-100"><AdminDataTable minWidth={640}><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>부서</AdminTableHead><AdminTableHead>직책</AdminTableHead><AdminTableHead>이메일</AdminTableHead></tr></AdminTableHeader><AdminTableBody>{bulkRows.slice(0, 5).map((row, index) => <tr key={`${row.email}-${index}`}><AdminTableCell><span className="admin-table-text-emphasis">{row.nameKo}</span></AdminTableCell><AdminTableCell>{row.departmentKo || ""}</AdminTableCell><AdminTableCell>{row.roleKo}</AdminTableCell><AdminTableCell>{row.email || ""}</AdminTableCell></tr>)}</AdminTableBody></AdminDataTable></div> : null}
               </div>
             </Modal>
 

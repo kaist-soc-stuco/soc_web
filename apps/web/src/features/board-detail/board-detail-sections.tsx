@@ -242,8 +242,8 @@ export function BoardDetailArticleCard({
 
       {article.survey && (
         <div className={`mt-6 flex ${category === "_EVENT" ? "justify-end md:justify-start" : "justify-start"}`} data-survey-cta>
-          {registrationClosed ? <Button type="button" variant="secondary" disabled className={`${category === "_EVENT" ? "w-full md:w-auto" : "w-auto"} bg-slate-100 text-slate-500 disabled:opacity-100`}>
-            {lang === "ko" ? "신청이 마감되었습니다" : "Registration is closed"}
+          {registrationClosed ? <Button type="button" variant="secondary" disabled className={`${category === "_EVENT" ? "w-full md:w-auto" : "w-auto"} disabled:!border-slate-200 disabled:!bg-slate-100 disabled:!text-slate-500 disabled:opacity-100`}>
+            {lang === "ko" ? "신청이 마감되었습니다." : "Registration is closed."}
           </Button> : <Button asChild className={category === "_EVENT" ? "w-full md:w-auto" : "w-auto"}>
             <Link to={`/survey/${article.survey.surveyId}`} target="_blank" rel="noopener noreferrer"
               aria-label={lang === "ko" ? `${surveyTitle} ${category === "_EVENT" ? "참가 신청하기" : "설문 참여하기"} (새 탭)` : `${category === "_EVENT" ? "Register for" : "Take"} ${surveyTitle} (opens in a new tab)`}>

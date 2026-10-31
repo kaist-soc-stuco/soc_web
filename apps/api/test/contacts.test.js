@@ -122,3 +122,24 @@ test("retired public directory never reads internal contact data", async () => {
   assert.deepEqual(await repo.findPublic(), {items: []});
   assert.deepEqual(await repo.findPublicDepartments(), {items: []});
 });
+
+test("spreadsheet imports create current-year activities from department and position", async () => {
+  const { ContactsService } = require("../dist/apps/api/src/features/contacts/contacts.service.js");
+  const { msToTimeObj, nowMs } = require("@soc/shared");
+  let imported;
+  let synced = false;
+  const service = new ContactsService(
+    { bulkImport: async dto => { imported = dto; return { importedCount: dto.items.length, removedCount: 0, items: [] }; } },
+    { record: async () => {} }, {}, { enqueueSync: async () => { synced = true; } },
+  );
+  const manualHistory = [{ year: 2025, departmentKo: "기획부", roleKo: "부장" }];
+  await service.bulkImport({ replaceExisting: false, items: [
+    CreateContactSchema.parse({ nameKo: "신규 부원", departmentKo: "전산관리부", roleKo: "부원" }),
+    CreateContactSchema.parse({ nameKo: "기존 이력", roleKo: "부장", activities: manualHistory }),
+  ] });
+  const year = msToTimeObj(nowMs()).year;
+  assert.equal(imported.items[0].cohort, year);
+  assert.deepEqual(imported.items[0].activities, [{ year, departmentKo: "전산관리부", departmentEn: "", roleKo: "부원", roleEn: "" }]);
+  assert.equal(imported.items[1].activities[0].year, 2025);
+  assert.equal(synced, true);
+});

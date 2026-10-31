@@ -55,7 +55,7 @@ def wait_for_home(page: Page) -> None:
 
 
 def login(page: Page, profile: str, *, consent: bool) -> dict[str, Any]:
-    consent_label = "개인정보 동의 후 가입" if consent else "개인정보 동의 없이 임시 이용"
+    consent_label = "동의하고 시작하기" if consent else "임시 이용하기"
     mark(f"login:{profile}:start")
     page.goto(f"{BASE_URL}/login", wait_until="commit")
     mark(f"login:{profile}:fake-sso")

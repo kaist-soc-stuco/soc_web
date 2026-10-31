@@ -150,6 +150,12 @@ class AcceptanceSuite:
                  body={"titleKo": "Unauthorized survey", "isAlwaysOpen": True})
         temporary = self.page("new")
         assert self.api(temporary, "/auth/session")["storageMode"] == "temporary"
+        temporary.goto(self.base + "/admin/finance")
+        expect(temporary.get_by_role("heading", name="개인정보 제공 동의가 필요합니다", exact=True)).to_be_visible()
+        assert urlsplit(temporary.url).path == "/admin/finance"
+        assert self.api(temporary, "/auth/session")["storageMode"] == "temporary"
+        temporary.get_by_role("link", name="홈으로", exact=True).click()
+        temporary.wait_for_url(self.base + "/")
         auth.logout(temporary)
         assert not self.api(temporary, "/auth/session")["authenticated"]
         # A previously registered user must also be able to log back in without
@@ -1066,13 +1072,13 @@ class AcceptanceSuite:
         assert {(item["year"], item["departmentKo"], item["roleKo"]) for item in contact["activities"]} == expected_history, contact
         exported = self.download_file(admin, admin.get_by_role("button", name="엑셀 내보내기", exact=True), "contacts.xlsx")
         rows = xlsx_rows(exported)
-        assert len(rows) == 2 and rows[1][rows[0].index("전화번호")] == "010-0012-0034", rows
+        assert len(rows) == 2 and rows[1][rows[0].index("전화번호")] == "01000120034", rows
         rows[1][rows[0].index("전화번호")] = "010-0099-0088"
         amended = ARTIFACTS / (self.marker + "-contacts.xlsx")
         write_xlsx(amended, rows)
         admin.get_by_role("button", name="엑셀 가져오기", exact=True).click()
         with admin.expect_file_chooser() as chooser:
-            admin.get_by_role("dialog", name="부원 명단 가져오기", exact=True).get_by_role("button", name="파일 선택", exact=True).click()
+            admin.get_by_role("dialog", name="부원 명단 가져오기", exact=True).get_by_role("button", name="엑셀 파일을 여기에 놓거나 클릭해 선택하세요", exact=False).click()
         chooser.value.set_files(str(amended))
         modal = admin.get_by_role("dialog", name="가져올 부원 확인", exact=True)
         modal.get_by_role("checkbox", name="기존 연락망 전체 교체", exact=True).check()
@@ -1082,9 +1088,11 @@ class AcceptanceSuite:
         admin.get_by_role("searchbox", name=re.compile("검색")).fill(name)
         admin.get_by_text(name, exact=True).click()
         drawer = admin.get_by_role("dialog", name="부원 정보 편집", exact=True)
-        expect(self.field(drawer, "전화번호")).to_have_value("010-0099-0088")
+        expect(self.field(drawer, "전화번호")).to_have_value("01000990088")
         contacts = self.api(admin, "/contacts/manage?pageSize=100")["items"]
         assert len(contacts) == 1, contacts
+        year = datetime.now(timezone(timedelta(hours=9))).year
+        expected_history = {(year, department + " 수정", "부원")}
         assert {(item["year"], item["departmentKo"], item["roleKo"]) for item in contacts[0]["activities"]} == expected_history, contacts
         drawer.get_by_role("button", name="취소", exact=True).click()
         admin.get_by_role("button", name="부서 관리", exact=True).click()
@@ -1439,14 +1447,18 @@ class AcceptanceSuite:
         admin.goto(self.base + "/admin/finance")
         grid = admin.get_by_role("grid", name="과비 납부 관리표", exact=True)
         expect(grid).to_be_visible()
+        admin.get_by_role("button", name="입금 엑셀 가져오기", exact=True).click()
+        import_dialog = admin.get_by_role("dialog", name="입금 엑셀 가져오기", exact=True)
         with admin.expect_download() as downloaded:
-            admin.get_by_role("button", name="입금 양식 다운로드", exact=True).click()
+            import_dialog.get_by_role("button", name="입금 양식 다운로드", exact=True).click()
         template = ARTIFACTS / (self.marker + "-income-template.xlsx")
         downloaded.value.save_as(template)
         headers = xlsx_rows(template)[0]
         assert headers == ["학번", "이름", "입금액", "입금일", "메모"]
         assert xlsx_rows(template)[1][1] == "홍길동(예시)"
+        import_dialog.get_by_role("button", name="취소", exact=True).click()
         summary = self.download_file(admin, admin.get_by_role("button", name="전체 명부 내보내기", exact=True), "fee-summary.xlsx")
+        admin.get_by_role("button", name="입금 엑셀 가져오기", exact=True).click()
         admin.get_by_label("입금 엑셀 파일", exact=True).set_input_files(summary)
         expect(admin.get_by_text("입금 등록 양식의 학번·이름·입금액·입금일 열이 필요합니다.", exact=False)).to_be_visible()
         rows = [headers, [number, existing_name, 15000, "2026-10-30", "추가 입금"],
@@ -1456,15 +1468,16 @@ class AcceptanceSuite:
         imported = ARTIFACTS / (self.marker + "-income.xlsx")
         write_xlsx(imported, rows)
         admin.get_by_label("입금 엑셀 파일", exact=True).set_input_files(imported)
-        dialog = admin.get_by_role("dialog", name="입금 등록 확인", exact=True)
+        dialog = admin.get_by_role("dialog", name="입금 엑셀 가져오기", exact=True)
         expect(dialog).to_be_visible()
         expect(dialog).to_contain_text("52,000원")
         expect(dialog).to_contain_text("신규 명부 1명")
         expect(dialog.get_by_role("table").get_by_role("row")).to_have_count(5)
         assert len(self.api(admin, base + "/detail/" + number)["history"]) == 0
-        dialog.get_by_role("button", name="취소", exact=True).click()
+        dialog.get_by_role("button", name="닫기", exact=True).click()
         expect(dialog).to_be_hidden()
         assert not any(row["stdNo"] == new_number for row in self.api(admin, base)["records"])
+        admin.get_by_role("button", name="입금 엑셀 가져오기", exact=True).click()
         admin.get_by_label("입금 엑셀 파일", exact=True).set_input_files(imported)
         expect(dialog).to_be_visible()
         intercepted = []
@@ -1491,18 +1504,46 @@ class AcceptanceSuite:
         expect(grid.get_by_role("row").filter(has_text=new_number)).to_contain_text("17,000")
         duplicate = ARTIFACTS / (self.marker + "-duplicate-income.xlsx")
         write_xlsx(duplicate, [headers, rows[3]])
+        admin.get_by_role("button", name="입금 엑셀 가져오기", exact=True).click()
         admin.get_by_label("입금 엑셀 파일", exact=True).set_input_files(duplicate)
         expect(dialog).to_contain_text("중복 의심")
         expect(dialog.get_by_role("button", name="입금 등록", exact=True)).to_be_disabled()
-        dialog.get_by_role("button", name="취소", exact=True).click()
+        dialog.get_by_role("button", name="닫기", exact=True).click()
         invalid = ARTIFACTS / (self.marker + "-wrong-name.xlsx")
         write_xlsx(invalid, [headers, [new_number, "다른 사람", 1000, "2026-10-31", ""]])
+        admin.get_by_role("button", name="입금 엑셀 가져오기", exact=True).click()
         admin.get_by_label("입금 엑셀 파일", exact=True).set_input_files(invalid)
         expect(dialog).to_contain_text("등록된 이름")
         expect(dialog.get_by_role("button", name="입금 등록", exact=True)).to_be_disabled()
-        dialog.get_by_role("button", name="취소", exact=True).click()
+        dialog.get_by_role("button", name="닫기", exact=True).click()
         self.api(student, "/users/fee-status/payments/import/preview", method="POST", body={"entries": intercepted[0]["entries"]}, status=403)
         self.api(student, "/users/fee-status/payments/import", method="POST", body=intercepted[0], status=403)
+
+    def test_login_back_allows_retry(self):
+        page = self.page("guest")
+        for width in [1440, 390]:
+            page.set_viewport_size({"width": width, "height": 900})
+            page.goto(self.base + "/about")
+            def login_button():
+                if width < 768:
+                    trigger = page.locator('button[aria-controls="mobile-primary-navigation"]')
+                    if trigger.get_attribute("aria-expanded") != "true":
+                        trigger.click()
+                    return page.locator("#mobile-primary-navigation").get_by_role("button", name="로그인", exact=False)
+                return page.get_by_role("button", name="로그인", exact=True)
+            for _ in range(2):
+                button = login_button()
+                expect(button).to_be_enabled()
+                button.click()
+                page.wait_for_url(self.base + "/__local-sso/authorize")
+                page.go_back()
+                page.wait_for_url(self.base + "/about")
+            expect(login_button()).to_be_enabled()
+            page.goto(self.base + "/login")
+            page.wait_for_url(self.base + "/__local-sso/authorize")
+            page.go_back()
+            page.wait_for_url(self.base + "/about")
+            expect(login_button()).to_be_enabled()
 
     def close(self):
         for context in self.contexts.values():

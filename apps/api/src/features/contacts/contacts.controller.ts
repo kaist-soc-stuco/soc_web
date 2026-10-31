@@ -76,7 +76,7 @@ export class ContactsController {
       reason,
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["이름", "학번", "부서", "직책", "이메일", "전화번호", "활동 이력", "개인정보동의", "표시순서"],
+      ["이름", "학번", "부서", "직책", "이메일", "전화번호"],
       ...items.map((item) => [
         item.nameKo,
         item.studentNumber,
@@ -84,26 +84,11 @@ export class ContactsController {
         item.roleKo,
         item.email,
         item.phoneNumber,
-        (item.activities?.length ? item.activities : item.cohort ? [{ year: item.cohort, departmentKo: item.departmentKo, roleKo: item.roleKo }] : [])
-          .map((activity) => `${activity.year < 100 ? 2000 + activity.year : activity.year}년 · ${activity.departmentKo ?? ""} · ${activity.roleKo}`).join("\n"),
-        item.privacyConsented ? "동의" : "미동의",
-        item.sortOrder,
       ]),
     ]);
-    worksheet["!cols"] = [
-      { wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 18 }, { wch: 22 }, { wch: 18 }, { wch: 22 },
-      { wch: 12 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 12 },
-    ];
-    const activities = XLSX.utils.aoa_to_sheet([
-      ["연락처 ID", "포털 사용자 ID", "이름", "연도", "부서 ID", "부서", "직책"],
-      ...items.flatMap((item) => (item.activities ?? []).map((activity) => [
-        item.id, item.portalUserId, item.nameKo, activity.year, activity.departmentId,
-        activity.departmentKo, activity.roleKo,
-      ])),
-    ]);
+    worksheet["!cols"] = [16, 16, 20, 16, 30, 18].map(wch => ({ wch }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "연락망");
-    XLSX.utils.book_append_sheet(workbook, activities, "활동 이력");
     const buffer = Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
     return new StreamableFile(buffer);
   }

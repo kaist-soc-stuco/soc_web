@@ -1,7 +1,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const XLSX = require("xlsx");
-const { parseContactSpreadsheet } = require("../dist/test-src/lib/contact-spreadsheet.js");
+const { BulkImportContactsSchema } = require("@soc/contracts");
+const { CONTACT_XLSX_TEMPLATE_ROWS, parseContactSpreadsheet } = require("../dist/test-src/lib/contact-spreadsheet.js");
 
 function parse(rows) {
   const book = XLSX.utils.book_new();
@@ -9,55 +10,34 @@ function parse(rows) {
   return parseContactSpreadsheet(XLSX.write(book, { bookType: "xlsx", type: "array" }));
 }
 
-test("contact sheet preserves multiple years without a separate year column", () => {
-  const result = parse([
-    ["이름", "학번", "부서", "직책", "이메일", "전화번호", "활동 이력"],
-    ["테스트", "20250001", "기획부", "부원", "", "", "2025년 · 기획부 · 부원\n2026년 · 전산관리부 · 부장"],
-  ]);
-  assert.deepEqual(result.errors, []);
-  assert.equal(result.rows[0].activities.length, 2);
-  assert.equal(result.rows[0].cohort, 2026);
-  assert.equal(result.rows[0].departmentKo, "전산관리부");
-  assert.equal(result.rows[0].roleKo, "부장");
-});
-
-test("legacy year columns remain importable and malformed history is rejected", () => {
-  const legacy = parse([["이름", "직책", "활동 연도"], ["테스트", "부원", 26]]);
-  assert.deepEqual(legacy.errors, []);
-  assert.equal(legacy.rows[0].cohort, 2026);
-  const malformed = parse([["이름", "직책", "활동 이력"], ["테스트", "부원", "잘못된 이력"]]);
-  assert.equal(malformed.rows.length, 0);
-  assert.equal(malformed.errors.length, 1);
-});
-
-test("exported activity history preserves department punctuation and compact legacy entries", () => {
-  const result = parse([
-    ["이름", "직책", "활동 이력"],
-    ["테스트", "부원", "2026년 · 소통·복지부 · 기획/운영\n2025년 · 교육/문화부 · 부원"],
-    ["기존 양식", "부원", "2025년·기획부·부원"],
-    ["부서 미지정", "회장", "2026년 ·  · 회장"],
-  ]);
-  assert.deepEqual(result.errors, []);
-  assert.deepEqual(result.rows[0].activities.map(({ departmentKo, roleKo }) => [departmentKo, roleKo]), [
-    ["소통·복지부", "기획/운영"], ["교육/문화부", "부원"],
-  ]);
-  assert.equal(result.rows[1].activities[0].departmentKo, "기획부");
-  assert.equal(result.rows[1].activities[0].roleKo, "부원");
-  assert.equal(result.rows[2].activities[0].departmentKo, "");
-  assert.equal(result.rows[2].activities[0].roleKo, "회장");
-});
-
-test("contact export imports display order and skips empty spreadsheet rows", () => {
-  const result = parse([
-    ["이름", "학번", "부서", "직책", "이메일", "전화번호", "활동 이력", "개인정보동의", "표시순서"],
-    ["테스트", "20260001", "기획부", "부원", "test@example.com", "010-1234-5678", "2026년 · 기획부 · 부원", "동의", 20],
-    ["", "", "", "", "", "", "", "", ""],
-  ]);
+test("the six-column Korean template imports without history, consent or display-order fields", () => {
+  assert.deepEqual(CONTACT_XLSX_TEMPLATE_ROWS[0], ["이름", "학번", "부서", "직책", "이메일", "전화번호"]);
+  const result = parse([...CONTACT_XLSX_TEMPLATE_ROWS, ["", "", "", "", "", ""]]);
   assert.deepEqual(result.errors, []);
   assert.equal(result.rows.length, 1);
-  assert.equal(result.rows[0].sortOrder, 20);
+  assert.equal(result.rows[0].privacyConsented, true);
+  assert.equal(Object.hasOwn(result.rows[0], "activities"), false);
+  assert.equal(Object.hasOwn(result.rows[0], "sortOrder"), false);
+  assert.ok(BulkImportContactsSchema.safeParse({ items: result.rows }).success);
+});
+
+test("contact imports follow column names and ignore retired spreadsheet metadata", () => {
+  const result = parse([
+    ["직책", "전화번호", "이름", "부서", "활동 이력", "개인정보동의", "표시순서"],
+    ["부원", "010-1234-5678", "테스트", "전산관리부", "이전 양식의 이력", "미동의", "숫자 아님"],
+  ]);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.rows[0].departmentKo, "전산관리부");
+  assert.equal(result.rows[0].roleKo, "부원");
   assert.equal(result.rows[0].phoneNumber, "01012345678");
-  assert.equal(result.rows[0].activities[0].year, 2026);
-  const { BulkImportContactsSchema } = require("@soc/contracts");
-  assert.ok(BulkImportContactsSchema.safeParse({ items: result.rows, replaceExisting: false }).success);
+  assert.equal(result.rows[0].privacyConsented, true);
+  assert.equal(Object.hasOwn(result.rows[0], "activities"), false);
+});
+
+test("missing required contact values and invalid emails have Korean error messages", () => {
+  assert.match(parse([["이메일"], ["a@example.com"]]).errors[0], /이름, 직책/);
+  const result = parse([["이름", "직책", "이메일"], ["", "부원", ""], ["테스트", "부원", "잘못된 이메일"]]);
+  assert.equal(result.rows.length, 0);
+  assert.match(result.errors[0], /2행: 이름/);
+  assert.match(result.errors[1], /3행: 이메일/);
 });

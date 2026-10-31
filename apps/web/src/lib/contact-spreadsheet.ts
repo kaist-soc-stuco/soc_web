@@ -1,5 +1,4 @@
 import * as XLSX from "xlsx";
-import type { ContactActivity } from "@soc/contracts";
 
 export interface ParsedContactSpreadsheetRow {
   nameKo: string;
@@ -9,12 +8,9 @@ export interface ParsedContactSpreadsheetRow {
   roleKo: string;
   roleEn: string;
   studentNumber: string;
-  cohort?: number;
-  activities?: ContactActivity[];
   email: string;
   phoneNumber: string;
   privacyConsented: boolean;
-  sortOrder?: number;
 }
 
 export interface ContactSpreadsheetParseResult {
@@ -22,7 +18,7 @@ export interface ContactSpreadsheetParseResult {
   errors: string[];
 }
 
-const HEADER_ALIASES: Record<keyof ParsedContactSpreadsheetRow, string[]> = {
+const HEADER_ALIASES: Record<Exclude<keyof ParsedContactSpreadsheetRow, "privacyConsented">, string[]> = {
   nameKo: ["nameko", "이름", "이름(한글)", "이름(국문)"],
   nameEn: ["nameen", "영문이름", "이름(영문)"],
   departmentKo: ["departmentko", "부서", "부서(한글)", "부서(국문)"],
@@ -30,12 +26,8 @@ const HEADER_ALIASES: Record<keyof ParsedContactSpreadsheetRow, string[]> = {
   roleKo: ["roleko", "직책", "역할", "직책(한글)", "역할(한글)"],
   roleEn: ["roleen", "영문직책", "직책(영문)", "역할(영문)"],
   studentNumber: ["studentnumber", "학번", "학생번호"],
-  cohort: ["cohort", "연도", "활동연도", "활동 연도", "기수"],
-  activities: ["activities", "활동이력"],
   email: ["email", "이메일", "메일"],
   phoneNumber: ["phonenumber", "phone", "전화번호", "연락처", "휴대전화"],
-  privacyConsented: ["privacyconsented", "개인정보동의", "동의여부"],
-  sortOrder: ["sortorder", "순서", "정렬순서", "표시순서"],
 };
 
 const requiredFields: Array<keyof ParsedContactSpreadsheetRow> = ["nameKo", "roleKo"];
@@ -73,18 +65,19 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
 
   const headerCells = rows[0].map(normalizeHeader);
   const columnIndexes = new Map<keyof ParsedContactSpreadsheetRow, number>();
-  (Object.keys(HEADER_ALIASES) as Array<keyof ParsedContactSpreadsheetRow>).forEach((field) => {
+  (Object.keys(HEADER_ALIASES) as Array<keyof typeof HEADER_ALIASES>).forEach((field) => {
     const index = headerCells.findIndex((header) =>
       HEADER_ALIASES[field].some((alias) => normalizeHeader(alias) === header),
     );
     if (index >= 0) columnIndexes.set(field, index);
   });
 
+  const fieldLabels: Partial<Record<keyof ParsedContactSpreadsheetRow, string>> = { nameKo: "이름", roleKo: "직책" };
   const missingFields = requiredFields.filter((field) => !columnIndexes.has(field));
   if (missingFields.length > 0) {
     return {
       rows: [],
-      errors: [`필수 열이 없습니다: ${missingFields.join(", ")}. XLSX 양식을 먼저 내보내 사용할 수 있습니다.`],
+      errors: [`필수 열이 없습니다: ${missingFields.map(field => fieldLabels[field]).join(", ")}. 양식을 내려받아 작성해 주세요.`],
     };
   }
 
@@ -96,8 +89,6 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
     const lineNumber = rowOffset + 2;
     const value = (field: keyof ParsedContactSpreadsheetRow) =>
       (columnIndexes.has(field) ? normalizeCell(cells[columnIndexes.get(field)!]) : "");
-    const cohortText = value("cohort");
-    const sortOrderText = value("sortOrder");
     const row: ParsedContactSpreadsheetRow = {
       nameKo: value("nameKo"),
       nameEn: value("nameEn"),
@@ -106,51 +97,18 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
       roleKo: value("roleKo"),
       roleEn: value("roleEn"),
       studentNumber: value("studentNumber"),
-      cohort: cohortText ? (Number(cohortText) < 100 ? 2000 + Number(cohortText) : Number(cohortText)) : undefined,
       email: value("email"),
       phoneNumber: value("phoneNumber").replace(/-/g, ""),
-      privacyConsented: value("privacyConsented")
-        ? !["false", "0", "no", "아니오", "미동의"].includes(value("privacyConsented").toLowerCase())
-        : true,
-      sortOrder: sortOrderText ? Number(sortOrderText) : undefined,
+      privacyConsented: true,
     };
-    const historyText = value("activities");
-    if (historyText) {
-      const activities: ContactActivity[] = [];
-      for (const entry of historyText.split(/\r?\n/).filter((line) => line.trim())) {
-        // Exported separators include spaces; bare punctuation belongs to the name.
-        const match = entry.match(/^\s*(\d{4})년?\s*[·/]\s*(.*?)\s+[·/]\s+(.+?)\s*$/)
-          ?? entry.match(/^\s*(\d{4})년?\s*[·/]\s*(.*?)\s*[·/]\s*(.+?)\s*$/);
-        if (!match || Number(match[1]) < 1900 || Number(match[1]) > 3000) {
-          errors.push(`${lineNumber}행: 활동 이력은 '2026년 · 부서 · 직책' 형식으로 입력해 주세요.`);
-          return;
-        }
-        activities.push({ year: Number(match[1]), departmentKo: match[2], departmentEn: "", roleKo: match[3], roleEn: "" });
-      }
-      row.activities = activities;
-      const latest = [...activities].sort((a, b) => b.year - a.year)[0];
-      if (latest) {
-        row.cohort = latest.year;
-        row.departmentKo = latest.departmentKo;
-        row.roleKo = latest.roleKo;
-      }
-    }
 
     const missing = requiredFields.filter((field) => !row[field]);
     if (missing.length > 0) {
-      errors.push(`${lineNumber}행: ${missing.join(", ")} 값이 비어 있습니다.`);
+      errors.push(`${lineNumber}행: ${missing.map(field => fieldLabels[field]).join(", ")}을 입력해 주세요.`);
       return;
     }
     if (row.email && !/^\S+@\S+\.\S+$/.test(row.email)) {
       errors.push(`${lineNumber}행: 이메일 형식이 올바르지 않습니다.`);
-      return;
-    }
-    if (row.sortOrder !== undefined && !Number.isInteger(row.sortOrder)) {
-      errors.push(`${lineNumber}행: 표시순서는 정수여야 합니다.`);
-      return;
-    }
-    if (row.cohort !== undefined && (!Number.isInteger(row.cohort) || row.cohort < 1)) {
-      errors.push(`${lineNumber}행: 연도는 1 이상의 정수여야 합니다.`);
       return;
     }
 
@@ -161,6 +119,6 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
 }
 
 export const CONTACT_XLSX_TEMPLATE_ROWS = [
-  ["이름", "학번", "부서", "직책", "이메일", "전화번호", "활동 이력", "개인정보동의", "표시순서"],
-  ["홍길동", "20261234", "회장단", "회장", "hong@example.com", "01000000000", "2026년 · 회장단 · 회장", "동의", 10],
+  ["이름", "학번", "부서", "직책", "이메일", "전화번호"],
+  ["홍길동", "20261234", "전산관리부", "부원", "hong@example.com", "01012345678"],
 ] as const;

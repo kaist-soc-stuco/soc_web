@@ -37,8 +37,9 @@ export function createFeePaymentTemplate(): Blob {
   ]), "작성 안내");
   // SheetJS CE does not serialize frozen panes; add the standard OOXML pane to its ZIP.
   const zip = XLSX.CFB.read(new Uint8Array(XLSX.write(book, { type: "array", bookType: "xlsx" })), { type: "buffer" });
-  const path = "xl/worksheets/sheet1.xml";
+  const path = "/xl/worksheets/sheet1.xml";
   const entry = XLSX.CFB.find(zip, path);
+  if (!entry) throw new Error("입금 양식 시트를 만들지 못했습니다.");
   const xml = new TextDecoder().decode(entry.content);
   const views = '<sheetViews><sheetView workbookViewId="0"><pane xSplit="2" ySplit="1" topLeftCell="C2" activePane="bottomRight" state="frozen"/><selection pane="bottomRight" activeCell="C3" sqref="C3"/></sheetView></sheetViews>';
   XLSX.CFB.utils.cfb_add(zip, path, new TextEncoder().encode(/<sheetViews[\s\S]*?<\/sheetViews>/.test(xml) ? xml.replace(/<sheetViews[\s\S]*?<\/sheetViews>/, views) : xml.replace(/<sheetFormatPr|<cols|<sheetData/, match => views + match)));

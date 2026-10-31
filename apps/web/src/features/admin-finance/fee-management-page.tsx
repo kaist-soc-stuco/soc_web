@@ -47,7 +47,9 @@ export function FeeManagementPage() {
   const [detail, setDetail] = useState<StudentFeeRosterDetailResponse | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(false);
   const detailRequest = useRef(0);
+  const detailIdentifier = useRef<string | null>(null);
   const [targets, setTargets] = useState<FeeRosterRow[] | null>(null);
   const [date, setDate] = useState(today);
   const [paymentNote, setPaymentNote] = useState("");
@@ -71,18 +73,30 @@ export function FeeManagementPage() {
     finally { setStatsLoading(false); }
   }, [client, canRead, semester, statsRange]);
   useEffect(() => { if (tab === "stats") void loadStats(); }, [tab, loadStats, revision]);
+  const loadDetail = useCallback(async (identifier: string) => {
+    if (detailIdentifier.current !== identifier) return;
+    const request = ++detailRequest.current;
+    setDetailLoading(true); setDetailError(false);
+    try { const result = await client.getStudentFeeRosterDetail(identifier, semester); if (request === detailRequest.current) setDetail(result); }
+    catch { if (request === detailRequest.current) setDetailError(true); }
+    finally { if (request === detailRequest.current) setDetailLoading(false); }
+  }, [client, semester]);
   const openDetail = useCallback(async (row: FeeRosterRow) => {
     const identifier = row.userId ?? row.stdNo;
-    const request = ++detailRequest.current;
-    setDetailId(identifier); setDetail(null); setDetailLoading(true);
-    try { const result = await client.getStudentFeeRosterDetail(identifier, semester); if (request === detailRequest.current) setDetail(result); }
-    catch { if (request === detailRequest.current) toast({type:"error",message:"납부 상세를 불러오지 못했습니다."}); }
-    finally { if (request === detailRequest.current) setDetailLoading(false); }
-  }, [client, semester, toast]);
+    detailIdentifier.current = identifier;
+    setDetailId(identifier);
+    await loadDetail(identifier);
+  }, [loadDetail]);
+  const closeDetail = () => {
+    detailIdentifier.current = null; detailRequest.current++;
+    setDetailId(null); setDetailLoading(false); setDetailError(false);
+  };
+  const detailCurrent = Boolean(detailId && detail && (detail.record.userId === detailId || detail.record.stdNo === detailId));
+  const detailStale = detailLoading || detailError || !detailCurrent;
   const saved = useCallback(() => { void queryClient.invalidateQueries({queryKey:["auth", "session"]}); }, [queryClient]);
   const refresh = async () => {
     setRevision(value => value + 1); saved();
-    if (detailId) setDetail(await client.getStudentFeeRosterDetail(detailId, semester));
+    if (detailId) await loadDetail(detailId);
   };
   const beginPayment = (rows: FeeRosterRow[]) => {
     if (!policy || !rows.length || dirty) return;
@@ -121,7 +135,7 @@ export function FeeManagementPage() {
   };
   return <AuthGuard requireAnyPermission={[Permissions.VIEW_FINANCE, Permissions.MANAGE_FINANCE]}><AdminPageShell className={`admin-fee-page ${tab === "payments" ? "admin-fee-page--payments" : ""}`}>
     <AdminPageMain className="admin-fee-management !max-w-none !gap-4 md:!px-6 xl:!px-6">
-      <AdminPageHeader title="과비 관리" actions={tab === "settings" ? <AdminSelectDropdown className="w-48" ariaLabel="설정 적용 학기" value={semester} disabled={dirty || busy} onChange={value => {setSemester(value); setDetailId(null);}} options={semesters} /> : undefined} />
+      <AdminPageHeader title="과비 관리" actions={tab === "settings" ? <AdminSelectDropdown className="w-48" ariaLabel="설정 적용 학기" value={semester} disabled={dirty || busy} onChange={value => {setSemester(value); closeDetail();}} options={semesters} /> : undefined} />
       <div className="flex flex-wrap items-center justify-between gap-3"><SegmentedControl variant="underline" role="tablist" className="w-fit" ariaLabel="과비 관리 보기" value={tab} onChange={value => {if (!dirty) setTab(value);}} options={[{value:"payments",label:"납부 관리"},{value:"stats",label:"통계"},...(canEdit ? [{value:"settings",label:"설정"}] : [])]} />
 
       </div>
@@ -130,14 +144,28 @@ export function FeeManagementPage() {
       {tab === "stats" && <FeeStatisticsPanel stats={stats} loading={statsLoading} error={statsError} onRetry={() => void loadStats()} range={statsRange} displayedRange={statsRange} onRangeChange={setStatsRange} />}
       {tab === "settings" && <section className="flex items-end gap-3 rounded-xl border border-slate-200 p-5"><AdminFormField label="표준 과비 (원)"><UiInput type="number" min={1} value={policyAmount} onChange={event=>setPolicyAmount(event.target.value)} /></AdminFormField><Button loading={busy} disabled={!canEdit || !policy || busy} onClick={async()=>{if(!Number.isInteger(Number(policyAmount)) || Number(policyAmount)<=0) return; setBusy(true);try {setPolicy(await client.createStudentFeePolicy({effectiveSemester:semester,amount:Number(policyAmount),coverageSemesters:6}));setRevision(value=>value+1);toast({type:"success",message:"표준 금액을 저장했습니다."});}catch{toast({type:"error",message:"설정을 저장하지 못했습니다."});}finally{setBusy(false);}}}>저장</Button></section>}
     </AdminPageMain>
-    <AdminDrawer open={Boolean(detailId)} onClose={()=>{detailRequest.current++;setDetailId(null);}} title={detail?.record.nameKo ? `${detail.record.nameKo} 납부 상세` : "납부 상세"} width="max-w-2xl">
-      {detailLoading ? <AdminLoadingState /> : detail ? <div className="space-y-6">
+    <AdminDrawer open={Boolean(detailId)} onClose={closeDetail} title={detail?.record.nameKo ? `${detail.record.nameKo} 납부 상세` : "납부 상세"} width="max-w-2xl">
+      {detailError ? <div role="alert" className="mb-4 flex items-center justify-between gap-3 text-sm text-slate-600"><span>최신 상세 정보를 불러오지 못했습니다.</span><Button variant="outline" size="sm" onClick={() => { if (detailId) void loadDetail(detailId); }}>다시 시도</Button></div> : null}
+      <div aria-busy={detailLoading}>
+      {detail ? <div inert={detailStale || busy} className={`space-y-6 transition-opacity duration-150 ${detailStale ? "opacity-60" : "opacity-100"}`}>
         <div><h3 className="text-lg font-semibold">{detail.record.nameKo}</h3><p className="mt-1 text-sm text-slate-500">{detail.record.stdNo || "학번 없음"} · {detail.record.userId ? "가입" : "미가입"}{detail.record.email ? ` · ${detail.record.email}` : ""}</p></div>
         <dl className="grid grid-cols-2 gap-4 rounded-lg border border-slate-200 p-4 text-sm"><div><dt className="text-slate-500">납부 상태</dt><dd className="mt-2"><AdminStatusBadge tone={detail.record.status === "PAID" ? "positive" : detail.record.status === "PARTIAL" ? "warning" : "neutral"}>{detail.record.status === "PAID" ? "완납" : detail.record.status === "PARTIAL" ? "부분 납부" : "미납"}</AdminStatusBadge></dd></div><div><dt className="text-slate-500">누적 수납액</dt><dd className="mt-2 font-semibold tabular-nums">{money(detail.record.totalPaidAmount ?? 0)}</dd></div><div><dt className="text-slate-500">미납 차액</dt><dd className="mt-2">{money(detail.record.remainingAmount ?? 0)}</dd></div><div><dt className="text-slate-500">최근 납부</dt><dd className="mt-2">{stamp(detail.record.paidAt)}</dd></div></dl>
-        <section><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold">납부 이력</h3>{canEdit && <Button size="sm" disabled={dirty || !policy || remainingFee(feeRosterRow(detail.record)) <= 0} onClick={()=>beginPayment([feeRosterRow(detail.record)])}>납부 내역 추가</Button>}</div>
+        <section><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold">납부 이력</h3>{canEdit && <Button size="sm" disabled={detailStale || busy || dirty || !policy || remainingFee(feeRosterRow(detail.record)) <= 0} onClick={()=>beginPayment([feeRosterRow(detail.record)])}>납부 내역 추가</Button>}</div>
           {!detail.history.length && <p className="text-sm text-slate-500">등록된 납부 이력이 없습니다.</p>}
-          <div className="divide-y divide-slate-100">{detail.history.map(payment=><div className="py-3 text-sm" key={payment.paymentId}><p className="font-medium">{money(payment.amount)} · {payment.amount === 0 ? "입금 취소됨" : `${payment.paymentType === "INITIAL_RECORD" ? "기초자료" : semesterLabel(payment.effectiveStartSemester) + " 납부 기록"}`}</p>{canEdit && payment.amount > 0 && <Button size="sm" variant="outline" className="mt-2" disabled={dirty || busy} onClick={()=>{setCancelPayment(payment);setCancelReason("");setRevokeRecognition(false);setError(null);}}>입금 취소</Button>}<p className="mt-1 text-xs text-slate-500">{payment.paymentType === "INITIAL_RECORD" ? "입금일 미상" : stamp(payment.paidAt)}{payment.paymentType !== "INITIAL_RECORD" && ` · ${payment.paymentType === "PRIOR_PAYMENT_BALANCE" ? "기납부 차액" : "6학기 일시납"}`}{payment.note ? ` · ${payment.note}` : ""}</p></div>)}</div></section>
-      </div> : <p className="text-sm text-slate-500">상세 정보를 불러오지 못했습니다.</p>}
+          <div className="divide-y divide-slate-100">{detail.history.map(payment => {
+            const isInitial = payment.paymentType === "INITIAL_RECORD";
+            const note = payment.note?.trim();
+            const showNote = note && !(isInitial && payment.amount > 0 && note === "기초자료");
+            return <div className="flex items-center justify-between gap-4 py-3 text-sm" key={payment.paymentId}>
+              <div className="min-w-0 flex-1 break-words">
+                <p className="font-medium">{money(payment.amount)} · {payment.amount === 0 ? "입금 취소됨" : isInitial ? "기초자료" : semesterLabel(payment.effectiveStartSemester) + " 납부 기록"}</p>
+                <p className="mt-1 text-xs text-slate-500">{isInitial ? "입금일 미상" : stamp(payment.paidAt)}{!isInitial && ` · ${payment.paymentType === "PRIOR_PAYMENT_BALANCE" ? "기납부 차액" : "6학기 일시납"}`}{showNote ? ` · ${note}` : ""}</p>
+              </div>
+              {canEdit && payment.amount > 0 && <Button size="sm" variant="outline" className="shrink-0" disabled={detailStale || dirty || busy} onClick={()=>{setCancelPayment(payment);setCancelReason("");setRevokeRecognition(false);setError(null);}}>입금 취소</Button>}
+            </div>;
+          })}</div></section>
+      </div> : detailLoading ? <AdminLoadingState /> : null}
+      </div>
     </AdminDrawer>
     <Modal size="wide" open={Boolean(targets)} onClose={()=>{if(!busy)setTargets(null);}} title="납부 내역 추가" footer={<><span className="mr-auto text-sm font-medium">{targets?.length ?? 0}명 · 합계 {money(targets?.reduce((sum,row)=>sum+(targets.length===1 ? amount : remainingFee(row)),0) ?? 0)}</span><Button variant="outline" disabled={busy} onClick={()=>setTargets(null)}>취소</Button><Button loading={busy} disabled={busy} onClick={()=>void submitPayment()}>납부 처리</Button></>}>
       <p className="mb-4 text-sm">{targets?.length === 1 ? targets[0].nameKo : `${targets?.length ?? 0}명`} · {targets && targets.length > 1 ? "각 대상자의 미납 차액만 기록합니다." : `미납 차액 ${money(targets ? remainingFee(targets[0]) : 0)}`}</p>

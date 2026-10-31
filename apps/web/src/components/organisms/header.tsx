@@ -86,6 +86,13 @@ export function Header({ variant = "default" }: HeaderProps) {
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const notificationsUserIdRef = useRef<string | null>(null);
   const [loginStarting, setLoginStarting] = useState(false);
+  useEffect(() => {
+    const resetLogin = (event: PageTransitionEvent) => {
+      if (event.persisted) setLoginStarting(false);
+    };
+    window.addEventListener("pageshow", resetLogin);
+    return () => window.removeEventListener("pageshow", resetLogin);
+  }, []);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const previousNotificationOpen = useRef(false);
   const { lang, setLanguage } = useLanguage();

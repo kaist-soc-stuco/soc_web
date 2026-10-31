@@ -33,6 +33,7 @@ export function AuthGuard({
   const permissionRecheckAttempted = useRef(false);
 
   const isAuthenticated = hasPersistedProfile(session ?? null);
+  const isTemporarySession = session?.authenticated && session.storageMode === "temporary";
   const permission = session?.permission ?? 0;
   const hasRequiredPermission =
     requirePermission === undefined
@@ -50,6 +51,7 @@ export function AuthGuard({
     }
 
     if (!isAuthenticated) {
+      if (isTemporarySession) return;
       rememberAuthReturnPath(
         window.location.pathname + window.location.search + window.location.hash,
       );
@@ -76,6 +78,7 @@ export function AuthGuard({
     isFetching,
     isError,
     isAuthenticated,
+    isTemporarySession,
     isLoading,
     navigate,
     refetch,
@@ -96,6 +99,16 @@ export function AuthGuard({
   }
 
   if (!isAuthenticated) {
+    if (isTemporarySession) {
+      return <ResponseStateCard embedded icon={ShieldAlert} headingAs="h1" className="px-6 py-16"
+        title={lang === "ko" ? "개인정보 제공 동의가 필요합니다" : "Consent is required"}
+        description={lang === "ko" ? "임시 이용 중에는 이 기능을 이용할 수 없습니다. 이용하려면 다시 로그인해 동의를 완료해 주세요." : "This feature is unavailable during temporary access. To use it, sign in again and complete the consent process."}
+        actions={<>
+          <Button asChild variant="outline" className={responseStateActionClassName}><Link to="/">{lang === "ko" ? "홈으로" : "Go home"}</Link></Button>
+          <Button asChild className={responseStateActionClassName}><Link to={redirectTo} onClick={() => rememberAuthReturnPath()}>{lang === "ko" ? "다시 로그인" : "Sign in again"}</Link></Button>
+        </>}
+      />;
+    }
     return null;
   }
 

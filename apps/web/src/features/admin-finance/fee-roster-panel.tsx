@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DataGrid, SelectColumn, renderTextEditor, type Column, type SortColumn, type RenderSortStatusProps } from "react-data-grid";
 import { Download, Plus, ChevronUp, ChevronDown } from "lucide-react";
 import "react-data-grid/lib/styles.css";
@@ -16,8 +16,6 @@ import { resolveApiBaseUrl } from "@/lib/api";
 import { downloadBlob } from "@/lib/download-blob";
 import { feeRosterRow, feeRosterUpdate, type FeeRosterRow } from "@/lib/fee-roster";
 import { FeePaymentImport } from "./fee-payment-import";
-import { Modal } from "@/components/ui/modal";
-import { createFeePaymentTemplate } from "@/lib/fee-payment-spreadsheet";
 import { randomId } from "@/lib/random-id";
 
 function renderSortStatus({ sortDirection, priority }: RenderSortStatusProps) {
@@ -41,9 +39,10 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
   const [original, setOriginal] = useState<FeeRosterRow[]>([]);
   const [rows, setRows] = useState<FeeRosterRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const loadRequest = useRef(0);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [membership, setMembership] = useState("all");
@@ -58,14 +57,17 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
   useEffect(() => { onSelectionChange(rows.filter(row => selected.has(row.key))); }, [rows, selected, onSelectionChange]);
   useUnsavedNavigation(dirty, () => confirm({ title: "저장하지 않은 변경 사항을 버릴까요?", confirmLabel: "변경 사항 버리기", tone: "danger" }));
   const load = useCallback(async () => {
+    const request = ++loadRequest.current;
     setLoading(true); setError(null);
     try {
       const result = await client.listStudentFeeRoster(semester);
+      if (request !== loadRequest.current) return;
       const next = result.records.map(feeRosterRow); setOriginal(next); setRows(next); setSelected(new Set());
-    } catch { setError("납부 정보를 불러오지 못했습니다."); }
-    finally { setLoading(false); }
+      setHasLoaded(true);
+    } catch { if (request === loadRequest.current) setError("납부 정보를 불러오지 못했습니다."); }
+    finally { if (request === loadRequest.current) setLoading(false); }
   }, [client, semester]);
-  useEffect(() => { void load(); }, [load, revision]);
+  useEffect(() => { void load(); return () => { loadRequest.current++; }; }, [load, revision]);
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const filtered = rows.filter(row => (membership === "all" || Boolean(row.userId) === (membership === "joined")) &&
@@ -104,20 +106,13 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
   const exportRows = async () => {
     const reason = "";
     setExporting(true);
-    try { downloadBlob(await client.exportStudentFeeRoster(reason, semester), "과비 납부 관리.xlsx"); setExportOpen(false); }
+    try { downloadBlob(await client.exportStudentFeeRoster(reason, semester), "과비 납부 관리.xlsx"); }
     catch { toast({ type: "error", message: "내려받지 못했습니다." }); }
     finally { setExporting(false); }
   };
   return <section className="fee-roster-panel min-w-0" aria-label="과비 납부 관리">
     {ConfirmDialog}
-    <Modal open={exportOpen} onClose={() => { if (!exporting) setExportOpen(false); }} title="내보내기" size="compact"
-      footer={<Button variant="outline" disabled={exporting} onClick={() => setExportOpen(false)}>닫기</Button>}>
-      <div className="flex flex-col gap-3">
-        {canExport && <Button variant="outline" loading={exporting} disabled={exporting} onClick={() => void exportRows()}><Download />전체 명부 내보내기</Button>}
-        {canEdit && <Button variant="outline" disabled={exporting} onClick={() => { downloadBlob(createFeePaymentTemplate(), "입금 등록 양식.xlsx"); setExportOpen(false); }}><Download />입금 양식 다운로드</Button>}
-      </div>
-    </Modal>
-    <AdminTableCard className="fee-roster-card overflow-hidden">
+    <AdminTableCard className="fee-roster-card overflow-hidden" refreshing={loading}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
         <div className="flex flex-wrap gap-2">
           <PageSearchField ariaLabel="납부 검색" placeholder="이름·학번·이메일·비고 검색" value={query} onChange={setQuery} onClear={() => setQuery("")} />
@@ -125,8 +120,8 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
           <AdminSelectDropdown className="w-32" ariaLabel="납부 상태" value={status} onChange={setStatus} options={[{ value: "all", label: "상태 전체" }, { value: "PAID", label: "완납" }, { value: "PARTIAL", label: "부분 납부" }, { value: "UNPAID", label: "미납" }]} />
         </div>
         <div className="flex flex-wrap gap-2">
-          {selectionAction}
-          {(canExport || canEdit) && <Button variant="outline" disabled={busy || dirty} onClick={() => setExportOpen(true)}><Download />내보내기</Button>}
+          {selectionAction ? <div inert={busy} aria-disabled={busy || undefined} className={busy ? "opacity-60" : undefined}>{selectionAction}</div> : null}
+          {canExport && <Button variant="outline" loading={exporting} disabled={busy || dirty || exporting} onClick={() => void exportRows()}><Download />전체 명부 내보내기</Button>}
           {canEdit && <><Button variant="outline" disabled={busy} onClick={() => { setQuery(""); setMembership("all"); setStatus("all"); setRows(current => [{ key: randomId(), stdNo: "", nameKo: "", admissionYear: "", paidSemesters: "0", paidAmount: "0", note: "", userId: null, joinedAt: null, updatedAt: null, totalPaidAmount: 0, status: "UNPAID" }, ...current]); }}><Plus />행 추가</Button>
             <FeePaymentImport disabled={busy || dirty} onImported={async () => { await load(); onSaved(); }} />
             {dirty && <Button variant="ghost" disabled={busy} onClick={async () => { if (await confirm({ title: "저장하지 않은 변경 사항을 버릴까요?", tone: "danger" })) void load(); }}>변경 취소</Button>}
@@ -134,10 +129,12 @@ export function FeeRosterPanel({ canEdit, canExport, semester, revision, onDirty
         </div>
       </div>
       {error && <p role="alert" className="px-4 py-3 text-sm text-rose-700">{error}{!dirty && <Button variant="ghost" onClick={() => void load()}>다시 시도</Button>}</p>}
-      {loading ? <AdminLoadingState /> : <DataGrid aria-label="과비 납부 관리표" className="admin-sheet-grid rdg-light" columns={columns} rows={visible} rowKeyGetter={row => row.key}
+      <div aria-busy={loading} inert={busy} className={`transition-opacity duration-150 ${loading && hasLoaded ? "opacity-60" : "opacity-100"}`}>
+      {loading && !hasLoaded ? <AdminLoadingState /> : <DataGrid aria-label="과비 납부 관리표" className="admin-sheet-grid rdg-light" columns={columns} rows={visible} rowKeyGetter={row => row.key}
         renderers={{ renderSortStatus }} defaultColumnOptions={{ sortable: true, resizable: true }} sortColumns={sortColumns} onSortColumnsChange={setSortColumns}
         selectedRows={selected} onSelectedRowsChange={canEdit ? setSelected : undefined} isRowSelectionDisabled={row => !canEdit || busy || (!row.userId && row.updatedAt === null)}
         onRowsChange={canEdit && !busy ? next => { const updates = new Map(next.map(row => [row.key, row])); setRows(current => current.map(row => updates.get(row.key) ?? row)); } : undefined} />}
+      </div>
       <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">{visible.length.toLocaleString()}명 / 전체 {rows.length.toLocaleString()}명{canEdit ? " · 이름·학번을 눌러 상세 보기" : " · 조회 전용"}</p>
     </AdminTableCard>
   </section>;

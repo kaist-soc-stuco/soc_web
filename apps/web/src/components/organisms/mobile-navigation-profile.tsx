@@ -40,8 +40,8 @@ export function MobileNavigationProfile({
           <strong>{lang === "ko" ? "로그인" : "Sign in"}</strong>
           <small>
             {lang === "ko"
-              ? "KAIST 계정으로 이용하세요"
-              : "Continue with your KAIST account"}
+              ? "KAIST 계정으로 로그인하세요"
+              : "Sign in with your KAIST account"}
           </small>
         </span>
         <ChevronRight />

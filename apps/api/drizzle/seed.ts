@@ -3108,12 +3108,12 @@ async function seedMockData() {
     const period = `${localDate(start)} – ${localDate(end)} (KST)`;
     const [row] = await db.insert(articles).values({
       boardId: eventBoard.boardId, authorUserId: seedAuthor.userId,
-      titleKo: event.titleKo, titleEn: event.isKoreanOnly ? null : event.titleEn,
+      titleKo: event.titleKo, titleEn: event.titleEn,
       contentKo: html([event.descriptionKo, `일시: ${period}`, `장소: ${event.location}`, "진행 방식과 준비 사항은 신청자에게 별도로 안내합니다.", "화면 확인을 위한 예시 행사입니다. 사진은 행사 분위기를 보여 주는 참고 이미지입니다."]),
-      contentEn: event.isKoreanOnly ? null : html([event.descriptionEn, `When: ${period}`, `Where: ${event.location}`, "Details will be provided to registered participants.", "This is a sample event. Photographs are illustrative."]),
+      contentEn: event.isKoreanOnly ? null : html([event.descriptionEn, `When: ${period}`, `Where: ${event.locationEn}`, "Details will be provided to registered participants.", "This is a sample event. Photographs are illustrative."]),
       eventDescriptionKo: event.descriptionKo, eventDescriptionEn: event.isKoreanOnly ? null : event.descriptionEn,
       eventStartDate: start, eventEndDate: end, eventLocation: event.location,
-      eventLocationEn: event.location === "온라인" ? "Online" : event.location,
+      eventLocationEn: event.locationEn,
       visibilityScope: "PUBLIC", isPinned: false, viewCount: 0, postedAt: demoDate(event.dayOffset - 10), isAnonymous: false,
     }).returning({ articleId: articles.articleId });
     if (event.photo) {

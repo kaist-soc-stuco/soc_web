@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/toast";
 import { ResponseStateCard, responseStateActionClassName } from "@/features/survey/response-state-card";
 
 type LoginStatus = "idle" | "starting" | "processing" | "failed";
+let historyRestoreHandled = false;
 
 const submitAuthorizeForm = (payload: {
   loginUrl: string;
@@ -61,6 +62,7 @@ export function LoginCallbackPage() {
   );
   const consumedLoginResultRef = useRef(false);
   const loginStartingRef = useRef(false);
+  const historyRestoreTargetRef = useRef<string | null>(null);
   const [status, setStatus] = useState<LoginStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingConsentToken, setPendingConsentToken] = useState<string | null>(
@@ -71,6 +73,22 @@ export function LoginCallbackPage() {
   >(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
+
+  const returnFromRestoredLogin = useCallback(() => {
+    historyRestoreHandled = true;
+    loginStartingRef.current = false;
+    historyRestoreTargetRef.current ??= consumeAuthReturnPath() ?? "/";
+    navigate(historyRestoreTargetRef.current, { replace: true });
+  }, [navigate]);
+
+  useEffect(() => {
+    const cancelRestoredLogin = (event: PageTransitionEvent) => {
+      if (!event.persisted || !loginStartingRef.current) return;
+      returnFromRestoredLogin();
+    };
+    window.addEventListener("pageshow", cancelRestoredLogin);
+    return () => window.removeEventListener("pageshow", cancelRestoredLogin);
+  }, [returnFromRestoredLogin]);
 
   const returnToPreviousPage = useCallback(
     (message: string) => {
@@ -91,6 +109,12 @@ export function LoginCallbackPage() {
 
     const searchParams = new URLSearchParams(location.search);
     const loginStatus = searchParams.get("status");
+    // A history restore may reload the document instead of using the back/forward cache.
+    const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    if (historyRestoreTargetRef.current || (!historyRestoreHandled && !loginStatus && navigation?.type === "back_forward" && new URL(navigation.name).pathname === location.pathname)) {
+      returnFromRestoredLogin();
+      return;
+    }
 
     // Inspect the otherwise unused failure UI without starting an SSO transaction.
     if (import.meta.env.DEV && searchParams.get("preview") === "failed") {
@@ -192,7 +216,7 @@ export function LoginCallbackPage() {
     }
 
     void startLogin();
-  }, [apiClient, lang, location.search, navigate, queryClient, returnToPreviousPage]);
+  }, [apiClient, lang, location.pathname, location.search, navigate, queryClient, returnFromRestoredLogin, returnToPreviousPage]);
 
   const submitConsentDecision = async (consent: boolean) => {
     if (!termsAccepted) {
@@ -299,7 +323,7 @@ export function LoginCallbackPage() {
                 onClick={() => void submitConsentDecision(false)}
                 className="text-sm font-medium"
               >
-                {lang === "ko" ? "개인정보 동의 없이 임시 이용" : "Use without privacy consent"}
+                {lang === "ko" ? "임시 이용하기" : "Use temporarily"}
               </Button>
               <Button loading={consentSubmitting === "persisted"}
                 variant="default"

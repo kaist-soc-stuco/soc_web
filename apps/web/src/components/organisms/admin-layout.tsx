@@ -45,7 +45,7 @@ export function AdminLayout() {
     >
       <img src="/kaist_logo.png" alt="KAIST" />
       <span className="admin-brand-divider" />
-      <strong>SoC</strong>
+      <img src="/tree-leaf.png" alt="Student Council" className="admin-brand-leaf" />
       <span className="admin-brand-scope">
         {lang === "ko" ? "관리자" : "Admin"}
       </span>
