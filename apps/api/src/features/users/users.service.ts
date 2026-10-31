@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from "@nestjs/common";
 
 import { AuditLogService } from "../audit/audit-log.service";
 import type { UserRecord } from "./entities/user";
@@ -153,6 +153,9 @@ export class UsersService {
     audit?: AuditMetadata,
     reason = "manual",
   ): Promise<UserRecord | null> {
+    if (!isActive && audit?.actorUserId?.toLowerCase() === userId.toLowerCase()) {
+      throw new ForbiddenException("cannot_deactivate_self");
+    }
     const updated = await this.usersRepository.setActiveStatus(userId, isActive);
 
     if (updated) {

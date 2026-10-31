@@ -4,6 +4,7 @@ const { ForbiddenException } = require("@nestjs/common");
 const { PERMISSION_REGISTRY, Permissions } = require("@soc/contracts");
 
 const { RoleGroupsService } = require("../dist/apps/api/src/features/role-groups/role-groups.service.js");
+const { UsersService } = require("../dist/apps/api/src/features/users/users.service.js");
 
 const permissionRecords = PERMISSION_REGISTRY.map((permission, index) => ({
   bitValue: permission.bit,
@@ -35,7 +36,7 @@ test("system administrators cannot remove their own system membership through ei
 });
 
 function createHarness({ actorMask = Permissions.MANAGE_ROLES, systemAdmin = false, target, members = [] } = {}) {
-  const calls = { create: 0, add: 0, replace: 0, remove: 0, update: 0, invalidated: [], audit: [] };
+  const calls = { create: 0, add: 0, replace: 0, remove: 0, update: 0, delete: 0, invalidated: [], audit: [] };
   const repository = {
     listPermissions: async () => permissionRecords,
     listRoleGroups: async () => target ? [target] : [],
@@ -61,6 +62,7 @@ function createHarness({ actorMask = Permissions.MANAGE_ROLES, systemAdmin = fal
     findRoleGroupById: async () => target ?? null,
     listRoleGroupMembers: async () => members,
     removeUserFromRoleGroup: async () => { calls.remove++; },
+    deleteRoleGroup: async () => { calls.delete++; },
     addUserToRoleGroup: async (roleGroupId, input) => {
       calls.add += 1;
       return { roleGroupId, userId: input.userId };
@@ -168,7 +170,7 @@ for (const targetMask of [Permissions.MANAGE_FINANCE, Permissions.MANAGE_USERS, 
   });
 }
 
-test("delegated managers can clear their own delegable role; administrators can clear protected non-system roles", async () => {
+test("managers can clear permitted roles they do not belong to", async () => {
   for (const systemAdmin of [false, true]) {
     const target = { isSystem: false, permissionMask: systemAdmin ? Permissions.MANAGE_FINANCE : Permissions.WRITE_OFFICIAL, roleGroupId: 8 };
     const { service, calls } = createHarness({ systemAdmin, actorMask: Permissions.MANAGE_ROLES | Permissions.WRITE_OFFICIAL, target });
@@ -196,4 +198,52 @@ test("permission and role capabilities expose the actual delegation boundary", a
   assert.equal((await service.listRoleGroups("manager"))[0].canManageMembers, false);
   const admin = createHarness({ systemAdmin: true, target });
   assert.equal((await admin.service.listRoleGroups("admin"))[0].canEdit, true);
+});
+
+for (const systemAdmin of [false, true]) {
+  test(`self-downgrades in non-system roles are rejected before mutation (system admin: ${systemAdmin})`, async () => {
+    const permissionId = permissionIdFor(Permissions.WRITE_OFFICIAL);
+    const target = { isSystem: false, permissionMask: Permissions.WRITE_OFFICIAL, permissionIds: [permissionId], roleGroupId: 8 };
+    const { calls, service } = createHarness({
+      systemAdmin, actorMask: Permissions.MANAGE_ROLES | Permissions.WRITE_OFFICIAL,
+      target, members: [{ userId: "manager" }, { userId: "other" }],
+    });
+    const audit = { actorUserId: "manager" };
+    await assert.rejects(service.removeUserFromRoleGroup(8, "manager", audit), /cannot_remove_own_role/);
+    await assert.rejects(service.removeUserFromRoleGroup(8, "MANAGER", audit), /cannot_remove_own_role/);
+    await assert.rejects(service.replaceRoleGroupMembers(8, { userIds: ["other"] }, audit), /cannot_remove_own_role/);
+    await assert.rejects(service.updateRoleGroup(8, { nameKo: "변경", permissionIds: [] }, audit), /cannot_reduce_own_permissions/);
+    await assert.rejects(service.deleteRoleGroup(8, audit), /cannot_delete_own_role/);
+    assert.deepEqual([calls.remove, calls.replace, calls.update, calls.delete], [0, 0, 0, 0]);
+    assert.deepEqual(calls.audit, []);
+    assert.deepEqual(calls.invalidated, []);
+
+    await service.updateRoleGroup(8, { nameKo: "이름 변경", permissionIds: [permissionId] }, audit);
+    await service.replaceRoleGroupMembers(8, { userIds: ["manager"] }, audit);
+    await service.removeUserFromRoleGroup(8, "other", audit);
+    assert.deepEqual([calls.update, calls.replace, calls.remove], [1, 1, 1]);
+  });
+}
+
+test("self-deactivation has no side effects while other-user and automated deactivation remain available", async () => {
+  const mutations = [], audits = [], emails = [];
+  const service = new UsersService(
+    { setActiveStatus: async (userId, isActive) => {
+      mutations.push({ userId, isActive });
+      return { userId, isActive, email: "test@example.com", nameKo: "테스트" };
+    } },
+    { record: async (entry) => audits.push(entry) },
+    { send: async (message) => emails.push(message) },
+  );
+  await assert.rejects(service.setAccountActive("manager", false, { actorUserId: "manager" }), /cannot_deactivate_self/);
+  await assert.rejects(service.setAccountActive("MANAGER", false, { actorUserId: "manager" }), /cannot_deactivate_self/);
+  assert.deepEqual([mutations.length, audits.length, emails.length], [0, 0, 0]);
+  await service.setAccountActive("other", false, { actorUserId: "manager" });
+  await service.setAccountActive("expired", false);
+  await service.setAccountActive("manager", true, { actorUserId: "manager" });
+  assert.deepEqual(mutations, [
+    { userId: "other", isActive: false }, { userId: "expired", isActive: false }, { userId: "manager", isActive: true },
+  ]);
+  assert.equal(audits.length, 3);
+  assert.equal(emails.length, 2);
 });

@@ -5,7 +5,6 @@ import { resolveAssetUrl } from "@/lib/asset-url";
 import { useOpenChannelTalk } from "@/features/channel-talk/channel-talk-provider";
 import { PledgesSection } from "./pledges-section";
 import { AboutProgramsSection } from "./about-programs-section";
-import { AboutPartnerMarquee } from "./about-partner-marquee";
 import { AboutOrganizationChart } from "./about-organization-chart";
 import { ABOUT_SECTION_IDS, type AboutSectionId } from "./use-about-page-controller";
 
@@ -124,7 +123,6 @@ function PartnershipSection({ lang }: { lang: string }) {
         <div><h2 id="tree-partnership-title">{title}</h2><p>{lang === "ko" ? description.replace(/받습니다\.\s*제안/, "받습니다.\n제안") : description}</p></div>
         <button type="button" className="tree-primary-link" onClick={openSupport}>{cta}<ArrowUpRight aria-hidden="true" /></button>
       </div>
-      <AboutPartnerMarquee lang={lang} />
     </div>
   </section>;
 }

@@ -119,6 +119,10 @@ export class RoleGroupsService {
     const memberIds = (await this.roleGroupsRepository.listRoleGroupMembers(roleGroupId)).map(
       (member) => member.userId,
     );
+    if (audit?.actorUserId && memberIds.includes(audit.actorUserId) &&
+        existing.permissionIds.some((id) => !input.permissionIds.includes(id))) {
+      throw new ForbiddenException("cannot_reduce_own_permissions");
+    }
     const updated = await this.roleGroupsRepository.updateRoleGroup(roleGroupId, input);
 
     if (!updated) {
@@ -160,6 +164,9 @@ export class RoleGroupsService {
       (member) => member.userId,
     );
 
+    if (audit?.actorUserId && memberIds.includes(audit.actorUserId)) {
+      throw new ForbiddenException("cannot_delete_own_role");
+    }
     await this.roleGroupsRepository.deleteRoleGroup(roleGroupId);
     await this.usersService.invalidatePermissionCaches(memberIds);
     await this.auditLogService.record({
@@ -248,8 +255,8 @@ export class RoleGroupsService {
 
     await this.assertRoleMutationAllowed(roleGroup, audit?.actorUserId);
 
-    if (roleGroup.isSystem && audit?.actorUserId === userId) {
-      throw new ForbiddenException("cannot_remove_own_system_role");
+    if (audit?.actorUserId?.toLowerCase() === userId.toLowerCase()) {
+      throw new ForbiddenException(roleGroup.isSystem ? "cannot_remove_own_system_role" : "cannot_remove_own_role");
     }
 
     await this.roleGroupsRepository.removeUserFromRoleGroup(roleGroupId, userId);
@@ -277,10 +284,10 @@ export class RoleGroupsService {
     await this.assertRoleMutationAllowed(roleGroup, audit?.actorUserId);
 
     const before = await this.roleGroupsRepository.listRoleGroupMembers(roleGroupId);
-    if (roleGroup.isSystem && audit?.actorUserId &&
+    if (audit?.actorUserId &&
         before.some((member) => member.userId === audit.actorUserId) &&
         !input.userIds.includes(audit.actorUserId)) {
-      throw new ForbiddenException("cannot_remove_own_system_role");
+      throw new ForbiddenException(roleGroup.isSystem ? "cannot_remove_own_system_role" : "cannot_remove_own_role");
     }
     const replaced = await this.roleGroupsRepository.replaceRoleGroupMembers(
       roleGroupId,
